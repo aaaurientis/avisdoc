@@ -105,7 +105,7 @@ const CollectivitiesSection = () => {
                 ))}
               </ul>
 
-              <Button asChild size="lg" variant="secondary" className="rounded-full group shadow-[0_12px_32px_-12px_hsl(14,85%,55%,0.5)]">
+              <Button asChild size="lg" variant="secondary" className="rounded-full group shadow-[0_12px_32px_-12px_hsl(23,86%,55%,0.5)]">
                 <a href="mailto:contact@avisdoc.fr">
                   Contacter notre équipe
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />

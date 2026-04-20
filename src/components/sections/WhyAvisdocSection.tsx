@@ -72,9 +72,9 @@ const WhyAvisdocSection = () => {
                       key={i}
                       className={`h-5 w-5 md:h-6 md:w-6 transition-colors ${
                         i >= 99
-                          ? 'text-avisdoc-coral drop-shadow-[0_0_6px_hsl(14,85%,68%)]'
+                          ? 'text-avisdoc-coral drop-shadow-[0_0_6px_hsl(23,86%,60%)]'
                           : i >= 90
-                          ? 'text-primary drop-shadow-[0_0_4px_hsl(174,56%,45%)]'
+                          ? 'text-primary drop-shadow-[0_0_4px_hsl(197,74%,55%)]'
                           : 'text-white/30'
                       }`}
                       strokeWidth={1.5}

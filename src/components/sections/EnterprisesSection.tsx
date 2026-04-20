@@ -92,7 +92,7 @@ const EnterprisesSection = () => {
                 <div key={step.num} className="text-center">
                   <div className={`h-12 w-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-lg font-semibold transition-transform hover:-translate-y-0.5 ${
                     step.highlight
-                      ? "bg-avisdoc-coral text-white shadow-[0_12px_30px_-12px_hsl(14,85%,55%,0.6)]"
+                      ? "bg-avisdoc-coral text-white shadow-[0_12px_30px_-12px_hsl(23,86%,55%,0.6)]"
                       : "bg-white/10 text-white border border-white/10"
                   }`}>
                     {step.num}
