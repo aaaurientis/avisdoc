@@ -35,34 +35,33 @@ const testimonials = [
 
 const TestimonialsSection = () => {
   return (
-    <section className="section-padding bg-muted/30">
+    <section className="section-padding surface-mist">
       <div className="section-container">
         <div className="text-center max-w-3xl mx-auto mb-14">
-          <span className="text-secondary font-semibold text-sm uppercase tracking-wider">
-            Témoignages
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mt-4 mb-6">
-            Ils ont participé à une journée de dépistage AvisDoc
+          <span className="eyebrow text-avisdoc-coral">Témoignages</span>
+          <h2 className="font-display text-3xl md:text-5xl font-semibold text-avisdoc-ink mt-5 mb-6 leading-[1.08]">
+            Ils ont participé à une journée de{" "}
+            <span className="italic text-primary">dépistage AvisDoc.</span>
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {testimonials.map((t, i) => (
-            <div
+            <figure
               key={i}
-              className="bg-card rounded-2xl p-6 shadow-soft border border-border/50 flex flex-col"
+              className="relative bg-card rounded-3xl p-7 border border-border/60 card-hover flex flex-col"
             >
-              <Quote className="h-6 w-6 text-primary/40 mb-4 flex-shrink-0" />
-              <p className="text-muted-foreground italic leading-relaxed flex-1 text-sm">
-                "{t.quote}"
-              </p>
-              <div className="mt-5 pt-4 border-t border-border/50">
+              <Quote className="h-8 w-8 text-primary/25 mb-4" />
+              <blockquote className="text-foreground/90 italic leading-relaxed flex-1 text-sm md:text-[15px]">
+                « {t.quote} »
+              </blockquote>
+              <figcaption className="mt-6 pt-4 border-t border-border/60">
                 <p className="font-semibold text-foreground text-sm">{t.author}</p>
                 {t.detail && (
-                  <p className="text-muted-foreground text-xs">{t.detail}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{t.detail}</p>
                 )}
-              </div>
-            </div>
+              </figcaption>
+            </figure>
           ))}
         </div>
       </div>

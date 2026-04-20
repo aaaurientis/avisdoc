@@ -74,61 +74,62 @@ const TeamSection = () => {
   ];
 
   const MemberCard = ({ member, variant = "team" }: { member: TeamMember; variant?: "team" | "committee" }) => (
-    <div className={`bg-card rounded-2xl p-6 shadow-soft border border-border/50 card-hover text-center ${
-      variant === "committee" ? "bg-muted/50" : ""
+    <div className={`relative rounded-3xl p-6 border border-border/60 card-hover text-center ${
+      variant === "committee" ? "bg-white" : "bg-card"
     }`}>
       {member.photo ? (
         <img
           src={member.photo}
           alt={member.name}
-          className="w-20 h-20 rounded-full mx-auto mb-4 object-cover grayscale"
+          className="w-24 h-24 rounded-full mx-auto mb-4 object-cover ring-4 ring-primary/10 grayscale hover:grayscale-0 transition-all"
         />
       ) : (
-        <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold ${
-          variant === "team" ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"
+        <div className={`w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-semibold ${
+          variant === "team" ? "bg-primary/10 text-primary" : "bg-avisdoc-coral/10 text-avisdoc-coral"
         }`}>
           {member.name.split(' ').map(n => n[0]).join('')}
         </div>
       )}
-      
-      <h4 className="font-display font-semibold text-foreground text-lg mb-1">
+
+      <h4 className="font-display font-semibold text-foreground text-base mb-1">
         {member.name}
       </h4>
       <p className="text-muted-foreground text-sm mb-1">{member.role}</p>
       {member.subtitle && (
-        <p className="text-muted-foreground text-xs">{member.subtitle}</p>
+        <p className="text-muted-foreground/80 text-xs leading-snug">{member.subtitle}</p>
       )}
-      
+
       {member.linkedin && (
         <a
           href={member.linkedin}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center w-10 h-10 mt-4 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+          className="inline-flex items-center justify-center w-9 h-9 mt-4 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           aria-label={`LinkedIn de ${member.name}`}
         >
-          <Linkedin className="h-5 w-5" />
+          <Linkedin className="h-4 w-4" />
         </a>
       )}
     </div>
   );
 
   return (
-    <section id="equipe" className="section-padding">
-      <div className="section-container">
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-8">
-          <span className="text-primary font-semibold text-sm uppercase tracking-wider">
-            Qui sommes-nous ?
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mt-4 mb-6">
-            Des professionnels de santé engagés et mobilisés
+    <section id="equipe" className="section-padding bg-background relative overflow-hidden">
+      <div aria-hidden className="absolute top-40 left-0 w-[420px] h-[420px] rounded-full bg-avisdoc-teal-soft blur-[160px] opacity-60" />
+      <div aria-hidden className="absolute bottom-0 right-0 w-[420px] h-[420px] rounded-full bg-avisdoc-coral-soft blur-[160px] opacity-60" />
+
+      <div className="section-container relative">
+        <div className="text-center max-w-3xl mx-auto mb-10">
+          <span className="eyebrow text-primary">Qui sommes-nous ?</span>
+          <h2 className="font-display text-3xl md:text-5xl font-semibold text-avisdoc-ink mt-5 mb-6 leading-[1.08]">
+            Des professionnels de santé{" "}
+            <span className="italic text-primary">engagés et mobilisés.</span>
           </h2>
         </div>
 
         {/* Manifesto */}
-        <div className="max-w-4xl mx-auto mb-16 space-y-6 text-muted-foreground text-base md:text-lg leading-relaxed">
-          <p className="text-foreground font-display text-xl md:text-2xl font-semibold text-center italic">
+        <div className="max-w-3xl mx-auto mb-20 space-y-6 text-muted-foreground text-base md:text-lg leading-relaxed">
+          <p className="text-foreground font-display text-2xl md:text-3xl font-semibold text-center italic">
             La dermatologie n'attend pas.
           </p>
 
@@ -144,21 +145,21 @@ const TeamSection = () => {
             Pour y parvenir, AvisDoc agit sur trois dimensions :
           </p>
 
-          <div className="space-y-6 pl-4 border-l-4 border-primary/20">
+          <div className="space-y-7 pl-5 border-l-2 border-primary/25">
             <div>
-              <h4 className="font-display font-semibold text-foreground mb-2">L'importance du contact humain.</h4>
+              <h4 className="font-display font-semibold text-foreground text-xl mb-2">L'importance du contact humain.</h4>
               <p>
                 Notre fonctionnement repose sur un réseau de soignants, déployé là où se trouvent les patients - en entreprise, dans les territoires, et notamment les zones rurales -, porté par des infirmières et infirmiers spécifiquement formés et choisis pour leur sérieux. Ce réseau est adossé à des dermatologues experts avec lesquels une confiance s'est construite dans la durée. Chaque dossier est analysé, chaque avis rendu personnalisé. Et lorsqu'une prise en charge s'impose, nous proposons aux patients qui le souhaitent de contacter des médecins partenaires, qui se sont engagés à les recevoir en priorité. Ce maillage territorial est la clé d'une prise en charge adaptée et efficace.
               </p>
             </div>
             <div>
-              <h4 className="font-display font-semibold text-foreground mb-2">La force de la pédagogie et de l'éducation.</h4>
+              <h4 className="font-display font-semibold text-foreground text-xl mb-2">La force de la pédagogie et de l'éducation.</h4>
               <p>
                 AvisDoc ne fait pas que dépister. Nos interventions commencent avec un moment d'éducation pour apprendre aux patients les lésions à surveiller, pratiquer l'auto-examen, adopter les bons réflexes de protection solaire. Comme les campagnes d'autopalpation mammaire ont transformé les comportements face au cancer du sein, notre souhait est d'installer une culture du dépistage cutané.
               </p>
             </div>
             <div>
-              <h4 className="font-display font-semibold text-foreground mb-2">Contribuer à un problème majeur de santé publique.</h4>
+              <h4 className="font-display font-semibold text-foreground text-xl mb-2">Contribuer à un problème majeur de santé publique.</h4>
               <p>
                 Face à la désertification médicale, chaque initiative compte. Une lésion cancéreuse détectée à temps, ce sont autant de chances de survie supplémentaires. Ce sont aussi des interventions moins invasives pour les patients, moins coûteuses pour la société. AvisDoc ne pourra pas tout résoudre et nous n'avons pas non plus vocation à couvrir d'autres spécialités : la dermatologie est notre ancrage, notre savoir-faire, et c'est dans cette discipline que nous entendons apporter notre pierre.
               </p>
@@ -170,27 +171,28 @@ const TeamSection = () => {
           </p>
         </div>
 
-        {/* Leadership Team */}
         <div className="mb-20">
-          <h3 className="font-display text-2xl font-semibold text-foreground text-center mb-10">
+          <h3 className="font-display text-2xl md:text-3xl font-semibold text-foreground text-center mb-10">
             L'équipe dirigeante
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {team.map((member) => (
               <MemberCard key={member.name} member={member} variant="team" />
             ))}
           </div>
         </div>
 
-        {/* Scientific Committee */}
-        <div className="bg-muted/30 rounded-3xl p-8 md:p-12">
-          <h3 className="font-display text-2xl font-semibold text-foreground text-center mb-4">
-            Le comité scientifique
-          </h3>
-          <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-10">
-            Notre comité scientifique est composé de personnalités issues de la dermatologie, du secteur de la recherche et de la santé.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-br from-avisdoc-teal-soft/60 via-white to-avisdoc-coral-soft/60 rounded-[2rem] p-8 md:p-12 border border-border/60">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <span className="eyebrow text-avisdoc-coral">Comité scientifique</span>
+            <h3 className="font-display text-2xl md:text-3xl font-semibold text-foreground mt-4 mb-3">
+              Le comité scientifique
+            </h3>
+            <p className="text-muted-foreground">
+              Notre comité scientifique est composé de personnalités issues de la dermatologie, du secteur de la recherche et de la santé.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
             {scientificCommittee.map((member) => (
               <MemberCard key={member.name + member.role} member={member} variant="committee" />
             ))}

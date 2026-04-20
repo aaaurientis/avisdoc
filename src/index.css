@@ -1,0 +1,296 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AvisDoc · Design System 2026 — modern, soft, santé */
+
+@layer base {
+  :root {
+    /* Brand — palette santé moderne */
+    --avisdoc-teal: 174 56% 32%;
+    --avisdoc-teal-soft: 174 44% 92%;
+    --avisdoc-sage: 152 30% 55%;
+    --avisdoc-coral: 14 85% 68%;
+    --avisdoc-coral-soft: 14 100% 95%;
+    --avisdoc-cream: 36 52% 96%;
+    --avisdoc-ink: 206 38% 14%;
+    --avisdoc-ink-soft: 206 30% 28%;
+    --avisdoc-mist: 210 32% 97%;
+    /* Legacy aliases (so les classes existantes type bg-avisdoc-navy marchent toujours) */
+    --avisdoc-turquoise: var(--avisdoc-teal);
+    --avisdoc-turquoise-light: var(--avisdoc-teal-soft);
+    --avisdoc-orange: var(--avisdoc-coral);
+    --avisdoc-orange-light: var(--avisdoc-coral-soft);
+    --avisdoc-navy: var(--avisdoc-ink);
+    --avisdoc-navy-light: var(--avisdoc-ink-soft);
+
+    /* Core tokens */
+    --background: 210 40% 99%;
+    --foreground: 206 38% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 206 38% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 206 38% 14%;
+
+    --primary: 174 56% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 14 85% 68%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 32% 96%;
+    --muted-foreground: 210 12% 42%;
+
+    --accent: 174 44% 92%;
+    --accent-foreground: 174 56% 22%;
+
+    --destructive: 0 78% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 22% 90%;
+    --input: 210 22% 90%;
+    --ring: 174 56% 40%;
+
+    --radius: 1rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(174 56% 34%) 0%, hsl(152 30% 48%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(14 85% 74%) 0%, hsl(30 88% 78%) 100%);
+    --gradient-hero: radial-gradient(120% 100% at 0% 0%, hsl(174 44% 92% / 0.9) 0%, transparent 60%),
+                     radial-gradient(90% 80% at 100% 20%, hsl(14 100% 95% / 0.85) 0%, transparent 55%),
+                     linear-gradient(180deg, hsl(36 52% 97%) 0%, hsl(210 40% 99%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(210 40% 99%) 0%, hsl(210 32% 97%) 100%);
+
+    /* Ombres teintées — douces, santé */
+    --shadow-sm: 0 1px 2px 0 hsl(206 38% 14% / 0.05);
+    --shadow-md: 0 8px 20px -10px hsl(174 56% 28% / 0.12), 0 2px 6px -2px hsl(206 38% 14% / 0.05);
+    --shadow-lg: 0 20px 40px -20px hsl(174 56% 28% / 0.2), 0 8px 16px -8px hsl(206 38% 14% / 0.06);
+    --shadow-xl: 0 40px 60px -30px hsl(174 56% 28% / 0.25), 0 12px 20px -10px hsl(206 38% 14% / 0.07);
+    --shadow-primary: 0 14px 40px -12px hsl(174 56% 32% / 0.4);
+
+    --sidebar-background: 210 40% 99%;
+    --sidebar-foreground: 206 20% 30%;
+    --sidebar-primary: 174 56% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 174 44% 92%;
+    --sidebar-accent-foreground: 174 56% 22%;
+    --sidebar-border: 210 22% 90%;
+    --sidebar-ring: 174 56% 40%;
+  }
+
+  .dark {
+    --background: 206 40% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 206 38% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 206 38% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 174 60% 55%;
+    --primary-foreground: 206 40% 7%;
+
+    --secondary: 14 85% 72%;
+    --secondary-foreground: 206 40% 7%;
+
+    --muted: 206 30% 15%;
+    --muted-foreground: 210 20% 70%;
+
+    --accent: 206 30% 18%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 206 25% 20%;
+    --input: 206 25% 20%;
+    --ring: 174 60% 55%;
+
+    --sidebar-background: 206 40% 7%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 174 60% 55%;
+    --sidebar-primary-foreground: 206 40% 7%;
+    --sidebar-accent: 206 30% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 206 25% 20%;
+    --sidebar-ring: 174 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Fraunces', 'DM Sans', Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--primary));
+  }
+}
+
+@layer components {
+  .section-container {
+    @apply max-w-7xl mx-auto px-5 sm:px-6 lg:px-8;
+  }
+
+  .section-padding {
+    @apply py-20 md:py-28;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1;
+    box-shadow: var(--shadow-md);
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em];
+  }
+
+  .eyebrow::before {
+    content: '';
+    @apply inline-block w-8 h-px bg-current opacity-50;
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .surface-mist {
+    background: var(--gradient-subtle);
+  }
+
+  .surface-hero {
+    background: var(--gradient-hero);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold tracking-wide;
+  }
+
+  .pattern-grid {
+    background-image:
+      radial-gradient(hsl(var(--primary) / 0.12) 1px, transparent 1px),
+      radial-gradient(hsl(var(--primary) / 0.08) 1px, transparent 1px);
+    background-size: 22px 22px, 22px 22px;
+    background-position: 0 0, 11px 11px;
+  }
+
+  .divider-soft {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
+  }
+
+  .legal-prose h2 {
+    @apply font-display text-xl md:text-2xl font-semibold text-foreground mt-0 mb-4 leading-snug;
+  }
+  .legal-prose h3 {
+    @apply font-display text-base md:text-lg font-semibold text-foreground mt-6 mb-3;
+  }
+  .legal-prose p {
+    @apply mb-3 text-[15px] md:text-base;
+  }
+  .legal-prose ul {
+    @apply list-disc pl-6 space-y-2 my-3 marker:text-primary;
+  }
+  .legal-prose ol {
+    @apply list-decimal pl-6 space-y-2 my-3 marker:text-primary;
+  }
+  .legal-prose strong {
+    @apply text-foreground font-semibold;
+  }
+  .legal-prose a {
+    @apply text-primary hover:underline;
+  }
+  .legal-prose section + section {
+    @apply pt-2;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.7s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out forwards;
+  }
+
+  .animate-float {
+    animation: float 10s ease-in-out infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulseSoft 5s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(0, -14px, 0); }
+  }
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-up,
+    .animate-scale-in,
+    .animate-float,
+    .animate-pulse-soft {
+      animation: none !important;
+    }
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
