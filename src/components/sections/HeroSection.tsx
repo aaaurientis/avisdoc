@@ -1,6 +1,9 @@
+import { Link } from "react-router-dom";
 import { ArrowRight, Building2, Landmark, Stethoscope, Sparkles, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import heroBg from "@/assets/hero-bg.jpg";
+import AnimatedCounter from "@/components/AnimatedCounter";
+import Reveal from "@/components/Reveal";
 
 const HeroSection = () => {
   const offers = [
@@ -8,28 +11,27 @@ const HeroSection = () => {
       icon: Building2,
       label: "Entreprises",
       desc: "Dépistage sur site pour vos collaborateurs",
-      href: "#entreprises",
+      to: "/entreprises",
       tint: "bg-avisdoc-teal-soft text-primary",
     },
     {
       icon: Landmark,
       label: "Collectivités",
       desc: "Accès aux soins sur votre territoire",
-      href: "#collectivites",
+      to: "/collectivites",
       tint: "bg-avisdoc-coral-soft text-avisdoc-coral",
     },
     {
       icon: Stethoscope,
       label: "Professionnels de santé",
       desc: "Téléexpertise en médecine de ville",
-      href: "#medecins",
+      to: "/professionnels",
       tint: "bg-[hsl(var(--avisdoc-sage)/0.18)] text-[hsl(var(--avisdoc-sage))]",
     },
   ];
 
   return (
     <section className="relative overflow-hidden pt-28 md:pt-32 pb-16 md:pb-24 surface-hero">
-      {/* Décor santé */}
       <div aria-hidden className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-32 -left-24 w-[520px] h-[520px] rounded-full bg-primary/10 blur-[140px]" />
         <div className="absolute top-1/3 -right-32 w-[460px] h-[460px] rounded-full bg-avisdoc-coral/20 blur-[140px]" />
@@ -39,8 +41,7 @@ const HeroSection = () => {
 
       <div className="section-container relative z-10">
         <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          {/* Colonne texte */}
-          <div className="lg:col-span-7 animate-fade-in">
+          <Reveal className="lg:col-span-7">
             <span className="chip bg-white/80 border border-border/70 text-primary shadow-soft backdrop-blur">
               <Sparkles className="h-3.5 w-3.5" />
               Réseau de soins dermatologique · France
@@ -74,33 +75,45 @@ const HeroSection = () => {
                 </a>
               </Button>
               <Button size="lg" variant="outline" asChild className="rounded-full px-6 border-2">
-                <a href="mailto:contact@avisdoc.fr">Nous contacter</a>
+                <Link to="/contact">Nous contacter</Link>
               </Button>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-3 gap-2 md:gap-6 max-w-xl">
-              {[
-                { value: "8 000+", label: "Avis d'experts délivrés" },
-                { value: "20", label: "Dermatologues experts" },
-                { value: "96h", label: "Délai de réponse moyen" },
-              ].map((stat) => (
-                <div key={stat.label} className="flex flex-col">
-                  <span className="font-display text-3xl md:text-4xl font-semibold text-primary">
-                    {stat.value}
-                  </span>
-                  <span className="text-[11px] md:text-xs text-muted-foreground leading-tight mt-1">
-                    {stat.label}
-                  </span>
-                </div>
-              ))}
+              <div className="flex flex-col">
+                <AnimatedCounter
+                  value={8000}
+                  suffix="+"
+                  className="font-display text-3xl md:text-4xl font-semibold text-primary"
+                />
+                <span className="text-[11px] md:text-xs text-muted-foreground leading-tight mt-1">
+                  Avis d'experts délivrés
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <AnimatedCounter
+                  value={20}
+                  className="font-display text-3xl md:text-4xl font-semibold text-primary"
+                />
+                <span className="text-[11px] md:text-xs text-muted-foreground leading-tight mt-1">
+                  Dermatologues experts
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <AnimatedCounter
+                  value={96}
+                  suffix="h"
+                  className="font-display text-3xl md:text-4xl font-semibold text-primary"
+                />
+                <span className="text-[11px] md:text-xs text-muted-foreground leading-tight mt-1">
+                  Délai de réponse moyen
+                </span>
+              </div>
             </div>
-          </div>
+          </Reveal>
 
-          {/* Visual + carte offres */}
-          <div className="lg:col-span-5 relative animate-slide-up">
+          <Reveal delay={120} className="lg:col-span-5">
             <div className="relative">
-              {/* Carte image éditoriale */}
               <div className="relative rounded-[2.25rem] overflow-hidden border border-white shadow-floating">
                 <img
                   src={heroBg}
@@ -120,7 +133,6 @@ const HeroSection = () => {
                 </div>
               </div>
 
-              {/* Badge confidentialité */}
               <div className="absolute -left-4 md:-left-8 top-6 md:top-10 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px] animate-float">
                 <div className="flex items-center gap-2 mb-1.5">
                   <ShieldCheck className="h-4 w-4 text-primary" />
@@ -131,7 +143,6 @@ const HeroSection = () => {
                 </p>
               </div>
 
-              {/* Mini-stat flottante */}
               <div className="absolute -right-4 md:-right-6 bottom-8 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px]">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
                   Spécialistes mobilisés
@@ -142,30 +153,29 @@ const HeroSection = () => {
                 <p className="text-[11px] text-muted-foreground mt-1">Partout en France</p>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
 
-        {/* 3 offres */}
         <div id="offres" className="mt-16 md:mt-24 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {offers.map((offer, i) => (
-            <a
-              key={offer.label}
-              href={offer.href}
-              className="group relative rounded-3xl border border-border/70 bg-white/70 backdrop-blur p-6 md:p-7 hover:-translate-y-1 hover:shadow-raised transition-all duration-300 animate-slide-up"
-              style={{ animationDelay: `${i * 0.08}s` }}
-            >
-              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-5 ${offer.tint}`}>
-                <offer.icon className="h-5 w-5" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-foreground mb-1.5">
-                {offer.label}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">{offer.desc}</p>
-              <span className="inline-flex items-center text-sm font-medium text-primary">
-                En savoir plus
-                <ArrowRight className="ml-1.5 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </a>
+            <Reveal key={offer.label} delay={i * 90}>
+              <Link
+                to={offer.to}
+                className="group relative block h-full rounded-3xl border border-border/70 bg-white/70 backdrop-blur p-6 md:p-7 hover:-translate-y-1 hover:shadow-raised transition-all duration-300"
+              >
+                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-5 ${offer.tint}`}>
+                  <offer.icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-foreground mb-1.5">
+                  {offer.label}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">{offer.desc}</p>
+                <span className="inline-flex items-center text-sm font-medium text-primary">
+                  En savoir plus
+                  <ArrowRight className="ml-1.5 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </div>

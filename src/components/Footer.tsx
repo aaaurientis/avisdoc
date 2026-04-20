@@ -4,35 +4,32 @@ import AvisdocLogo from "./AvisdocLogo";
 
 const Footer = () => {
   const legalLinks = [
-    { label: "CGU", href: "/cgu", internal: true },
-    { label: "Politique de confidentialité", href: "/politique-de-confidentialite", internal: true },
-    { label: "Mentions légales", href: "/mentions-legales", internal: true },
-    { label: "Suppression des données", href: "/suppression-donnees", internal: true },
+    { label: "CGU", to: "/cgu" },
+    { label: "Politique de confidentialité", to: "/politique-de-confidentialite" },
+    { label: "Mentions légales", to: "/mentions-legales" },
+    { label: "Suppression des données", to: "/suppression-donnees" },
   ];
 
-  const navLinks = [
-    { label: "Pourquoi AvisDoc ?", href: "#pourquoi" },
-    { label: "Entreprises", href: "#entreprises" },
-    { label: "Collectivités", href: "#collectivites" },
-    { label: "Professionnels de santé", href: "#medecins" },
-    { label: "Qui sommes-nous ?", href: "#equipe" },
+  const solutions = [
+    { label: "Entreprises", to: "/entreprises" },
+    { label: "Collectivités", to: "/collectivites" },
+    { label: "Professionnels de santé", to: "/professionnels" },
+  ];
+
+  const company = [
+    { label: "À propos", to: "/a-propos" },
+    { label: "Contact", to: "/contact" },
+    { label: "FAQ", to: "/#faq" },
   ];
 
   return (
     <footer className="relative overflow-hidden bg-avisdoc-ink text-white">
-      {/* Décor dégradé */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-primary/25 blur-[140px]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 right-0 w-[360px] h-[360px] rounded-full bg-avisdoc-coral/20 blur-[140px]"
-      />
+      <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-primary/25 blur-[140px]" />
+      <div aria-hidden className="pointer-events-none absolute bottom-0 right-0 w-[360px] h-[360px] rounded-full bg-avisdoc-coral/20 blur-[140px]" />
 
       <div className="relative section-container pt-20 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-16">
-          <div className="lg:col-span-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-10 md:gap-12 mb-16">
+          <div className="col-span-2 lg:col-span-4">
             <div className="inline-flex items-center justify-center bg-white rounded-2xl p-3 mb-6 shadow-soft">
               <AvisdocLogo className="h-9 w-auto" />
             </div>
@@ -59,51 +56,55 @@ const Footer = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
-            <h3 className="font-display text-lg font-semibold mb-5 text-white">Navigation</h3>
+          <div className="lg:col-span-2">
+            <h3 className="font-display text-sm font-semibold mb-5 text-white uppercase tracking-wider">
+              Solutions
+            </h3>
             <ul className="space-y-3">
-              {navLinks.map((link) => (
-                <li key={link.href}>
-                  <a
-                    href={link.href}
-                    className="text-white/70 hover:text-white transition-colors text-sm"
-                  >
+              {solutions.map((link) => (
+                <li key={link.to}>
+                  <Link to={link.to} className="text-white/70 hover:text-white transition-colors text-sm">
                     {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="lg:col-span-3">
-            <h3 className="font-display text-lg font-semibold mb-5 text-white">Informations légales</h3>
-            <ul className="space-y-3">
-              {legalLinks.map((link) => (
-                <li key={link.href}>
-                  {link.internal ? (
-                    <Link
-                      to={link.href}
-                      className="text-white/70 hover:text-white transition-colors text-sm"
-                    >
-                      {link.label}
-                    </Link>
-                  ) : (
-                    <a
-                      href={link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white/70 hover:text-white transition-colors text-sm"
-                    >
-                      {link.label}
-                    </a>
-                  )}
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
 
           <div className="lg:col-span-2">
-            <h3 className="font-display text-lg font-semibold mb-5 text-white">Contact</h3>
+            <h3 className="font-display text-sm font-semibold mb-5 text-white uppercase tracking-wider">
+              Entreprise
+            </h3>
+            <ul className="space-y-3">
+              {company.map((link) => (
+                <li key={link.to}>
+                  <Link to={link.to} className="text-white/70 hover:text-white transition-colors text-sm">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2">
+            <h3 className="font-display text-sm font-semibold mb-5 text-white uppercase tracking-wider">
+              Légal
+            </h3>
+            <ul className="space-y-3">
+              {legalLinks.map((link) => (
+                <li key={link.to}>
+                  <Link to={link.to} className="text-white/70 hover:text-white transition-colors text-sm">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="col-span-2 lg:col-span-2">
+            <h3 className="font-display text-sm font-semibold mb-5 text-white uppercase tracking-wider">
+              Contact
+            </h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3 text-white/70 text-sm leading-relaxed">
                 <MapPin className="h-4 w-4 text-avisdoc-coral flex-shrink-0 mt-0.5" />
@@ -130,9 +131,7 @@ const Footer = () => {
           <p className="text-white/50 text-xs">
             © {new Date().getFullYear()} AvisDoc. Tous droits réservés.
           </p>
-          <p className="text-white/40 text-xs italic">
-            La dermatologie n'attend pas.
-          </p>
+          <p className="text-white/40 text-xs italic">La dermatologie n'attend pas.</p>
         </div>
       </div>
     </footer>
