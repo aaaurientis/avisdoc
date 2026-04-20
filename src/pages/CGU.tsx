@@ -5,6 +5,8 @@ const CGU = () => {
     <LegalLayout
       eyebrow="Informations légales"
       title="Conditions Générales d'Utilisation – AVISDOC"
+      canonicalPath="/cgu"
+      metaDescription="Conditions générales d'utilisation de la plateforme AvisDoc, outil numérique sécurisé de communication entre professionnels de santé."
     >
       <section>
         <h2>1. Objet</h2>

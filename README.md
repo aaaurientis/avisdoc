@@ -1,73 +1,94 @@
-# Welcome to your Lovable project
+# AvisDoc — site vitrine
 
-## Project info
+Site vitrine d'AvisDoc, solution française de téléexpertise dermatologique.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+- **Slogan** : *La dermatologie n'attend pas.*
+- **Proposition** : avis d'un dermatologue expert sous 96 heures, sans déplacement.
+- **Publics** : entreprises, collectivités, professionnels de santé.
 
-## How can I edit this code?
+## Stack
 
-There are several ways of editing your application.
+- **Vite** + **React 18** + **TypeScript**
+- **Tailwind CSS** avec un design system maison (`src/index.css`, `tailwind.config.ts`)
+- **React Router** pour la navigation
+- **shadcn/ui** — seulement les composants réellement utilisés (`button`, `accordion`, `input`, `toast`, `sonner`, `tooltip`)
+- **lucide-react** pour les icônes
+- **Supabase Edge Function** pour le formulaire de suppression de données (`supabase/functions/send-data-deletion-request`)
 
-**Use Lovable**
+## Développement
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+npm install
+npm run dev       # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+Autres scripts :
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build         # build production
+npm run build:dev     # build avec mode development
+npm run preview       # servir le build
+npm run lint          # ESLint
+npm run test          # Vitest (un seul run)
+npm run test:watch    # Vitest watch
+```
 
-**Use GitHub Codespaces**
+## Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+src/
+  assets/               Images (photos équipe, hero, logos partenaires)
+  components/
+    primitives.tsx      Eyebrow, Chip, Section, SectionHeader
+    sections/           Sections marketing de la home
+    ui/                 Primitifs shadcn (button, accordion, input, toast, tooltip)
+    Header.tsx
+    Footer.tsx
+    LegalLayout.tsx     Layout partagé pour CGU / mentions / confidentialité
+  integrations/
+    supabase/           Client Supabase (suppression des données)
+  lib/
+    seo.ts              Hook useSEO (title, description, canonical, OG, JSON-LD)
+    schema.ts           Schémas schema.org réutilisables (MedicalOrganization, HowTo, FAQPage…)
+    utils.ts            cn() Tailwind merge
+  pages/
+    Index.tsx           Home
+    CGU.tsx
+    MentionsLegales.tsx
+    PolitiqueConfidentialite.tsx
+    SuppressionDonnees.tsx
+    NotFound.tsx
+public/
+  favicon.svg           Favicon SVG aux couleurs de la marque
+  og-image.svg          Image de partage (LinkedIn / Twitter / Meta)
+  robots.txt            Autorise les bots classiques ET génératifs (GPTBot, ClaudeBot, PerplexityBot…)
+  sitemap.xml           Plan du site
+  llms.txt              Résumé structuré du site pour les moteurs génératifs (GEO)
+  manifest.webmanifest  Manifeste PWA minimal
+```
 
-## What technologies are used for this project?
+## SEO & GEO
 
-This project is built with:
+Chaque page appelle `useSEO({ title, description, canonical, jsonLd })` pour :
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- mettre à jour `<title>`, `<meta description>`, `<link rel="canonical">`
+- pousser les bonnes métadonnées Open Graph & Twitter
+- injecter un bloc JSON-LD (`MedicalOrganization`, `WebSite`, `MedicalProcedure`, `HowTo`, `FAQPage`)
 
-## How can I deploy this project?
+Le dossier `public/` contient également `robots.txt`, `sitemap.xml` et `llms.txt` pour maximiser la découvrabilité par Google, Bing, et les moteurs génératifs (ChatGPT search, Perplexity, Google SGE, Claude search).
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Sur la home, le composant `AtAGlanceSection` fournit un résumé déclaratif et citable (chiffres clés, mission) optimisé pour les extraits générés par les LLMs.
 
-## Can I connect a custom domain to my Lovable project?
+## Environnement
 
-Yes, you can!
+Les variables d'environnement vivent dans `.env` (non commité normalement) :
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```
+VITE_SUPABASE_PROJECT_ID=…
+VITE_SUPABASE_PUBLISHABLE_KEY=…   # clé anon, publique par design
+VITE_SUPABASE_URL=…
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Déploiement
+
+Le build (`npm run build`) produit le dossier `dist/` servable par n'importe quel hébergement statique (Netlify, Vercel, Cloudflare Pages, OVH, GitHub Pages…). Penser à configurer les redirections SPA (toute route → `/index.html`) pour que React Router fonctionne.

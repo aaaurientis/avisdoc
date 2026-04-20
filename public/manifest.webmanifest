@@ -1,0 +1,13 @@
+{
+  "name": "AvisDoc · La dermatologie n'attend pas",
+  "short_name": "AvisDoc",
+  "description": "Téléexpertise dermatologique française. Avis d'un dermatologue expert sous 96 h.",
+  "lang": "fr-FR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBFCFD",
+  "theme_color": "#29B1E0",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

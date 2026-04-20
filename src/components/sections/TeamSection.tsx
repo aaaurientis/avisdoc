@@ -80,7 +80,11 @@ const TeamSection = () => {
       {member.photo ? (
         <img
           src={member.photo}
-          alt={member.name}
+          alt={`Photo de ${member.name} — ${member.role}`}
+          width={192}
+          height={192}
+          loading="lazy"
+          decoding="async"
           className="w-24 h-24 rounded-full mx-auto mb-4 object-cover ring-4 ring-primary/10 grayscale hover:grayscale-0 transition-all"
         />
       ) : (

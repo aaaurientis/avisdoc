@@ -6,12 +6,21 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, CheckCircle, Shield } from "lucide-react";
+import { useSEO } from "@/lib/seo";
 
 const SuppressionDonnees = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
+
+  useSEO({
+    title: "Suppression de vos données personnelles · AvisDoc",
+    description:
+      "Demandez la suppression de vos données personnelles AvisDoc conformément au RGPD. Traitement sous 30 jours.",
+    canonical: "/suppression-donnees",
+    robots: "noindex,follow",
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +59,7 @@ const SuppressionDonnees = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main>
+      <main id="main-content">
         <section className="relative overflow-hidden pt-32 md:pt-40 pb-12 md:pb-16 surface-hero">
           <div aria-hidden className="absolute -top-24 -right-24 w-[460px] h-[460px] rounded-full bg-primary/10 blur-[160px]" />
           <div aria-hidden className="absolute inset-0 pattern-grid opacity-40" />

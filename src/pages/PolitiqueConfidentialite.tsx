@@ -6,6 +6,8 @@ const PolitiqueConfidentialite = () => {
       eyebrow="Informations légales"
       title="Politique de confidentialité"
       subtitle="Politique de protection des données personnelles."
+      canonicalPath="/politique-de-confidentialite"
+      metaDescription="Politique de protection des données personnelles d'AvisDoc. Traitement conforme RGPD, hébergement HDS, rôles du Médecin Requérant et du Médecin Téléexpert."
     >
       <section>
         <h2>1. Informations générales</h2>

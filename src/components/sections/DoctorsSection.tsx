@@ -50,7 +50,11 @@ const DoctorsSection = () => {
         <div className="max-w-3xl mx-auto mb-16 rounded-[2rem] overflow-hidden border border-border/60 shadow-floating">
           <img
             src={dermatoscopeImg}
-            alt="Examen dermatoscopique"
+            alt="Médecin examinant une lésion cutanée au dermatoscope"
+            width={1280}
+            height={720}
+            loading="lazy"
+            decoding="async"
             className="w-full h-64 md:h-80 object-cover"
           />
         </div>

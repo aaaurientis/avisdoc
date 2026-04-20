@@ -79,7 +79,11 @@ const EnterprisesSection = () => {
             <div className="rounded-[2rem] overflow-hidden border border-white/10 mb-10 shadow-floating">
               <img
                 src={doctorExamImg}
-                alt="Examen dermatologique en entreprise"
+                alt="Infirmière réalisant un examen dermatologique en entreprise"
+                width={1280}
+                height={720}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-64 md:h-80 object-cover"
               />
             </div>
@@ -107,10 +111,10 @@ const EnterprisesSection = () => {
                 Ils nous ont fait confiance
               </p>
               <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
-                <img src={sanofiLogo} alt="Sanofi" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
-                <img src={viabeezLogo} alt="Viabeez" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
-                <img src={groupamaLogo} alt="Groupama" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
-                <img src={extremeLogo} alt="Extreme" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
+                <img src={sanofiLogo} alt="Sanofi" loading="lazy" decoding="async" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
+                <img src={viabeezLogo} alt="Viabeez" loading="lazy" decoding="async" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
+                <img src={groupamaLogo} alt="Groupama" loading="lazy" decoding="async" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
+                <img src={extremeLogo} alt="Extreme" loading="lazy" decoding="async" className="h-8 md:h-9 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
               </div>
             </div>
           </div>

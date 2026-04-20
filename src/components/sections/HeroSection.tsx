@@ -104,7 +104,11 @@ const HeroSection = () => {
               <div className="relative rounded-[2.25rem] overflow-hidden border border-white shadow-floating">
                 <img
                   src={heroBg}
-                  alt="Soignant examinant la peau d'une patiente"
+                  alt="Infirmière AvisDoc examinant la peau d'une patiente lors d'un dépistage dermatologique"
+                  width={1200}
+                  height={800}
+                  fetchPriority="high"
+                  decoding="async"
                   className="w-full h-[420px] md:h-[520px] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-avisdoc-ink/70 via-avisdoc-ink/10 to-transparent" />

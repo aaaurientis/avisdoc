@@ -1,0 +1,37 @@
+# AvisDoc — Téléexpertise dermatologique
+
+> Solution française de téléexpertise dermatologique, créée en 2022 par des dermatologues. AvisDoc propose un réseau de soins qui permet à un professionnel de santé d'obtenir l'avis d'un dermatologue expert sous 96 heures ouvrées, sans déplacement. Le service se concentre sur le dépistage des cancers de la peau (mélanomes, carcinomes).
+
+## Chiffres-clés
+- Plus de 8 000 avis d'experts délivrés.
+- Environ 20 dermatologues français en réseau.
+- Délai de réponse moyen : 96 heures (4 jours ouvrés).
+- Hébergement certifié HDS (Hébergeur de Données de Santé) — conforme RGPD.
+- Société : AVISDOC SAS, RCS Paris 901 941 880, siège au 11 chaussée de la Muette, 75016 Paris.
+
+## Trois publics servis
+
+- [Entreprises](https://www.avisdoc.fr/#entreprises) : programme de dépistage des cancers de la peau clé en main pour les collaborateurs — journées sur site, infirmiers formés, avis d'experts, réseau d'aval pour les cas détectés.
+- [Collectivités](https://www.avisdoc.fr/#collectivites) : journées de sensibilisation et de dépistage dermatologique en zones sous-médicalisées, en partenariat avec les maires et soignants locaux.
+- [Professionnels de santé](https://www.avisdoc.fr/#medecins) : téléexpertise dermatologique pour médecins généralistes, infirmier·e·s et dermatologues, via une plateforme sécurisée HDS.
+
+## Équipe et gouvernance
+- Dr Henry Pawin — co-fondateur, président, dermatologue, président du comité scientifique.
+- Laurent Boukobza — directeur général associé, docteur en pharmacie.
+- Arthur Aurientis — directeur général associé.
+- Comité scientifique (extraits) : Pr. Céleste Lebbé (vice-présidente, dermatologue), Dr Barouyr Baroudjian (dermatologue), Pr. Florence Gallois (économiste de la santé), Dr Jean-François Blanchemain (médecin généraliste et médecin du travail).
+
+## Méthode ABCDE (auto-examen cutané)
+Cinq critères pour surveiller un grain de beauté : **A**symétrie, **B**ords irréguliers, **C**ouleur non uniforme, **D**iamètre > 6 mm, **É**volution dans le temps. En cas de doute, AvisDoc permet au professionnel de santé d'obtenir un avis dermatologique sous 96 h.
+
+## Ressources
+
+- [Conditions Générales d'Utilisation](https://www.avisdoc.fr/cgu)
+- [Politique de confidentialité](https://www.avisdoc.fr/politique-de-confidentialite)
+- [Mentions légales](https://www.avisdoc.fr/mentions-legales)
+- [Suppression des données](https://www.avisdoc.fr/suppression-donnees)
+
+## Contact
+- Email : contact@avisdoc.fr
+- Téléphone : +33 6 73 99 59 27
+- LinkedIn : https://www.linkedin.com/company/avisdoc/

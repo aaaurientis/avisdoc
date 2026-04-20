@@ -5,6 +5,8 @@ const MentionsLegales = () => {
     <LegalLayout
       eyebrow="Informations légales"
       title="Mentions légales"
+      canonicalPath="/mentions-legales"
+      metaDescription="Mentions légales du site AvisDoc : éditeur, hébergement, directeur de la publication, RGPD, propriété intellectuelle."
     >
       <section>
         <h2>Éditeur du site</h2>

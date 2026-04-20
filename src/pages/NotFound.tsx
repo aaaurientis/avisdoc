@@ -1,17 +1,18 @@
-import { Link, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { ArrowLeft, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSEO } from "@/lib/seo";
 
 const NotFound = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
-  }, [location.pathname]);
+  useSEO({
+    title: "Page introuvable · AvisDoc",
+    description:
+      "Cette page n'existe pas. Retournez à l'accueil pour découvrir la téléexpertise dermatologique AvisDoc.",
+    robots: "noindex,follow",
+  });
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center surface-hero overflow-hidden">
+    <main id="main-content" className="relative min-h-screen flex items-center justify-center surface-hero overflow-hidden">
       <div aria-hidden className="absolute -top-32 -left-24 w-[520px] h-[520px] rounded-full bg-primary/10 blur-[160px]" />
       <div aria-hidden className="absolute top-1/3 -right-32 w-[460px] h-[460px] rounded-full bg-avisdoc-coral/20 blur-[160px]" />
       <div aria-hidden className="absolute inset-0 pattern-grid opacity-40" />

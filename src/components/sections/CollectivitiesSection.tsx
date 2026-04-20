@@ -27,7 +27,7 @@ const CollectivitiesSection = () => {
             <div className="relative order-2 lg:order-1">
               <div className="bg-gradient-to-br from-primary/5 via-white to-avisdoc-coral/5 rounded-[2rem] p-8 lg:p-10 space-y-6 border border-border/60">
                 <div className="bg-card rounded-2xl p-6 shadow-soft border border-border/60 flex items-start gap-5">
-                  <img src={gillesNoelImg} alt="Gilles Noël" className="w-16 h-16 rounded-full object-cover flex-shrink-0 ring-4 ring-primary/10" />
+                  <img src={gillesNoelImg} alt="Gilles Noël, maire de Varzy" width={128} height={128} loading="lazy" decoding="async" className="w-16 h-16 rounded-full object-cover flex-shrink-0 ring-4 ring-primary/10" />
                   <div>
                     <p className="text-muted-foreground italic mb-3 text-sm leading-relaxed">
                       "Les inégalités d'accès aux soins en ruralité sont une réalité criante laissant nos concitoyens trop souvent en souffrance. Les collectivités locales, interlocutrices privilégiées de ces derniers, sont des "remparts" de proximité contre cet état de fait grâce aux initiatives locales qu'elles génèrent."
@@ -49,7 +49,7 @@ const CollectivitiesSection = () => {
                 <div className="bg-card rounded-2xl shadow-soft border border-border/60 overflow-hidden flex flex-col sm:flex-row items-center gap-0">
                   <div className="p-6 flex flex-col justify-center flex-1 order-2 sm:order-1">
                     <div className="flex items-center gap-3 mb-4">
-                      <img src={groupamaLogo} alt="Groupama" className="h-7" />
+                      <img src={groupamaLogo} alt="Groupama" loading="lazy" decoding="async" className="h-7" />
                       <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
                         Groupama Rhône-Alpes Auvergne
                       </span>
@@ -72,7 +72,11 @@ const CollectivitiesSection = () => {
                   >
                     <img
                       src={articleImg}
-                      alt="Article Groupama"
+                      alt="Extrait de presse Groupama : dépistage cancer de la peau avec AvisDoc"
+                      width={640}
+                      height={880}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105"
                     />
                     <p className="text-[9px] text-muted-foreground/60 text-center mt-1">Cliquez pour agrandir</p>

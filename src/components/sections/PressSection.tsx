@@ -21,7 +21,7 @@ const PressSection = () => {
             <article className="bg-card rounded-[2rem] border border-border/60 shadow-soft overflow-hidden flex flex-col lg:flex-row items-stretch">
               <div className="p-8 lg:p-10 flex flex-col justify-center flex-1 order-2 lg:order-1">
                 <div className="flex items-center gap-4 mb-6">
-                  <img src={groupamaLogo} alt="Groupama" className="h-8" />
+                  <img src={groupamaLogo} alt="Logo Groupama" loading="lazy" decoding="async" className="h-8" />
                   <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                     Groupama Rhône-Alpes Auvergne
                   </span>
@@ -52,7 +52,11 @@ const PressSection = () => {
               >
                 <img
                   src={articleImg}
-                  alt="Article Groupama"
+                  alt="Article Groupama Rhône-Alpes Auvergne mentionnant AvisDoc"
+                  width={640}
+                  height={880}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full max-w-[180px] mx-auto rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105"
                 />
                 <p className="text-[11px] text-muted-foreground/70 text-center mt-2">Cliquez pour agrandir</p>
