@@ -15,12 +15,12 @@ const Header = () => {
   }, []);
 
   const navItems = [
-    { label: "Pourquoi AvisDoc ?", href: "#pourquoi" },
-    { label: "Entreprises", href: "#entreprises" },
-    { label: "Collectivités", href: "#collectivites" },
-    { label: "Professionnels de santé", href: "#medecins" },
-    { label: "Qui sommes-nous ?", href: "#equipe" },
-    { label: "FAQ", href: "#faq" },
+    { label: "Pourquoi AvisDoc ?", href: "/#pourquoi" },
+    { label: "Entreprises", href: "/#entreprises" },
+    { label: "Collectivités", href: "/#collectivites" },
+    { label: "Professionnels de santé", href: "/#medecins" },
+    { label: "Qui sommes-nous ?", href: "/#equipe" },
+    { label: "FAQ", href: "/#faq" },
   ];
 
   return (
@@ -33,7 +33,7 @@ const Header = () => {
     >
       <div className="section-container">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <a href="#" className="flex-shrink-0 flex items-center gap-2" aria-label="Accueil AvisDoc">
+          <a href="/" className="flex-shrink-0 flex items-center gap-2" aria-label="Accueil AvisDoc">
             <AvisdocLogo className="h-9 md:h-11 w-auto" />
           </a>
 

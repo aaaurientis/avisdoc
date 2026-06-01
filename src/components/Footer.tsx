@@ -11,11 +11,11 @@ const Footer = () => {
   ];
 
   const navLinks = [
-    { label: "Pourquoi AvisDoc ?", href: "#pourquoi" },
-    { label: "Entreprises", href: "#entreprises" },
-    { label: "Collectivités", href: "#collectivites" },
-    { label: "Professionnels de santé", href: "#medecins" },
-    { label: "Qui sommes-nous ?", href: "#equipe" },
+    { label: "Pourquoi AvisDoc ?", href: "/#pourquoi" },
+    { label: "Entreprises", href: "/#entreprises" },
+    { label: "Collectivités", href: "/#collectivites" },
+    { label: "Professionnels de santé", href: "/#medecins" },
+    { label: "Qui sommes-nous ?", href: "/#equipe" },
   ];
 
   return (
