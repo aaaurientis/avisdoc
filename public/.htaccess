@@ -1,0 +1,62 @@
+# AvisDoc — Apache config pour OVH Web Cloud (et autres hébergements Apache)
+# Le fichier est placé dans public/ et copié automatiquement dans dist/ au build.
+
+# --- Routage SPA (React Router) ---
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# --- Compression GZIP ---
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml application/xml
+</IfModule>
+
+# --- Cache long pour les assets versionnés Vite ---
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # HTML : pas de cache (pour récupérer les nouvelles versions du JS/CSS)
+  ExpiresByType text/html "access plus 0 seconds"
+
+  # JS/CSS empreintés par Vite → cache long
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+
+  # Polices et images
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/webp "access plus 1 month"
+  ExpiresByType image/avif "access plus 1 month"
+  ExpiresByType image/x-icon "access plus 1 month"
+</IfModule>
+
+# --- En-têtes de sécurité ---
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+  # HSTS — n'activer qu'une fois HTTPS bien en place :
+  # Header set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+  # Cache-Control immutable pour /assets/ (Vite y met tout ce qui est empreinté)
+  <FilesMatch "\.(js|css|woff2|svg|png|jpg|jpeg|webp|avif)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+# --- Encodage par défaut ---
+AddDefaultCharset UTF-8
+
+# --- Pages d'erreur ---
+ErrorDocument 404 /index.html
