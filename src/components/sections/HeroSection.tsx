@@ -135,12 +135,12 @@ const HeroSection = () => {
                 </p>
               </div>
 
-              {/* Mini-stat flottante — masquée en mobile */}
-              <div className="hidden md:block absolute -right-4 md:-right-6 bottom-8 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px]">
+              {/* Mini-stat flottante — masquée en mobile, centrée verticalement à droite */}
+              <div className="hidden md:block absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[200px]">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
                   Spécialistes mobilisés
                 </p>
-                <p className="font-display text-2xl font-semibold text-foreground">
+                <p className="font-display text-xl font-semibold text-foreground">
                   ≈ 20 dermatologues
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1">Partout en France</p>
