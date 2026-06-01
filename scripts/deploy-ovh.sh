@@ -10,13 +10,14 @@
 #   OVH_USER       login SSH/SFTP
 #   OVH_REMOTE_DIR ex. /www  (racine web sur OVH)
 #   OVH_PORT       optionnel — 22 par défaut (SSH/SFTP)
+#   OVH_PASSWORD   optionnel — mot de passe SFTP (pour offres OVH sans SSH key,
+#                  ex. Web Cloud Éco). Si défini, utilise lftp en mode SFTP.
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Charger .env.deploy si présent
 if [[ -f .env.deploy ]]; then
   # shellcheck disable=SC1091
   set -a; source .env.deploy; set +a
@@ -32,23 +33,42 @@ npm run build
 
 echo "▶︎ Déploiement vers ${OVH_USER}@${OVH_HOST}:${OVH_REMOTE_DIR} (port ${OVH_PORT})…"
 
-# Choix de l'outil : rsync (rapide, idempotent) si dispo, sinon lftp en fallback
-if command -v rsync >/dev/null 2>&1; then
+# Mode 1 — SFTP avec mot de passe (offres OVH sans clé SSH, ex. Web Cloud Éco)
+if [[ -n "${OVH_PASSWORD:-}" ]]; then
+  if ! command -v lftp >/dev/null 2>&1; then
+    echo "✗ lftp est requis pour le déploiement par mot de passe SFTP."
+    echo "  macOS  → brew install lftp"
+    echo "  Debian → sudo apt install lftp"
+    exit 1
+  fi
+
+  echo "  → mode : SFTP avec mot de passe (via lftp)"
+  LFTP_PASSWORD="$OVH_PASSWORD" lftp \
+    -u "${OVH_USER},${OVH_PASSWORD}" \
+    "sftp://${OVH_HOST}:${OVH_PORT}" \
+    -e "
+      set sftp:auto-confirm yes;
+      set ssl:verify-certificate no;
+      mirror -R --delete --verbose --parallel=4 \
+        --exclude-glob .DS_Store \
+        --exclude-glob .git \
+        dist/ ${OVH_REMOTE_DIR}/;
+      quit
+    "
+
+# Mode 2 — SSH par clé (offres OVH Pro / Performance / Cloud Web)
+elif command -v rsync >/dev/null 2>&1; then
+  echo "  → mode : rsync SSH (clé)"
   rsync -avz --delete \
     -e "ssh -p ${OVH_PORT} -o StrictHostKeyChecking=accept-new" \
     --exclude ".DS_Store" \
     --exclude ".git" \
     dist/ "${OVH_USER}@${OVH_HOST}:${OVH_REMOTE_DIR}/"
-elif command -v lftp >/dev/null 2>&1; then
-  lftp -c "
-    set sftp:auto-confirm yes;
-    open sftp://${OVH_USER}@${OVH_HOST}:${OVH_PORT};
-    mirror -R --delete --verbose --exclude-glob .DS_Store dist/ ${OVH_REMOTE_DIR}/
-  "
+
 else
-  echo "✗ Ni rsync ni lftp n'est installé. Installe l'un des deux :"
-  echo "  macOS  → brew install rsync (ou lftp)"
-  echo "  Debian → sudo apt install rsync lftp"
+  echo "✗ Outils manquants. Installe lftp (SFTP/mot de passe) ou rsync (SSH/clé) :"
+  echo "  macOS  → brew install lftp"
+  echo "  Debian → sudo apt install lftp"
   exit 1
 fi
 
