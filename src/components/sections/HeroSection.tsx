@@ -124,8 +124,8 @@ const HeroSection = () => {
                 </div>
               </div>
 
-              {/* Badge confidentialité */}
-              <div className="absolute -left-4 md:-left-8 top-6 md:top-10 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px] animate-float">
+              {/* Badge confidentialité — masqué en mobile pour ne pas encombrer */}
+              <div className="hidden md:block absolute -left-4 md:-left-8 top-6 md:top-10 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px] animate-float">
                 <div className="flex items-center gap-2 mb-1.5">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   <span className="text-xs font-semibold text-foreground">Certifié HDS</span>
@@ -135,8 +135,8 @@ const HeroSection = () => {
                 </p>
               </div>
 
-              {/* Mini-stat flottante */}
-              <div className="absolute -right-4 md:-right-6 bottom-8 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px]">
+              {/* Mini-stat flottante — masquée en mobile */}
+              <div className="hidden md:block absolute -right-4 md:-right-6 bottom-8 bg-white rounded-2xl shadow-raised border border-border/60 p-4 max-w-[220px]">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
                   Spécialistes mobilisés
                 </p>

@@ -46,7 +46,7 @@ const WhyAvisdocSection = () => {
           </p>
         </div>
 
-        <div className="mb-20 rounded-[2rem] overflow-hidden bg-avisdoc-ink text-white p-8 md:p-14 max-w-6xl mx-auto relative">
+        <div className="mb-20 rounded-[2rem] overflow-hidden bg-avisdoc-ink text-white p-6 sm:p-8 md:p-14 max-w-6xl mx-auto relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-transparent to-avisdoc-coral/20 pointer-events-none" />
           <div
             aria-hidden
@@ -66,11 +66,11 @@ const WhyAvisdocSection = () => {
 
             <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
               <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-10 gap-x-1.5 gap-y-1 shrink-0">
+                <div className="grid grid-cols-10 gap-x-[3px] sm:gap-x-1.5 gap-y-0.5 sm:gap-y-1 shrink-0">
                   {Array.from({ length: 100 }).map((_, i) => (
                     <User
                       key={i}
-                      className={`h-5 w-5 md:h-6 md:w-6 transition-colors ${
+                      className={`h-3.5 w-3.5 sm:h-5 sm:w-5 md:h-6 md:w-6 transition-colors ${
                         i >= 99
                           ? 'text-avisdoc-coral drop-shadow-[0_0_6px_hsl(23,86%,60%)]'
                           : i >= 90

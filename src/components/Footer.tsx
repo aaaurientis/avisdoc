@@ -31,8 +31,8 @@ const Footer = () => {
       />
 
       <div className="relative section-container pt-20 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-16">
-          <div className="lg:col-span-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-10 md:gap-8 lg:gap-12 mb-16">
+          <div className="sm:col-span-2 md:col-span-4 lg:col-span-4">
             <div className="inline-flex items-center justify-center bg-white rounded-2xl p-3 mb-6 shadow-soft">
               <AvisdocLogo className="h-9 w-auto" />
             </div>
@@ -59,7 +59,7 @@ const Footer = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="md:col-span-1 lg:col-span-3">
             <h3 className="font-display text-lg font-semibold mb-5 text-white">Navigation</h3>
             <ul className="space-y-3">
               {navLinks.map((link) => (
@@ -75,7 +75,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="md:col-span-1 lg:col-span-3">
             <h3 className="font-display text-lg font-semibold mb-5 text-white">Informations légales</h3>
             <ul className="space-y-3">
               {legalLinks.map((link) => (
@@ -102,7 +102,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="md:col-span-2 lg:col-span-2">
             <h3 className="font-display text-lg font-semibold mb-5 text-white">Contact</h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3 text-white/70 text-sm leading-relaxed">
