@@ -129,6 +129,8 @@
 
   html {
     scroll-behavior: smooth;
+    /* Offset pour le header fixe (h-16 mobile / h-20 desktop) lors d'un scroll vers ancre. */
+    scroll-padding-top: 5rem;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -143,6 +145,19 @@
     font-family: 'Fraunces', 'DM Sans', Georgia, serif;
     font-optical-sizing: auto;
     letter-spacing: -0.015em;
+    /* Évite les veuves/orphelines sur les gros titres */
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Focus visible cohérent partout — clavier seulement, pas au clic. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 
   ::selection {
