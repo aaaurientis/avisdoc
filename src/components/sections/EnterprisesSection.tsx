@@ -68,7 +68,7 @@ const EnterprisesSection = () => {
             <p className="text-xs text-white/40 mb-6">*Enquête Ipsos - 2023</p>
 
             <Button asChild size="lg" className="rounded-full shadow-primary group">
-              <a href="mailto:contact@avisdoc.fr">
+              <a href="/contact">
                 Demander une présentation
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </a>

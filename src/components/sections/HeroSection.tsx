@@ -74,7 +74,7 @@ const HeroSection = () => {
                 </a>
               </Button>
               <Button size="lg" variant="outline" asChild className="rounded-full px-6 border-2">
-                <a href="mailto:contact@avisdoc.fr">Nous contacter</a>
+                <a href="/contact">Nous contacter</a>
               </Button>
             </div>
 

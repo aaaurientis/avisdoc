@@ -69,7 +69,7 @@ const Header = () => {
 
           <div className="hidden md:flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild className="rounded-full">
-              <a href="mailto:contact@avisdoc.fr" className="gap-1.5">
+              <a href="/contact" className="gap-1.5">
                 Contact
                 <ArrowUpRight className="h-4 w-4" />
               </a>
@@ -137,7 +137,7 @@ const Header = () => {
             })}
             <div className="flex flex-col gap-2 pt-4 mt-2 border-t border-border">
               <Button variant="outline" asChild className="w-full rounded-full">
-                <a href="mailto:contact@avisdoc.fr">Nous contacter</a>
+                <a href="/contact">Nous contacter</a>
               </Button>
               <Button asChild className="w-full rounded-full">
                 <a

@@ -1,1 +1,7 @@
 project_id = "fmchuaxxchghfagfpvwn"
+
+[functions.send-data-deletion-request]
+verify_jwt = false
+
+[functions.send-contact-message]
+verify_jwt = false

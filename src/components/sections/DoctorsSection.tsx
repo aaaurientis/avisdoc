@@ -100,7 +100,7 @@ const DoctorsSection = () => {
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full border-white/50 bg-white/10 hover:bg-white/20 text-white hover:text-white">
-                <a href="mailto:contact@avisdoc.fr">Nous contacter</a>
+                <a href="/contact">Nous contacter</a>
               </Button>
             </div>
           </div>
