@@ -4,7 +4,6 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Mail,
   MapPin,
@@ -43,6 +42,7 @@ const Contact = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [botField, setBotField] = useState(""); // honeypot anti-spam
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -62,8 +62,10 @@ const Contact = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.functions.invoke("send-contact-message", {
-        body: {
+      const response = await fetch("/api/contact.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           profile,
           profileLabel: profiles.find((p) => p.value === profile)?.label,
           name,
@@ -71,17 +73,24 @@ const Contact = () => {
           email,
           phone,
           message,
-        },
+          _botfield: botField,
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Erreur ${response.status}`);
+      }
+
       setIsSubmitted(true);
     } catch (err) {
       console.error("Contact form error:", err);
       toast({
         title: "Erreur",
         description:
-          "Une erreur est survenue lors de l'envoi. Vous pouvez réessayer ou nous écrire à contact@avisdoc.fr.",
+          err instanceof Error && err.message
+            ? err.message
+            : "Une erreur est survenue lors de l'envoi. Vous pouvez réessayer ou nous écrire à contact@avisdoc.fr.",
         variant: "destructive",
       });
     } finally {
@@ -337,6 +346,29 @@ const Contact = () => {
                         required
                         minLength={10}
                         className="w-full rounded-2xl border border-input bg-background px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
+                      />
+                    </div>
+
+                    {/* Honeypot anti-spam : champ caché aux humains. */}
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        left: "-9999px",
+                        width: "1px",
+                        height: "1px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <label htmlFor="contact-website">Site web (ne pas remplir)</label>
+                      <input
+                        id="contact-website"
+                        type="text"
+                        name="website"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={botField}
+                        onChange={(e) => setBotField(e.target.value)}
                       />
                     </div>
 
