@@ -2,9 +2,22 @@
 # Le fichier est placé dans public/ et copié automatiquement dans dist/ au build.
 
 # --- Routage SPA (React Router) ---
+# Un seul /www sert deux applications selon le sous-domaine :
+#   admin.avisdoc.fr → admin.html (back-office)
+#   avisdoc.fr / www → index.html (site vitrine)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Back-office : tout ce qui n'est pas un fichier réel retombe sur admin.html.
+  RewriteCond %{HTTP_HOST} ^admin\. [NC]
+  RewriteRule ^admin\.html$ - [L]
+  RewriteCond %{HTTP_HOST} ^admin\. [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /admin.html [L]
+
+  # Site vitrine.
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

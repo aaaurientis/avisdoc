@@ -5,3 +5,8 @@ verify_jwt = false
 
 [functions.send-contact-message]
 verify_jwt = false
+
+# Recherche Pappers — exige un JWT valide ; le domaine @avisdoc.fr est
+# revérifié dans la fonction.
+[functions.pappers-search]
+verify_jwt = true

@@ -1,0 +1,19 @@
+/* Ajustements responsive propres au back-office.
+   Le design system (fonts, tokens, couleurs) vient de src/index.css — identique
+   au site vitrine. Ce fichier ne fait qu'adapter la coquille sur petits écrans. */
+
+@media (max-width: 900px) {
+  .ad-shell {
+    flex-direction: column;
+  }
+  .ad-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .ad-content {
+    padding: 1.5rem 1.25rem;
+  }
+}
