@@ -51,34 +51,47 @@ src/admin/
 
 ## Modes de fonctionnement (variables d'env Vite)
 
+Le back-office a son **propre projet Supabase**, distinct de celui du site :
+`wtovhzxymlqnfxyjxrdq` (`https://wtovhzxymlqnfxyjxrdq.supabase.co`).
+
 Par défaut, l'admin tourne **sans backend** (données de démo, SSO simulé) —
-idéal pour développer/valider l'UI. Pour activer le vrai backend :
+idéal pour développer/valider l'UI. Variables (`.env`) :
 
 ```bash
-# .env
+# Projet Supabase dédié à l'admin
+VITE_ADMIN_SUPABASE_URL=https://wtovhzxymlqnfxyjxrdq.supabase.co
+VITE_ADMIN_SUPABASE_ANON_KEY=<clé anon public du projet admin>
+
+# Bascule démo ↔ backend réel (mettre les deux à "supabase" quand prêt)
 VITE_ADMIN_BACKEND=supabase   # persistance Postgres + Storage
 VITE_ADMIN_AUTH=supabase      # vrai SSO Google (@avisdoc.fr)
 ```
 
-Les variables Supabase existantes (`VITE_SUPABASE_URL`,
-`VITE_SUPABASE_PUBLISHABLE_KEY`) sont réutilisées — même projet Supabase que le
-site.
+> Les deux variables `VITE_ADMIN_SUPABASE_*` doivent être définies ensemble ;
+> sinon le client retombe sur le projet du site (`VITE_SUPABASE_*`). Tant que
+> `VITE_ADMIN_BACKEND`/`VITE_ADMIN_AUTH` valent `mock`/`demo`, l'app reste en
+> mode démonstration.
 
 ## Mise en place du backend Supabase
 
-### 1. Schéma + sécurité (RLS)
+> Toutes ces étapes visent le **projet admin** `wtovhzxymlqnfxyjxrdq`.
 
-Exécuter `supabase/migrations/0001_admin_schema.sql` (SQL Editor Supabase ou
-`supabase db push`). Il crée les tables `admin_*`, active la **Row Level
-Security** (accès réservé aux emails `@avisdoc.fr` via `is_avisdoc_user()`), et
-crée le bucket privé `admin-documents`.
+### 1. Schéma + sécurité (RLS) + données de démo
+
+Exécuter, dans le SQL Editor du projet admin (ou via `supabase db push`) :
+
+1. `supabase/migrations/0001_admin_schema.sql` — crée les tables `admin_*`,
+   active la **Row Level Security** (accès réservé aux emails `@avisdoc.fr` via
+   `is_avisdoc_user()`), crée le bucket privé `admin-documents`.
+2. `supabase/migrations/0002_admin_seed.sql` *(optionnel)* — peuple la base avec
+   le jeu de démonstration (à retirer en production réelle).
 
 ### 2. SSO Google restreint au domaine
 
 1. Supabase → **Authentication → Providers → Google** : activer, renseigner
    Client ID / Secret (Google Cloud Console, écran OAuth + identifiants Web).
 2. Dans Google Cloud, autoriser l'URL de redirection Supabase
-   (`https://<projet>.supabase.co/auth/v1/callback`).
+   (`https://wtovhzxymlqnfxyjxrdq.supabase.co/auth/v1/callback`).
 3. La restriction `@avisdoc.fr` est imposée à **trois** niveaux :
    - le paramètre `hd=avisdoc.fr` envoyé à Google (indicatif) ;
    - la vérification du domaine côté client (`AuthContext`) ;
@@ -89,6 +102,7 @@ crée le bucket privé `admin-documents`.
 ### 3. Edge Function Pappers (clé API côté serveur)
 
 ```bash
+supabase link --project-ref wtovhzxymlqnfxyjxrdq
 supabase functions deploy pappers-search
 supabase secrets set PAPPERS_API_KEY=xxxxxxxx
 ```
