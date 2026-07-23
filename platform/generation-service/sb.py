@@ -26,6 +26,23 @@ def _storage(path: str) -> str:
     return f"{SUPABASE_URL}/storage/v1/{path}"
 
 
+def probe() -> dict:
+    """Diagnostic : que peut faire la clé du conteneur sur PostgREST ?
+
+    200 + lignes -> clé service_role opérationnelle. 401 -> clé rejetée.
+    [] -> clé soumise à la RLS (anon). Ne révèle aucun secret.
+    """
+    try:
+        r = httpx.get(
+            _rest("clients"),
+            params={"select": "nom", "limit": "3"},
+            headers=_HEADERS, timeout=15,
+        )
+        return {"http_status": r.status_code, "corps": r.text[:200]}
+    except Exception as e:  # noqa: BLE001
+        return {"erreur": str(e)[:200]}
+
+
 def get_client(client_id: str) -> dict | None:
     r = httpx.get(
         _rest("clients"),
