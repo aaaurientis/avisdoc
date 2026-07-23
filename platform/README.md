@@ -10,7 +10,7 @@ dépôt). Cadrage complet : [`docs/cadrage-plateforme-client.md`](../docs/cadrag
 | `supabase/migrations/` | Schéma Postgres, RLS (cloison `public`/`client`/`hds`), buckets Storage, triggers de génération | **fait** (Lot 0) |
 | `generation-service/` | Service Docker (FastAPI) qui exécute le pack et publie les documents logotés — Scaleway | **fait** (Lot 1) |
 | `admin/` | Backoffice `admin.avisdoc.fr` (CRM, espaces, logo, invitations) | **fait** (Lot 2) |
-| `client/` | Espace `client.avisdoc.fr` (bibliothèque, aperçu, e-mails) | à venir (Lot 3) |
+| `client/` | Espace `client.avisdoc.fr` (bibliothèque, aperçu, e-mails) | **fait** (Lot 3) |
 
 L'Edge Function d'invitation vit dans le projet Supabase commun :
 `supabase/functions/inviter-utilisateurs/` (à la racine du dépôt).
