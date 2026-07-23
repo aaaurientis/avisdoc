@@ -9,9 +9,17 @@
   RewriteEngine On
   RewriteBase /
 
-  # Back-office : tout ce qui n'est pas un fichier réel retombe sur admin.html.
+  # Back-office : admin.html est déjà servi tel quel.
   RewriteCond %{HTTP_HOST} ^admin\. [NC]
   RewriteRule ^admin\.html$ - [L]
+
+  # Racine du sous-domaine admin → admin.html.
+  # Le "/" correspond au répertoire racine : la condition !-d plus bas
+  # l'empêcherait d'être réécrit, on le traite donc explicitement ici.
+  RewriteCond %{HTTP_HOST} ^admin\. [NC]
+  RewriteRule ^$ /admin.html [L]
+
+  # Autres chemins du back-office (non-fichiers) → admin.html.
   RewriteCond %{HTTP_HOST} ^admin\. [NC]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
