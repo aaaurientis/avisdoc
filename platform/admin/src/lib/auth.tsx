@@ -27,7 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (actif) { setEstAdmin(false); setChargement(false); }
         return;
       }
-      // La RLS ne renvoie une ligne admins que si l'utilisateur EST admin.
+      // Règle métier : tout compte @avisdoc.fr est admin (aligné sur is_admin()
+      // côté base). Sinon, on vérifie la liste d'exception `admins`.
+      const email = (s.user.email ?? "").toLowerCase();
+      if (email.endsWith("@avisdoc.fr")) {
+        if (actif) { setEstAdmin(true); setChargement(false); }
+        return;
+      }
       const { data } = await supabase
         .from("admins")
         .select("auth_user_id")

@@ -1,5 +1,5 @@
 -- ============================================================================
--- AvisDoc — plateforme client · TOUTES LES MIGRATIONS (0001 -> 0004)
+-- AvisDoc — plateforme client · TOUTES LES MIGRATIONS (0001 -> 0005)
 -- Fichier concatene pour le SQL Editor Supabase : coller l'integralite,
 -- puis Run. Genere depuis migrations/*.sql — ne pas editer a la main.
 -- ============================================================================
@@ -366,4 +366,20 @@ drop trigger if exists trg_clients_signe_after on clients;
 create trigger trg_clients_signe_after
   after update on clients
   for each row execute function creer_job_generation();
+
+-- >>>>>>>>>>>>>>>>>>>>>>>> migrations/0005_admin_par_domaine.sql >>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- AvisDoc — Plateforme client · Administrateurs par domaine
+-- ----------------------------------------------------------------------------
+-- Règle métier : tout compte dont l'adresse e-mail est en @avisdoc.fr est
+-- administrateur. La table `admins` est conservée comme liste d'exception
+-- (ex. prestataire externe), combinée en OR.
+-- ============================================================================
+
+create or replace function is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select
+    coalesce(lower(auth.jwt() ->> 'email') like '%@avisdoc.fr', false)
+    or exists (select 1 from admins where auth_user_id = auth.uid());
+$$;
 

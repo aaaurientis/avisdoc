@@ -15,16 +15,13 @@ npm run dev            # http://localhost:8090
 
 ## Rôle d'administrateur
 
-L'accès est réservé aux comptes présents dans la table `admins`. Connexion par
-lien magique (`signInWithOtp`). Un compte connecté mais absent d'`admins` voit
-un écran « Accès réservé ».
+Connexion par **Google** (`signInWithOAuth`). **Tout compte `@avisdoc.fr` est
+administrateur** (fonction `is_admin()` côté base, `queryParams.hd=avisdoc.fr`
+côté client). Un compte hors `@avisdoc.fr` voit « Accès réservé ».
 
-Pour déclarer un premier admin (une fois le compte Auth créé) :
-
-```sql
-insert into admins (auth_user_id, email)
-values ('<auth_user_id>', 'prenom@avisdoc.fr');
-```
+La table `admins` reste une **liste d'exception** (admin externe ponctuel) —
+voir `platform/supabase/seed-admin.sql`. Le provider Google doit être activé
+dans Supabase (voir `platform/DEPLOIEMENT.md`, étape 3).
 
 ## Flux couvert
 

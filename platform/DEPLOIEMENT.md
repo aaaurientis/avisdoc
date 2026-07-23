@@ -56,29 +56,41 @@ select id, public from storage.buckets order by id;
 
 ---
 
-## Étape 2 — Premier administrateur
+## Étape 2 — Administrateurs (règle par domaine)
 
-1. Ouvre `admin.avisdoc.fr` (ou en local `npm run dev` dans `platform/admin`),
-   connecte-toi par lien magique avec ton adresse `@avisdoc.fr`. Tu verras
-   « Accès réservé » : c'est attendu, la ligne `auth.users` est créée.
-2. Dans le SQL Editor Supabase, exécute `platform/supabase/seed-admin.sql`
-   après y avoir mis ton adresse.
-3. Recharge l'admin : tu as maintenant accès.
+**Tout compte `@avisdoc.fr` est administrateur** (fonction `is_admin()`, migration
+`0005`). Aucune déclaration manuelle n'est nécessaire : il suffit de se connecter
+à l'admin avec un compte Google `@avisdoc.fr` (voir étape 3 pour activer Google).
+
+- Si tu as appliqué `all-migrations.sql`, la règle est déjà en place.
+- La table `admins` reste une **liste d'exception** (ex. prestataire externe) :
+  `platform/supabase/seed-admin.sql` pour y ajouter un compte hors `@avisdoc.fr`.
 
 ---
 
-## Étape 3 — Auth (SMTP + URLs de redirection)
+## Étape 3 — Auth (providers, URLs, SMTP)
+
+Deux modes de connexion : **Google** pour l'admin (`@avisdoc.fr`), **lien
+magique** pour les clients.
 
 Dans Supabase > Authentication :
 
+- **Providers > Google** (connexion admin) :
+  1. Google Cloud Console > *Credentials* > crée un *OAuth client ID* (type
+     « Web application »).
+  2. *Authorized redirect URI* :
+     `https://wtovhzxymlqnfxyjxrdq.supabase.co/auth/v1/callback`
+  3. Colle *Client ID* et *Client Secret* dans Supabase > Providers > Google,
+     active le provider.
+- **Providers > Email** : garde-le activé (lien magique des clients).
 - **URL Configuration** :
   - *Site URL* : `https://client.avisdoc.fr`
-  - *Redirect URLs* (allow-list) : ajoute
-    `https://admin.avisdoc.fr/**` et `https://client.avisdoc.fr/**`
-    (et tes URLs locales si tu testes : `http://localhost:8090/**`, `:8091/**`).
+  - *Redirect URLs* (allow-list) : `https://admin.avisdoc.fr/**`,
+    `https://client.avisdoc.fr/**` (et en test `http://localhost:8090/**`,
+    `http://localhost:8091/**`).
 - **SMTP** : configure un serveur d'envoi (OVH / Google Workspace) pour que les
-  liens magiques et les invitations partent réellement. Sans SMTP, l'envoi de
-  masse est bridé par Supabase.
+  liens magiques et les invitations partent réellement. Sans SMTP, l'envoi est
+  fortement bridé par Supabase.
 
 ---
 

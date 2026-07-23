@@ -38,9 +38,16 @@ serve(async (req) => {
   });
   const { data: userData } = await asUser.auth.getUser();
   if (!userData?.user) return json({ error: "non authentifié" }, 401);
-  const { data: adminRow } = await asUser
-    .from("admins").select("auth_user_id").eq("auth_user_id", userData.user.id).maybeSingle();
-  if (!adminRow) return json({ error: "réservé aux administrateurs" }, 403);
+
+  // Admin = compte @avisdoc.fr, ou entrée explicite dans la liste `admins`.
+  const email = (userData.user.email ?? "").toLowerCase();
+  let estAdmin = email.endsWith("@avisdoc.fr");
+  if (!estAdmin) {
+    const { data: adminRow } = await asUser
+      .from("admins").select("auth_user_id").eq("auth_user_id", userData.user.id).maybeSingle();
+    estAdmin = !!adminRow;
+  }
+  if (!estAdmin) return json({ error: "réservé aux administrateurs" }, 403);
 
   // 2) Charger le client, ses domaines et ses utilisateurs non encore invités.
   const { client_id } = await req.json().catch(() => ({}));
