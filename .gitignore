@@ -15,6 +15,11 @@ dist-ssr
 # Secrets de déploiement OVH (ne JAMAIS committer)
 .env.deploy
 
+# Plateforme client (platform/)
+platform/**/__pycache__/
+platform/**/node_modules/
+platform/generation-service/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

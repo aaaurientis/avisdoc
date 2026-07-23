@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Correspondants pour adressage patients, Paris</title>
+<style>
+__CHARTE__
+
+/* ---- Spécifique à la liste ---- */
+@page{ @bottom-right{content:"Avril 2026 · " counter(page,decimal-leading-zero)} }
+h1{font-size:24pt}
+.doc-meta{min-width:38mm}
+.intro{font-size:10.5pt;color:var(--ardoise);line-height:1.6;margin:0 0 6mm;max-width:150mm}
+.intro b{color:var(--marine);font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:10pt}
+thead th{
+  background:var(--marine);color:var(--blanc);
+  font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  text-align:left;padding:2.6mm 3.5mm;
+}
+thead th:first-child{border-radius:1.4mm 0 0 0}
+thead th:last-child{border-radius:0 1.4mm 0 0}
+tbody td{padding:3mm 3.5mm;border-bottom:.5pt solid var(--beige);vertical-align:top;color:var(--ardoise)}
+tbody tr:nth-child(even) td{background:var(--cyan-tres-clair)}
+tbody tr{break-inside:avoid}
+td.med{color:var(--marine);font-weight:700;white-space:nowrap}
+td.med .spe{display:block;font-weight:400;font-size:8.5pt;font-style:italic;color:var(--taupe);margin-top:.4mm}
+td.tel{white-space:nowrap;letter-spacing:.03em;font-feature-settings:"tnum";color:var(--marine);font-weight:600}
+td.tel .autre{display:block;font-weight:400;letter-spacing:0;font-size:9pt;color:var(--ardoise)}
+td.adr .cp{color:var(--taupe)}
+.col-med{width:34%}
+.col-tel{width:22%}
+.col-adr{width:44%}
+
+.pied-societe{
+  margin-top:8mm;padding-top:4mm;border-top:.5pt solid var(--beige);
+  display:flex;gap:8mm;font-size:8pt;color:var(--taupe);line-height:1.55;
+}
+.pied-societe .bloc-k{
+  font-size:7pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ardoise);margin-bottom:1mm;
+}
+.pied-societe .num{letter-spacing:.03em;font-feature-settings:"tnum"}
+.pied-societe > div{flex:1}
+</style>
+</head>
+<body>
+
+<div class="brandhead">
+  <img src="__LOGO__" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+  <span class="sep-client" data-slot="logo-client"></span>
+  <img class="logo-client" data-slot="logo-client" src="__LOGO_CLIENT__" alt="">
+</div>
+<div class="refhead">Réseau d'aval · Dermatologie</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<!-- TITRE -->
+<div class="doc-head">
+  <div>
+    <div class="kicker">Réseau d'aval</div>
+    <h1>Correspondants pour<br>adressage patients, <em>Paris</em></h1>
+    <p class="doc-sub">Dermatologues assurant la prise en charge en présentiel à la suite d'une téléexpertise.</p>
+  </div>
+  <div class="doc-meta">
+    <div class="grp">
+      <div class="k">Correspondants</div>
+      <div class="v">7</div>
+    </div>
+    <div class="grp">
+      <div class="k">Mise à jour</div>
+      <div class="v">Avril 2026</div>
+    </div>
+  </div>
+</div>
+
+<p class="intro">Tous les correspondants de cette liste assurent les <b>avis et les exérèses</b>. Prendre rendez-vous
+directement auprès du cabinet, en mentionnant l'adressage AvisDoc.</p>
+
+<!-- TABLEAU -->
+<table>
+  <thead>
+    <tr>
+      <th class="col-med">Médecin</th>
+      <th class="col-tel">Téléphone</th>
+      <th class="col-adr">Adresse</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="med">Dr Jennifer Roux<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 43 35 84 23</td>
+      <td class="adr">63 bis rue de Varenne<br><span class="cp">75007 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Henry Pawin<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 88 00 88</td>
+      <td class="adr">11 chaussée de la Muette<br><span class="cp">75016 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Charlotte Brugière<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 72 11 88</td>
+      <td class="adr">54 rue de Turbigo<br><span class="cp">75003 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Pauline Laly<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 72 11 88</td>
+      <td class="adr">54 rue de Turbigo<br><span class="cp">75003 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Barouyr Baroudjian<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 84 75 02 34</td>
+      <td class="adr">55 rue du Faubourg Saint-Antoine<br><span class="cp">75011 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Inés Tejedor<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 84 75 02 34</td>
+      <td class="adr">55 rue du Faubourg Saint-Antoine<br><span class="cp">75011 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Agathe Labonnelie<span class="spe">Dermatologue</span></td>
+      <td class="tel"><span class="autre">Rendez-vous via Doctolib</span></td>
+      <td class="adr">Centre de dermatologie Saint-Fargeau<br>73 rue Saint-Fargeau<br><span class="cp">75020 Paris</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- PIED SOCIÉTÉ -->
+<div class="pied-societe">
+  <div>
+    <div class="bloc-k">AvisDoc</div>
+    Société par actions simplifiée<br>
+    11 chaussée de la Muette<br>75016 Paris
+  </div>
+  <div>
+    <div class="bloc-k">Identifiants</div>
+    SIRET <span class="num">901 941 880 00014</span><br>
+    TVA <span class="num">FR79 901941880</span><br>
+    Code NAF <span class="num">6201Z</span>
+  </div>
+  <div>
+    <div class="bloc-k">Contact</div>
+    henry.pawin@gmail.com<br>
+    Tél <span class="num">06 73 99 59 27</span>
+  </div>
+</div>
+
+</body>
+</html>

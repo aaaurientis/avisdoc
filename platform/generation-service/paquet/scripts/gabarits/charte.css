@@ -1,0 +1,201 @@
+
+  /* ============ POLICES : pile standard, Aptos en tête ============ */
+
+  /* ============ JETONS (charte §1) ============ */
+  :root{
+    --creme:#F7F4EF;
+    --marine:#142A33;
+    --cyan:#0CA6DF;
+    --cyan-clair:#29B1E0;
+    --orange:#EC7735;
+    --ardoise:#5C6A6E;
+    --beige:#E3DCD2;
+    --filet-carte:#E3DCD2;
+    --cyan-tres-clair:#EAF6FB;
+    --taupe:#9A8E7F;
+    --blanc:#FFFFFF;
+
+    --serif:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+    --sans:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+  }
+
+  /* ============ PAGE ============ */
+  @page{
+    size:A4;
+    margin:22mm 16mm 15mm;
+    background:var(--blanc);
+
+    @top-left{content:element(brandhead);vertical-align:bottom;padding-bottom:5mm}
+    @top-right{content:element(refhead);vertical-align:bottom;padding-bottom:5mm}
+    @bottom-left{content:element(brandfoot);vertical-align:top;padding-top:4mm}
+    @bottom-right{
+      content:"Mai 2026 · " counter(page,decimal-leading-zero);
+      vertical-align:top;padding-top:4mm;
+      font-family:var(--sans);font-size:8pt;color:var(--taupe);
+    }
+  }
+
+  html{background:var(--blanc)}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:11pt;
+    line-height:1.5;
+    color:var(--marine);
+  }
+  .wordmark{font-weight:700}
+  .wordmark .a{color:var(--cyan)}
+  .wordmark .d{color:var(--orange)}
+
+  /* En-tête et pied de page courants */
+  .brandhead{position:running(brandhead);display:flex;align-items:center;gap:2.4mm;white-space:nowrap}
+  .brandhead img:not(.logo-client){width:6.2mm;height:auto}
+  .brandhead .site{font-size:8pt;color:var(--taupe)}
+  .refhead{position:running(refhead);font-size:8pt;color:var(--taupe);white-space:nowrap;text-align:right}
+  .brandfoot{position:running(brandfoot);font-size:8pt;color:var(--taupe);white-space:nowrap}
+  .brandfoot .wordmark{font-size:8.5pt}
+
+  /* ============ TITRE DU DOCUMENT (charte §5) ============ */
+  .doc-head{display:flex;gap:10mm;align-items:flex-start;margin-bottom:7mm}
+  .kicker{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--orange);
+    margin-bottom:2.5mm;
+  }
+  h1{
+    font-family:var(--serif);font-weight:700;letter-spacing:-.015em;
+    font-size:26pt;line-height:1.12;color:var(--marine);
+    margin:0;
+  }
+  h1 em{font-style:italic;color:var(--cyan)}
+  .doc-sub{font-size:10.5pt;color:var(--ardoise);margin:2.5mm 0 0}
+  .doc-meta{margin-left:auto;flex:none;text-align:right;min-width:52mm}
+  .doc-meta .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--taupe);
+  }
+  .doc-meta .v{font-size:9.5pt;font-weight:600;color:var(--marine);letter-spacing:.02em;font-feature-settings:"tnum"}
+  .doc-meta .grp + .grp{margin-top:2.4mm}
+
+  /* ============ ENCADRÉ RÉSULTAT (charte §5, note à filet cyan) ============ */
+  .resultat{
+    background:var(--cyan-tres-clair);
+    border-left:3.5pt solid var(--cyan);
+    border-radius:0 2mm 2mm 0;
+    padding:5mm 6mm;margin-bottom:7.5mm;
+    break-inside:avoid;
+  }
+  .resultat .kicker{color:var(--orange);margin-bottom:2mm}
+  .resultat h2{
+    font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--marine);
+    margin:0 0 3.5mm;padding-bottom:3.5mm;border-bottom:.5pt solid rgba(12,166,223,.30);
+  }
+  .champs{display:grid;grid-template-columns:30mm 1fr;gap:0 5mm}
+  .champs .k{
+    font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--cyan);padding-top:.9mm;
+  }
+  .champs .v{font-size:10.5pt;color:var(--ardoise);line-height:1.5}
+  .champs .v .lead{display:block;font-weight:600;color:var(--marine)}
+  .champs .r2{margin-top:3mm;padding-top:3mm;border-top:.5pt solid rgba(12,166,223,.20)}
+  .champs .k.r2{padding-top:3.9mm}
+
+  /* ============ SECTIONS (charte §4, numérotation 01 ·) ============ */
+  section{margin-bottom:5mm;break-inside:avoid}
+  .sec-head{display:flex;align-items:center;gap:3mm;margin-bottom:3.5mm}
+  .sec-head .lbl{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--orange);
+    white-space:nowrap;
+  }
+  .sec-head::after{content:"";flex:1;height:.5pt;background:var(--beige)}
+  .sec-head{break-after:avoid}
+
+  /* ============ GRILLES DE CHAMPS ============ */
+  .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:4.5mm 5mm}
+  .field .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin-bottom:.8mm;line-height:1.25;min-height:6.6mm;
+  }
+  .field .v{font-size:10.5pt;font-weight:600;color:var(--marine)}
+  .field .v.num{letter-spacing:.03em;font-feature-settings:"tnum";white-space:nowrap}
+  .field .v.num.nir{font-size:9.5pt}
+  .field .v.nr{color:var(--taupe);font-weight:400;font-style:italic}
+
+  /* ============ CARTES (charte §4) ============ */
+  .cards-2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .card{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm}
+  .card .role{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin-bottom:1.2mm;
+  }
+  .card .nom{font-family:var(--serif);font-size:13pt;font-weight:700;color:var(--marine);line-height:1.25}
+  .card .meta{font-size:9.5pt;color:var(--ardoise);line-height:1.6;margin-top:1mm}
+  .card .meta .num{letter-spacing:.04em;font-feature-settings:"tnum"}
+
+  /* ============ CONTEXTE ============ */
+  .cap{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin:4mm 0 1.5mm;
+  }
+  .quote{font-size:10.5pt;color:var(--ardoise);line-height:1.6;margin:0}
+
+  /* ============ PASTILLES ============ */
+  .pills{display:grid;grid-template-columns:1fr 1fr;gap:2mm 8mm}
+  .pill-row{display:flex;align-items:center;gap:3mm;font-size:10pt;color:var(--ardoise)}
+  .pill{
+    font-size:7.5pt;font-weight:700;letter-spacing:.06em;
+    padding:.5mm 2.2mm;border-radius:6mm;flex:none;min-width:8mm;text-align:center;
+  }
+  .pill.rens{background:var(--cyan-tres-clair);color:var(--marine)}
+  .pill.nr{background:transparent;border:.5pt dashed var(--beige);color:var(--taupe);font-weight:600}
+  .dl{border-top:.5pt dashed var(--beige);margin-top:3.5mm;padding-top:2.5mm;font-size:10pt;color:var(--ardoise)}
+  .dl + .dl{border:0;margin-top:1mm;padding-top:0}
+  .dl b{color:var(--marine);font-weight:600}
+  .dl .nr{color:var(--taupe);font-style:italic}
+
+  /* ============ ZONE DOCUMENTÉE ============ */
+  .zone{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;overflow:hidden}
+  .zone-head{display:flex;align-items:center;gap:3mm;padding:3.5mm 4.5mm;border-bottom:.5pt solid var(--filet-carte)}
+  .zone-num{
+    width:5.5mm;height:5.5mm;border-radius:1.4mm;background:var(--cyan);color:var(--blanc);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:8.5pt;font-weight:700;
+  }
+  .zone-head .t{font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--cyan)}
+  .zone-body{padding:4mm 4.5mm 4.5mm}
+  .zone-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4.5mm 5mm}
+  .shots{display:flex;gap:3mm;margin-top:5mm}
+  figure{margin:0;width:30mm}
+  figure img{width:30mm;height:30mm;object-fit:cover;border-radius:1.4mm;border:.5pt solid var(--filet-carte);display:block}
+  figcaption{font-size:8pt;font-style:italic;color:var(--taupe);margin-top:1mm}
+
+  /* ============ CONDUITE À TENIR (grands chiffres Newsreader cyan, charte §4) ============ */
+  .etape{display:flex;gap:4.5mm;align-items:baseline;padding:2.8mm 0;border-top:.5pt solid var(--beige)}
+  .etape:last-child{border-bottom:.5pt solid var(--beige)}
+  .etape .n{
+    font-family:var(--serif);font-size:19pt;font-weight:700;color:var(--cyan);
+    line-height:1;flex:none;width:9mm;font-feature-settings:"tnum"
+  }
+  .etape p{margin:0;font-size:10.5pt;color:var(--ardoise);line-height:1.55}
+  .etape b{color:var(--marine);font-weight:600}
+
+  /* ============ MENTIONS ============ */
+  .legal{
+    margin-top:5mm;background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;
+    padding:3mm 4mm;font-size:8pt;color:var(--ardoise);line-height:1.45;break-inside:avoid;
+  }
+  .legal p{margin:0 0 1.6mm}
+  .legal p:last-child{margin-bottom:0}
+  .legal b{color:var(--marine);font-weight:600}
+  .legal .fictif{color:var(--taupe);font-style:italic}
+
+  /* ============ Emplacement logo client (injection automatique) ============ */
+  /* Vide, l'emplacement ne rend rien : ni cadre, ni réserve d'espace.        */
+  .logo-client{height:6.4mm;width:auto;max-width:42mm;display:block;object-fit:contain}
+  .sep-client{width:.5pt;height:5mm;background:var(--beige);flex:none}
+  .apercu .logo-client-vide{
+    display:inline-block;height:6.4mm;min-width:22mm;
+    border:.5pt dashed var(--taupe);border-radius:1mm;
+    font-size:6.5pt;font-style:italic;color:var(--taupe);
+    text-align:center;line-height:6.4mm;
+  }

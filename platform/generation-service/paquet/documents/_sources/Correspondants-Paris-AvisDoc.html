@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Correspondants pour adressage patients, Paris</title>
+<style>
+
+  /* ============ POLICES : pile standard, Aptos en tête ============ */
+
+  /* ============ JETONS (charte §1) ============ */
+  :root{
+    --creme:#F7F4EF;
+    --marine:#142A33;
+    --cyan:#0CA6DF;
+    --cyan-clair:#29B1E0;
+    --orange:#EC7735;
+    --ardoise:#5C6A6E;
+    --beige:#E3DCD2;
+    --filet-carte:#E3DCD2;
+    --cyan-tres-clair:#EAF6FB;
+    --taupe:#9A8E7F;
+    --blanc:#FFFFFF;
+
+    --serif:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+    --sans:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+  }
+
+  /* ============ PAGE ============ */
+  @page{
+    size:A4;
+    margin:22mm 16mm 15mm;
+    background:var(--blanc);
+
+    @top-left{content:element(brandhead);vertical-align:bottom;padding-bottom:5mm}
+    @top-right{content:element(refhead);vertical-align:bottom;padding-bottom:5mm}
+    @bottom-left{content:element(brandfoot);vertical-align:top;padding-top:4mm}
+    @bottom-right{
+      content:"Mai 2026 · " counter(page,decimal-leading-zero);
+      vertical-align:top;padding-top:4mm;
+      font-family:var(--sans);font-size:8pt;color:var(--taupe);
+    }
+  }
+
+  html{background:var(--blanc)}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:11pt;
+    line-height:1.5;
+    color:var(--marine);
+  }
+  .wordmark{font-weight:700}
+  .wordmark .a{color:var(--cyan)}
+  .wordmark .d{color:var(--orange)}
+
+  /* En-tête et pied de page courants */
+  .brandhead{position:running(brandhead);display:flex;align-items:center;gap:2.4mm;white-space:nowrap}
+  .brandhead img:not(.logo-client){width:6.2mm;height:auto}
+  .brandhead .site{font-size:8pt;color:var(--taupe)}
+  .refhead{position:running(refhead);font-size:8pt;color:var(--taupe);white-space:nowrap;text-align:right}
+  .brandfoot{position:running(brandfoot);font-size:8pt;color:var(--taupe);white-space:nowrap}
+  .brandfoot .wordmark{font-size:8.5pt}
+
+  /* ============ TITRE DU DOCUMENT (charte §5) ============ */
+  .doc-head{display:flex;gap:10mm;align-items:flex-start;margin-bottom:7mm}
+  .kicker{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--orange);
+    margin-bottom:2.5mm;
+  }
+  h1{
+    font-family:var(--serif);font-weight:700;letter-spacing:-.015em;
+    font-size:26pt;line-height:1.12;color:var(--marine);
+    margin:0;
+  }
+  h1 em{font-style:italic;color:var(--cyan)}
+  .doc-sub{font-size:10.5pt;color:var(--ardoise);margin:2.5mm 0 0}
+  .doc-meta{margin-left:auto;flex:none;text-align:right;min-width:52mm}
+  .doc-meta .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--taupe);
+  }
+  .doc-meta .v{font-size:9.5pt;font-weight:600;color:var(--marine);letter-spacing:.02em;font-feature-settings:"tnum"}
+  .doc-meta .grp + .grp{margin-top:2.4mm}
+
+  /* ============ ENCADRÉ RÉSULTAT (charte §5, note à filet cyan) ============ */
+  .resultat{
+    background:var(--cyan-tres-clair);
+    border-left:3.5pt solid var(--cyan);
+    border-radius:0 2mm 2mm 0;
+    padding:5mm 6mm;margin-bottom:7.5mm;
+    break-inside:avoid;
+  }
+  .resultat .kicker{color:var(--orange);margin-bottom:2mm}
+  .resultat h2{
+    font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--marine);
+    margin:0 0 3.5mm;padding-bottom:3.5mm;border-bottom:.5pt solid rgba(12,166,223,.30);
+  }
+  .champs{display:grid;grid-template-columns:30mm 1fr;gap:0 5mm}
+  .champs .k{
+    font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--cyan);padding-top:.9mm;
+  }
+  .champs .v{font-size:10.5pt;color:var(--ardoise);line-height:1.5}
+  .champs .v .lead{display:block;font-weight:600;color:var(--marine)}
+  .champs .r2{margin-top:3mm;padding-top:3mm;border-top:.5pt solid rgba(12,166,223,.20)}
+  .champs .k.r2{padding-top:3.9mm}
+
+  /* ============ SECTIONS (charte §4, numérotation 01 ·) ============ */
+  section{margin-bottom:5mm;break-inside:avoid}
+  .sec-head{display:flex;align-items:center;gap:3mm;margin-bottom:3.5mm}
+  .sec-head .lbl{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--orange);
+    white-space:nowrap;
+  }
+  .sec-head::after{content:"";flex:1;height:.5pt;background:var(--beige)}
+  .sec-head{break-after:avoid}
+
+  /* ============ GRILLES DE CHAMPS ============ */
+  .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:4.5mm 5mm}
+  .field .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin-bottom:.8mm;line-height:1.25;min-height:6.6mm;
+  }
+  .field .v{font-size:10.5pt;font-weight:600;color:var(--marine)}
+  .field .v.num{letter-spacing:.03em;font-feature-settings:"tnum";white-space:nowrap}
+  .field .v.num.nir{font-size:9.5pt}
+  .field .v.nr{color:var(--taupe);font-weight:400;font-style:italic}
+
+  /* ============ CARTES (charte §4) ============ */
+  .cards-2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .card{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm}
+  .card .role{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin-bottom:1.2mm;
+  }
+  .card .nom{font-family:var(--serif);font-size:13pt;font-weight:700;color:var(--marine);line-height:1.25}
+  .card .meta{font-size:9.5pt;color:var(--ardoise);line-height:1.6;margin-top:1mm}
+  .card .meta .num{letter-spacing:.04em;font-feature-settings:"tnum"}
+
+  /* ============ CONTEXTE ============ */
+  .cap{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin:4mm 0 1.5mm;
+  }
+  .quote{font-size:10.5pt;color:var(--ardoise);line-height:1.6;margin:0}
+
+  /* ============ PASTILLES ============ */
+  .pills{display:grid;grid-template-columns:1fr 1fr;gap:2mm 8mm}
+  .pill-row{display:flex;align-items:center;gap:3mm;font-size:10pt;color:var(--ardoise)}
+  .pill{
+    font-size:7.5pt;font-weight:700;letter-spacing:.06em;
+    padding:.5mm 2.2mm;border-radius:6mm;flex:none;min-width:8mm;text-align:center;
+  }
+  .pill.rens{background:var(--cyan-tres-clair);color:var(--marine)}
+  .pill.nr{background:transparent;border:.5pt dashed var(--beige);color:var(--taupe);font-weight:600}
+  .dl{border-top:.5pt dashed var(--beige);margin-top:3.5mm;padding-top:2.5mm;font-size:10pt;color:var(--ardoise)}
+  .dl + .dl{border:0;margin-top:1mm;padding-top:0}
+  .dl b{color:var(--marine);font-weight:600}
+  .dl .nr{color:var(--taupe);font-style:italic}
+
+  /* ============ ZONE DOCUMENTÉE ============ */
+  .zone{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;overflow:hidden}
+  .zone-head{display:flex;align-items:center;gap:3mm;padding:3.5mm 4.5mm;border-bottom:.5pt solid var(--filet-carte)}
+  .zone-num{
+    width:5.5mm;height:5.5mm;border-radius:1.4mm;background:var(--cyan);color:var(--blanc);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:8.5pt;font-weight:700;
+  }
+  .zone-head .t{font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--cyan)}
+  .zone-body{padding:4mm 4.5mm 4.5mm}
+  .zone-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4.5mm 5mm}
+  .shots{display:flex;gap:3mm;margin-top:5mm}
+  figure{margin:0;width:30mm}
+  figure img{width:30mm;height:30mm;object-fit:cover;border-radius:1.4mm;border:.5pt solid var(--filet-carte);display:block}
+  figcaption{font-size:8pt;font-style:italic;color:var(--taupe);margin-top:1mm}
+
+  /* ============ CONDUITE À TENIR (grands chiffres Newsreader cyan, charte §4) ============ */
+  .etape{display:flex;gap:4.5mm;align-items:baseline;padding:2.8mm 0;border-top:.5pt solid var(--beige)}
+  .etape:last-child{border-bottom:.5pt solid var(--beige)}
+  .etape .n{
+    font-family:var(--serif);font-size:19pt;font-weight:700;color:var(--cyan);
+    line-height:1;flex:none;width:9mm;font-feature-settings:"tnum"
+  }
+  .etape p{margin:0;font-size:10.5pt;color:var(--ardoise);line-height:1.55}
+  .etape b{color:var(--marine);font-weight:600}
+
+  /* ============ MENTIONS ============ */
+  .legal{
+    margin-top:5mm;background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;
+    padding:3mm 4mm;font-size:8pt;color:var(--ardoise);line-height:1.45;break-inside:avoid;
+  }
+  .legal p{margin:0 0 1.6mm}
+  .legal p:last-child{margin-bottom:0}
+  .legal b{color:var(--marine);font-weight:600}
+  .legal .fictif{color:var(--taupe);font-style:italic}
+
+  /* ============ Emplacement logo client (injection automatique) ============ */
+  /* Vide, l'emplacement ne rend rien : ni cadre, ni réserve d'espace.        */
+  .logo-client{height:6.4mm;width:auto;max-width:42mm;display:block;object-fit:contain}
+  .sep-client{width:.5pt;height:5mm;background:var(--beige);flex:none}
+  .apercu .logo-client-vide{
+    display:inline-block;height:6.4mm;min-width:22mm;
+    border:.5pt dashed var(--taupe);border-radius:1mm;
+    font-size:6.5pt;font-style:italic;color:var(--taupe);
+    text-align:center;line-height:6.4mm;
+  }
+
+
+/* ---- Spécifique à la liste ---- */
+@page{ @bottom-right{content:"Avril 2026 · " counter(page,decimal-leading-zero)} }
+h1{font-size:24pt}
+.doc-meta{min-width:38mm}
+.intro{font-size:10.5pt;color:var(--ardoise);line-height:1.6;margin:0 0 6mm;max-width:150mm}
+.intro b{color:var(--marine);font-weight:700}
+
+table{width:100%;border-collapse:collapse;font-size:10pt}
+thead th{
+  background:var(--marine);color:var(--blanc);
+  font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  text-align:left;padding:2.6mm 3.5mm;
+}
+thead th:first-child{border-radius:1.4mm 0 0 0}
+thead th:last-child{border-radius:0 1.4mm 0 0}
+tbody td{padding:3mm 3.5mm;border-bottom:.5pt solid var(--beige);vertical-align:top;color:var(--ardoise)}
+tbody tr:nth-child(even) td{background:var(--cyan-tres-clair)}
+tbody tr{break-inside:avoid}
+td.med{color:var(--marine);font-weight:700;white-space:nowrap}
+td.med .spe{display:block;font-weight:400;font-size:8.5pt;font-style:italic;color:var(--taupe);margin-top:.4mm}
+td.tel{white-space:nowrap;letter-spacing:.03em;font-feature-settings:"tnum";color:var(--marine);font-weight:600}
+td.tel .autre{display:block;font-weight:400;letter-spacing:0;font-size:9pt;color:var(--ardoise)}
+td.adr .cp{color:var(--taupe)}
+.col-med{width:34%}
+.col-tel{width:22%}
+.col-adr{width:44%}
+
+.pied-societe{
+  margin-top:8mm;padding-top:4mm;border-top:.5pt solid var(--beige);
+  display:flex;gap:8mm;font-size:8pt;color:var(--taupe);line-height:1.55;
+}
+.pied-societe .bloc-k{
+  font-size:7pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ardoise);margin-bottom:1mm;
+}
+.pied-societe .num{letter-spacing:.03em;font-feature-settings:"tnum"}
+.pied-societe > div{flex:1}
+</style>
+</head>
+<body>
+
+<div class="brandhead">
+  <img src="data:image/png;base64,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" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+</div>
+<div class="refhead">Réseau d'aval · Dermatologie</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<!-- TITRE -->
+<div class="doc-head">
+  <div>
+    <div class="kicker">Réseau d'aval</div>
+    <h1>Correspondants pour<br>adressage patients, <em>Paris</em></h1>
+    <p class="doc-sub">Dermatologues assurant la prise en charge en présentiel à la suite d'une téléexpertise.</p>
+  </div>
+  <div class="doc-meta">
+    <div class="grp">
+      <div class="k">Correspondants</div>
+      <div class="v">7</div>
+    </div>
+    <div class="grp">
+      <div class="k">Mise à jour</div>
+      <div class="v">Avril 2026</div>
+    </div>
+  </div>
+</div>
+
+<p class="intro">Tous les correspondants de cette liste assurent les <b>avis et les exérèses</b>. Prendre rendez-vous
+directement auprès du cabinet, en mentionnant l'adressage AvisDoc.</p>
+
+<!-- TABLEAU -->
+<table>
+  <thead>
+    <tr>
+      <th class="col-med">Médecin</th>
+      <th class="col-tel">Téléphone</th>
+      <th class="col-adr">Adresse</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="med">Dr Jennifer Roux<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 43 35 84 23</td>
+      <td class="adr">63 bis rue de Varenne<br><span class="cp">75007 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Henry Pawin<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 88 00 88</td>
+      <td class="adr">11 chaussée de la Muette<br><span class="cp">75016 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Charlotte Brugière<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 72 11 88</td>
+      <td class="adr">54 rue de Turbigo<br><span class="cp">75003 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Pauline Laly<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 42 72 11 88</td>
+      <td class="adr">54 rue de Turbigo<br><span class="cp">75003 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Barouyr Baroudjian<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 84 75 02 34</td>
+      <td class="adr">55 rue du Faubourg Saint-Antoine<br><span class="cp">75011 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Inés Tejedor<span class="spe">Dermatologue</span></td>
+      <td class="tel">01 84 75 02 34</td>
+      <td class="adr">55 rue du Faubourg Saint-Antoine<br><span class="cp">75011 Paris</span></td>
+    </tr>
+    <tr>
+      <td class="med">Dr Agathe Labonnelie<span class="spe">Dermatologue</span></td>
+      <td class="tel"><span class="autre">Rendez-vous via Doctolib</span></td>
+      <td class="adr">Centre de dermatologie Saint-Fargeau<br>73 rue Saint-Fargeau<br><span class="cp">75020 Paris</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- PIED SOCIÉTÉ -->
+<div class="pied-societe">
+  <div>
+    <div class="bloc-k">AvisDoc</div>
+    Société par actions simplifiée<br>
+    11 chaussée de la Muette<br>75016 Paris
+  </div>
+  <div>
+    <div class="bloc-k">Identifiants</div>
+    SIRET <span class="num">901 941 880 00014</span><br>
+    TVA <span class="num">FR79 901941880</span><br>
+    Code NAF <span class="num">6201Z</span>
+  </div>
+  <div>
+    <div class="bloc-k">Contact</div>
+    henry.pawin@gmail.com<br>
+    Tél <span class="num">06 73 99 59 27</span>
+  </div>
+</div>
+
+</body>
+</html>
