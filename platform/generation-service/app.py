@@ -17,7 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 import sb
 from generator import LogoInvalide, generer_pour_client
 
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
 
 
 def _maintenant() -> str:
@@ -99,7 +99,7 @@ def _traiter(job_id: str, client_id: str) -> dict:
 
 @app.post("/generate")
 async def generate(payload: dict, x_webhook_secret: str = Header(default="")) -> dict:
-    if not WEBHOOK_SECRET or x_webhook_secret != WEBHOOK_SECRET:
+    if not WEBHOOK_SECRET or x_webhook_secret.strip() != WEBHOOK_SECRET:
         raise HTTPException(401, "secret webhook invalide")
     job_id, client_id = _extraire_job(payload)
     return await run_in_threadpool(_traiter, job_id, client_id)

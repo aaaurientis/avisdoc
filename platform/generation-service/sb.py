@@ -9,8 +9,10 @@ from __future__ import annotations
 import os
 import httpx
 
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+# .strip() : robustesse face aux espaces/tabulations collés par erreur dans les
+# variables d'environnement (un simple '\t' en tête d'URL casse toutes les requêtes).
+SUPABASE_URL = os.environ["SUPABASE_URL"].strip().rstrip("/")
+SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip()
 
 _HEADERS = {
     "apikey": SERVICE_KEY,
