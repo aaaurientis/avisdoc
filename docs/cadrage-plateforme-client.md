@@ -259,6 +259,14 @@ Reprises du brief §Anomalies / guide §6, à traiter côté métier / plateform
 
 ## 10. Points ouverts (à trancher avec Arthur)
 
+> **Défauts adoptés (2026-07-23, faute d'arbitrage explicite) — révisables :**
+> - **Ordre de construction** : admin d'abord, puis client.
+> - **CRM** : *statut simple* (fiche client + champ statut), extensible en pipeline plus tard (pt. 8).
+> - **Ouverture** : génération auto au passage « Signé », **puis validation admin** avant envoi des
+>   magic links (pt. 1).
+> - **Lignes `hds`** : jamais matérialisées sur cette base (pt. 4).
+
+
 1. **Ouverture de l'espace** : 100 % auto au passage « Signé », ou génération auto **puis** validation admin
    avant l'envoi des magic links ? (proposé : validation admin avant envoi.)
 2. **Rôles dans l'admin** : qui peut changer un statut CRM, uploader un logo, envoyer les invitations ?

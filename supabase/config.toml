@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.send-contact-message]
 verify_jwt = false
+
+# Invitations des utilisateurs client : requiert un jeton (admin vérifié dans la fonction).
+[functions.inviter-utilisateurs]
+verify_jwt = true

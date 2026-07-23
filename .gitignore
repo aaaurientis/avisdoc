@@ -18,7 +18,8 @@ dist-ssr
 # Plateforme client (platform/)
 platform/**/__pycache__/
 platform/**/node_modules/
-platform/generation-service/.env
+platform/**/dist/
+platform/**/.env
 
 # Editor directories and files
 .vscode/*
