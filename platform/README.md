@@ -12,8 +12,9 @@ dépôt). Cadrage complet : [`docs/cadrage-plateforme-client.md`](../docs/cadrag
 | `admin/` | Backoffice `admin.avisdoc.fr` (CRM, espaces, logo, invitations) | **fait** (Lot 2) |
 | `client/` | Espace `client.avisdoc.fr` (bibliothèque, aperçu, e-mails) | **fait** (Lot 3) |
 
-L'Edge Function d'invitation vit dans le projet Supabase commun :
-`supabase/functions/inviter-utilisateurs/` (à la racine du dépôt).
+Backend Supabase de la plateforme : projet **`wtovhzxymlqnfxyjxrdq`** (distinct
+du site vitrine `fmchuaxxchghfagfpvwn`). Migrations, config et Edge Function sous
+`platform/supabase/`. Déploiement pas à pas : [`DEPLOIEMENT.md`](DEPLOIEMENT.md).
 
 ## Architecture
 

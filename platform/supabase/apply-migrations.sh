@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Applique les migrations de la plateforme dans l'ordre, via psql.
 #
-#   export DATABASE_URL="postgresql://postgres:MOT_DE_PASSE@db.fmchuaxxchghfagfpvwn.supabase.co:5432/postgres"
+#   export DATABASE_URL="postgresql://postgres:MOT_DE_PASSE@db.wtovhzxymlqnfxyjxrdq.supabase.co:5432/postgres"
 #   ./apply-migrations.sh
 #
 # La chaîne de connexion se trouve dans Supabase :

@@ -1,7 +1,7 @@
 # Déploiement — plateforme client AvisDoc
 
 Runbook, à dérouler **dans l'ordre**. Chaque étape est autonome et vérifiable.
-Projet Supabase : `fmchuaxxchghfagfpvwn`.
+Projet Supabase : `wtovhzxymlqnfxyjxrdq`.
 
 ---
 
@@ -12,41 +12,47 @@ Projet Supabase : `fmchuaxxchghfagfpvwn`.
 - **Clés Supabase** (Project Settings > API) :
   - `anon` (publique) → pour les frontends ;
   - `service_role` (**secrète**) → pour le service de génération et l'Edge Function.
-- **Chaîne de connexion Postgres** (Project Settings > Database > Connection string > URI).
-- **Compte Scaleway** + `scw` CLI (`scaleway.com`), ou l'interface web.
-- **Docker** installé localement.
+- **Compte Scaleway** (console web).
 - **Un secret webhook** que tu inventes (chaîne aléatoire), noté `WEBHOOK_SECRET`.
 
-```bash
-# À garder sous la main (ne pas committer)
-export DATABASE_URL="postgresql://postgres:MDP@db.fmchuaxxchghfagfpvwn.supabase.co:5432/postgres"
-export SUPABASE_URL="https://fmchuaxxchghfagfpvwn.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="..."      # secret
-export SUPABASE_ANON_KEY="..."              # public
-export WEBHOOK_SECRET="$(openssl rand -hex 24)"
-echo "WEBHOOK_SECRET=$WEBHOOK_SECRET"       # à conserver
+> Ce runbook est écrit pour **sans psql** (migrations via le SQL Editor) et
+> **sans Docker local** (l'image est construite par GitHub Actions). La chaîne
+> de connexion Postgres n'est donc pas nécessaire.
+
+Valeurs à garder sous la main (ne rien committer) :
+
+```
+SUPABASE_URL              = https://wtovhzxymlqnfxyjxrdq.supabase.co
+SUPABASE_SERVICE_ROLE_KEY = …   (secret)
+SUPABASE_ANON_KEY         = …   (public)
+WEBHOOK_SECRET            = …   (invente une chaîne aléatoire, ex. via `openssl rand -hex 24`)
 ```
 
 ---
 
-## Étape 1 — Base de données (migrations)
+## Étape 1 — Base de données (migrations, via le SQL Editor)
 
 Crée les tables, la RLS, les buckets Storage et les triggers.
 
-```bash
-cd platform/supabase
-chmod +x apply-migrations.sh
-./apply-migrations.sh
-```
+1. Ouvre **Supabase > SQL Editor > New query**.
+2. Copie **tout** le contenu de `platform/supabase/all-migrations.sql` (les 4
+   migrations concaténées dans l'ordre) et colle-le.
+3. Clique **Run**. Aucune erreur attendue.
 
-Vérification :
+Vérification (nouvelle requête) :
 
 ```sql
--- Doit lister les 6 tables + 3 buckets.
+-- Doit lister les 6 tables :
 select table_name from information_schema.tables
-  where table_schema = 'public' order by 1;
+  where table_schema = 'public'
+    and table_name in ('admins','clients','domaines','utilisateurs_client',
+                       'documents','generation_jobs')
+  order by 1;
+-- Doit lister 3 buckets (logos, documents-public, documents-client) :
 select id, public from storage.buckets order by id;
 ```
+
+> Avec psql, l'alternative est `./apply-migrations.sh` (voir en-tête du script).
 
 ---
 
@@ -76,46 +82,49 @@ Dans Supabase > Authentication :
 
 ---
 
-## Étape 4 — Service de génération (Docker + Scaleway)
+## Étape 4 — Service de génération (image via GitHub Actions + conteneur Scaleway)
 
-Build et publication de l'image, puis création du conteneur serverless.
+Sans Docker local : **GitHub Actions construit l'image et la pousse** vers le
+registre Scaleway ; on crée ensuite le conteneur dans la console Scaleway.
 
-```bash
-cd platform/generation-service
+### 4.1 — Registre Scaleway
 
-# 4.1 — Registre Scaleway (adapter la région / le namespace)
-scw registry namespace create name=avisdoc region=fr-par || true
-docker login rg.fr-par.scw.cloud -u nologin --password-stdin <<<"$SCW_SECRET_KEY"
+Console Scaleway > **Container Registry** > créer un *namespace* `avisdoc`
+(région `fr-par`), en visibilité **privée**. L'image cible sera
+`rg.fr-par.scw.cloud/avisdoc/generation`.
 
-# 4.2 — Build + push
-IMAGE="rg.fr-par.scw.cloud/avisdoc/generation:latest"
-docker build -t "$IMAGE" .
-docker push "$IMAGE"
+### 4.2 — Clé d'API Scaleway → secret GitHub
 
-# 4.3 — Conteneur serverless (scale-to-zero)
-scw container namespace create name=avisdoc region=fr-par || true
-NS=$(scw container namespace list -o json | jq -r '.[]|select(.name=="avisdoc").id')
+- Scaleway > **IAM > API Keys** : crée une clé, note la *Secret Key*.
+- GitHub (dépôt) > **Settings > Secrets and variables > Actions** :
+  - *New repository secret* : `SCW_SECRET_KEY` = la Secret Key.
+  - (facultatif, si tu changes de région/namespace : *Variables*
+    `SCW_REGION`, `SCW_REGISTRY_NAMESPACE`.)
 
-scw container container create \
-  namespace-id="$NS" name=generation \
-  registry-image="$IMAGE" port=8080 \
-  min-scale=0 max-scale=1 memory-limit=2048 cpu-limit=1000 \
-  timeout=300s \
-  environment-variables.SUPABASE_URL="$SUPABASE_URL" \
-  secret-environment-variables.SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-  secret-environment-variables.WEBHOOK_SECRET="$WEBHOOK_SECRET"
+### 4.3 — Lancer le build
 
-scw container container deploy name=generation
+GitHub > onglet **Actions** > workflow *« Image du service de génération »* >
+**Run workflow**. Il build et pousse `…/generation:latest`. (Il se relance
+aussi automatiquement à chaque modification de `platform/generation-service/`.)
+
+### 4.4 — Créer le conteneur serverless
+
+Console Scaleway > **Serverless > Containers** > *Deploy a container* :
+
+- *Registry image* : `rg.fr-par.scw.cloud/avisdoc/generation:latest`
+- *Port* : `8080`
+- *Scale* : min **0**, max **1** ; *Memory* **2048 Mo** ; *Timeout* **300 s**
+- *Environment variables* :
+  - `SUPABASE_URL` = `https://wtovhzxymlqnfxyjxrdq.supabase.co`
+- *Secret environment variables* :
+  - `SUPABASE_SERVICE_ROLE_KEY` = … (clé service_role)
+  - `WEBHOOK_SECRET` = … (celui de l'étape 0)
+
+Déploie, récupère l'**URL publique** du conteneur et teste dans un navigateur
+ou :
+
 ```
-
-> Alternative sans CLI : tout est faisable dans la console Scaleway
-> (Container Registry + Serverless Containers), mêmes valeurs.
-
-Récupère l'**URL publique** du conteneur (ex.
-`https://generationxxxx.functions.fnc.fr-par.scw.cloud`) et teste :
-
-```bash
-curl -s https://<URL_CONTENEUR>/health      # -> {"ok":true}
+GET https://<URL_CONTENEUR>/health   ->  {"ok":true}
 ```
 
 ---
@@ -147,13 +156,22 @@ select statut, erreur from generation_jobs order by cree_le desc limit 1;
 
 ## Étape 6 — Edge Function d'invitation
 
-Déploie la fonction (projet commun, à la racine `supabase/`) :
+La fonction vit dans le projet **plateforme** : `platform/supabase/functions/`.
+Le déploiement ne nécessite pas Docker (seul le `serve` local en aurait besoin).
+
+**Option CLI** (Supabase CLI installé) — depuis le dossier `platform/` :
 
 ```bash
-supabase functions deploy inviter-utilisateurs --project-ref fmchuaxxchghfagfpvwn
-# Variable facultative : URL de l'espace client pour la redirection
-supabase secrets set CLIENT_APP_URL=https://client.avisdoc.fr --project-ref fmchuaxxchghfagfpvwn
+cd platform
+supabase functions deploy inviter-utilisateurs --project-ref wtovhzxymlqnfxyjxrdq
+supabase secrets set CLIENT_APP_URL=https://client.avisdoc.fr --project-ref wtovhzxymlqnfxyjxrdq
 ```
+
+**Option console** (sans CLI) : Supabase > **Edge Functions** > *Create a
+function* nommée `inviter-utilisateurs`, colle le contenu de
+`platform/supabase/functions/inviter-utilisateurs/index.ts`, déploie. Ajoute la
+variable `CLIENT_APP_URL=https://client.avisdoc.fr` dans les secrets des Edge
+Functions.
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` et `SUPABASE_ANON_KEY` sont fournis
 automatiquement aux Edge Functions.
