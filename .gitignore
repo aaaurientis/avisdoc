@@ -17,6 +17,7 @@ dist-ssr
 
 # Plateforme client (platform/)
 platform/**/__pycache__/
+platform/**/.pytest_cache/
 platform/**/node_modules/
 platform/**/dist/
 platform/**/.env

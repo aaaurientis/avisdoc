@@ -62,6 +62,19 @@ docker run -p 8080:8080 --env-file .env avisdoc-generation
 Le `Dockerfile` lance `build.py controles` à la construction : l'image ne se
 construit pas si le pack n'est pas sain.
 
+## Tests
+
+`tests/test_generation.py` exécute la vraie chaîne (`build.py client`) en mockant
+Supabase, et vérifie les garde-fous : 9 documents logotés + 3 non-logotés publiés,
+**0 document `hds`**, mapping des buckets, empreinte du logo, respect du cache.
+
+```bash
+pip install -r requirements-dev.txt
+npm install -g pptxgenjs@3.12.0
+export NODE_PATH="$(npm root -g)"     # pour que build.py trouve pptxgenjs
+pytest tests/ -v                       # ~20 s (régénère les documents)
+```
+
 ## Pack vendorisé
 
 `paquet/` contient la chaîne documentaire (`build.py` + `scripts/` + `assets/`).

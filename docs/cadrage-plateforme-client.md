@@ -265,6 +265,8 @@ Reprises du brief §Anomalies / guide §6, à traiter côté métier / plateform
 > - **Ouverture** : génération auto au passage « Signé », **puis validation admin** avant envoi des
 >   magic links (pt. 1).
 > - **Lignes `hds`** : jamais matérialisées sur cette base (pt. 4).
+> - **Hébergement génération** : **Scaleway** confirmé (2026-07-23). Aucun autre outil externe
+>   introduit ; les connecteurs de session (Notion, etc.) ne jouent aucun rôle.
 
 
 1. **Ouverture de l'espace** : 100 % auto au passage « Signé », ou génération auto **puis** validation admin
