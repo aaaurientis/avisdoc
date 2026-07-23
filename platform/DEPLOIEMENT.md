@@ -28,6 +28,36 @@ SUPABASE_ANON_KEY         = …   (public)
 WEBHOOK_SECRET            = …   (invente une chaîne aléatoire, ex. via `openssl rand -hex 24`)
 ```
 
+### Carte des secrets — qui va où (source de vérité)
+
+| Secret | Valeur | Où le poser | Comment vérifier |
+|---|---|---|---|
+| `SCW_SECRET_KEY` | clé API Scaleway (IAM) | **GitHub** › Settings › Secrets › Actions | le workflow *build* passe au vert |
+| `SUPABASE_URL` | `https://wtovhzxymlqnfxyjxrdq.supabase.co` | **Scaleway** conteneur (variable) | — |
+| `SUPABASE_SERVICE_ROLE_KEY` | JWT **service_role** (rôle `service_role`) | **Scaleway** conteneur (secret) | test navigateur ci-dessous |
+| `WEBHOOK_SECRET` | jeton au choix (ex. `avisdoc-hook-8231`) | **Scaleway** conteneur (variable) | doit être identique au header ci-dessous |
+| `X-Webhook-Secret` | **le même** jeton que `WEBHOOK_SECRET` | **Supabase** › Database › Webhooks › header | caractère pour caractère |
+| `VITE_SUPABASE_ANON_KEY` | clé **anon** (publique) | build des **frontends** | — |
+| `CLIENT_APP_URL` | `https://client.avisdoc.fr` | **Supabase** secret de l'Edge Function | — |
+
+**Vérifier la clé service_role sans l'exposer** (console navigateur, F12) — teste
+la capacité réelle (contourne-t-elle la RLS ?) sur le chemin exact du service :
+
+```js
+fetch("https://wtovhzxymlqnfxyjxrdq.supabase.co/rest/v1/clients?select=nom", {
+  headers: { apikey: "COLLE_LA_CLE", Authorization: "Bearer COLLE_LA_CLE" }
+}).then(r => r.json()).then(console.log)
+```
+
+- renvoie la liste des clients (ex. `[{nom:"Demo"}]`) → **c'est bien la service_role** ✅
+- renvoie `[]` → c'est la clé **anon** (soumise à la RLS) ❌
+- renvoie une erreur `{message:...}` → clé invalide/tronquée ❌
+
+Pièges Scaleway : les **Secrets** sont masqués (`$argon2id…`) et **se vident**
+quand on réédite les variables — re-vérifier qu'ils sont remplis avant chaque
+*Deploy*. En cas de doute, mettre `WEBHOOK_SECRET` en **variable simple** (non
+secrète) : c'est un jeton d'appel, pas une clé Supabase.
+
 ---
 
 ## Étape 1 — Base de données (migrations, via le SQL Editor)
