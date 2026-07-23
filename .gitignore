@@ -21,6 +21,8 @@ platform/**/.pytest_cache/
 platform/**/node_modules/
 platform/**/dist/
 platform/**/.env
+platform/.env.deploy
+platform/**/.env.deploy
 
 # Editor directories and files
 .vscode/*

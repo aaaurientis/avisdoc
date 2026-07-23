@@ -1,0 +1,11 @@
+# SPA + espace privé (ne pas indexer). Apache / OVH Web Cloud.
+Options -MultiViews
+RewriteEngine On
+# Toute route inconnue -> index.html (React Router)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>

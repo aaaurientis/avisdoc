@@ -220,31 +220,39 @@ automatiquement aux Edge Functions.
 
 ---
 
-## Étape 7 — Frontends (build + hébergement + DNS)
+## Étape 7 — Frontends (build + hébergement OVH + DNS)
 
-Pour chacune des apps (`platform/admin`, `platform/client`) :
+### 7.0 — Tester en local (recommandé avant d'héberger)
 
 ```bash
-cd platform/admin        # puis idem dans platform/client
-npm ci
-echo "VITE_SUPABASE_URL=$SUPABASE_URL"          >  .env
-echo "VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
-npm run build            # produit dist/
+cd platform/admin           # puis idem platform/client
+npm install
+cp .env.example .env        # renseigner VITE_SUPABASE_ANON_KEY (clé anon)
+npm run dev                 # admin :8090 / client :8091
 ```
 
-- **Hébergement** : `dist/` est statique → OVH (comme le site vitrine), ou
-  Netlify / Vercel / Cloudflare Pages.
-- **DNS** : `admin.avisdoc.fr` → hébergement de l'admin ;
-  `client.avisdoc.fr` → hébergement du client.
-- **Redirections SPA** (indispensable pour React Router). Sur OVH (Apache),
-  déposer un `.htaccess` à la racine de chaque app :
+Ajouter `http://localhost:8090/**` et `http://localhost:8091/**` aux *Redirect
+URLs* de Supabase (étape 3) pour que le login revienne en local.
 
-  ```apache
-  RewriteEngine On
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
-  ```
+### 7.1 — Sous-domaines OVH (Multisite)
+
+OVH → hébergement → **Multisite** : créer `admin.avisdoc.fr` → dossier `/admin`
+et `client.avisdoc.fr` → dossier `/client` (les répertoires du `.env.deploy`).
+
+### 7.2 — Déploiement
+
+Les `.htaccess` (redirection SPA + `noindex`) sont déjà dans `public/` de chaque
+app et copiés dans `dist/` par le script.
+
+```bash
+cp platform/.env.deploy.example platform/.env.deploy   # remplir OVH_* + dirs
+# renseigner VITE_SUPABASE_ANON_KEY dans platform/admin/.env et platform/client/.env
+./platform/scripts/deploy-front-ovh.sh admin
+./platform/scripts/deploy-front-ovh.sh client
+```
+
+Le script build l'app (clé anon embarquée) et mirroie `dist/` vers le dossier du
+sous-domaine (lftp si `OVH_PASSWORD`, sinon rsync/SSH).
 
 ---
 
