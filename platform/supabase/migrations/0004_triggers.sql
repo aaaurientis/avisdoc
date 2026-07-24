@@ -26,8 +26,12 @@ create trigger trg_clients_signe_before
   before update on clients
   for each row execute function creer_job_signature();
 
+-- SECURITY DEFINER : l'insertion du job est une action système déclenchée par
+-- le changement de statut (réservé aux admins via la RLS de `clients`). Elle
+-- doit contourner la RLS de generation_jobs, qui n'accorde pas d'INSERT aux
+-- rôles applicatifs.
 create or replace function creer_job_generation() returns trigger
-language plpgsql as $$
+language plpgsql security definer set search_path = public as $$
 begin
   -- Ouverture de l'espace au passage à 'signe'
   if new.statut_crm = 'signe' and old.statut_crm is distinct from 'signe' then
