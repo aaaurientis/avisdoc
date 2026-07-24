@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { FileText } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { PHASES, type GeneratedDoc, type PhaseCampagne } from "../lib/types";
+import { Badge, Card, PageHeader } from "../../admin/components/ui";
+
+const selectCls =
+  "rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-avisdoc-teal";
 
 export function Bibliotheque({ clientId }: { clientId: string }) {
   const [docs, setDocs] = useState<GeneratedDoc[]>([]);
@@ -33,46 +38,58 @@ export function Bibliotheque({ clientId }: { clientId: string }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-semibold text-avisdoc-ink">Vos documents</h1>
-        <div className="flex gap-2">
-          <select value={phase} onChange={(e) => setPhase(e.target.value as PhaseCampagne | "")}
-            className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
-            <option value="">Toutes les phases</option>
-            {PHASES.map((p) => <option key={p.valeur} value={p.valeur}>{p.libelle}</option>)}
-          </select>
-          <select value={format} onChange={(e) => setFormat(e.target.value)}
-            className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
-            <option value="">Tous les formats</option>
-            {formats.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </div>
-      </div>
+      <PageHeader
+        title="Vos documents"
+        subtitle={`${docs.length} document${docs.length > 1 ? "s" : ""} de campagne à votre disposition`}
+        action={
+          <div className="flex gap-2">
+            <select value={phase} onChange={(e) => setPhase(e.target.value as PhaseCampagne | "")} className={selectCls}>
+              <option value="">Toutes les phases</option>
+              {PHASES.map((p) => <option key={p.valeur} value={p.valeur}>{p.libelle}</option>)}
+            </select>
+            <select value={format} onChange={(e) => setFormat(e.target.value)} className={selectCls}>
+              <option value="">Tous les formats</option>
+              {formats.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        }
+      />
 
-      {err && <p className="mt-4 text-sm text-orange-600">{err}</p>}
+      {err && (
+        <p className="mb-4 rounded-xl border border-orange-400/40 bg-orange-50 px-3.5 py-2 text-sm text-orange-700">{err}</p>
+      )}
 
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {visibles.map((d) => (
-          <li key={d.id} className="flex flex-col justify-between rounded-xl border border-border bg-card p-4">
-            <div>
-              <p className="font-medium">{d.titre}</p>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded bg-muted px-2 py-0.5">{PHASES.find((p) => p.valeur === d.phase)?.libelle}</span>
-                <span>{d.format}</span><span>v{d.version}</span>
-              </p>
+          <Card key={d.id} className="flex flex-col justify-between p-5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-avisdoc-teal/12 text-avisdoc-teal">
+                <FileText className="size-[18px]" strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-avisdoc-ink">{d.titre}</p>
+                <p className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <Badge className="bg-muted text-muted-foreground">
+                    {PHASES.find((p) => p.valeur === d.phase)?.libelle ?? d.phase}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{d.format} · v{d.version}</span>
+                </p>
+              </div>
             </div>
-            <button onClick={() => ouvrir(d)}
-              className="mt-4 self-start rounded-xl bg-avisdoc-ink px-3 py-2 text-sm text-white hover:opacity-90">
+            <button
+              onClick={() => ouvrir(d)}
+              className="mt-4 self-start rounded-xl bg-avisdoc-ink px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
+            >
               Aperçu / Télécharger
             </button>
-          </li>
+          </Card>
         ))}
         {visibles.length === 0 && (
-          <li className="col-span-full rounded-xl border border-border bg-card px-4 py-8 text-center text-muted-foreground">
+          <Card className="col-span-full px-4 py-10 text-center text-muted-foreground">
             Aucun document pour ces filtres.
-          </li>
+          </Card>
         )}
-      </ul>
+      </div>
     </div>
   );
 }

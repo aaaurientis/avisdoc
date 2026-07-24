@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import emailsData from "../data/emails.json";
+import { PageHeader } from "../../admin/components/ui";
 
 interface EmailOption { id: string; angle: string; objet: string; corps: string[] }
 interface Sequence { id: string; libelle: string; envoi: string; options: EmailOption[] }
@@ -42,11 +43,11 @@ export function Emails({ entreprise }: { entreprise: string }) {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-avisdoc-ink">E-mails de campagne</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Renseignez les champs, choisissez la séquence et l'angle, puis copiez le message.
-      </p>
-      <div className="mt-6 grid gap-6 md:grid-cols-[280px_1fr]">
+      <PageHeader
+        title="E-mails de campagne"
+        subtitle="Renseignez les champs, choisissez la séquence et l'angle, puis copiez le message."
+      />
+      <div className="grid gap-6 md:grid-cols-[280px_1fr]">
         <div className="space-y-4">
           <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             {tokens.map((t) => (
