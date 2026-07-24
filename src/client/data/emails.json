@@ -1,0 +1,175 @@
+{
+  "version": "2026.1",
+  "note": "Textes réécrits en ton neutre : suppression des emoji, des superlatifs et des injonctions. Les champs entre accolades sont à substituer.",
+  "variables": {
+    "{{date}}": "Date de la journée de dépistage",
+    "{{lieu}}": "Lieu, salle ou bâtiment",
+    "{{lien}}": "URL du formulaire d'inscription",
+    "{{entreprise}}": "Nom de l'entreprise",
+    "{{signature}}": "Signature de l'expéditeur, par défaut « L'équipe ressources humaines »"
+  },
+  "sequences": [
+    {
+      "id": "annonce",
+      "libelle": "Mail d'annonce",
+      "envoi": "J-21",
+      "options": [
+        {
+          "id": "annonce-1",
+          "angle": "Factuel",
+          "objet": "Journée de dépistage dermatologique le {{date}}",
+          "corps": [
+            "Dans le cadre de sa démarche de prévention santé, {{entreprise}} organise une journée de dépistage des cancers de la peau au sein de ses locaux, en partenariat avec AvisDoc, plateforme de téléexpertise spécialisée en dermatologie.",
+            "L'examen est réalisé par un professionnel de santé, puis analysé à distance par un dermatologue. Il est rapide, non invasif et confidentiel.",
+            "TABLEAU",
+            "La participation est volontaire. Votre employeur n'a accès à aucune information médicale individuelle.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "annonce-2",
+          "angle": "Accès aux soins",
+          "objet": "Dépistage dermatologique sur votre lieu de travail",
+          "corps": [
+            "Les délais d'accès à un dermatologue peuvent atteindre plusieurs mois. {{entreprise}} organise une journée de dépistage des cancers de la peau directement sur site, en partenariat avec AvisDoc.",
+            "L'examen se déroule sur votre temps de travail, sans déplacement ni rendez-vous extérieur. Un professionnel de santé photographie les lésions à documenter ; un dermatologue les analyse ensuite à distance et vous transmet son avis.",
+            "TABLEAU",
+            "La participation est volontaire et confidentielle.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "annonce-3",
+          "angle": "Prévention",
+          "objet": "Prévention des cancers de la peau : journée de dépistage le {{date}}",
+          "corps": [
+            "Le cancer de la peau est le cancer le plus fréquent en France. Détecté tôt, il se traite dans la très grande majorité des cas.",
+            "{{entreprise}} organise une journée de dépistage sur site, en partenariat avec AvisDoc. L'examen est réalisé par un professionnel de santé, puis analysé par un dermatologue.",
+            "TABLEAU",
+            "La participation est volontaire. Les résultats vous sont transmis directement, par voie sécurisée.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "annonce-4",
+          "angle": "Bref",
+          "objet": "Inscription : journée de dépistage dermatologique",
+          "corps": [
+            "{{entreprise}} organise une journée de dépistage des cancers de la peau sur site, en partenariat avec AvisDoc.",
+            "TABLEAU",
+            "L'examen dure moins de quinze minutes. Il est réalisé par un professionnel de santé et analysé par un dermatologue. La participation est volontaire et confidentielle.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "relance-14",
+      "libelle": "Première relance",
+      "envoi": "J-14",
+      "options": [
+        {
+          "id": "relance14-1",
+          "angle": "Rappel simple",
+          "objet": "J-14 : journée de dépistage dermatologique, inscriptions ouvertes",
+          "corps": [
+            "La journée de dépistage des cancers de la peau organisée par {{entreprise}} aura lieu dans deux semaines. Les inscriptions restent ouvertes.",
+            "TABLEAU",
+            "L'examen est réalisé par un professionnel de santé, puis analysé par un dermatologue. Il est rapide, non invasif et confidentiel.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance14-2",
+          "angle": "Organisation",
+          "objet": "J-14 : dépistage dermatologique sur votre temps de travail",
+          "corps": [
+            "Nous vous rappelons la tenue prochaine de la journée de dépistage des cancers de la peau, organisée sur site.",
+            "Le rendez-vous dure moins de quinze minutes et se déroule sur votre temps de travail, sans déplacement.",
+            "TABLEAU",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance14-3",
+          "angle": "Accès aux soins",
+          "objet": "J-14 : un dermatologue vient à vous",
+          "corps": [
+            "Obtenir un rendez-vous chez un dermatologue demande souvent plusieurs mois d'attente. La journée de dépistage organisée par {{entreprise}} vous permet d'obtenir l'avis d'un dermatologue sans déplacement.",
+            "TABLEAU",
+            "La participation est volontaire. Les inscriptions sont ouvertes jusqu'à la veille de la journée, dans la limite des créneaux disponibles.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance14-4",
+          "angle": "Bref",
+          "objet": "J-14 : inscriptions ouvertes",
+          "corps": [
+            "Rappel : la journée de dépistage des cancers de la peau approche.",
+            "TABLEAU",
+            "Examen réalisé par un professionnel de santé, analysé par un dermatologue. Volontaire et confidentiel.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "relance-7",
+      "libelle": "Seconde relance",
+      "envoi": "J-7",
+      "options": [
+        {
+          "id": "relance7-1",
+          "angle": "Rappel simple",
+          "objet": "J-7 : dernière semaine pour vous inscrire au dépistage dermatologique",
+          "corps": [
+            "La journée de dépistage des cancers de la peau a lieu la semaine prochaine. Il reste possible de vous inscrire, dans la limite des créneaux disponibles.",
+            "TABLEAU",
+            "L'examen est réalisé par un professionnel de santé, puis analysé par un dermatologue.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance7-2",
+          "angle": "Organisation",
+          "objet": "J-7 : quinze minutes pour un dépistage dermatologique",
+          "corps": [
+            "À une semaine de la journée de dépistage, nous vous rappelons que l'examen se déroule sur votre lieu de travail et dure moins de quinze minutes.",
+            "TABLEAU",
+            "Les inscriptions restent ouvertes.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance7-3",
+          "angle": "Levée de frein",
+          "objet": "J-7 : ce que prévoit la journée de dépistage",
+          "corps": [
+            "La journée de dépistage des cancers de la peau a lieu la semaine prochaine.",
+            "Le dispositif est volontaire, confidentiel et rapide. Aucun prélèvement n'est effectué : le professionnel de santé photographie les lésions à documenter, un dermatologue les analyse ensuite à distance. Vous recevez son avis par voie sécurisée.",
+            "TABLEAU",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        },
+        {
+          "id": "relance7-4",
+          "angle": "Bref",
+          "objet": "J-7 : derniers créneaux disponibles",
+          "corps": [
+            "Il reste des créneaux pour la journée de dépistage des cancers de la peau.",
+            "TABLEAU",
+            "Examen réalisé sur site par un professionnel de santé, analysé par un dermatologue. Moins de quinze minutes.",
+            "Pour vous inscrire : {{lien}}"
+          ]
+        }
+      ]
+    }
+  ],
+  "tableau_pratique": [
+    ["Date", "{{date}}"],
+    ["Lieu", "{{lieu}}"],
+    ["Durée", "Moins de 15 minutes"]
+  ],
+  "signature_defaut": "L'équipe ressources humaines"
+}
