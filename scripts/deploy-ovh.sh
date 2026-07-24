@@ -48,8 +48,14 @@ if ! command -v lftp >/dev/null 2>&1; then
   exit 1
 fi
 
-# Cibles demandées (défaut : admin + client, la vitrine ne change pas à chaque fois)
-cibles=("$@")
+# Cibles demandées (défaut : admin + client, la vitrine ne change pas à chaque fois).
+# On ignore tout argument à partir d'un « # » : sous zsh, un commentaire collé en
+# fin de ligne est passé comme argument littéral (interactive_comments off).
+cibles=()
+for a in "$@"; do
+  [[ "$a" == \#* ]] && break
+  cibles+=("$a")
+done
 [[ ${#cibles[@]} -eq 0 ]] && cibles=(admin client)
 if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www); fi
 
