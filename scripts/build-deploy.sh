@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$racine"
 
 echo "▸ Build Vite (3 entrées)…"

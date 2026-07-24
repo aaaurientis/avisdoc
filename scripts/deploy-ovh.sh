@@ -1,17 +1,29 @@
 #!/usr/bin/env bash
-# Déploiement du site AvisDoc sur OVH Web Cloud (Apache, SFTP/SSH).
+# Déploiement AvisDoc sur OVH Web Cloud Multisite (Apache, SFTP).
+#
+# OVH sert chaque sous-domaine depuis SON PROPRE dossier (relatif au home) :
+#   avisdoc.fr / www   → OVH_DIR_WWW    (défaut : www)
+#   admin.avisdoc.fr   → OVH_DIR_ADMIN  (défaut : admin)
+#   client.avisdoc.fr  → OVH_DIR_CLIENT (défaut : client)
+#
+# On build d'abord trois dossiers autonomes (scripts/build-deploy.sh), puis on
+# téléverse chacun vers son sous-domaine. Chaque dossier étant propre à une
+# app, le --delete est sûr (ne touche jamais aux autres sous-domaines).
 #
 # Usage :
-#   1. Copier .env.deploy.example en .env.deploy, le remplir.
-#   2. ./scripts/deploy-ovh.sh
+#   ./scripts/deploy-ovh.sh                # admin + client (défaut)
+#   ./scripts/deploy-ovh.sh all            # admin + client + www
+#   ./scripts/deploy-ovh.sh admin          # une seule cible
+#   ./scripts/deploy-ovh.sh client www     # plusieurs cibles
 #
-# Variables attendues (dans .env.deploy ou exportées) :
-#   OVH_HOST       ex. ftp.cluster021.hosting.ovh.net
-#   OVH_USER       login SSH/SFTP
-#   OVH_REMOTE_DIR ex. /www  (racine web sur OVH)
-#   OVH_PORT       optionnel — 22 par défaut (SSH/SFTP)
-#   OVH_PASSWORD   optionnel — mot de passe SFTP (pour offres OVH sans SSH key,
-#                  ex. Web Cloud Éco). Si défini, utilise lftp en mode SFTP.
+# Variables (dans .env.deploy ou exportées) :
+#   OVH_HOST       ex. ftp.cluster129.hosting.ovh.net   (obligatoire)
+#   OVH_USER       login SFTP OVH                        (obligatoire)
+#   OVH_PASSWORD   mot de passe SFTP                     (obligatoire ici)
+#   OVH_PORT       optionnel — 22 par défaut
+#   OVH_DIR_WWW    optionnel — www
+#   OVH_DIR_ADMIN  optionnel — admin
+#   OVH_DIR_CLIENT optionnel — client
 
 set -euo pipefail
 
@@ -25,52 +37,61 @@ fi
 
 : "${OVH_HOST:?Variable OVH_HOST manquante (cf. .env.deploy.example)}"
 : "${OVH_USER:?Variable OVH_USER manquante}"
-: "${OVH_REMOTE_DIR:=/www}"
+: "${OVH_PASSWORD:?Variable OVH_PASSWORD manquante (déploiement SFTP par mot de passe)}"
 : "${OVH_PORT:=22}"
+: "${OVH_DIR_WWW:=www}"
+: "${OVH_DIR_ADMIN:=admin}"
+: "${OVH_DIR_CLIENT:=client}"
 
-echo "▶︎ Build production…"
-npm run build
-
-echo "▶︎ Déploiement vers ${OVH_USER}@${OVH_HOST}:${OVH_REMOTE_DIR} (port ${OVH_PORT})…"
-
-# Mode 1 — SFTP avec mot de passe (offres OVH sans clé SSH, ex. Web Cloud Éco)
-if [[ -n "${OVH_PASSWORD:-}" ]]; then
-  if ! command -v lftp >/dev/null 2>&1; then
-    echo "✗ lftp est requis pour le déploiement par mot de passe SFTP."
-    echo "  macOS  → brew install lftp"
-    echo "  Debian → sudo apt install lftp"
-    exit 1
-  fi
-
-  echo "  → mode : SFTP avec mot de passe (via lftp)"
-  LFTP_PASSWORD="$OVH_PASSWORD" lftp \
-    -u "${OVH_USER},${OVH_PASSWORD}" \
-    "sftp://${OVH_HOST}:${OVH_PORT}" \
-    -e "
-      set sftp:auto-confirm yes;
-      set ssl:verify-certificate no;
-      mirror -R --delete --verbose --parallel=4 \
-        --exclude-glob .DS_Store \
-        --exclude-glob .git \
-        dist/ ${OVH_REMOTE_DIR}/;
-      quit
-    "
-
-# Mode 2 — SSH par clé (offres OVH Pro / Performance / Cloud Web)
-elif command -v rsync >/dev/null 2>&1; then
-  echo "  → mode : rsync SSH (clé)"
-  rsync -avz --delete \
-    -e "ssh -p ${OVH_PORT} -o StrictHostKeyChecking=accept-new" \
-    --exclude ".DS_Store" \
-    --exclude ".git" \
-    dist/ "${OVH_USER}@${OVH_HOST}:${OVH_REMOTE_DIR}/"
-
-else
-  echo "✗ Outils manquants. Installe lftp (SFTP/mot de passe) ou rsync (SSH/clé) :"
-  echo "  macOS  → brew install lftp"
-  echo "  Debian → sudo apt install lftp"
+if ! command -v lftp >/dev/null 2>&1; then
+  echo "✗ lftp est requis. macOS → brew install lftp"
   exit 1
 fi
 
-echo "✓ Déploiement terminé."
-echo "  Vérifie : https://avisdoc.fr (ou ton domaine pointant vers cet hébergement)"
+# Cibles demandées (défaut : admin + client, la vitrine ne change pas à chaque fois)
+cibles=("$@")
+[[ ${#cibles[@]} -eq 0 ]] && cibles=(admin client)
+if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www); fi
+
+# Résout le dossier distant d'une cible.
+dir_distant() {
+  case "$1" in
+    www)    echo "$OVH_DIR_WWW" ;;
+    admin)  echo "$OVH_DIR_ADMIN" ;;
+    client) echo "$OVH_DIR_CLIENT" ;;
+    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | all)" >&2; exit 1 ;;
+  esac
+}
+
+echo "▶︎ Assemblage des dossiers par sous-domaine…"
+"$ROOT_DIR/scripts/build-deploy.sh"
+
+for cible in "${cibles[@]}"; do
+  local_dir="dist-deploy/$cible"
+  remote_dir="$(dir_distant "$cible")"
+  if [[ ! -d "$local_dir" ]]; then
+    echo "✗ $local_dir introuvable — le build a-t-il réussi ?"; exit 1
+  fi
+  echo
+  echo "▶︎ $cible → ${OVH_USER}@${OVH_HOST}:${remote_dir}/  (port ${OVH_PORT})"
+  lftp -u "${OVH_USER},${OVH_PASSWORD}" "sftp://${OVH_HOST}:${OVH_PORT}" -e "
+    set sftp:auto-confirm yes;
+    set net:timeout 15;
+    set net:max-retries 2;
+    mirror -R --delete --verbose --parallel=4 \
+      --exclude-glob .DS_Store \
+      ${local_dir}/ ${remote_dir}/;
+    quit
+  "
+  echo "  ✓ $cible déployé."
+done
+
+echo
+echo "✓ Terminé. Vérifie :"
+for cible in "${cibles[@]}"; do
+  case "$cible" in
+    www)    echo "  https://avisdoc.fr" ;;
+    admin)  echo "  https://admin.avisdoc.fr" ;;
+    client) echo "  https://client.avisdoc.fr" ;;
+  esac
+done
