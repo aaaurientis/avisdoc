@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Compte-rendu de télé-expertise, dermatologie</title>
+<style>
+  /* ============ POLICES : pile standard, Aptos en tête ============ */
+
+  /* ============ JETONS (charte §1) ============ */
+  :root{
+    --creme:#F7F4EF;
+    --marine:#142A33;
+    --cyan:#0CA6DF;
+    --cyan-clair:#29B1E0;
+    --orange:#EC7735;
+    --ardoise:#5C6A6E;
+    --beige:#E3DCD2;
+    --filet-carte:#E3DCD2;
+    --cyan-tres-clair:#EAF6FB;
+    --taupe:#9A8E7F;
+    --blanc:#FFFFFF;
+
+    --serif:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+    --sans:"Aptos","Aptos Display","Calibri","Carlito","Segoe UI",Arial,sans-serif;
+  }
+
+  /* ============ PAGE ============ */
+  @page{
+    size:A4;
+    margin:22mm 16mm 15mm;
+    background:var(--blanc);
+
+    @top-left{content:element(brandhead);vertical-align:bottom;padding-bottom:5mm}
+    @top-right{content:element(refhead);vertical-align:bottom;padding-bottom:5mm}
+    @bottom-left{content:element(brandfoot);vertical-align:top;padding-top:4mm}
+    @bottom-right{
+      content:"Mai 2026 · " counter(page,decimal-leading-zero);
+      vertical-align:top;padding-top:4mm;
+      font-family:var(--sans);font-size:8pt;color:var(--taupe);
+    }
+  }
+
+  html{background:var(--blanc)}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:11pt;
+    line-height:1.5;
+    color:var(--marine);
+  }
+  .wordmark{font-weight:700}
+  .wordmark .a{color:var(--cyan)}
+  .wordmark .d{color:var(--orange)}
+
+  /* En-tête et pied de page courants */
+  .brandhead{position:running(brandhead);display:flex;align-items:center;gap:2.4mm;white-space:nowrap}
+  .brandhead img:not(.logo-client){width:6.2mm;height:auto}
+  .brandhead .site{font-size:8pt;color:var(--taupe)}
+  .refhead{position:running(refhead);font-size:8pt;color:var(--taupe);white-space:nowrap;text-align:right}
+  /* ============ Emplacement logo client (injection automatique) ============ */
+  .logo-client{height:6.4mm;width:auto;max-width:42mm;display:block;object-fit:contain}
+  .sep-client{width:.5pt;height:5mm;background:var(--beige);flex:none}
+  .apercu .logo-client-vide{
+    display:inline-block;height:6.4mm;min-width:22mm;
+    border:.5pt dashed var(--taupe);border-radius:1mm;
+    font-size:6.5pt;font-style:italic;color:var(--taupe);
+    text-align:center;line-height:6.4mm;
+  }
+  .brandfoot{position:running(brandfoot);font-size:8pt;color:var(--taupe);white-space:nowrap}
+  .brandfoot .wordmark{font-size:8.5pt}
+
+  /* ============ TITRE DU DOCUMENT (charte §5) ============ */
+  .doc-head{display:flex;gap:10mm;align-items:flex-start;margin-bottom:7mm}
+  .kicker{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--orange);
+    margin-bottom:2.5mm;
+  }
+  h1{
+    font-family:var(--serif);font-weight:700;letter-spacing:-.015em;
+    font-size:26pt;line-height:1.12;color:var(--marine);
+    margin:0;
+  }
+  h1 em{font-style:italic;color:var(--cyan)}
+  .doc-sub{font-size:10.5pt;color:var(--ardoise);margin:2.5mm 0 0}
+  .doc-meta{margin-left:auto;flex:none;text-align:right;min-width:52mm}
+  .doc-meta .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--taupe);
+  }
+  .doc-meta .v{font-size:9.5pt;font-weight:600;color:var(--marine);letter-spacing:.02em;font-feature-settings:"tnum"}
+  .doc-meta .grp + .grp{margin-top:2.4mm}
+
+  /* ============ ENCADRÉ RÉSULTAT (charte §5, note à filet cyan) ============ */
+  .resultat{
+    background:var(--cyan-tres-clair);
+    border-left:3.5pt solid var(--cyan);
+    border-radius:0 2mm 2mm 0;
+    padding:4.5mm 5.5mm;margin-bottom:6.5mm;
+    break-inside:avoid;
+  }
+  .resultat .kicker{color:var(--orange);margin-bottom:2mm}
+  .resultat h2{
+    font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--marine);
+    margin:0 0 3mm;padding-bottom:3mm;border-bottom:.5pt solid rgba(12,166,223,.30);
+  }
+  .champs{display:grid;grid-template-columns:30mm 1fr;gap:0 5mm}
+  .champs .k{
+    font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--cyan);padding-top:.9mm;
+  }
+  .champs .v{font-size:10.5pt;color:var(--ardoise);line-height:1.5}
+  .champs .v .lead{display:block;font-weight:600;color:var(--marine)}
+  .champs .r2{margin-top:2.5mm;padding-top:2.5mm;border-top:.5pt solid rgba(12,166,223,.20)}
+  .champs .k.r2{padding-top:3.4mm}
+
+  /* ============ SECTIONS (charte §4, numérotation 01 ·) ============ */
+  section{margin-bottom:4mm;break-inside:avoid}
+  .sec-head{display:flex;align-items:center;gap:3mm;margin-bottom:3.5mm}
+  .sec-head .lbl{
+    font-family:var(--sans);font-size:9pt;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--orange);
+    white-space:nowrap;
+  }
+  .sec-head::after{content:"";flex:1;height:.5pt;background:var(--beige)}
+
+  /* ============ GRILLES DE CHAMPS ============ */
+  .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:4.5mm 5mm}
+  .field .k{
+    font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);margin-bottom:.8mm;line-height:1.25;
+  }
+  .field .v{font-size:10.5pt;font-weight:600;color:var(--marine)}
+  .field .v.num{letter-spacing:.03em;font-feature-settings:"tnum";white-space:nowrap}
+  .field .v.num.nir{font-size:9.5pt}
+  .field .v.nr{color:var(--taupe);font-weight:400;font-style:italic}
+
+  /* ============ CARTES (charte §4) ============ */
+  .cards-2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .card{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm}
+  .card .role{
+    font-size:7.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--cyan);margin-bottom:1.2mm;
+  }
+  .card .nom{font-family:var(--serif);font-size:13pt;font-weight:700;color:var(--marine);line-height:1.25}
+  /* grille libelle / valeur : les lignes se calent entre les deux cartes */
+  .card .ids{display:grid;grid-template-columns:17mm 1fr;gap:1.4mm 3mm;margin:2.5mm 0 0;font-size:9.5pt}
+  .card .ids dt{
+    font-size:7pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--taupe);padding-top:.7mm;
+  }
+  .card .ids dd{margin:0;color:var(--ardoise)}
+  .card .ids dd.num{letter-spacing:.03em;font-feature-settings:"tnum";color:var(--marine);font-weight:600}
+  .card .ids dd.nr{color:var(--taupe);font-style:italic}
+
+
+  /* ============ PASTILLES ============ */
+  .pills{display:grid;grid-template-columns:1fr 1fr;gap:1.6mm 8mm}
+  .pill-row{display:flex;align-items:center;gap:3mm;font-size:10pt;color:var(--ardoise)}
+  .pill{
+    font-size:7.5pt;font-weight:700;letter-spacing:.06em;
+    padding:.5mm 2.2mm;border-radius:6mm;flex:none;min-width:8mm;text-align:center;
+  }
+  .pill.rens{background:var(--cyan-tres-clair);color:var(--marine)}
+  .pill.nr{background:transparent;border:.5pt dashed var(--beige);color:var(--taupe);font-weight:600}
+  .dl{border-top:.5pt dashed var(--beige);margin-top:3mm;padding-top:2mm;font-size:10pt;color:var(--ardoise)}
+  .dl + .dl{border:0;margin-top:.4mm;padding-top:0}
+  .dl b{color:var(--marine);font-weight:600}
+  .dl .nr{color:var(--taupe);font-style:italic}
+
+  /* ============ ZONE DOCUMENTÉE ============ */
+  section.zones{break-inside:auto}
+  .zone{break-inside:avoid;background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;overflow:hidden}
+  .zone-head{display:flex;align-items:center;gap:3mm;padding:3.5mm 4.5mm;border-bottom:.5pt solid var(--filet-carte)}
+  .zone-num{
+    width:5.5mm;height:5.5mm;border-radius:1.4mm;background:var(--cyan);color:var(--blanc);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:8.5pt;font-weight:700;
+  }
+  .zone-head .t{font-family:var(--sans);font-size:12pt;font-weight:700;color:var(--cyan)}
+  .zone-body{padding:3.5mm 4.5mm 4mm}
+  .zone-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3.5mm 5mm}
+  /* deux couples image + légende par ligne, la légende à côté de son image */
+  .shots{display:grid;grid-template-columns:repeat(2,1fr);gap:3mm 5mm;margin-top:4mm}
+  figure{margin:0;display:flex;gap:3.5mm;align-items:flex-start;min-width:0}
+  figure img{width:26mm;height:26mm;flex:none;object-fit:cover;border-radius:1.4mm;border:.5pt solid var(--filet-carte);display:block}
+  figcaption{flex:1;min-width:0;font-size:8.5pt;font-style:italic;color:var(--taupe);line-height:1.5;padding-top:.8mm}
+
+  /* ============ CONDUITE À TENIR (grands chiffres Newsreader cyan, charte §4) ============ */
+  .etape{display:flex;gap:4.5mm;align-items:baseline;padding:2mm 0;border-top:.5pt solid var(--beige)}
+  .etape:last-child{border-bottom:.5pt solid var(--beige)}
+  .etape .n{
+    font-family:var(--serif);font-size:19pt;font-weight:700;color:var(--cyan);
+    line-height:1;flex:none;width:9mm;font-feature-settings:"tnum"
+  }
+  .etape p{margin:0;font-size:10.5pt;color:var(--ardoise);line-height:1.55}
+  .etape b{color:var(--marine);font-weight:600}
+
+  /* ============ MENTIONS ============ */
+  .legal{
+    margin-top:4mm;background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;
+    padding:2.6mm 3.6mm;font-size:8pt;color:var(--ardoise);line-height:1.45;break-inside:avoid;
+
+  }
+  .legal p{margin:0 0 1.6mm}
+  .legal p:last-child{margin-bottom:0}
+  .legal b{color:var(--marine);font-weight:600}
+  .legal .fictif{color:var(--taupe);font-style:italic;margin-bottom:0}
+</style>
+</head>
+<body>
+
+<!-- En-tête et pied de page courants -->
+<div class="brandhead">
+  <img src="__LOGO__" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+  <span class="sep-client" data-slot="logo-client"></span>
+  <img class="logo-client" data-slot="logo-client" src="__LOGO_CLIENT__" alt="">
+</div>
+<div class="refhead">Compte-rendu de télé-expertise · Dermatologie</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<!-- TITRE -->
+<div class="doc-head">
+  <div>
+    <div class="kicker">Compte-rendu d'avis spécialisé</div>
+    <h1>Avis de télé-expertise,<br><em>dermatologie</em></h1>
+    <p class="doc-sub">Avis asynchrone rendu à la demande du Dr Julien Marchand.</p>
+  </div>
+  <div class="doc-meta">
+    <div class="grp">
+      <div class="k">Référence dossier</div>
+      <div class="v">7c4b0932e18a5df6b0271e44</div>
+    </div>
+    <div class="grp">
+      <div class="k">Motif</div>
+      <div class="v">Tumeurs cutanées</div>
+    </div>
+    <div class="grp">
+      <div class="k">Demande créée le</div>
+      <div class="v">20/05/2026</div>
+    </div>
+    <div class="grp">
+      <div class="k">Images transmises</div>
+      <div class="v">2</div>
+    </div>
+  </div>
+</div>
+
+<!-- RÉSULTAT -->
+<div class="resultat">
+  <div class="kicker">Résultat de la télé-expertise</div>
+  <h2>Avis classé NON URGENT : aucune action immédiate requise.</h2>
+  <div class="champs">
+    <div class="k">Avis</div>
+    <div class="v">
+      <span class="lead">Lésion ne paraissant pas suspecte.</span>
+      Vérifier l'absence d'évolutivité.
+    </div>
+    <div class="k r2">Recommandation</div>
+    <div class="v r2">Consultation dermatologique non indispensable.</div>
+  </div>
+</div>
+
+<!-- 01 PATIENT -->
+<section>
+  <div class="sec-head"><span class="lbl">01 · Patient</span></div>
+  <div class="fields">
+    <div class="field"><div class="k">Nom / Prénom</div><div class="v">Marion Delaunay</div></div>
+    <div class="field"><div class="k">Sexe</div><div class="v">Féminin</div></div>
+    <div class="field"><div class="k">Date de naissance</div><div class="v num">12/06/1982 (43 ans)</div></div>
+    <div class="field"><div class="k">NIR</div><div class="v num nir">2 82 06 92 025 118 / 95</div></div>
+    <div class="field"><div class="k">Téléphone</div><div class="v num">06 39 98 42 17</div></div>
+    <div class="field"><div class="k">Adresse postale</div><div class="v num">92100</div></div>
+    <div class="field"><div class="k">Organisme payeur</div><div class="v nr">Non renseigné</div></div>
+  </div>
+</section>
+
+<!-- 02 MÉDECINS -->
+<section>
+  <div class="sec-head"><span class="lbl">02 · Professionnels de santé</span></div>
+  <div class="cards-2">
+    <div class="card">
+      <div class="role">Requérant</div>
+      <div class="nom">Dr Julien Marchand</div>
+      <dl class="ids">
+        <dt>RPPS</dt><dd class="num">123 456 789 01</dd>
+        <dt>ADELI</dt><dd class="num">1 234 5678 9</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <div class="role">Expert Dermatologue</div>
+      <div class="nom">Dr Hélène Vasseur</div>
+      <dl class="ids">
+        <dt>RPPS</dt><dd class="num">123 456 789 01</dd>
+        <dt>ADELI</dt><dd class="num">1 234 5678 9</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- 04 INTERROGATOIRE -->
+<section>
+  <div class="sec-head"><span class="lbl">03 · Interrogatoire et terrain</span></div>
+  <div class="pills">
+    <div class="pill-row"><span class="pill rens">Non</span> Antécédents de cancers cutanés</div>
+    <div class="pill-row"><span class="pill rens">Non</span> Antécédents familiaux de mélanome</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Patiente autonome</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Phototype clair</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Aspirine / antiagrégants</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Anticoagulants</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Immunodépression</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Démence</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Logement</div>
+    <div class="pill-row"><span class="pill nr">N.R.</span> Traitements antérieurs</div>
+  </div>
+  <div class="dl"><b>Autres antécédents :</b> <span class="nr">non renseignés.</span></div>
+  <div class="dl"><b>Traitements en cours :</b> <span class="nr">non renseignés.</span></div>
+  <div class="dl"><b>Commentaires libres :</b> <span class="nr">non renseignés.</span></div>
+</section>
+
+<!-- 05 ZONE -->
+<section class="zones">
+  <div class="sec-head"><span class="lbl">04 · Zone documentée</span></div>
+  <div class="zone">
+    <div class="zone-head">
+      <span class="zone-num">1</span>
+      <span class="t">Cuisse gauche</span>
+    </div>
+    <div class="zone-body">
+      <div class="zone-grid">
+        <div class="field"><div class="k">Taille</div><div class="v num">5 mm</div></div>
+        <div class="field"><div class="k">Ancienneté</div><div class="v">Plusieurs années</div></div>
+        <div class="field"><div class="k">Douleur</div><div class="v">Non</div></div>
+      </div>
+      <div class="shots">
+        <figure><img src="__IMG1__" alt=""><figcaption>1 · Dermatoscopie</figcaption></figure>
+        <figure><img src="__IMG2__" alt=""><figcaption>2 · Clinique</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 CONDUITE À TENIR -->
+<section>
+  <div class="sec-head"><span class="lbl">05 · Conduite à tenir, informations patiente</span></div>
+  <div class="etape"><span class="n">1</span><p><b>Aucune consultation urgente n'est nécessaire :</b> la lésion de votre cuisse gauche ne paraît pas suspecte. Un rendez-vous chez un dermatologue n'est pas indispensable à ce stade.</p></div>
+  <div class="etape"><span class="n">2</span><p><b>Surveillez la lésion :</b> vérifiez qu'elle n'évolue pas (taille, couleur, bords, relief, saignement).</p></div>
+  <div class="etape"><span class="n">3</span><p><b>Reconsultez en cas de changement :</b> si vous constatez une modification, contactez votre médecin. Un nouvel avis ou une consultation en présentiel sera alors nécessaire.</p></div>
+</section>
+
+<!-- MENTIONS -->
+<div class="legal">
+  <p><b>Portée de l'avis :</b> cet avis de télé-expertise est rendu à distance, sur la base des éléments cliniques et
+  photographiques transmis par le médecin requérant. Il ne se substitue pas à un examen clinique direct ni à une
+  consultation présentielle. La responsabilité de la prise en charge et du suivi demeure celle du médecin requérant.
+  En cas d'aggravation ou d'élément nouveau, un nouvel avis ou une consultation présentielle doit être sollicité.</p>
+  <p><b>Confidentialité :</b> document contenant des données de santé à caractère personnel, hébergé chez un Hébergeur
+  de Données de Santé (HDS) certifié, traité conformément au RGPD. Diffusion strictement limitée à la patiente et au
+  médecin requérant.</p>
+  <p class="fictif">Jeu de données fictif, document de démonstration. Aucune donnée de santé réelle.</p>
+</div>
+
+</body>
+</html>

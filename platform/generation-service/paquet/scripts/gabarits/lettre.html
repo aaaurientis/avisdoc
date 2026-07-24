@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Lettre d'adressage</title>
+<style>
+__CHARTE__
+
+/* ---- Ordonnance : neutre, noir et blanc, sans marque ---- */
+:root{
+  --creme:#FFFFFF;
+  --marine:#111111;
+  --ardoise:#333333;
+  --beige:#D8D8D8;
+  --taupe:#8A8A8A;
+}
+@page{
+  margin:18mm 20mm 15mm;
+  @top-left{content:none}
+  @top-right{content:none}
+  @bottom-left{content:none}
+  @bottom-right{
+    content:counter(page) "/" counter(pages);
+    vertical-align:top;padding-top:4mm;
+    font-family:var(--sans);font-size:8pt;color:var(--taupe);
+  }
+}
+body{font-size:11pt;color:var(--marine)}
+
+/* En-tête praticien */
+.entete{display:flex;gap:10mm;align-items:flex-start;padding-bottom:4mm;border-bottom:.5pt solid var(--beige)}
+.entete .nom{font-size:15pt;font-weight:700;line-height:1.2}
+.entete .spe{
+  font-size:8.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--marine);margin-top:1.5mm;
+}
+.entete .titres{font-size:8.5pt;font-style:italic;color:var(--taupe);line-height:1.5;margin-top:2.5mm}
+.entete .bloc-droite{margin-left:auto;text-align:right;flex:none}
+.entete .logo-client{margin:0 0 3mm auto}
+.entete .coord{font-size:9pt;color:var(--ardoise);line-height:1.7}
+.entete .coord .num{letter-spacing:.03em;font-feature-settings:"tnum"}
+
+.date{text-align:right;font-size:10.5pt;margin:6mm 0 9mm}
+
+/* Corps */
+.lettre{line-height:1.7;max-width:150mm}
+.lettre p{margin:0 0 4mm}
+.lettre .appel{margin-bottom:5mm}
+.lettre .formule{margin-top:6mm}
+
+/* Signature */
+.signature{display:flex;justify-content:flex-end;margin-top:10mm}
+.signature .bloc{min-width:64mm}
+.signature .nom{font-size:11pt;font-weight:700}
+.signature .meta{font-size:8.5pt;color:var(--taupe);line-height:1.6;margin-top:.8mm}
+.signature .zone-sig{
+  height:24mm;margin-top:3mm;border:.5pt dashed var(--beige);border-radius:1.4mm;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8pt;font-style:italic;color:var(--taupe);
+}
+</style>
+</head>
+<body>
+
+<div class="entete">
+  <div>
+    <div class="nom">Dr Henry Pawin</div>
+    <div class="spe">Dermatologue et vénérologue</div>
+    <div class="titres">
+      Ancien Interne des Hôpitaux de Paris<br>
+      Lauréat de la Faculté de Médecine de Paris<br>
+      Membre de la Société Française de Dermatologie<br>
+      Member of the American Academy of Dermatology
+    </div>
+  </div>
+  <div class="bloc-droite">
+    <img class="logo-client" data-slot="logo-client" src="__LOGO_CLIENT__" alt="">
+    <div class="coord">
+    11 chaussée de la Muette<br>75016 Paris<br>
+    Tél <span class="num">01 42 88 00 88</span><br>
+    RPPS <span class="num">1000056169</span>
+    </div>
+  </div>
+</div>
+
+<p class="date">Le 28 avril 2026</p>
+
+<div class="lettre">
+  <p class="appel">Mon cher Confrère,</p>
+  <p>Dans le cadre d'une journée de dépistage des tumeurs cutanées en téléexpertise organisée dans son entreprise,
+  le dermatologue expert a vu les photos de ce patient. Il existe un doute sur une lésion.</p>
+  <p>Je vous remercie de le prendre en charge pour le voir en présentiel ou pour pratiquer une exérèse ou une biopsie
+  avec histologie. Pourriez-vous me tenir au courant du résultat histologique ?</p>
+  <p class="formule">En vous remerciant par avance, bien confraternellement,</p>
+</div>
+
+<div class="signature">
+  <div class="bloc">
+    <div class="nom">Dr Henry Pawin</div>
+    <div class="meta">RPPS <span style="letter-spacing:.03em">1000056169</span></div>
+    <div class="zone-sig">Signature électronique à apposer</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Contexte de build : n'envoyer que le nécessaire à l'image.
+tests/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.env
+*.md
+requirements-dev.txt
+paquet/**/node_modules/

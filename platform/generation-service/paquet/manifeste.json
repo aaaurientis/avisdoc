@@ -1,0 +1,190 @@
+{
+  "version": "2026.1",
+  "genere_par": "build.py",
+  "niveaux_acces": {
+    "public": "diffusable sans authentification",
+    "client": "espace client authentifié",
+    "hds": "données de santé, plateforme certifiée HDS uniquement, jamais sur le web"
+  },
+  "phases": [
+    "cadrage",
+    "annonce",
+    "relance",
+    "preparation",
+    "jour-j",
+    "bilan"
+  ],
+  "documents": [
+    {
+      "id": "affiche-1",
+      "fichier": "affiches/Affiche-1-Prenez-soin-de-votre-peau.pdf",
+      "titre": "Affiche · Prenez soin de votre peau",
+      "format": "A2",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "annonce",
+      "existe": true,
+      "octets": 259387
+    },
+    {
+      "id": "affiche-2",
+      "fichier": "affiches/Affiche-2-Preserver-sa-peau.pdf",
+      "titre": "Affiche · Préserver sa peau, c'est aussi préserver sa santé",
+      "format": "A2",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "annonce",
+      "existe": true,
+      "octets": 276089
+    },
+    {
+      "id": "affiche-3",
+      "fichier": "affiches/Affiche-3-Prenez-soin-de-votre-peau-2.pdf",
+      "titre": "Affiche · Prenez soin de votre peau (variante)",
+      "format": "A2",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "annonce",
+      "existe": true,
+      "octets": 299624
+    },
+    {
+      "id": "affiche-4",
+      "fichier": "affiches/Affiche-4-Difficultes-rendez-vous.pdf",
+      "titre": "Affiche · Difficultés à prendre un rendez-vous ?",
+      "format": "A2",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "relance",
+      "existe": true,
+      "octets": 483422
+    },
+    {
+      "id": "affiche-5",
+      "fichier": "affiches/Affiche-5-Difficultes-rendez-vous-2.pdf",
+      "titre": "Affiche · Difficultés à prendre un rendez-vous ? (variante)",
+      "format": "A2",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "relance",
+      "existe": true,
+      "octets": 282157
+    },
+    {
+      "id": "kit-collaborateur",
+      "fichier": "pdf/Kit-collaborateur-AvisDoc.pdf",
+      "titre": "Kit collaborateur",
+      "format": "A4",
+      "logo_client": true,
+      "acces": "public",
+      "phase": "preparation",
+      "existe": true,
+      "octets": 292935
+    },
+    {
+      "id": "correspondants",
+      "fichier": "pdf/Correspondants-Paris-AvisDoc.pdf",
+      "titre": "Réseau d'aval · correspondants Paris",
+      "format": "A4",
+      "logo_client": true,
+      "acces": "client",
+      "phase": "bilan",
+      "existe": true,
+      "octets": 31227
+    },
+    {
+      "id": "kit-com-interne",
+      "fichier": "pptx/KIT_COM_INTERNE_AvisDoc.pptx",
+      "titre": "Mode d'emploi RH",
+      "format": "16:9",
+      "logo_client": true,
+      "acces": "client",
+      "phase": "cadrage",
+      "existe": true,
+      "octets": 207324
+    },
+    {
+      "id": "kit-collaborateur-ppt",
+      "fichier": "pptx/KIT_COLLABORATEUR_AvisDoc.pptx",
+      "titre": "Kit collaborateur (présentation)",
+      "format": "16:9",
+      "logo_client": true,
+      "acces": "client",
+      "phase": "preparation",
+      "existe": true,
+      "octets": 1076467
+    },
+    {
+      "id": "emails",
+      "fichier": "pdf/Recueil-emails-campagne-AvisDoc.pdf",
+      "titre": "Recueil des e-mails de campagne",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "client",
+      "phase": "annonce",
+      "note": "Servir depuis gabarits/emails.json, pas depuis ce PDF.",
+      "existe": true,
+      "octets": 46770
+    },
+    {
+      "id": "notice-consentement",
+      "fichier": "pdf/Notice-information-consentement-AvisDoc.pdf",
+      "titre": "Notice d'information et de consentement à un acte de télémédecine",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "public",
+      "phase": "preparation",
+      "note": "Contenu juridique validé. Mise en page modifiable, texte non.",
+      "existe": true,
+      "octets": 46153
+    },
+    {
+      "id": "formulaire-consentement",
+      "fichier": "pdf/Formulaire-consentement-patient-AvisDoc.pdf",
+      "titre": "Formulaire de consentement du patient",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "client",
+      "phase": "jour-j",
+      "note": "À imprimer, environ 35 exemplaires par journée. Texte non modifiable.",
+      "existe": true,
+      "octets": 33804
+    },
+    {
+      "id": "cr-1zone",
+      "fichier": "pdf/CR-teleexpertise-AvisDoc.pdf",
+      "titre": "Compte-rendu de téléexpertise · une zone",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "hds",
+      "phase": "bilan",
+      "note": "Données de santé. Jeu de démonstration fictif dans ce paquet.",
+      "existe": true,
+      "octets": 65155
+    },
+    {
+      "id": "cr-2zones",
+      "fichier": "pdf/CR-teleexpertise-AvisDoc-2zones.pdf",
+      "titre": "Compte-rendu de téléexpertise · deux zones",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "hds",
+      "phase": "bilan",
+      "note": "Données de santé. Jeu de démonstration fictif dans ce paquet.",
+      "existe": true,
+      "octets": 81804
+    },
+    {
+      "id": "lettre-adressage",
+      "fichier": "pdf/Lettre-adressage.pdf",
+      "titre": "Lettre d'adressage confraternelle",
+      "format": "A4",
+      "logo_client": false,
+      "acces": "hds",
+      "phase": "bilan",
+      "note": "Neutre, sans marque. Ne pas ajouter de logo.",
+      "existe": true,
+      "octets": 18660
+    }
+  ]
+}

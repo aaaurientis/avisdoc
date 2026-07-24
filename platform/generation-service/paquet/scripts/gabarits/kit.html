@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Kit collaborateur, dépistage du cancer cutané</title>
+<style>
+__CHARTE__
+
+/* ============ Spécifique au kit ============ */
+@page{ @bottom-right{content:"Kit collaborateur 2026 · " counter(page,decimal-leading-zero)} }
+.doc-meta{min-width:32mm}
+h1{font-size:23pt}
+.doc-head > div:first-child{flex:1;min-width:0}
+
+
+/* Chiffres clés */
+.chiffres{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+.chiffre{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm}
+.chiffre .n{font-size:24pt;font-weight:700;color:var(--cyan);line-height:1.1;letter-spacing:-.02em}
+.chiffre .l{font-size:9.5pt;color:var(--ardoise);line-height:1.45;margin-top:1.5mm}
+.source{font-size:7.5pt;font-style:italic;color:var(--taupe);margin:2.5mm 0 0}
+
+/* Étapes */
+.etapes{display:grid;grid-template-columns:repeat(2,1fr);gap:4mm 5mm}
+.etape-k{display:flex;gap:3.5mm;align-items:flex-start}
+.etape-k .n{
+  width:6.5mm;height:6.5mm;border-radius:50%;background:var(--cyan);color:var(--blanc);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:9pt;font-weight:700;margin-top:.4mm;
+}
+.etape-k .t{font-size:10.5pt;font-weight:700;color:var(--marine);line-height:1.35}
+.etape-k .d{font-size:9.5pt;color:var(--ardoise);line-height:1.5;margin-top:.8mm}
+
+/* Deux colonnes texte + image */
+.duo{display:flex;gap:6mm;align-items:flex-start}
+.duo .txt{flex:1;min-width:0}
+.duo .img{width:44mm;flex:none}
+.duo .img img{width:44mm;height:44mm;object-fit:cover;border-radius:2mm;display:block}
+
+ul.puces{margin:0;padding-left:4.5mm;font-size:10.5pt;color:var(--ardoise);line-height:1.6}
+ul.puces li{margin-bottom:1.8mm}
+ul.puces li::marker{color:var(--cyan)}
+ul.puces b{color:var(--marine);font-weight:700}
+
+.sous-titre{
+  font-size:8pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--cyan);margin:0 0 2mm;
+}
+.sous-titre + ul.puces{margin-bottom:5mm}
+
+/* Planche ABCDE : image à gauche, légende en colonne à droite */
+.abcde{display:flex;gap:6mm;align-items:flex-start}
+.abcde img{width:112mm;flex:none;border:.5pt solid var(--filet-carte);border-radius:2mm;display:block}
+.abcde-legende{flex:1;min-width:0;display:flex;flex-direction:column;gap:3.5mm;padding-top:1mm}
+.abcde-legende div{display:flex;gap:3mm;align-items:baseline;font-size:9.5pt;color:var(--ardoise);line-height:1.35}
+.abcde-legende b{color:var(--cyan);font-size:15pt;font-weight:700;width:5mm;flex:none}
+
+/* Situations */
+.situations{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
+.situation{border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm;background:var(--blanc)}
+.situation.alerte{background:#FEF4EE;border-color:#F6D3BE}
+.situation .t{font-size:10.5pt;font-weight:700;color:var(--marine);margin-bottom:1.5mm}
+.situation.alerte .t{color:var(--orange)}
+.situation p{margin:0;font-size:9.5pt;color:var(--ardoise);line-height:1.55}
+
+/* FAQ */
+.faq{break-inside:auto}
+.qr{padding:3mm 0;border-top:.5pt solid var(--beige);break-inside:avoid}
+.qr:last-child{border-bottom:.5pt solid var(--beige)}
+.qr .q{font-size:10.5pt;font-weight:700;color:var(--marine);margin-bottom:1.2mm}
+.qr .r{font-size:10pt;color:var(--ardoise);line-height:1.55}
+</style>
+</head>
+<body>
+
+<div class="brandhead">
+  <img src="__LOGO__" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+  <span class="sep-client" data-slot="logo-client"></span>
+  <img class="logo-client" data-slot="logo-client" src="__LOGO_CLIENT__" alt="">
+</div>
+<div class="refhead">Kit collaborateur · Dépistage du cancer cutané</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<!-- TITRE -->
+<div class="doc-head">
+  <div>
+    <div class="kicker">Kit collaborateur</div>
+    <h1>Votre entreprise s'engage pour la<br><em>prévention du cancer cutané</em></h1>
+    <p class="doc-sub">Tout ce qu'il faut savoir sur votre journée de dépistage.</p>
+  </div>
+</div>
+
+<!-- 01 LE CANCER DE LA PEAU -->
+<section>
+  <div class="sec-head"><span class="lbl">01 · Le cancer de la peau</span></div>
+  <p class="doc-sub" style="margin:0 0 4mm">Un enjeu majeur de santé publique, dont le pronostic dépend de la précocité du dépistage.</p>
+  <div class="chiffres">
+    <div class="chiffre"><div class="n">≈ 200 000</div><div class="l">cancers de la peau par an</div></div>
+    <div class="chiffre"><div class="n">≈ 20 000</div><div class="l">nouveaux mélanomes détectés par an</div></div>
+    <div class="chiffre"><div class="n">≈ 2 000</div><div class="l">décès chaque année</div></div>
+  </div>
+  <p class="source">Source : Institut National du Cancer.</p>
+</section>
+
+<!-- 02 LES ÉTAPES -->
+<section>
+  <div class="sec-head"><span class="lbl">02 · Les étapes clés de votre dépistage</span></div>
+  <div class="etapes">
+    <div class="etape-k"><span class="n">1</span><div>
+      <div class="t">Prise de rendez-vous</div>
+      <div class="d">Auprès de vos RH.</div></div></div>
+    <div class="etape-k"><span class="n">2</span><div>
+      <div class="t">Préparation de votre visite</div>
+      <div class="d">Auto-examen en utilisant la règle ABCDE, décrite en section 03.</div></div></div>
+    <div class="etape-k"><span class="n">3</span><div>
+      <div class="t">Journée de dépistage</div>
+      <div class="d">Rendez-vous individuel avec un professionnel de santé, incluant un examen à l'aide d'un dermatoscope.</div></div></div>
+    <div class="etape-k"><span class="n">4</span><div>
+      <div class="t">Résultats sur la plateforme AvisDoc</div>
+      <div class="d">Deux orientations possibles, décrites en section 05.</div></div></div>
+  </div>
+</section>
+
+<!-- 03 PRÉPARER -->
+<section>
+  <div class="sec-head"><span class="lbl">03 · Comment préparer votre dépistage</span></div>
+  <div class="duo">
+    <div class="txt">
+      <ul class="puces">
+        <li><b>Auto-examen cutané</b> en suivant la règle ABCDE, ci-dessous.</li>
+        <li><b>S'examiner de la tête aux pieds</b>, sans oublier les plantes de pieds et le cuir chevelu.</li>
+        <li><b>Se faire aider par son entourage</b> pour les zones non visibles.</li>
+        <li><b>Noter vos antécédents</b>, en particulier familiaux de cancers cutanés, et vos traitements des 3 derniers mois.</li>
+      </ul>
+    </div>
+    <div class="img"><img src="__AUTOEX__" alt=""></div>
+  </div>
+</section>
+
+<!-- 04 RÈGLE ABCDE -->
+<section>
+  <div class="sec-head"><span class="lbl">04 · La règle ABCDE</span></div>
+  <div class="abcde">
+    <img src="__ABCDE__" alt="Les cinq critères de la règle ABCDE">
+    <div class="abcde-legende">
+      <div><b>A</b><span>Asymétrie de la lésion</span></div>
+      <div><b>B</b><span>Bords irréguliers</span></div>
+      <div><b>C</b><span>Couleur non homogène</span></div>
+      <div><b>D</b><span>Diamètre supérieur à 6 mm</span></div>
+      <div><b>E</b><span>Évolution dans le temps</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 LE RENDEZ-VOUS -->
+<section>
+  <div class="sec-head"><span class="lbl">05 · Comment se passe votre rendez-vous</span></div>
+  <div class="duo">
+    <div class="txt">
+      <div class="sous-titre">Le jour J</div>
+      <ul class="puces">
+        <li>Dépistage réalisé par un <b>professionnel de santé formé</b>.</li>
+        <li>Examen <b>non invasif</b>, dans un cadre confidentiel.</li>
+        <li>Une <b>lettre de consentement</b> vous sera remise pour signature.</li>
+      </ul>
+      <div class="sous-titre">Documents à apporter</div>
+      <ul class="puces">
+        <li>Votre <b>carte Vitale</b>.</li>
+        <li>Une <b>pièce d'identité</b>.</li>
+        <li>Le <b>document d'information et de consentement</b> à un acte de télémédecine, transmis par vos RH.</li>
+      </ul>
+    </div>
+    <div class="img"><img src="__GRAIN__" alt=""></div>
+  </div>
+</section>
+
+<!-- 06 RÉSULTATS -->
+<section>
+  <div class="sec-head"><span class="lbl">06 · La mise à disposition de vos résultats</span></div>
+  <div class="sous-titre">Comment y accéder</div>
+  <ul class="puces" style="margin-bottom:5mm">
+    <li>Lorsque vos résultats sont disponibles, vous recevez un <b>email sécurisé</b>.</li>
+    <li>Cet email contient un <b>code d'accès personnel</b>.</li>
+    <li>Vous vous connectez à la <b>plateforme AvisDoc</b> pour consulter vos résultats de manière claire et confidentielle.</li>
+  </ul>
+  <div class="sous-titre">Deux situations possibles</div>
+  <div class="situations">
+    <div class="situation">
+      <div class="t">Aucune anomalie n'est détectée</div>
+      <p>Vous recevez votre dossier médical. Il n'y a rien d'autre à faire.</p>
+    </div>
+    <div class="situation alerte">
+      <div class="t">Une anomalie est détectée</div>
+      <p>Vous recevez votre dossier médical ainsi qu'une lettre d'adressage via la plateforme. Vous pouvez ensuite
+      consulter le médecin de votre choix, ou être orienté(e) vers un professionnel du réseau d'aval.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 07 FAQ -->
+<section class="faq">
+  <div class="sec-head"><span class="lbl">07 · Questions fréquentes</span></div>
+  <div class="qr">
+    <div class="q">Est-ce obligatoire ?</div>
+    <div class="r">Non. La participation est entièrement volontaire.</div>
+  </div>
+  <div class="qr">
+    <div class="q">Combien de temps cela prend-il ?</div>
+    <div class="r">En moyenne moins de 15 minutes.</div>
+  </div>
+  <div class="qr">
+    <div class="q">Comment se déroule concrètement le dépistage ?</div>
+    <div class="r">Vous êtes accompagné(e) par un professionnel de santé formé. Des photos de vos grains de beauté sont
+    prises, puis analysées à distance par un dermatologue. Vous recevez ensuite vos résultats.</div>
+  </div>
+  <div class="qr">
+    <div class="q">Que se passe-t-il si quelque chose nécessite une attention particulière ?</div>
+    <div class="r">Vous en êtes informé(e) simplement et, si besoin, orienté(e) vers un réseau de professionnels de santé
+    pour la suite de la prise en charge. Vous restez libre de vos démarches.</div>
+  </div>
+  <div class="qr">
+    <div class="q">Mes informations sont-elles confidentielles ?</div>
+    <div class="r">Oui, totalement. Les données sont sécurisées, traitées dans le respect du RGPD, et l'employeur n'a
+    accès à aucune information médicale individuelle.</div>
+  </div>
+</section>
+
+</body>
+</html>

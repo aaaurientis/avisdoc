@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Formulaire de consentement du patient</title>
+<style>
+__CHARTE__
+
+@page{ @bottom-right{content:"Formulaire de consentement · " counter(page) "/" counter(pages)} }
+h1{font-size:22pt}
+body{font-size:10pt;line-height:1.5}
+
+.intro{font-size:11pt;color:var(--ardoise);margin:0 0 5mm;line-height:1.55}
+
+/* Identité du signataire */
+.identite{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm;margin-bottom:6mm}
+.identite .k{font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--taupe);margin-bottom:3mm}
+.champs-l{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4mm 5mm;align-items:end}
+.champ{border-bottom:.75pt solid var(--beige);height:7mm}
+.etiq{font-size:9.5pt;color:var(--marine);font-weight:600;padding-bottom:1.2mm;white-space:nowrap}
+.civilite{font-size:10pt;color:var(--ardoise);padding-bottom:1.2mm;white-space:nowrap}
+.civilite b{color:var(--marine)}
+
+/* Déclarations à cocher */
+.declarations{margin-bottom:5mm}
+.decl{display:flex;gap:3.5mm;align-items:flex-start;padding:2.2mm 0;border-bottom:.5pt solid var(--beige)}
+.decl:first-of-type{border-top:.5pt solid var(--beige)}
+.case{width:4.2mm;height:4.2mm;flex:none;border:.75pt solid var(--cyan);border-radius:.8mm;margin-top:.6mm}
+.decl p{margin:0;font-size:10pt;color:var(--ardoise);line-height:1.45}
+.decl b{color:var(--marine);font-weight:600}
+
+.encadre{
+  background:var(--cyan-tres-clair);border-left:3pt solid var(--cyan);border-radius:0 2mm 2mm 0;
+  padding:4mm 5mm;margin-bottom:5mm;font-size:10pt;color:var(--ardoise);line-height:1.5;break-inside:avoid;
+}
+.encadre p{margin:0 0 2.5mm}
+.encadre p:last-child{margin-bottom:0}
+.encadre b{color:var(--marine);font-weight:600}
+
+ul.fin{margin:2mm 0 0;padding-left:4.5mm}
+ul.fin li{margin-bottom:1.8mm;color:var(--ardoise);font-size:10pt}
+ul.fin li::marker{color:var(--cyan)}
+
+/* Bloc signature */
+.signature-bloc{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4.5mm 5mm;break-inside:avoid}
+.signature-bloc .k{font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--taupe);margin-bottom:3.5mm}
+.ligne{margin-bottom:4.5mm}
+.ligne .etiq{display:block;margin-bottom:1mm}
+.ligne .champ{height:8mm}
+.sig-grille{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:6mm;margin-top:1mm}
+.zone-signature{border:.75pt dashed var(--beige);border-radius:1.4mm;height:26mm;margin-top:1.5mm}
+</style>
+</head>
+<body>
+
+<div class="brandhead">
+  <img src="__LOGO__" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+</div>
+<div class="refhead">Plateforme de téléexpertise · Dermatologie</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<div class="doc-head">
+  <div>
+    <div class="kicker">Formulaire à signer</div>
+    <h1>Consentement du patient<br><em>à un acte de téléexpertise</em></h1>
+    <p class="doc-sub">À remplir et signer après lecture de la notice d'information.</p>
+  </div>
+</div>
+
+<div class="identite">
+  <div class="k">Je soussigné(e)</div>
+  <div class="champs-l">
+    <span class="civilite"><b>Madame</b> / <b>Monsieur</b></span>
+    <span class="champ"></span>
+    <span class="etiq">né(e) le</span>
+    <span class="champ"></span>
+  </div>
+</div>
+
+<p class="intro">déclare et certifie que, en signant ce formulaire de consentement :</p>
+
+<div class="declarations">
+  <div class="decl"><span class="case"></span><p>Je reconnais avoir <b>lu et compris</b> le présent document.</p></div>
+  <div class="decl"><span class="case"></span><p>Je reconnais avoir eu l'occasion de <b>poser toutes mes questions</b> et obtenu des réponses satisfaisantes.</p></div>
+  <div class="decl"><span class="case"></span><p>Je reconnais avoir été en mesure de prendre une <b>décision libre et éclairée</b> pour la réalisation de la téléexpertise.</p></div>
+  <div class="decl"><span class="case"></span><p>Je consens à l'acte réalisé par le <b>Professionnel Requérant</b> et le <b>Médecin Téléexpert</b>.</p></div>
+  <div class="decl"><span class="case"></span><p>Je reconnais avoir pris connaissance des <b>modalités de traitement de mes données personnelles</b> réalisées par le Professionnel Requérant et le Médecin Téléexpert, et les accepter.</p></div>
+  <div class="decl"><span class="case"></span><p>Je reconnais avoir été informé(e) que mes données seront conservées dans un <b>dossier patient informatisé</b>.</p></div>
+  <div class="decl"><span class="case"></span><p>Je consens au <b>partage de mes données de santé</b> au sein de l'équipe de soins participant à ma prise en charge en télémédecine.</p></div>
+  <div class="decl"><span class="case"></span><p>Je consens à l'usage et au partage de mes données de santé pour un <b>usage secondaire</b>, sécurisé, de recherche et développement, de statistiques et d'études dans le domaine de la dermatologie, compatibles avec la finalité de téléexpertise initiale et dans le respect du droit applicable.</p></div>
+</div>
+
+<div class="encadre">
+  <p>J'ai bien pris connaissance du contenu de ce formulaire d'information et de consentement. Je consens à
+  bénéficier du service de téléexpertise proposé par le Professionnel Requérant et le Médecin Téléexpert selon les
+  conditions précitées, et je suis informé(e) que je peux <b>retirer mon consentement à l'acte de téléexpertise à
+  tout moment</b>.</p>
+  <p>J'ai bien pris connaissance des conditions de traitement de mes données personnelles, y compris de mes données
+  de santé, et je consens à ce traitement selon ces conditions, pour les finalités suivantes :</p>
+  <ul class="fin">
+    <li>Permettre la mise en relation entre le Professionnel Requérant et le Médecin Téléexpert, obtenir un avis du
+    Médecin Téléexpert et assurer le fonctionnement du système d'information opérant la plateforme de téléexpertise.</li>
+    <li>Pour un usage secondaire, sécurisé, de recherche et développement, de statistiques et d'études dans le domaine
+    de la dermatologie, compatibles avec la finalité de téléexpertise initiale et dans le respect du droit applicable.</li>
+  </ul>
+  <p style="margin-top:2.5mm">Je suis informé(e) que je peux <b>retirer mon consentement au traitement de mes données
+  personnelles à tout moment</b>.</p>
+</div>
+
+<div class="signature-bloc">
+  <div class="k">Identité et signature</div>
+
+  <div class="ligne">
+    <span class="etiq">Patient — nom et prénoms</span>
+    <div class="champ"></div>
+  </div>
+  <div class="ligne">
+    <span class="etiq">Représentant légal, s'il y a lieu — nom et prénoms</span>
+    <div class="champ"></div>
+  </div>
+  <div class="ligne">
+    <span class="etiq">Numéro de sécurité sociale / Identifiant National de Santé (INS)</span>
+    <div class="champ"></div>
+  </div>
+
+  <div class="sig-grille">
+    <div>
+      <span class="etiq">Lieu</span>
+      <div class="champ"></div>
+    </div>
+    <div>
+      <span class="etiq">Date</span>
+      <div class="champ"></div>
+    </div>
+    <div>
+      <span class="etiq">Signature</span>
+      <div class="zone-signature"></div>
+    </div>
+  </div>
+</div>
+
+<div class="legal">
+  <p><b>Document à conserver au dossier.</b> Un exemplaire signé est archivé par le Professionnel Requérant.
+  La notice d'information détaillée fait l'objet d'un document distinct, remis avant signature.</p>
+</div>
+
+</body>
+</html>
