@@ -10,3 +10,7 @@ verify_jwt = false
 # revérifié dans la fonction.
 [functions.pappers-search]
 verify_jwt = true
+
+# Invitations de l'espace client — admin @avisdoc.fr vérifié dans la fonction.
+[functions.inviter-espace]
+verify_jwt = true

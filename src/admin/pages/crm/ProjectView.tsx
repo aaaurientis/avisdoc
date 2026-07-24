@@ -5,6 +5,7 @@ import { euro, frDate, initials, todayISO } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card, SectionLabel } from "../../components/ui";
+import EspaceClientCard from "../../espace/EspaceClientCard";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -328,6 +329,9 @@ export default function ProjectView({
             </div>
           </Card>
         </div>
+
+        {/* Espace client (fusion : logo, domaines, documents générés, invitations) */}
+        <EspaceClientCard clientId={client.id} clientName={client.company} />
 
         {/* Suivis et échéances */}
         <Card className="p-[22px]">
