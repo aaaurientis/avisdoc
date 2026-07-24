@@ -117,8 +117,12 @@ export function ClientDetail() {
     const { data, error } = await supabase.functions.invoke("inviter-utilisateurs", {
       body: { client_id: client!.id },
     });
-    if (error) setErr(error.message);
-    else { setMsg(`Invitations envoyées : ${data?.invites ?? 0}.`); charger(); }
+    if (error) { setErr(error.message); return; }
+    const n = data?.invites ?? 0;
+    const raisons: string[] = data?.erreurs ?? [];
+    setMsg(`Invitations envoyées : ${n}.` + (raisons.length ? ` Ignorés — ${raisons.join(" ; ")}` : ""));
+    if (raisons.length && n === 0) setErr(raisons.join(" ; "));
+    charger();
   }
 
   return (
