@@ -65,9 +65,17 @@ export default function EspaceClientCard({ clientId, clientName }: { clientId: s
   async function inviter() {
     await agir(async () => {
       const r = await espaceRepo.inviter(clientId);
-      if (r.invites) setMsg(`Invitations envoyées : ${r.invites}.`);
       if (r.erreurs.length) setErr(r.erreurs.join(" ; "));
-      else if (!r.invites) setMsg("Aucune invitation à envoyer (utilisateurs déjà invités ?).");
+      if (r.invites) setMsg(`Liens envoyés : ${r.invites}.`);
+      else if (!r.erreurs.length) setMsg("Aucun utilisateur déclaré à qui envoyer un lien.");
+    });
+  }
+
+  async function renvoyer(u: EspaceUser) {
+    await agir(async () => {
+      const r = await espaceRepo.inviter(clientId, u.id);
+      if (r.erreurs.length) setErr(r.erreurs.join(" ; "));
+      else if (r.invites) setMsg(`Lien renvoyé à ${u.email}.`);
     });
   }
 
@@ -136,21 +144,27 @@ export default function EspaceClientCard({ clientId, clientName }: { clientId: s
         </div>
         <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
           {users.map((u) => (
-            <li key={u.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
-              <span>{u.email}
+            <li key={u.id} className="flex items-center justify-between gap-2 px-3 py-2 text-[13px]">
+              <span className="min-w-0 truncate">{u.email}
                 {u.premiere_connexion_le ? <span className="ml-2 text-avisdoc-teal">· connecté</span>
                   : u.auth_user_id ? <span className="ml-2 text-muted-foreground">· invité</span>
                   : <span className="ml-2 text-muted-foreground">· en attente</span>}
               </span>
-              <button className="text-muted-foreground hover:text-orange-600" onClick={() => agir(() => espaceRepo.removeUser(u.id))}>Retirer</button>
+              <span className="flex shrink-0 items-center gap-3">
+                <button className="text-avisdoc-teal hover:underline disabled:opacity-40" disabled={busy}
+                        onClick={() => renvoyer(u)}>
+                  {u.auth_user_id ? "Renvoyer le lien" : "Inviter"}
+                </button>
+                <button className="text-muted-foreground hover:text-orange-600" onClick={() => agir(() => espaceRepo.removeUser(u.id))}>Retirer</button>
+              </span>
             </li>
           ))}
           {users.length === 0 && <li className="px-3 py-2 text-[13px] text-muted-foreground">Aucun utilisateur.</li>}
         </ul>
-        <button className={`${btnPrimary} mt-2`} disabled={busy || !signe || users.length === 0} onClick={inviter}>
-          Envoyer les invitations
+        <button className={`${btnPrimary} mt-2`} disabled={busy || users.length === 0} onClick={inviter}>
+          (Re)envoyer les liens à tous
         </button>
-        {!signe && <p className="mt-1 text-[12px] text-muted-foreground">Disponible une fois le client « Signé ».</p>}
+        {!signe && <p className="mt-1 text-[12px] text-muted-foreground">L'espace s'ouvre au passage à « Signé », mais tu peux envoyer un lien dès maintenant.</p>}
       </div>
 
       {/* Documents générés */}

@@ -99,8 +99,11 @@ export const espaceRepo = {
     return (data as GenJob[]) ?? [];
   },
 
-  async inviter(clientId: string): Promise<{ invites: number; erreurs: string[] }> {
-    const { data, error } = await sb.functions.invoke("inviter-espace", { body: { client_id: clientId } });
+  // userId absent → (re)envoi à tous ; userId présent → renvoi ciblé.
+  async inviter(clientId: string, userId?: string): Promise<{ invites: number; erreurs: string[] }> {
+    const body: { client_id: string; user_id?: string } = { client_id: clientId };
+    if (userId) body.user_id = userId;
+    const { data, error } = await sb.functions.invoke("inviter-espace", { body });
     if (error) throw error;
     return { invites: data?.invites ?? 0, erreurs: data?.erreurs ?? [] };
   },
