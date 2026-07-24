@@ -95,7 +95,10 @@ serve(async (req) => {
   if (!client_id) return json({ error: "client_id requis" }, 400);
 
   const admin = createClient(URL, SERVICE);
-  const pub = createClient(URL, ANON); // pour signInWithOtp (envoi magic link)
+  // Flux « implicit » : le magic link renvoie les jetons dans le #hash, sans
+  // vérificateur PKCE — seule façon qu'un lien généré côté serveur soit
+  // consommable par le navigateur du client.
+  const pub = createClient(URL, ANON, { auth: { flowType: "implicit", persistSession: false } });
 
   let q = admin.from("admin_client_espace_users")
     .select("id, email, auth_user_id").eq("client_id", client_id);

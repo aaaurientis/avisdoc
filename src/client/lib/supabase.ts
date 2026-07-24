@@ -21,5 +21,9 @@ export const supabase = createClient(url, key, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Flux « implicit » (jetons dans le #hash) et non PKCE : indispensable pour
+    // des liens magiques ouverts sur un autre appareil/navigateur que celui qui
+    // les a demandés (invitation générée par l'admin, renvoi côté serveur).
+    flowType: "implicit",
   },
 });
