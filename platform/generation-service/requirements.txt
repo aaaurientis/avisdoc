@@ -2,7 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx==0.28.1
 # Chaîne documentaire (le pack) :
-weasyprint==63.1
+weasyprint==69.0
 python-pptx==1.0.2
 pdfplumber==0.11.4
 pillow==11.0.0
