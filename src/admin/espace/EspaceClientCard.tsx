@@ -1,7 +1,7 @@
 // Carte « Espace client » injectée dans la fiche projet (ProjectView).
 // Logo, domaines, documents générés + statut, utilisateurs + invitations.
 // Auto-contenue : charge ses données via espaceRepo, n'impacte pas le CRM.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ElementType } from "react";
 import { Card, SectionLabel } from "../components/ui";
 import {
   espaceRepo, type Domaine, type EspaceInfo, type EspaceUser,
@@ -15,7 +15,15 @@ const btnGhost = "rounded-xl border border-border bg-card px-3 py-2 text-[13px] 
 
 const domaineDe = (email: string) => email.split("@")[1]?.toLowerCase() ?? "";
 
-export default function EspaceClientCard({ clientId, clientName }: { clientId: string; clientName: string }) {
+export default function EspaceClientCard({
+  clientId,
+  clientName,
+  bare = false,
+}: {
+  clientId: string;
+  clientName: string;
+  bare?: boolean;
+}) {
   const [info, setInfo] = useState<EspaceInfo | null>(null);
   const [domaines, setDomaines] = useState<Domaine[]>([]);
   const [users, setUsers] = useState<EspaceUser[]>([]);
@@ -79,10 +87,13 @@ export default function EspaceClientCard({ clientId, clientName }: { clientId: s
     });
   }
 
+  // En mode « bare » (dans un accordéon), on retire la carte englobante et le
+  // libellé de section redondant avec l'en-tête de l'accordéon.
+  const Wrap: ElementType = bare ? "div" : Card;
   return (
-    <Card className="p-[22px]">
+    <Wrap className={bare ? "" : "p-[22px]"}>
       <div className="mb-3 flex items-center justify-between">
-        <SectionLabel>Espace client</SectionLabel>
+        {!bare && <SectionLabel>Espace client</SectionLabel>}
         <span className={`rounded-full px-2.5 py-0.5 text-[11px] ${signe ? "bg-avisdoc-teal/15 text-avisdoc-teal" : "bg-muted text-muted-foreground"}`}>
           {signe ? "Signé — espace actif" : "S'active au passage à « Signé »"}
         </span>
@@ -193,6 +204,6 @@ export default function EspaceClientCard({ clientId, clientName }: { clientId: s
           )}
         </ul>
       </div>
-    </Card>
+    </Wrap>
   );
 }
