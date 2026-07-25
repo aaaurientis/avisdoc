@@ -14,6 +14,8 @@ import sys
 
 from PIL import Image
 from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Emu
 
 NOM = "LOGO_CLIENT"
@@ -33,13 +35,27 @@ def injecter(pptx_src, logo, pptx_out):
         cibles = [s for s in slide.shapes if s.name == NOM]
         for cadre in cibles:
             cx, cy, cw, ch = cadre.left, cadre.top, cadre.width, cadre.height
-            # inscription dans le cadre, rapport d'aspect conservé
-            if cw / ch > ratio:
-                h = ch
-                w = int(ch * ratio)
+
+            # Plaque blanche sous le logo : sur une couverture sombre, le logo
+            # client (souvent sombre ou multicolore) ne ressort pas. On pose un
+            # rectangle blanc arrondi à la taille du cadre ; le logo vient dessus
+            # avec une marge intérieure pour respirer.
+            plaque = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, cx, cy, cw, ch)
+            plaque.adjustments[0] = 0.10
+            plaque.fill.solid()
+            plaque.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            plaque.line.fill.background()
+            plaque.shadow.inherit = False
+
+            # inscription dans le cadre (avec marge), rapport d'aspect conservé
+            pad_w, pad_h = int(cw * 0.10), int(ch * 0.16)
+            iw, ih = cw - 2 * pad_w, ch - 2 * pad_h
+            if iw / ih > ratio:
+                h = ih
+                w = int(ih * ratio)
             else:
-                w = cw
-                h = int(cw / ratio)
+                w = iw
+                h = int(iw / ratio)
             slide.shapes.add_picture(str(logo), Emu(cx + (cw - w) // 2), Emu(cy + (ch - h) // 2),
                                      width=Emu(w), height=Emu(h))
             retirer(cadre)
