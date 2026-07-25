@@ -43,7 +43,7 @@ const CATEGORIE_PAR_DOC: Record<string, CategorieId> = {
   "affiche-1": "affiches", "affiche-2": "affiches", "affiche-3": "affiches",
   "affiche-4": "affiches", "affiche-5": "affiches",
   "kit-collaborateur": "collaborateurs", "kit-collaborateur-ppt": "collaborateurs",
-  "kit-com-interne": "rh", "correspondants": "rh",
+  "kit-com-interne": "rh",
   "notice-consentement": "consentement", "formulaire-consentement": "consentement",
 };
 
@@ -51,6 +51,7 @@ export function categorieDe(docCatalogueId: string): CategorieId {
   return CATEGORIE_PAR_DOC[docCatalogueId] ?? "autres";
 }
 
-// Le recueil d'e-mails est servi par l'onglet « E-mails » (copier-coller),
-// pas en téléchargement — on l'exclut de la bibliothèque.
-export const DOCS_EXCLUS = new Set(["emails"]);
+// Documents non exposés dans la bibliothèque client :
+//   - "emails" : servi par l'onglet « E-mails » (copier-coller), pas en PDF ;
+//   - "correspondants" (Réseau d'aval) : non destiné à l'espace client.
+export const DOCS_EXCLUS = new Set(["emails", "correspondants"]);
