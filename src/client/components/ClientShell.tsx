@@ -2,7 +2,7 @@
 // Reprend exactement le design du back-office (Sidebar admin) : mêmes tokens,
 // même logo, mêmes états actifs. La nav et le pied diffèrent (contexte client).
 import { NavLink } from "react-router-dom";
-import { FileText, Mail, Power } from "lucide-react";
+import { CalendarClock, FileText, Mail, Power } from "lucide-react";
 import type { ReactNode } from "react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { supabase } from "../lib/supabase";
 const NAV = [
   { to: "/", label: "Documents", icon: FileText, end: true },
   { to: "/emails", label: "E-mails", icon: Mail, end: false },
+  { to: "/rendez-vous", label: "Rendez-vous", icon: CalendarClock, end: false },
 ];
 
 function initialesDe(nom: string, email: string): string {

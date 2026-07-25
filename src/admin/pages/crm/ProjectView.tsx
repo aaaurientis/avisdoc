@@ -6,6 +6,7 @@ import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
+import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
 import { cn } from "@/lib/utils";
 
@@ -472,6 +473,11 @@ export default function ProjectView({
         {/* 6. Espace client */}
         <Section titre="Espace client">
           <EspaceClientCard bare clientId={client.id} clientName={client.company} />
+        </Section>
+
+        {/* 7. Rendez-vous (journées de dépistage) */}
+        <Section titre="Rendez-vous">
+          <RendezVousCard bare clientId={client.id} />
         </Section>
 
         {/* Zone de danger : suppression complète du client */}

@@ -7,6 +7,7 @@ import { AuthConfirm } from "./pages/AuthConfirm";
 import { Reservation } from "./pages/Reservation";
 import { Bibliotheque } from "./pages/Bibliotheque";
 import { Emails } from "./pages/Emails";
+import { RendezVous } from "./pages/RendezVous";
 
 function Splash() {
   return (
@@ -64,6 +65,7 @@ export default function ClientApp() {
         >
           <Route path="/" element={<Bibliotheque clientId={clientId} />} />
           <Route path="/emails" element={<Emails entreprise={clientNom ?? ""} />} />
+          <Route path="/rendez-vous" element={<RendezVous />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       )}
