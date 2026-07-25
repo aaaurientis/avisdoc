@@ -87,6 +87,11 @@ export default function EspaceClientCard({
     });
   }
 
+  async function regenerer() {
+    await agir(() => espaceRepo.regenerer(clientId),
+      "Régénération lancée — les documents se mettront à jour dans un instant.");
+  }
+
   // En mode « bare » (dans un accordéon), on retire la carte englobante et le
   // libellé de section redondant avec l'en-tête de l'accordéon.
   const Wrap: ElementType = bare ? "div" : Card;
@@ -180,7 +185,13 @@ export default function EspaceClientCard({
 
       {/* Documents générés */}
       <div>
-        <p className="mb-2 text-[13px] font-medium">Documents générés ({docs.length})</p>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-[13px] font-medium">Documents générés ({docs.length})</p>
+          <button className={btnGhost} disabled={busy || !signe} onClick={regenerer}
+                  title="Vide le cache et relance la génération avec le code à jour">
+            Régénérer
+          </button>
+        </div>
         {jobs[0] && jobs[0].statut !== "termine" && (
           <p className="mb-2 text-[12px] text-muted-foreground">
             Génération : {jobs[0].statut}{jobs[0].erreur ? ` — ${jobs[0].erreur}` : "…"}

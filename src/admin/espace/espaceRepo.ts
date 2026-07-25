@@ -99,6 +99,17 @@ export const espaceRepo = {
     return (data as GenJob[]) ?? [];
   },
 
+  // Force la régénération des documents avec le code de génération à jour :
+  // vide le cache (lignes admin_generated_docs) puis remet un job en file.
+  // Le webhook Supabase déclenche alors le service de génération.
+  async regenerer(clientId: string): Promise<void> {
+    const info = await this.info(clientId);
+    await sb.from("admin_generated_docs").delete().eq("client_id", clientId);
+    const { error } = await sb.from("admin_generation_jobs")
+      .insert({ client_id: clientId, type: "maj_logo", logo_sha256: info?.logo_sha256 ?? null });
+    if (error) throw error;
+  },
+
   // Suppression complète : Storage (via Edge Function service_role) + cascade base.
   async supprimerClient(clientId: string): Promise<void> {
     const { error } = await sb.functions.invoke("supprimer-client", { body: { client_id: clientId } });
