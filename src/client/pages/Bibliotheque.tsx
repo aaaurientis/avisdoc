@@ -17,14 +17,30 @@ const ICONES: Record<CategorieId, LucideIcon> = {
 
 export function Bibliotheque({ clientId }: { clientId: string }) {
   const [docs, setDocs] = useState<GeneratedDoc[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    let actif = true;
     supabase.from("admin_generated_docs").select("*").eq("client_id", clientId).order("titre")
-      .then(({ data, error }) => {
-        if (error) setErr(error.message);
-        else setDocs((data ?? []) as GeneratedDoc[]);
+      .then(async ({ data, error }) => {
+        if (error) { if (actif) setErr(error.message); return; }
+        const list = (data ?? []) as GeneratedDoc[];
+        if (actif) setDocs(list);
+        // Pré-résolution des URLs pour des liens <a> directs (pas de window.open
+        // après await → plus de blocage par le bloqueur de pop-up).
+        const map: Record<string, string> = {};
+        await Promise.all(list.map(async (d) => {
+          if (d.storage_bucket === "espace-docs-public") {
+            map[d.id] = supabase.storage.from(d.storage_bucket).getPublicUrl(d.storage_path).data.publicUrl;
+          } else {
+            const { data: s } = await supabase.storage.from(d.storage_bucket).createSignedUrl(d.storage_path, 3600);
+            if (s?.signedUrl) map[d.id] = s.signedUrl;
+          }
+        }));
+        if (actif) setUrls(map);
       });
+    return () => { actif = false; };
   }, [clientId]);
 
   // Regroupe les documents (hors exclus) par catégorie, dans l'ordre de CATEGORIES.
@@ -36,18 +52,6 @@ export function Bibliotheque({ clientId }: { clientId: string }) {
   }, [docs]);
 
   const total = useMemo(() => docs.filter((d) => !DOCS_EXCLUS.has(d.doc_catalogue_id)).length, [docs]);
-
-  async function ouvrir(d: GeneratedDoc) {
-    setErr(null);
-    if (d.storage_bucket === "espace-docs-public") {
-      const { data } = supabase.storage.from(d.storage_bucket).getPublicUrl(d.storage_path);
-      window.open(data.publicUrl, "_blank", "noopener");
-      return;
-    }
-    const { data, error } = await supabase.storage.from(d.storage_bucket).createSignedUrl(d.storage_path, 3600);
-    if (error) setErr(error.message);
-    else window.open(data.signedUrl, "_blank", "noopener");
-  }
 
   return (
     <div>
@@ -91,12 +95,18 @@ export function Bibliotheque({ clientId }: { clientId: string }) {
                       <p className="truncate font-semibold text-avisdoc-ink">{d.titre}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">{d.format} · v{d.version}</p>
                     </div>
-                    <button
-                      onClick={() => ouvrir(d)}
-                      className="shrink-0 rounded-xl bg-avisdoc-ink px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90"
+                    <a
+                      href={urls[d.id] ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-disabled={!urls[d.id]}
+                      className={
+                        "shrink-0 rounded-xl bg-avisdoc-ink px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90" +
+                        (urls[d.id] ? "" : " pointer-events-none opacity-50")
+                      }
                     >
                       Ouvrir
-                    </button>
+                    </a>
                   </Card>
                 ))}
               </div>
