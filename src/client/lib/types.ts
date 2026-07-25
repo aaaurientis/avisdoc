@@ -23,3 +23,34 @@ export const PHASES: { valeur: PhaseCampagne; libelle: string }[] = [
   { valeur: "jour-j", libelle: "Jour J" },
   { valeur: "bilan", libelle: "Bilan" },
 ];
+
+// --- Classification métier de la bibliothèque ---------------------------------
+// Regroupe les documents en catégories parlantes pour le client.
+export type CategorieId =
+  | "affiches" | "collaborateurs" | "rh" | "consentement" | "autres";
+
+export const CATEGORIES: { id: CategorieId; libelle: string; description: string }[] = [
+  { id: "affiches", libelle: "Affiches", description: "À imprimer et afficher sur vos sites." },
+  { id: "collaborateurs", libelle: "Documents collaborateurs", description: "À diffuser aux salariés." },
+  { id: "rh", libelle: "Documents RH", description: "Pour l'équipe RH et l'organisation." },
+  { id: "consentement", libelle: "Consentement", description: "Notice d'information et formulaire patient." },
+  { id: "autres", libelle: "Autres documents", description: "" },
+];
+
+// Rattachement doc_catalogue_id → catégorie.
+// Source de vérité des ids : le CATALOGUE de build.py (service de génération).
+const CATEGORIE_PAR_DOC: Record<string, CategorieId> = {
+  "affiche-1": "affiches", "affiche-2": "affiches", "affiche-3": "affiches",
+  "affiche-4": "affiches", "affiche-5": "affiches",
+  "kit-collaborateur": "collaborateurs", "kit-collaborateur-ppt": "collaborateurs",
+  "kit-com-interne": "rh", "correspondants": "rh",
+  "notice-consentement": "consentement", "formulaire-consentement": "consentement",
+};
+
+export function categorieDe(docCatalogueId: string): CategorieId {
+  return CATEGORIE_PAR_DOC[docCatalogueId] ?? "autres";
+}
+
+// Le recueil d'e-mails est servi par l'onglet « E-mails » (copier-coller),
+// pas en téléchargement — on l'exclut de la bibliothèque.
+export const DOCS_EXCLUS = new Set(["emails"]);

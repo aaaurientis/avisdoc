@@ -23,7 +23,7 @@ export function Emails({ entreprise }: { entreprise: string }) {
   });
   const [seqId, setSeqId] = useState(DATA.sequences[0]?.id ?? "");
   const [optId, setOptId] = useState(DATA.sequences[0]?.options[0]?.id ?? "");
-  const [copie, setCopie] = useState(false);
+  const [copie, setCopie] = useState<string | null>(null);
 
   const sequence = DATA.sequences.find((s) => s.id === seqId) ?? DATA.sequences[0];
   const option = sequence?.options.find((o) => o.id === optId) ?? sequence?.options[0];
@@ -35,10 +35,12 @@ export function Emails({ entreprise }: { entreprise: string }) {
   }
   const objet = useMemo(() => (option ? substituer(option.objet) : ""), [option, valeurs]);
   const corps = useMemo(() => (option ? option.corps.map(substituer) : []), [option, valeurs]);
+  const messageTexte = corps.join("\n\n");
 
-  async function copier() {
-    await navigator.clipboard.writeText(`Objet : ${objet}\n\n${corps.join("\n\n")}`);
-    setCopie(true); setTimeout(() => setCopie(false), 1800);
+  async function copier(cle: string, texte: string) {
+    await navigator.clipboard.writeText(texte);
+    setCopie(cle);
+    setTimeout(() => setCopie((c) => (c === cle ? null : c)), 1800);
   }
 
   return (
@@ -76,17 +78,37 @@ export function Emails({ entreprise }: { entreprise: string }) {
             </label>
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-start justify-between gap-4">
-            <p className="font-medium"><span className="text-muted-foreground">Objet : </span>{objet}</p>
-            <button onClick={copier}
-              className="shrink-0 rounded-xl bg-avisdoc-teal px-3 py-2 text-sm font-medium text-white hover:opacity-90">
-              {copie ? "Copié ✓" : "Copier"}
-            </button>
+        <div className="space-y-4">
+          {/* Objet — bloc copiable */}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Objet</span>
+              <button onClick={() => copier("objet", objet)}
+                className="rounded-lg bg-avisdoc-teal px-2.5 py-1 text-xs font-medium text-white hover:opacity-90">
+                {copie === "objet" ? "Copié ✓" : "Copier"}
+              </button>
+            </div>
+            <p className="px-4 py-3 text-sm">{objet}</p>
           </div>
-          <div className="mt-4 space-y-3 whitespace-pre-wrap text-sm leading-relaxed">
-            {corps.map((p, i) => <p key={i}>{p}</p>)}
+
+          {/* Message — bloc copiable */}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Message</span>
+              <button onClick={() => copier("corps", messageTexte)}
+                className="rounded-lg bg-avisdoc-teal px-2.5 py-1 text-xs font-medium text-white hover:opacity-90">
+                {copie === "corps" ? "Copié ✓" : "Copier"}
+              </button>
+            </div>
+            <div className="space-y-3 whitespace-pre-wrap px-4 py-3 text-sm leading-relaxed">
+              {corps.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
           </div>
+
+          <button onClick={() => copier("tout", `Objet : ${objet}\n\n${messageTexte}`)}
+            className="w-full rounded-xl bg-avisdoc-ink px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">
+            {copie === "tout" ? "E-mail complet copié ✓" : "Copier l'e-mail complet"}
+          </button>
         </div>
       </div>
     </div>
