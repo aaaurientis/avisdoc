@@ -5,6 +5,7 @@ import ClientShell from "./components/ClientShell";
 import { Login } from "./pages/Login";
 import { AuthConfirm } from "./pages/AuthConfirm";
 import { Reservation } from "./pages/Reservation";
+import { AnnulationRdv } from "./pages/AnnulationRdv";
 import { Bibliotheque } from "./pages/Bibliotheque";
 import { Emails } from "./pages/Emails";
 import { RendezVous } from "./pages/RendezVous";
@@ -48,6 +49,7 @@ export default function ClientApp() {
       <Route path="/auth/confirm" element={<AuthConfirm />} />
       {/* Réservation publique (sans compte) — accès par lien à jeton. */}
       <Route path="/rdv/:token" element={<Reservation />} />
+      <Route path="/annuler/:token" element={<AnnulationRdv />} />
 
       {chargement ? (
         <Route path="*" element={<Splash />} />
