@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import emailsData from "../data/emails.json";
+import { supabase } from "../lib/supabase";
 import { PageHeader } from "../../admin/components/ui";
 
 interface EmailOption { id: string; angle: string; objet: string; corps: string[] }
@@ -17,6 +18,11 @@ const LIBELLES: Record<string, string> = {
   "{{date}}": "Date", "{{lieu}}": "Lieu", "{{lien}}": "Lien d'inscription",
   "{{entreprise}}": "Entreprise", "{{signature}}": "Signature",
 };
+const CLIENT_APP_URL = "https://client.avisdoc.fr";
+const dateFr = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
+interface JourneeLite { id: string; date: string; lieu: string; token: string; actif: boolean }
 
 export function Emails({ entreprise }: { entreprise: string }) {
   const tokens = Object.keys(DATA.variables);
@@ -29,10 +35,35 @@ export function Emails({ entreprise }: { entreprise: string }) {
   });
   const [copie, setCopie] = useState<string | null>(null);
   const [ouverts, setOuverts] = useState<Set<string>>(new Set());
+  const [journees, setJournees] = useState<JourneeLite[]>([]);
+  const [journeeId, setJourneeId] = useState("");
+
+  useEffect(() => {
+    supabase.from("admin_journees").select("id, date, lieu, token, actif").order("date", { ascending: false })
+      .then(({ data }) => setJournees((data ?? []) as JourneeLite[]));
+  }, []);
+
+  const lien = valeurs["{{lien}}"] || "";
+
+  // Choisir une journée renseigne le lien de réservation (+ date et lieu).
+  function choisirJournee(id: string) {
+    setJourneeId(id);
+    const j = journees.find((x) => x.id === id);
+    setValeurs((v) => ({
+      ...v,
+      "{{lien}}": j ? `${CLIENT_APP_URL}/rdv/${j.token}` : "",
+      ...(j && "{{date}}" in v ? { "{{date}}": dateFr(j.date) } : {}),
+      ...(j && "{{lieu}}" in v ? { "{{lieu}}": j.lieu } : {}),
+    }));
+  }
 
   function substituer(t: string): string {
     let out = t;
-    for (const [token, val] of Object.entries(valeurs)) out = out.split(token).join(val || token);
+    for (const [token, val] of Object.entries(valeurs)) {
+      // {{lien}} vide → jeton retiré (jamais de « {{lien}} » brut dans l'e-mail).
+      const remplacement = val || (token === "{{lien}}" ? "" : token);
+      out = out.split(token).join(remplacement);
+    }
     return out;
   }
   const tableau = useMemo(
@@ -42,8 +73,10 @@ export function Emails({ entreprise }: { entreprise: string }) {
 
   // Rendu d'un e-mail : objet, lignes de corps (avec marqueur TABLEAU) et texte de copie.
   function calc(option: EmailOption) {
+    // Sans lien, on retire les lignes qui le contiennent (pas de phrase orpheline).
+    const lignes = lien ? option.corps : option.corps.filter((l) => !l.includes("{{lien}}"));
     const objet = substituer(option.objet);
-    const corps = option.corps.map(substituer);
+    const corps = lignes.map(substituer);
     const messageTexte = corps
       .map((l) => (l === "TABLEAU" ? tableau.map(([k, v]) => `${k} : ${v}`).join("\n") : l))
       .join("\n\n");
@@ -73,7 +106,20 @@ export function Emails({ entreprise }: { entreprise: string }) {
       {/* Champs à substituer (partagés par tous les e-mails) */}
       <div className="mb-6 rounded-xl border border-border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {tokens.map((t) => (
+          {/* Le lien d'inscription vient de la journée choisie */}
+          <label className="block text-sm">
+            <span className="text-muted-foreground">Journée (lien d'inscription)</span>
+            <select value={journeeId} onChange={(e) => choisirJournee(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-card px-2.5 py-1.5 text-sm outline-none focus:border-avisdoc-teal">
+              <option value="">Aucune — sans lien d'inscription</option>
+              {journees.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {dateFr(j.date)}{j.lieu ? ` · ${j.lieu}` : ""}{!j.actif ? " (fermée)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          {tokens.filter((t) => t !== "{{lien}}").map((t) => (
             <label key={t} className="block text-sm">
               <span className="text-muted-foreground">{LIBELLES[t] ?? t}</span>
               <input value={valeurs[t]} onChange={(e) => setValeurs({ ...valeurs, [t]: e.target.value })}
@@ -81,6 +127,12 @@ export function Emails({ entreprise }: { entreprise: string }) {
             </label>
           ))}
         </div>
+        {journees.length === 0 && (
+          <p className="mt-2 text-[11.5px] text-muted-foreground">
+            Aucune journée programmée : les e-mails s'afficheront sans lien d'inscription.
+            Créez une journée dans l'onglet « Rendez-vous » (avec votre référent AvisDoc).
+          </p>
+        )}
       </div>
 
       {/* Tous les e-mails, à la suite, message dépliable */}
