@@ -22,3 +22,7 @@ verify_jwt = true
 # Réservation publique de créneaux (sans compte) — le jeton de la journée fait foi.
 [functions.rdv]
 verify_jwt = false
+
+# Rappels de RDV par e-mail (cron) — protégée par un secret partagé (x-secret).
+[functions.rdv-rappels]
+verify_jwt = false
