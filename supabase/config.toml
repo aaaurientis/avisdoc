@@ -18,3 +18,7 @@ verify_jwt = true
 # Suppression complète d'un client — admin @avisdoc.fr vérifié dans la fonction.
 [functions.supprimer-client]
 verify_jwt = true
+
+# Réservation publique de créneaux (sans compte) — le jeton de la journée fait foi.
+[functions.rdv]
+verify_jwt = false

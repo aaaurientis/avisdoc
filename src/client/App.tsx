@@ -4,6 +4,7 @@ import { supabase } from "./lib/supabase";
 import ClientShell from "./components/ClientShell";
 import { Login } from "./pages/Login";
 import { AuthConfirm } from "./pages/AuthConfirm";
+import { Reservation } from "./pages/Reservation";
 import { Bibliotheque } from "./pages/Bibliotheque";
 import { Emails } from "./pages/Emails";
 
@@ -44,6 +45,8 @@ export default function ClientApp() {
     <Routes>
       {/* Atterrissage des liens d'e-mail — doit s'exécuter même sans session. */}
       <Route path="/auth/confirm" element={<AuthConfirm />} />
+      {/* Réservation publique (sans compte) — accès par lien à jeton. */}
+      <Route path="/rdv/:token" element={<Reservation />} />
 
       {chargement ? (
         <Route path="*" element={<Splash />} />
