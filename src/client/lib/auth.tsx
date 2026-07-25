@@ -24,15 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function rattacher(s: Session | null) {
       if (!s) { if (actif) { setClientId(null); setClientNom(null); setChargement(false); } return; }
-      // RLS : ne renvoie que la ligne de l'utilisateur courant.
+      const email = (s.user.email ?? "").toLowerCase();
+      // Rattachement par e-mail (clé naturelle, vérifiée par le lien magique) :
+      // robuste même si auth_user_id a été perdu. RLS : ne voit que son client.
       const { data: uc } = await supabase
         .from("admin_client_espace_users")
         .select("id, client_id, premiere_connexion_le")
-        .eq("auth_user_id", s.user.id).maybeSingle();
+        .eq("email", email).maybeSingle();
 
-      if (uc && !uc.premiere_connexion_le) {
-        await supabase.from("admin_client_espace_users")
-          .update({ premiere_connexion_le: new Date().toISOString() }).eq("id", uc.id);
+      if (uc) {
+        // Confort admin : relier auth_user_id + marquer la 1re connexion.
+        void supabase.rpc("lier_auth_user");
+        if (!uc.premiere_connexion_le) void supabase.rpc("marquer_premiere_connexion");
       }
       let nom: string | null = null;
       if (uc?.client_id) {
