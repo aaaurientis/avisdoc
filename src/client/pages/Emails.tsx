@@ -4,7 +4,12 @@ import { PageHeader } from "../../admin/components/ui";
 
 interface EmailOption { id: string; angle: string; objet: string; corps: string[] }
 interface Sequence { id: string; libelle: string; envoi: string; options: EmailOption[] }
-interface EmailsData { variables: Record<string, string>; sequences: Sequence[]; signature_defaut: string }
+interface EmailsData {
+  variables: Record<string, string>;
+  sequences: Sequence[];
+  tableau_pratique: [string, string][];
+  signature_defaut: string;
+}
 
 const DATA = emailsData as unknown as EmailsData;
 const LIBELLES: Record<string, string> = {
@@ -21,11 +26,10 @@ export function Emails({ entreprise }: { entreprise: string }) {
     if ("{{signature}}" in init) init["{{signature}}"] = DATA.signature_defaut ?? "";
     return init;
   });
-  const [seqId, setSeqId] = useState(DATA.sequences[0]?.id ?? "");
   const [optId, setOptId] = useState(DATA.sequences[0]?.options[0]?.id ?? "");
   const [copie, setCopie] = useState<string | null>(null);
 
-  const sequence = DATA.sequences.find((s) => s.id === seqId) ?? DATA.sequences[0];
+  const sequence = DATA.sequences.find((s) => s.options.some((o) => o.id === optId)) ?? DATA.sequences[0];
   const option = sequence?.options.find((o) => o.id === optId) ?? sequence?.options[0];
 
   function substituer(t: string): string {
@@ -33,9 +37,19 @@ export function Emails({ entreprise }: { entreprise: string }) {
     for (const [token, val] of Object.entries(valeurs)) out = out.split(token).join(val || token);
     return out;
   }
+  const tableau = useMemo(
+    () => DATA.tableau_pratique.map(([k, v]) => [substituer(k), substituer(v)] as [string, string]),
+    [valeurs],
+  );
   const objet = useMemo(() => (option ? substituer(option.objet) : ""), [option, valeurs]);
+  // Corps en « blocs » : le marqueur TABLEAU devient le tableau pratique.
   const corps = useMemo(() => (option ? option.corps.map(substituer) : []), [option, valeurs]);
-  const messageTexte = corps.join("\n\n");
+  const messageTexte = useMemo(
+    () => corps
+      .map((l) => (l === "TABLEAU" ? tableau.map(([k, v]) => `${k} : ${v}`).join("\n") : l))
+      .join("\n\n"),
+    [corps, tableau],
+  );
 
   async function copier(cle: string, texte: string) {
     await navigator.clipboard.writeText(texte);
@@ -43,13 +57,19 @@ export function Emails({ entreprise }: { entreprise: string }) {
     setTimeout(() => setCopie((c) => (c === cle ? null : c)), 1800);
   }
 
+  const itemCls = (actif: boolean) =>
+    `w-full rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+      actif ? "bg-avisdoc-ink text-white" : "hover:bg-accent hover:text-avisdoc-ink"
+    }`;
+
   return (
     <div>
       <PageHeader
         title="E-mails de campagne"
-        subtitle="Renseignez les champs, choisissez la séquence et l'angle, puis copiez le message."
+        subtitle="Choisissez un e-mail, renseignez les champs, puis copiez-le tel quel."
       />
-      <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        {/* Colonne gauche : champs + liste des e-mails disponibles */}
         <div className="space-y-4">
           <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             {tokens.map((t) => (
@@ -60,26 +80,37 @@ export function Emails({ entreprise }: { entreprise: string }) {
               </label>
             ))}
           </div>
-          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-            <label className="block text-sm">
-              <span className="text-muted-foreground">Séquence</span>
-              <select value={seqId} onChange={(e) => { setSeqId(e.target.value);
-                  const s = DATA.sequences.find((x) => x.id === e.target.value); setOptId(s?.options[0]?.id ?? ""); }}
-                className="mt-1 w-full rounded-xl border border-border bg-card px-2 py-1.5">
-                {DATA.sequences.map((s) => <option key={s.id} value={s.id}>{s.libelle}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="text-muted-foreground">Angle</span>
-              <select value={optId} onChange={(e) => setOptId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-border bg-card px-2 py-1.5">
-                {sequence?.options.map((o) => <option key={o.id} value={o.id}>{o.angle}</option>)}
-              </select>
-            </label>
+
+          <div className="rounded-xl border border-border bg-card p-3">
+            {DATA.sequences.map((s) => (
+              <div key={s.id} className="mb-3 last:mb-0">
+                <div className="mb-1 flex items-baseline justify-between px-1">
+                  <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                    {s.libelle}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground/80">{s.envoi}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {s.options.map((o) => (
+                    <button key={o.id} onClick={() => setOptId(o.id)} className={itemCls(o.id === optId)}>
+                      {o.angle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* Colonne droite : l'e-mail sélectionné, en blocs copiables */}
         <div className="space-y-4">
-          {/* Objet — bloc copiable */}
+          <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+            <span className="rounded-full bg-muted px-2.5 py-0.5">{sequence?.libelle}</span>
+            <span>· {sequence?.envoi}</span>
+            <span>· angle « {option?.angle} »</span>
+          </div>
+
+          {/* Objet */}
           <div className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
               <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Objet</span>
@@ -91,7 +122,7 @@ export function Emails({ entreprise }: { entreprise: string }) {
             <p className="px-4 py-3 text-sm">{objet}</p>
           </div>
 
-          {/* Message — bloc copiable */}
+          {/* Message */}
           <div className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
               <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Message</span>
@@ -100,8 +131,23 @@ export function Emails({ entreprise }: { entreprise: string }) {
                 {copie === "corps" ? "Copié ✓" : "Copier"}
               </button>
             </div>
-            <div className="space-y-3 whitespace-pre-wrap px-4 py-3 text-sm leading-relaxed">
-              {corps.map((p, i) => <p key={i}>{p}</p>)}
+            <div className="space-y-3 px-4 py-3 text-sm leading-relaxed">
+              {corps.map((ligne, i) =>
+                ligne === "TABLEAU" ? (
+                  <table key={i} className="w-full overflow-hidden rounded-lg border border-border text-[13px]">
+                    <tbody>
+                      {tableau.map(([k, v]) => (
+                        <tr key={k} className="border-b border-border last:border-0">
+                          <td className="bg-muted/50 px-3 py-1.5 font-medium">{k}</td>
+                          <td className="px-3 py-1.5">{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p key={i} className="whitespace-pre-wrap">{ligne}</p>
+                ),
+              )}
             </div>
           </div>
 
