@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { espaceRepo } from "../espace/espaceRepo";
 import type {
   ActivityItem,
   Client,
@@ -56,6 +57,7 @@ interface DataValue {
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
+  deleteClient: (id: string) => Promise<void>;
   addProjectContact: (clientId: string, input: { name: string; role: string; email: string }) => void;
   removeProjectContact: (clientId: string, contactId: string) => void;
   addProjectDoc: (clientId: string, name: string) => void;
@@ -273,6 +275,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+  // Suppression complète (Storage + cascade base, via Edge Function service_role).
+  // On attend le succès avant de retirer de l'état : geste destructif, pas d'optimisme.
+  const deleteClient: DataValue["deleteClient"] = useCallback(async (id) => {
+    await espaceRepo.supprimerClient(id);
+    setClients((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
   // --- Documents ---
   const deleteDoc: DataValue["deleteDoc"] = useCallback(
     (id) => {
@@ -336,6 +345,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       updateContact,
       addClient,
       updateClientFields,
+      deleteClient,
       addProjectContact,
       removeProjectContact,
       addProjectDoc,
@@ -350,7 +360,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
-      addContact, updateContact, addClient, updateClientFields,
+      addContact, updateContact, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, deleteDoc, bumpDocVersion,
       addDocType, removeDocType,

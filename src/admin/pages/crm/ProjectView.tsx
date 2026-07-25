@@ -6,6 +6,7 @@ import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card, SectionLabel } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
+import DangerZone from "../../espace/DangerZone";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -486,6 +487,9 @@ export default function ProjectView({
             )}
           </Card>
         </div>
+
+        {/* Zone de danger : suppression complète du client */}
+        <DangerZone clientId={client.id} clientName={client.company} onDeleted={onClose} />
       </div>
     </div>
   );

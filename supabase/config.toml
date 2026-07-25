@@ -14,3 +14,7 @@ verify_jwt = true
 # Invitations de l'espace client — admin @avisdoc.fr vérifié dans la fonction.
 [functions.inviter-espace]
 verify_jwt = true
+
+# Suppression complète d'un client — admin @avisdoc.fr vérifié dans la fonction.
+[functions.supprimer-client]
+verify_jwt = true

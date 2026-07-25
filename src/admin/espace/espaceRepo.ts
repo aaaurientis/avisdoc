@@ -99,6 +99,12 @@ export const espaceRepo = {
     return (data as GenJob[]) ?? [];
   },
 
+  // Suppression complète : Storage (via Edge Function service_role) + cascade base.
+  async supprimerClient(clientId: string): Promise<void> {
+    const { error } = await sb.functions.invoke("supprimer-client", { body: { client_id: clientId } });
+    if (error) throw error;
+  },
+
   // userId absent → (re)envoi à tous ; userId présent → renvoi ciblé.
   async inviter(clientId: string, userId?: string): Promise<{ invites: number; erreurs: string[] }> {
     const body: { client_id: string; user_id?: string } = { client_id: clientId };
