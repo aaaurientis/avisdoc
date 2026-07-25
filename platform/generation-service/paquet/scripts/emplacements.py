@@ -17,6 +17,7 @@ Le PPTX suit la même convention : la forme porte le nom d'objet LOGO_CLIENT
 (voir logo_client_pptx.py).
 """
 import base64
+import io
 import mimetypes
 import pathlib
 import re
@@ -24,11 +25,50 @@ import re
 JETON = "__LOGO_CLIENT__"
 MARQUEUR = 'data-slot="logo-client"'
 
+_RASTER = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+
+
+def _detourer(data):
+    """Détoure et recentre un logo raster : retire les marges vides (transparentes
+    ou de couleur de fond uniforme) et ajoute une fine marge régulière. Le logo
+    remplit alors sa réserve et reste centré, quelle que soit sa mise en page
+    d'origine. Renvoie un PNG (bytes). Silencieux : rend l'original en cas d'échec.
+    """
+    try:
+        from PIL import Image, ImageChops
+    except Exception:
+        return None
+    try:
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
+
+    # 1) marge transparente ; 2) sinon, marge de la couleur des coins.
+    bbox = im.split()[3].getbbox()
+    if bbox is None:
+        fond = Image.new("RGBA", im.size, im.getpixel((0, 0)))
+        bbox = ImageChops.difference(im, fond).getbbox()
+    if bbox:
+        im = im.crop(bbox)
+
+    marge = max(2, round(0.03 * max(im.size)))
+    toile = Image.new("RGBA", (im.width + 2 * marge, im.height + 2 * marge), (0, 0, 0, 0))
+    toile.paste(im, (marge, marge))
+
+    out = io.BytesIO()
+    toile.save(out, "PNG")
+    return out.getvalue()
+
 
 def _data_uri(chemin):
     chemin = pathlib.Path(chemin)
+    data = chemin.read_bytes()
     mime = mimetypes.guess_type(chemin.name)[0] or "image/png"
-    return f"data:{mime};base64," + base64.b64encode(chemin.read_bytes()).decode()
+    if chemin.suffix.lower() in _RASTER:
+        detoure = _detourer(data)
+        if detoure is not None:
+            data, mime = detoure, "image/png"
+    return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
 def injecter(html, logo=None, apercu=False):
