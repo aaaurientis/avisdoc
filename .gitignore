@@ -29,3 +29,7 @@ dist-deploy/
 
 # Sorties de génération du pack (documents)
 platform/generation-service/paquet/documents/
+
+# Python bytecode
+__pycache__/
+*.pyc
