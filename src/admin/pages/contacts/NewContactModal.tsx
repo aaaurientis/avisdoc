@@ -82,7 +82,7 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       const st = d.structures?.[0];
       const enrichie: FichePro = {
         ...f,
-        specialite: d.specialites?.[0],
+        specialite: d.specialites?.[0] || f.specialite,
         structure: st?.nom || undefined,
         telephone: st?.telephone || undefined,
         email_pro: st?.email || undefined,
@@ -169,7 +169,8 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
               >
                 <div className="text-[13px] font-semibold text-avisdoc-ink">{f.nom}</div>
                 <div className="text-[11.5px] text-muted-foreground">
-                  {[f.profession, f.ville, f.rpps ? `RPPS ${f.rpps}` : null].filter(Boolean).join(" · ") || "—"}
+                  {[f.specialite || f.profession, f.ville, f.rpps ? `RPPS ${f.rpps}` : null]
+                    .filter(Boolean).join(" · ") || "—"}
                 </div>
               </button>
             ))}
