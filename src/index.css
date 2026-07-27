@@ -309,3 +309,46 @@
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Mode sombre — compatibilité des couleurs « en dur » du back-office.
+   Les tokens (.dark) couvrent card/muted/border… ; on adapte ici les classes
+   de marque utilisées en texte et les fonds pastel qui resteraient clairs.
+   NB : bg-avisdoc-ink (surfaces sombres volontaires) reste inchangé.
+--------------------------------------------------------------------------- */
+.dark .text-avisdoc-ink,
+.dark .hover\:text-avisdoc-ink:hover {
+  color: hsl(210 40% 96%);
+}
+.dark .hover\:border-avisdoc-ink:hover {
+  border-color: hsl(210 30% 70%);
+}
+/* Lignes survolées / sélection (listes CRM, tableaux) */
+.dark .bg-sky-50\/70,
+.dark .bg-sky-50\/40,
+.dark .hover\:bg-sky-50\/70:hover,
+.dark .hover\:bg-sky-50\/50:hover {
+  background-color: hsl(197 45% 17% / 0.65);
+}
+.dark .bg-sky-100 { background-color: hsl(197 45% 20%); }
+.dark .text-sky-700 { color: hsl(197 70% 70%); }
+.dark .text-blue-700 { color: hsl(212 85% 72%); }
+/* Encarts d'avertissement / erreur */
+.dark .bg-amber-50 { background-color: hsl(45 50% 12%); }
+.dark .bg-amber-100 { background-color: hsl(45 50% 16%); }
+.dark .text-amber-700, .dark .text-amber-800 { color: hsl(45 85% 70%); }
+.dark .bg-orange-50 { background-color: hsl(24 55% 12%); }
+.dark .text-orange-700 { color: hsl(24 90% 70%); }
+/* Statuts */
+.dark .bg-emerald-100 { background-color: hsl(152 45% 15%); }
+.dark .text-emerald-700 { color: hsl(152 60% 65%); }
+.dark .bg-rose-50, .dark .bg-rose-100 { background-color: hsl(350 50% 15%); }
+.dark .text-rose-700 { color: hsl(350 80% 72%); }
+.dark .border-rose-300, .dark .border-rose-300\/60 { border-color: hsl(350 50% 35%); }
+.dark .hover\:bg-rose-50:hover { background-color: hsl(350 50% 15%); }
+/* Fonds doux teintés marque */
+.dark .bg-avisdoc-teal\/5,
+.dark .bg-avisdoc-teal\/10,
+.dark .bg-avisdoc-teal\/15 {
+  background-color: hsl(197 60% 18% / 0.8);
+}

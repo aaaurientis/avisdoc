@@ -52,13 +52,16 @@ interface DataValue {
 
   getClient: (id: string) => Client | undefined;
 
-  addContact: (input: { name: string; email: string; type: ContactType }) => void;
+  addContact: (input: {
+    name: string; email: string; type: ContactType;
+    role?: string; ville?: string; adresse?: string; tel?: string; notes?: string;
+  }) => void;
   updateContact: (contact: NetworkContact) => void;
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
   deleteClient: (id: string) => Promise<void>;
-  addProjectContact: (clientId: string, input: { name: string; role: string; email: string }) => void;
+  addProjectContact: (clientId: string, input: { prenom: string; nom: string; role: string; email: string }) => void;
   removeProjectContact: (clientId: string, contactId: string) => void;
   addProjectDoc: (clientId: string, name: string) => void;
   removeProjectDoc: (clientId: string, docId: string) => void;
@@ -127,19 +130,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   // --- Annuaire ---
   const addContact: DataValue["addContact"] = useCallback(
-    ({ name, email, type }) => {
+    ({ name, email, type, role, ville, adresse, tel, notes }) => {
       const contact: NetworkContact = {
         id: uid(),
         name: name.trim() || "Nouveau contact",
-        role: "",
+        role: role?.trim() ?? "",
         type,
         statut: "En attente",
-        ville: "",
-        adresse: "",
+        ville: ville?.trim() ?? "",
+        adresse: adresse?.trim() ?? "",
         email: email.trim(),
-        tel: "",
+        tel: tel?.trim() ?? "",
         last: todayLabel(),
-        notes: "",
+        notes: notes?.trim() ?? "",
       };
       setContacts((prev) => [contact, ...prev]);
       persist(() => repo.createContact(contact));
@@ -174,9 +177,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const addProjectContact: DataValue["addProjectContact"] = useCallback(
     (clientId, input) => {
+      const prenom = input.prenom.trim();
+      const nom = input.nom.trim();
       const pc = {
         id: uid(),
-        name: input.name.trim(),
+        name: [prenom, nom].filter(Boolean).join(" "),
+        prenom,
+        nom,
         role: input.role.trim() || "Contact",
         email: input.email.trim() || "—",
         tel: "—",

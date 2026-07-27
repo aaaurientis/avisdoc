@@ -6,6 +6,7 @@ import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Crm from "./pages/Crm";
+import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
 import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
@@ -32,6 +33,7 @@ function Gate() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/crm" element={<Crm />} />
           <Route path="/crm/:clientId" element={<Crm />} />
+          <Route path="/clients" element={<Clients />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/settings" element={<Settings />} />

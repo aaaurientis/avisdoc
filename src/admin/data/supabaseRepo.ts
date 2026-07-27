@@ -34,7 +34,11 @@ function toContact(r: any): NetworkContact {
 }
 
 function toProjectContact(r: any): ProjectContact {
-  return { id: r.id, name: r.name, role: r.role ?? "", email: r.email ?? "", tel: r.tel ?? "" };
+  return {
+    id: r.id, name: r.name,
+    prenom: r.prenom ?? "", nom: r.nom ?? "",
+    role: r.role ?? "", email: r.email ?? "", tel: r.tel ?? "",
+  };
 }
 
 function toProjectDoc(r: any): ProjectDoc {
@@ -94,8 +98,11 @@ export class SupabaseRepo implements AdminRepo {
       id: r.id,
       company: r.company,
       siren: r.siren ?? "",
+      siret: r.siret ?? "",
       naf: r.naf ?? "",
       adresse: r.adresse ?? "",
+      codePostal: r.code_postal ?? "",
+      ville: r.ville ?? "",
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
       jours: r.jours ?? 1,
@@ -144,7 +151,9 @@ export class SupabaseRepo implements AdminRepo {
 
   async createClient(c: Client): Promise<void> {
     const { error } = await sb.from("admin_clients").insert({
-      id: c.id, company: c.company, siren: c.siren, naf: c.naf, adresse: c.adresse,
+      id: c.id, company: c.company, siren: c.siren, siret: c.siret || null,
+      naf: c.naf, adresse: c.adresse,
+      code_postal: c.codePostal || null, ville: c.ville || null,
       effectif: c.effectif, stage: c.stage, jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,
     });
@@ -156,7 +165,7 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateClientFields(id: string, fields: Partial<Client>): Promise<void> {
     const row: Record<string, unknown> = {};
-    const map: Record<string, string> = { statutPropo: "statut_propo" };
+    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal" };
     for (const [k, v] of Object.entries(fields)) {
       if (["contacts", "docs", "suivis"].includes(k)) continue;
       row[map[k] ?? k] = v;
@@ -168,7 +177,9 @@ export class SupabaseRepo implements AdminRepo {
 
   async addProjectContact(clientId: string, c: ProjectContact): Promise<void> {
     const { error } = await sb.from("admin_client_contacts").insert({
-      id: c.id, client_id: clientId, name: c.name, role: c.role, email: c.email, tel: c.tel,
+      id: c.id, client_id: clientId, name: c.name,
+      prenom: c.prenom || null, nom: c.nom || null,
+      role: c.role, email: c.email, tel: c.tel,
     });
     this.assert(error);
   }

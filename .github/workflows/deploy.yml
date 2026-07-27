@@ -1,0 +1,83 @@
+# Déploiement automatique AvisDoc — front OVH + fonctions Supabase.
+#
+# Se déclenche :
+#   - à chaque push sur main            → tout est déployé (front all + fonctions)
+#   - manuellement (onglet Actions →    → cibles au choix, depuis n'importe
+#     « Déploiement » → Run workflow)      quelle branche
+#
+# Secrets à créer une seule fois dans GitHub
+# (Settings → Secrets and variables → Actions → New repository secret) :
+#   OVH_HOST                ex. ftp.cluster129.hosting.ovh.net
+#   OVH_USER                login SFTP OVH
+#   OVH_PASSWORD            mot de passe SFTP
+#   SUPABASE_ACCESS_TOKEN   jeton personnel : supabase.com/dashboard/account/tokens
+#
+# NB : les migrations SQL restent à appliquer via le SQL Editor du dashboard
+# Supabase (navigateur) — jamais rejouées automatiquement par prudence.
+
+name: Déploiement
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      front:
+        description: "Déployer le front (OVH)"
+        type: boolean
+        default: true
+      cibles:
+        description: "Cibles front"
+        type: choice
+        options: [all, "admin client", admin, client, www]
+        default: all
+      fonctions:
+        description: "Déployer les fonctions Supabase"
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  front:
+    name: Front → OVH
+    if: github.event_name == 'push' || inputs.front
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Build + envoi SFTP
+        env:
+          OVH_HOST: ${{ secrets.OVH_HOST }}
+          OVH_USER: ${{ secrets.OVH_USER }}
+          OVH_PASSWORD: ${{ secrets.OVH_PASSWORD }}
+        run: ./scripts/deploy-ovh.sh ${{ github.event_name == 'push' && 'all' || inputs.cibles }}
+
+  fonctions:
+    name: Fonctions → Supabase
+    if: github.event_name == 'push' || inputs.fonctions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Déployer toutes les Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref wtovhzxymlqnfxyjxrdq

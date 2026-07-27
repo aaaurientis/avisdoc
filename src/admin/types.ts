@@ -27,7 +27,10 @@ export type DocExt = "PDF" | "DOC" | "XLS";
 /** Contact rattaché à un projet CRM. */
 export interface ProjectContact {
   id: string;
+  /** Nom d'affichage complet (« prénom nom ») — conservé pour compat. */
   name: string;
+  prenom: string;
+  nom: string;
   role: string;
   email: string;
   tel: string;
@@ -55,8 +58,11 @@ export interface Client {
   id: string;
   company: string;
   siren: string;
+  siret?: string;
   naf: string;
-  adresse: string;
+  adresse: string; // adresse complète (affichage)
+  codePostal?: string;
+  ville?: string;
   effectif: string;
   stage: Stage;
   jours: number;
@@ -99,6 +105,7 @@ export interface AdminUser {
 export interface PappersResult {
   company: string;
   siren: string;
+  siret?: string;
   naf: string;
   adresse: string;
   effectif: string;
