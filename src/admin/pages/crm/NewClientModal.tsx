@@ -34,6 +34,7 @@ export default function NewClientModal({
   const [result, setResult] = useState<PappersResult | null>(null);
   const [qontoClients, setQontoClients] = useState<ClientQonto[]>([]);
   const [qontoPick, setQontoPick] = useState<ClientQonto | null>(null);
+  const [qQonto, setQQonto] = useState("");
   const [jours, setJours] = useState(2);
   const [tarif, setTarif] = useState(1200);
 
@@ -50,12 +51,12 @@ export default function NewClientModal({
     [crmClients],
   );
   const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = qQonto.trim().toLowerCase();
     return qontoClients
       .filter((c) => !dejaCrm.has((c.name ?? "").trim().toLowerCase()))
       .filter((c) => !q || (c.name ?? "").toLowerCase().includes(q) || (c.tax_id ?? "").includes(q))
-      .slice(0, 5);
-  }, [qontoClients, dejaCrm, query]);
+      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr"));
+  }, [qontoClients, dejaCrm, qQonto]);
 
   const runSearch = async () => {
     if (!query.trim() || loading) return;
@@ -160,13 +161,26 @@ export default function NewClientModal({
         </button>
       </div>
 
-      {/* Clients Qonto correspondants */}
-      {!result && !qontoPick && suggestions.length > 0 && (
+      {/* Clients Qonto existants : petite recherche dédiée + liste scrollable */}
+      {!result && !qontoPick && qontoClients.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-            Déjà dans Qonto
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+              Déjà dans Qonto ({suggestions.length})
+            </div>
+            <input
+              className="ad-input w-[180px] rounded-full border border-border bg-muted/50 px-3 py-1.5 text-[12px] outline-none transition-colors focus:border-avisdoc-teal"
+              placeholder="Filtrer la liste…"
+              value={qQonto}
+              onChange={(e) => setQQonto(e.target.value)}
+            />
           </div>
-          <div className="flex flex-col overflow-hidden rounded-xl border border-border">
+          <div className="flex max-h-56 flex-col overflow-y-auto rounded-xl border border-border">
+            {suggestions.length === 0 && (
+              <p className="px-3.5 py-3 text-[12.5px] italic text-muted-foreground">
+                Aucun client Qonto ne correspond.
+              </p>
+            )}
             {suggestions.map((c) => (
               <button
                 key={c.id}
