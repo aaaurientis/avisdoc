@@ -140,11 +140,13 @@ serve(async (req) => {
       await admin.from("admin_clients").update({ qonto_client_id: existant.id }).eq("id", c!.id);
       return { id: existant.id, cree: false };
     }
-    // Contact référent (source unique) : prénom / nom saisis en 2 champs (0009).
-    // Repli sur un découpage de `name` pour les contacts créés avant la migration.
+    // Contact retenu = le « référent » (rôle contenant « référent »), à défaut
+    // le 1er contact. Prénom / nom saisis en 2 champs (0009) ; repli sur un
+    // découpage de `name` pour les contacts créés avant la migration.
     const { data: cts } = await admin.from("admin_client_contacts")
-      .select("prenom, nom, name, email").eq("client_id", c!.id).limit(1);
-    const ct = cts?.[0];
+      .select("prenom, nom, name, email, role").eq("client_id", c!.id);
+    const liste = cts ?? [];
+    const ct = liste.find((x: any) => /r[ée]f[ée]rent/i.test(x.role ?? "")) ?? liste[0];
     const sp = splitNom(ct?.name);
     const prenom = ct?.prenom || sp.prenom || undefined;
     const nom = ct?.nom || sp.nom || undefined;
