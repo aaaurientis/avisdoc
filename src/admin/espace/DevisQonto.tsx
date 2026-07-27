@@ -13,6 +13,7 @@ interface StatutClient { lie: boolean; id?: string; trouve?: { id: string; name?
 export default function DevisQonto({ clientId }: { clientId: string }) {
   const [devis, setDevis] = useState<Devis[]>([]);
   const [statut, setStatut] = useState<StatutClient | null>(null);
+  const [statutErr, setStatutErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -20,7 +21,8 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
   async function recharger() {
     try {
       setDevis(await devisRepo.liste(clientId));
-      try { setStatut(await devisRepo.statutClient(clientId)); } catch { /* Qonto non configuré : on n'affiche pas le statut */ }
+      try { setStatut(await devisRepo.statutClient(clientId)); setStatutErr(null); }
+      catch (e: any) { setStatut(null); setStatutErr(e?.message ?? String(e)); }
     } catch (e: any) { setErr(e?.message ?? String(e)); }
   }
   useEffect(() => { recharger(); /* eslint-disable-next-line */ }, [clientId]);
@@ -57,6 +59,13 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
           </button>
         </div>
       </div>
+
+      {/* Statut Qonto indisponible (fonction non déployée, secrets manquants, erreur API) */}
+      {statutErr && (
+        <p className="mb-3 break-words rounded-xl border border-amber-300/50 bg-amber-50 px-3.5 py-2 text-[12px] text-amber-800">
+          Statut Qonto indisponible : {statutErr}
+        </p>
+      )}
 
       {/* Statut du client dans Qonto */}
       {statut && (
