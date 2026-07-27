@@ -9,6 +9,7 @@ import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
 import DevisQonto from "../../espace/DevisQonto";
+import QontoTag from "../../espace/QontoTag";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -149,6 +150,7 @@ export default function ProjectView({
           titre={client.company}
           actions={
             <>
+              <QontoTag clientId={client.id} />
               {editing ? (
                 <>
                   <button
