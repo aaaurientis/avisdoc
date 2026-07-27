@@ -23,6 +23,8 @@ export default defineConfig({
         admin: path.resolve(__dirname, "admin.html"),
         // Espace client (client.avisdoc.fr)
         client: path.resolve(__dirname, "client.html"),
+        // Espace professionnel (pro.avisdoc.fr)
+        pro: path.resolve(__dirname, "pro.html"),
       },
     },
   },

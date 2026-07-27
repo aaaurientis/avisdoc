@@ -29,7 +29,7 @@ on:
       cibles:
         description: "Cibles front"
         type: choice
-        options: [all, "admin client", admin, client, www]
+        options: [all, "admin client", admin, client, www, pro]
         default: all
       fonctions:
         description: "Déployer les fonctions Supabase"

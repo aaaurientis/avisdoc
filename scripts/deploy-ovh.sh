@@ -5,6 +5,7 @@
 #   avisdoc.fr / www   → OVH_DIR_WWW    (défaut : www)
 #   admin.avisdoc.fr   → OVH_DIR_ADMIN  (défaut : admin)
 #   client.avisdoc.fr  → OVH_DIR_CLIENT (défaut : client)
+#   pro.avisdoc.fr     → OVH_DIR_PRO    (défaut : pro)
 #
 # On build d'abord trois dossiers autonomes (scripts/build-deploy.sh), puis on
 # téléverse chacun vers son sous-domaine. Chaque dossier étant propre à une
@@ -42,6 +43,7 @@ fi
 : "${OVH_DIR_WWW:=www}"
 : "${OVH_DIR_ADMIN:=admin}"
 : "${OVH_DIR_CLIENT:=client}"
+: "${OVH_DIR_PRO:=pro}"
 
 if ! command -v lftp >/dev/null 2>&1; then
   echo "✗ lftp est requis. macOS → brew install lftp"
@@ -57,7 +59,7 @@ for a in "$@"; do
   cibles+=("$a")
 done
 [[ ${#cibles[@]} -eq 0 ]] && cibles=(admin client)
-if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www); fi
+if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www pro); fi
 
 # Résout le dossier distant d'une cible.
 dir_distant() {
@@ -65,7 +67,8 @@ dir_distant() {
     www)    echo "$OVH_DIR_WWW" ;;
     admin)  echo "$OVH_DIR_ADMIN" ;;
     client) echo "$OVH_DIR_CLIENT" ;;
-    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | all)" >&2; exit 1 ;;
+    pro)    echo "$OVH_DIR_PRO" ;;
+    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | pro | all)" >&2; exit 1 ;;
   esac
 }
 
@@ -99,5 +102,6 @@ for cible in "${cibles[@]}"; do
     www)    echo "  https://avisdoc.fr" ;;
     admin)  echo "  https://admin.avisdoc.fr" ;;
     client) echo "  https://client.avisdoc.fr" ;;
+    pro)    echo "  https://pro.avisdoc.fr" ;;
   esac
 done

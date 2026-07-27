@@ -6,12 +6,13 @@
 #   avisdoc.fr / www      → home/www
 #   admin.avisdoc.fr      → home/admin
 #   client.avisdoc.fr     → home/client
+#   pro.avisdoc.fr        → home/pro
 #
 # Chaque dossier doit donc être autonome : son propre index.html (l'entrée de
 # l'app), une copie des assets versionnés, et un .htaccess de repli SPA.
 # On évite ainsi toute détection par host (fragile) : dossier = sous-domaine.
 #
-# Produit : dist-deploy/{www,admin,client}
+# Produit : dist-deploy/{www,admin,client,pro}
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -76,7 +77,7 @@ monter() {
   # Tout dist/ (dont les fichiers cachés) puis on retire ce qui ne va pas
   # dans un dossier autonome : les .html d'entrée et le .htaccess partagé.
   cp -a dist/. "$cible/"
-  rm -f "$cible/index.html" "$cible/admin.html" "$cible/client.html" "$cible/.htaccess"
+  rm -f "$cible/index.html" "$cible/admin.html" "$cible/client.html" "$cible/pro.html" "$cible/.htaccess"
   cp "dist/$entree" "$cible/index.html"
   htaccess_spa > "$cible/.htaccess"
   echo "  ✓ $cible  (index.html ← $entree)"
@@ -86,9 +87,11 @@ echo "▸ Assemblage des dossiers par sous-domaine…"
 monter www    index.html
 monter admin  admin.html
 monter client client.html
+monter pro    pro.html
 
 echo
 echo "Prêt. Dossiers autonomes dans $sortie/ :"
 echo "  $sortie/www    → home/www    (avisdoc.fr)"
 echo "  $sortie/admin  → home/admin  (admin.avisdoc.fr)"
 echo "  $sortie/client → home/client (client.avisdoc.fr)"
+echo "  $sortie/pro    → home/pro    (pro.avisdoc.fr)"
