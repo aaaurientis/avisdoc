@@ -110,7 +110,7 @@ serve(async (req) => {
 
   if (!client_id) return json({ error: "client_id requis" }, 400);
   const { data: c, error: cErr } = await admin.from("admin_clients")
-    .select("id, company, siren, adresse, email_facturation, jours, tarif, qonto_client_id")
+    .select("id, company, siren, adresse, email_facturation, contact_prenom, contact_nom, contact_email, jours, tarif, qonto_client_id")
     .eq("id", client_id).maybeSingle();
   // Erreur de lecture (souvent : colonnes qonto_client_id/email_facturation
   // absentes = migration 0008 non appliquée) → on la remonte telle quelle.
@@ -140,11 +140,18 @@ serve(async (req) => {
       await admin.from("admin_clients").update({ qonto_client_id: existant.id }).eq("id", c!.id);
       return { id: existant.id, cree: false };
     }
-    // Contact principal (prénom/nom/e-mail) rattaché au client Qonto.
-    const { data: cts } = await admin.from("admin_client_contacts")
-      .select("name, email").eq("client_id", c!.id).limit(1);
-    const contact = cts?.[0];
-    const { prenom, nom } = splitNom(contact?.name);
+    // Contact de facturation : champs dédiés (0009) ; à défaut, 1er contact CRM.
+    let prenom = c!.contact_prenom || undefined;
+    let nom = c!.contact_nom || undefined;
+    let email = c!.contact_email || undefined;
+    if (!prenom && !nom) {
+      const { data: cts } = await admin.from("admin_client_contacts")
+        .select("name, email").eq("client_id", c!.id).limit(1);
+      const sp = splitNom(cts?.[0]?.name);
+      prenom = prenom || sp.prenom;
+      nom = nom || sp.nom;
+      email = email || cts?.[0]?.email || undefined;
+    }
 
     // Payload à plat (pas de wrapper) ; société => kind=company + name.
     const payload: Record<string, unknown> = {
@@ -152,7 +159,7 @@ serve(async (req) => {
       name: c!.company,
       first_name: prenom,
       last_name: nom,
-      email: contact?.email || c!.email_facturation || undefined,
+      email: email || c!.email_facturation || undefined,
       tax_identification_number: c!.siren || undefined,
       vat_number: tvaFR(c!.siren),
       billing_address: adresseQonto(c!.adresse),
