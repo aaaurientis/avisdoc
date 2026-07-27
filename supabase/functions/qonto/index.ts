@@ -35,6 +35,22 @@ function tvaFR(siren?: string): string | undefined {
   return `FR${String(cle).padStart(2, "0")}${s}`;
 }
 
+// Découpe une adresse libre (Pappers) en rue / code postal / ville pour Qonto.
+// Repère le code postal FR (5 chiffres) : ce qui précède = rue, ce qui suit = ville.
+function adresseQonto(adr?: string): Record<string, string> | undefined {
+  const s = (adr ?? "").trim();
+  if (!s) return undefined;
+  const m = s.match(/\b(\d{5})\b/);
+  if (!m || m.index === undefined) return { street_address: s, country_code: "FR" };
+  const zip = m[1];
+  const rue = s.slice(0, m.index).replace(/[,\s]+$/, "").trim();
+  const ville = s.slice(m.index + zip.length).replace(/^[,\s]+/, "").trim();
+  const out: Record<string, string> = { country_code: "FR", zip_code: zip };
+  if (rue) out.street_address = rue;
+  if (ville) out.city = ville;
+  return out;
+}
+
 // Appel Qonto générique. Renvoie { ok, status, data|text }.
 async function qonto(path: string, method = "GET", body?: unknown) {
   const res = await fetch(`${Q_BASE}${path}`, {
@@ -123,7 +139,7 @@ serve(async (req) => {
       email: c!.email_facturation || undefined,
       tax_identification_number: c!.siren || undefined,
       vat_number: tvaFR(c!.siren),
-      billing_address: c!.adresse ? { street_address: c!.adresse, country_code: "FR" } : undefined,
+      billing_address: adresseQonto(c!.adresse),
     };
     const r = await qonto("/clients", "POST", payload);
     if (!r.ok) return { erreur: r.data };
