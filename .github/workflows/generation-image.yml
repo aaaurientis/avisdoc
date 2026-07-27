@@ -1,0 +1,40 @@
+name: Image du service de génération
+
+# Construit l'image Docker du service de génération et la pousse vers le
+# registre Scaleway. Évite d'avoir Docker en local : GitHub construit l'image.
+#
+# Secret requis (Settings > Secrets and variables > Actions) :
+#   SCW_SECRET_KEY  — clé secrète Scaleway (identifiants du registre)
+# Variables (facultatives, avec valeurs par défaut ci-dessous) :
+#   SCW_REGISTRY_NAMESPACE (def. "avisdoc")   SCW_REGION (def. "fr-par")
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/avisdoc-fusion]
+    paths:
+      - "platform/generation-service/**"
+      - ".github/workflows/generation-image.yml"
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    env:
+      REGION: ${{ vars.SCW_REGION || 'fr-par' }}
+      NAMESPACE: ${{ vars.SCW_REGISTRY_NAMESPACE || 'avisdoc' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connexion au registre Scaleway
+        run: |
+          echo "${{ secrets.SCW_SECRET_KEY }}" \
+            | docker login "rg.${REGION}.scw.cloud" -u nologin --password-stdin
+
+      - name: Build & push
+        run: |
+          IMG="rg.${REGION}.scw.cloud/${NAMESPACE}/generation"
+          docker build -t "${IMG}:latest" -t "${IMG}:${GITHUB_SHA::12}" \
+            platform/generation-service
+          docker push "${IMG}:latest"
+          docker push "${IMG}:${GITHUB_SHA::12}"
+          echo "Image poussée : ${IMG}:latest"

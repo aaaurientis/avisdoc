@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvisDoc — Information et consentement à un acte de télémédecine</title>
+<style>
+__CHARTE__
+
+/* ---- Document juridique : lecture dense, hiérarchie nette ---- */
+@page{ @bottom-right{content:"Notice d'information · " counter(page) "/" counter(pages)} }
+h1{font-size:21pt}
+.doc-meta{min-width:34mm}
+body{font-size:10pt;line-height:1.5}
+
+.chapo{
+  background:var(--cyan-tres-clair);border-left:3pt solid var(--cyan);border-radius:0 2mm 2mm 0;
+  padding:4mm 5mm;margin-bottom:6mm;font-size:10.5pt;color:var(--ardoise);line-height:1.55;
+}
+.chapo p{margin:0 0 2.5mm}
+.chapo p:last-child{margin-bottom:0}
+.chapo b{color:var(--marine);font-weight:600}
+
+section{margin-bottom:5mm;break-inside:auto}
+.sec-head{break-after:avoid}
+p{margin:0 0 2.8mm;color:var(--ardoise)}
+p b, li b{color:var(--marine);font-weight:600}
+ul{margin:0 0 3mm;padding-left:4.5mm}
+li{margin-bottom:1.8mm;color:var(--ardoise)}
+li::marker{color:var(--cyan)}
+
+.defs{display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-bottom:3mm}
+.def{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:3mm 3.5mm}
+.def .k{font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:1mm}
+.def p{margin:0;font-size:9.5pt;line-height:1.45}
+
+.alerte{
+  background:#FDF1E9;border:.5pt solid #F6D3BE;border-radius:2mm;
+  padding:3.5mm 4mm;margin:0 0 4mm;font-size:10pt;color:var(--ardoise);line-height:1.5;
+}
+.alerte b{color:var(--orange)}
+
+.etapes{counter-reset:e;margin:0 0 3mm;padding:0;list-style:none}
+.etapes li{counter-increment:e;position:relative;padding-left:8mm;margin-bottom:2.2mm}
+.etapes li::before{
+  content:counter(e);position:absolute;left:0;top:.2mm;
+  width:5mm;height:5mm;border-radius:50%;background:var(--cyan);color:var(--blanc);
+  font-size:8pt;font-weight:700;text-align:center;line-height:5mm;
+}
+
+table.donnees{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:3mm}
+table.donnees th{
+  background:var(--marine);color:var(--blanc);text-align:left;padding:2mm 3mm;
+  font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+}
+table.donnees th:first-child{border-radius:1.4mm 0 0 0}
+table.donnees th:last-child{border-radius:0 1.4mm 0 0}
+table.donnees td{padding:2.4mm 3mm;border-bottom:.5pt solid var(--beige);vertical-align:top;color:var(--ardoise)}
+table.donnees tr:nth-child(even) td{background:var(--cyan-tres-clair)}
+table.donnees td:first-child{color:var(--marine);font-weight:600;width:34%}
+
+.contact{background:var(--blanc);border:.5pt solid var(--filet-carte);border-radius:2mm;padding:4mm 4.5mm;margin-bottom:4mm}
+.contact .k{font-size:7.5pt;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--taupe);margin-bottom:1.5mm}
+.contact p{margin:0;font-size:10pt}
+</style>
+</head>
+<body>
+
+<div class="brandhead">
+  <img src="__LOGO__" alt="">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span>
+  <span class="site">avisdoc.fr</span>
+</div>
+<div class="refhead">Plateforme de téléexpertise · Dermatologie</div>
+<div class="brandfoot">
+  <span class="wordmark"><span class="a">Avis</span><span class="d">Doc</span></span> · avisdoc.fr
+</div>
+
+<div class="doc-head">
+  <div>
+    <div class="kicker">Notice d'information</div>
+    <h1>Information et consentement du patient<br><em>à un acte de télémédecine</em></h1>
+    <p class="doc-sub">À lire avant de signer le formulaire de consentement.</p>
+  </div>
+</div>
+
+<div class="chapo">
+  <p>Vous vous apprêtez à bénéficier d'un acte de <b>téléexpertise</b> de la part d'un professionnel de santé
+  et d'un médecin dermatologue, dans le but d'obtenir un avis, des conseils, des recommandations, une
+  réorientation ou une prescription d'examens complémentaires.</p>
+  <p>Cette notice vous informe sur le déroulement de cette prise en charge et vise à recueillir votre consentement,
+  nécessaire à la réalisation de l'acte. <b>Le secret médical est respecté et vos données personnelles sont
+  protégées.</b> Vous pouvez être accompagné(e) d'un proche, d'un aidant ou d'un professionnel de santé pendant
+  tout le parcours.</p>
+</div>
+
+<section>
+  <div class="sec-head"><span class="lbl">01 · Les professionnels concernés</span></div>
+  <div class="defs">
+    <div class="def">
+      <div class="k">Le Professionnel Requérant</div>
+      <p>Professionnel de santé établi en France, autorisé à exercer par les ordres compétents. Son nom et ses
+      numéros ADELI et RPPS vous sont communiqués sur le document de réponse à la demande.</p>
+    </div>
+    <div class="def">
+      <div class="k">Le Médecin Téléexpert</div>
+      <p>Dermatologue établi en France, autorisé à pratiquer la médecine. Ses numéros RPPS et ADELI vous sont
+      communiqués dans les meilleurs délais.</p>
+    </div>
+  </div>
+  <p>Ces deux professionnels répondent aux conditions légales d'exercice définies par le code de la santé publique.
+  Ils respectent l'obligation d'assurance destinée à couvrir leur responsabilité, civile ou administrative,
+  susceptible d'être engagée dans le cadre de leurs activités de prévention, de diagnostic et de soins.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="lbl">02 · Qu'est-ce qu'une téléexpertise ?</span></div>
+  <p>La télémédecine est une forme de pratique médicale à distance utilisant les technologies de l'information et
+  de la communication, dont le régime est prévu par les <b>articles L.6316-1 et suivants du code de la santé
+  publique</b>.</p>
+  <p>Parmi les actes de télémédecine, la téléexpertise permet à un professionnel de santé de solliciter à distance,
+  par messagerie ou tout autre outil sécurisé, l'avis d'un ou plusieurs professionnels de santé médicaux, en raison
+  de leurs formations ou compétences particulières, face à une situation médicale donnée et sur la base des
+  informations de santé liées à la prise en charge d'un patient.</p>
+  <p>En l'occurrence, le Professionnel Requérant sollicite le Médecin Téléexpert et lui transmet des données de
+  santé vous concernant, afin qu'il les consulte à distance pour se prononcer.</p>
+  <div class="alerte">
+    <b>Une téléexpertise n'équivaut pas à une consultation en présentiel</b> et ne fournit pas le même degré
+    d'analyse médicale. Elle ne se substitue en aucun cas à un contrôle médical complet, régulier et en présentiel,
+    qui reste le meilleur moyen d'évaluer et de dépister un état dermatologique anormal.
+  </div>
+  <p>Sur la base des informations qui lui sont transmises, le Médecin Téléexpert évalue le besoin visuel et peut
+  fournir un avis médical, établir un diagnostic, préparer une décision thérapeutique, fournir des conseils de
+  prévention personnalisés, des recommandations ou une réorientation.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="lbl">03 · Votre consentement</span></div>
+  <ul>
+    <li>Aucun acte médical ni aucun traitement ne peut être pratiqué sans le <b>consentement libre et éclairé</b>
+    du patient, et ce consentement peut être <b>retiré à tout moment</b>.</li>
+    <li>Toute personne a le droit d'être informée sur son état de santé. Cette information porte sur les différentes
+    investigations, traitements ou actions de prévention proposés, leur utilité, leur urgence éventuelle, leurs
+    conséquences, les risques fréquents ou graves normalement prévisibles, ainsi que sur les autres solutions
+    possibles et les conséquences prévisibles en cas de refus.</li>
+    <li>Cette information incombe à tout professionnel de santé dans le cadre de ses compétences et dans le respect
+    des règles professionnelles applicables. Seules l'urgence ou l'impossibilité d'informer peuvent l'en dispenser.
+    Elle est délivrée au cours d'un entretien individuel.</li>
+    <li><b>Si vous refusez de consentir, l'acte ne pourra pas être effectué.</b> Vous avez le libre choix d'accepter
+    ou non une prise en charge en télémédecine ; il vous suffit alors de prévenir le Professionnel Requérant. Votre
+    suivi reste assuré par tout professionnel habilité. Les professionnels de santé ont l'obligation de respecter
+    votre volonté après vous avoir informé des conséquences de vos choix et de leur éventuelle gravité.</li>
+    <li>Votre consentement est valable auprès du Professionnel Requérant et du Médecin Téléexpert jusqu'à ce que
+    vous le retiriez de manière explicite.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="lbl">04 · Éligibilité et moyens techniques</span></div>
+  <p>L'éligibilité à la téléexpertise est déterminée en fonction de votre situation de santé et, le cas échéant, de
+  votre domiciliation dans une éventuelle région de carence dermatologique.</p>
+  <p>Si le recours à la téléexpertise est jugé pertinent, la transmission des éléments par le Professionnel Requérant
+  se fait via une <b>plateforme sécurisée hébergée auprès d'un hébergeur de données de santé (HDS) certifié</b>,
+  répondant aux exigences techniques et de sécurité en matière de télémédecine.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="lbl">05 · Déroulement de la téléexpertise</span></div>
+  <div class="cap">Pendant votre rendez-vous</div>
+  <ol class="etapes">
+    <li>Le Professionnel Requérant vous demande votre état civil complet et apprécie la pertinence du recours à la
+    téléexpertise vous concernant. Le cas échéant, il lance la procédure.</li>
+    <li>Il prend un ou plusieurs clichés des lésions pour lesquelles il souhaite obtenir l'avis du Médecin Téléexpert.</li>
+    <li>Vous remplissez avec son aide un questionnaire recueillant les autres données de santé ou administratives,
+    et vous lui fournissez les pièces complémentaires nécessaires.</li>
+    <li>Il soumet l'ensemble de votre dossier au Médecin Téléexpert.</li>
+  </ol>
+  <div class="cap">Après votre rendez-vous</div>
+  <p>L'analyse de votre dossier par le Médecin Téléexpert est réalisée pendant les jours ouvrés, dans un délai
+  <b>moyen de quatre-vingt-seize (96) heures</b> à compter de la demande, sous réserve de sa décision médicale
+  indépendante. La teneur de l'avis et son délai de remise restent à sa discrétion.</p>
+  <ul>
+    <li>Le Médecin Téléexpert évalue au préalable l'opportunité du recours et la complétude du dossier, décide ou non
+    de réaliser l'acte, puis, le cas échéant, émet un avis médical, des conseils de prévention personnalisés, des
+    recommandations ou une réorientation. Il dresse un compte-rendu. <b>Toute décision est prise selon sa discrétion
+    et sous sa responsabilité médicale.</b></li>
+    <li><b>Réponse et suivi :</b> vous recevez un courriel vous permettant d'accéder au contenu de l'avis. Vous pouvez
+    télécharger votre dossier depuis la plateforme.</li>
+    <li>Si votre dossier justifie une autre consultation, <b>un courrier d'adressage vous est envoyé par courriel</b>.</li>
+    <li>Vous pouvez ensuite vous rendre chez le professionnel de santé de votre choix afin de faire réaliser l'acte
+    prescrit, le cas échéant, sur la base de l'ordonnance reçue.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="lbl">06 · Traitement de vos données personnelles</span></div>
+  <p>Pour cet acte de téléexpertise, il est nécessaire que vous communiquiez des données personnelles vous concernant,
+  y compris des données de santé.</p>
+  <table class="donnees">
+    <tr><th>Catégorie</th><th>Données concernées</th></tr>
+    <tr><td>Données de contact</td><td>Civilité, nom, prénom, adresse postale, adresse électronique, numéro de téléphone, date de naissance</td></tr>
+    <tr><td>Identifiants</td><td>Numéro de sécurité sociale (NIR), profession</td></tr>
+    <tr><td>Données de santé</td><td>Descriptif de maladie, clichés médicaux, antécédents médicaux, prestations de soins réalisées, résultats d'examens, traitements, voyages réalisés</td></tr>
+  </table>
+  <p>Tous les champs marqués d'un astérisque, ou signalés de façon équivalente par le Professionnel Requérant,
+  doivent obligatoirement être remplis afin de sécuriser la procédure et de permettre la réalisation de l'acte.</p>
+
+  <div class="cap">Responsables du traitement</div>
+  <p>Les responsables de ce traitement sont respectivement le <b>Professionnel Requérant</b> et le
+  <b>Médecin Téléexpert</b>.</p>
+  <div class="contact">
+    <div class="k">Pour toute question sur vos données et vos droits</div>
+    <p>Par courriel : <b>contact@avisdoc.fr</b><br>
+    Par courrier : AvisDoc, 11 chaussée de la Muette, 75016 Paris</p>
+  </div>
+
+  <div class="cap">Finalités</div>
+  <p>Le traitement a pour finalité de permettre l'orientation des soins et des services requis par votre état de
+  santé, la mise en relation entre le Professionnel Requérant et le Médecin Téléexpert, l'obtention d'un avis
+  portant notamment sur un diagnostic ou sa confirmation, la gestion et la tenue de votre dossier médical, la
+  communication entre professionnels et structures de soins participant à votre prise en charge, la gestion du
+  paiement de l'acte ou de sa prise en charge financière, l'établissement et la télétransmission des documents
+  destinés à l'assurance maladie, la tenue de la comptabilité des responsables de traitement, et le fonctionnement
+  du système d'information opérant la plateforme.</p>
+  <p>Vos données peuvent également, <b>dans un cadre secondaire</b>, être analysées et anonymisées afin de générer
+  des informations de fonctionnement et d'amélioration de la plateforme et des statistiques s'y rapportant, au moyen
+  notamment d'outils algorithmiques.</p>
+  <p>La plateforme est éditée par la société <b>AVISDOC</b>, société par actions simplifiée au capital de 6 750 €,
+  immatriculée au Registre du Commerce et des Sociétés sous le numéro 901 941 880 RCS Paris, dont le siège social
+  est situé 11 chaussée de la Muette, 75016 Paris. AVISDOC a pour mission, <b>en tant que sous-traitant</b>, de
+  traiter les données des patients pour le compte du Professionnel Requérant et du Médecin Téléexpert.</p>
+
+  <div class="cap">Base légale</div>
+  <p>Ce traitement est fondé sur votre consentement, le respect d'obligations légales des responsables de traitement
+  (tenue du dossier médical, télétransmission à l'assurance maladie, tenue du dossier de prise en charge sanitaire),
+  leur intérêt légitime à assurer un traitement sécurisé, à lutter contre la fraude et à gérer votre dossier, ainsi
+  que sur l'exercice d'un acte de diagnostic médical ou de sa confirmation, en application des
+  <b>articles 6.1 (a), (c), (f), 9.2 (a) et (h) et 9.3 du RGPD</b>.</p>
+
+  <div class="cap">Destinataires</div>
+  <p>Les données sont transmises au Médecin Téléexpert, le cas échéant à d'autres professionnels de santé concourant
+  à la prévention et aux soins vous concernant, aux personnels chargés du secrétariat, aux organismes d'assurance
+  maladie et d'assurance maladie complémentaire, ainsi qu'à la société AVISDOC agissant comme sous-traitant.
+  Les données échangées restent <b>confidentielles</b> et ne font l'objet d'<b>aucun transfert hors de l'Espace
+  économique européen</b>.</p>
+
+  <div class="cap">Durées de conservation</div>
+  <ul>
+    <li><b>5 ans</b> en base active, à compter de la dernière intervention sur votre dossier médical.</li>
+    <li><b>15 ans</b> ensuite, sous forme archivée sur un support distinct, dans des conditions de sécurité
+    équivalentes.</li>
+    <li><b>90 jours</b> pour les doubles des feuilles de soins électroniques, conformément à l'article R. 161-47 du
+    code de la sécurité sociale.</li>
+  </ul>
+  <p>À l'expiration de ces délais, les données sont supprimées ou archivées sous une forme anonymisée.</p>
+
+  <div class="cap">Vos droits</div>
+  <p>Selon les conditions applicables, vous pouvez accéder à vos données et les modifier, demander leur effacement
+  ou leur portabilité, exercer votre droit d'opposition et de limitation du traitement, et définir des directives
+  quant au sort de vos données après votre décès, en vous adressant au responsable de traitement aux coordonnées
+  indiquées ci-dessus. Si vous estimez que vos droits ne sont pas respectés, vous pouvez déposer une réclamation
+  auprès de la <b>Commission Nationale de l'Informatique et des Libertés (CNIL)</b>, via
+  <b>cnil.fr/fr/plaintes</b>.</p>
+  <p>Le Professionnel Requérant et le Médecin Téléexpert ont mis en place les mesures requises pour assurer la
+  protection et la sécurité de vos données de santé. Celles-ci sont hébergées par un <b>hébergeur de données de
+  santé certifié</b>, conformément à l'article L.1111-8 du code de la santé publique.</p>
+</section>
+
+<div class="legal">
+  <p><b>Document remis avant signature.</b> Le formulaire de consentement à signer fait l'objet d'un document distinct.
+  Conservez cette notice : elle vous appartient.</p>
+</div>
+
+</body>
+</html>

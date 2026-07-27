@@ -5,3 +5,24 @@ verify_jwt = false
 
 [functions.send-contact-message]
 verify_jwt = false
+
+# Recherche Pappers — exige un JWT valide ; le domaine @avisdoc.fr est
+# revérifié dans la fonction.
+[functions.pappers-search]
+verify_jwt = true
+
+# Invitations de l'espace client — admin @avisdoc.fr vérifié dans la fonction.
+[functions.inviter-espace]
+verify_jwt = true
+
+# Suppression complète d'un client — admin @avisdoc.fr vérifié dans la fonction.
+[functions.supprimer-client]
+verify_jwt = true
+
+# Réservation publique de créneaux (sans compte) — le jeton de la journée fait foi.
+[functions.rdv]
+verify_jwt = false
+
+# Rappels de RDV par e-mail (cron) — protégée par un secret partagé (x-secret).
+[functions.rdv-rappels]
+verify_jwt = false

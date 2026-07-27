@@ -67,6 +67,22 @@ public/
   manifest.webmanifest  Manifeste PWA minimal
 ```
 
+## Application d'administration (`admin.avisdoc.fr`)
+
+Le dépôt contient **deux applications** partageant le même design system :
+
+- le **site vitrine** (`index.html` → `src/main.tsx`) ;
+- le **back-office** interne (`admin.html` → `src/admin/main.tsx`), réservé à
+  l'équipe (SSO Google `@avisdoc.fr`) : tableau de bord, CRM (kanban + projets),
+  annuaire de contacts, gestion documentaire, réglages.
+
+`npm run build` produit les deux (`dist/index.html` + `dist/admin.html`). Par
+défaut le back-office tourne en **mode démo** (données en mémoire, SSO simulé) ;
+il se branche sur **Supabase** (Postgres + Auth Google + Storage + Edge Function
+Pappers) via `VITE_ADMIN_BACKEND=supabase` et `VITE_ADMIN_AUTH=supabase`.
+
+📖 Architecture, migration SQL et runbook Supabase : **[`docs/admin-app.md`](docs/admin-app.md)**.
+
 ## SEO & GEO
 
 Chaque page appelle `useSEO({ title, description, canonical, jsonLd })` pour :

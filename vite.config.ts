@@ -14,4 +14,16 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        // Site vitrine (avisdoc.fr)
+        main: path.resolve(__dirname, "index.html"),
+        // Back-office (admin.avisdoc.fr)
+        admin: path.resolve(__dirname, "admin.html"),
+        // Espace client (client.avisdoc.fr)
+        client: path.resolve(__dirname, "client.html"),
+      },
+    },
+  },
 });
