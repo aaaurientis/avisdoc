@@ -51,6 +51,14 @@ function adresseQonto(adr?: string): Record<string, string> | undefined {
   return out;
 }
 
+// Découpe un nom complet en prénom / nom (1er mot = prénom, le reste = nom).
+function splitNom(full?: string): { prenom?: string; nom?: string } {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return {};
+  if (parts.length === 1) return { prenom: parts[0] };
+  return { prenom: parts[0], nom: parts.slice(1).join(" ") };
+}
+
 // Appel Qonto générique. Renvoie { ok, status, data|text }.
 async function qonto(path: string, method = "GET", body?: unknown) {
   const res = await fetch(`${Q_BASE}${path}`, {
@@ -132,11 +140,19 @@ serve(async (req) => {
       await admin.from("admin_clients").update({ qonto_client_id: existant.id }).eq("id", c!.id);
       return { id: existant.id, cree: false };
     }
+    // Contact principal (prénom/nom/e-mail) rattaché au client Qonto.
+    const { data: cts } = await admin.from("admin_client_contacts")
+      .select("name, email").eq("client_id", c!.id).limit(1);
+    const contact = cts?.[0];
+    const { prenom, nom } = splitNom(contact?.name);
+
     // Payload à plat (pas de wrapper) ; société => kind=company + name.
     const payload: Record<string, unknown> = {
       kind: "company",
       name: c!.company,
-      email: c!.email_facturation || undefined,
+      first_name: prenom,
+      last_name: nom,
+      email: contact?.email || c!.email_facturation || undefined,
       tax_identification_number: c!.siren || undefined,
       vat_number: tvaFR(c!.siren),
       billing_address: adresseQonto(c!.adresse),
