@@ -152,6 +152,52 @@ serve(async (req) => {
       .filter((r: any) => r?.resourceType === "Practitioner")
       .map(mapPractitioner);
 
+    // Enrichissement de la liste : spécialité + ville d'exercice, via UN appel
+    // groupé PractitionerRole (tous les ids) avec les structures incluses.
+    if (resultats.length > 0) {
+      try {
+        const ids = resultats.map((r: any) => r.id).join(",");
+        const uRoles = new URL(`${BASE}/PractitionerRole`);
+        uRoles.searchParams.set("practitioner", ids);
+        uRoles.searchParams.set("_include", "PractitionerRole:organization");
+        uRoles.searchParams.set("_count", "100");
+        const rRoles = await fetch(uRoles.toString(), {
+          headers: { "ESANTE-API-KEY": KEY, Accept: "application/fhir+json" },
+        });
+        if (rRoles.ok) {
+          const bRoles = await rRoles.json();
+          const ress = (Array.isArray(bRoles?.entry) ? bRoles.entry : []).map((e: any) => e?.resource);
+          const orgs = new Map<string, any>();
+          for (const r of ress)
+            if (r?.resourceType === "Organization" && r.id) orgs.set(String(r.id), r);
+          const parPraticien = new Map<string, { specialite?: string; ville?: string }>();
+          for (const r of ress) {
+            if (r?.resourceType !== "PractitionerRole") continue;
+            const pid = String(r.practitioner?.reference ?? "").split("/").pop();
+            if (!pid) continue;
+            const e = parPraticien.get(pid) ?? {};
+            if (!e.specialite) {
+              e.specialite = [...(r.specialty ?? []), ...(r.code ?? [])]
+                .flatMap((x: any) => x?.coding ?? [])
+                .map((c: any) => c?.display)
+                .find(Boolean);
+            }
+            if (!e.ville) {
+              const refOrg = String(r.organization?.reference ?? "").split("/").pop();
+              const adr = refOrg ? (orgs.get(refOrg)?.address?.[0] ?? {}) : {};
+              e.ville = adr.city ?? undefined;
+            }
+            parPraticien.set(pid, e);
+          }
+          for (const r of resultats) {
+            const e = parPraticien.get(String(r.id));
+            if (e?.specialite) (r as any).specialite = e.specialite;
+            if (!r.ville && e?.ville) r.ville = e.ville;
+          }
+        }
+      } catch { /* enrichissement best-effort — la liste reste utilisable */ }
+    }
+
     return json({ resultats, total: bundle?.total ?? resultats.length });
   } catch (e) {
     console.error(e);
