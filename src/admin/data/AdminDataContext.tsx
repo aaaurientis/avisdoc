@@ -59,6 +59,7 @@ interface DataValue {
     prenom?: string; nom?: string; rpps?: string; profession?: string;
     specialite?: string; structure?: string; codePostal?: string; source?: string;
     savoirFaire?: string[]; diplomes?: string[]; activites?: ActiviteContact[];
+    fhirBrut?: unknown;
   }) => void;
   updateContact: (contact: NetworkContact) => void;
   deleteContact: (id: string) => void;

@@ -109,13 +109,18 @@ serve(async (req) => {
           .filter(Boolean);
 
       // Diplômes d'État + profession : sur la ressource Practitioner elle-même.
+      // On garde aussi la ressource brute (onglet JSON de la fiche contact).
       let diplomes: string[] = [];
       let profession = "";
+      let practitionerBrut: unknown = null;
       try {
         const rP = await fetch(`${BASE}/Practitioner/${practitioner_id}`, {
           headers: { "ESANTE-API-KEY": KEY, Accept: "application/fhir+json" },
         });
-        if (rP.ok) ({ profession, diplomes } = qualifs(await rP.json()));
+        if (rP.ok) {
+          practitionerBrut = await rP.json();
+          ({ profession, diplomes } = qualifs(practitionerBrut as Record<string, any>));
+        }
       } catch { /* best-effort */ }
 
       const savoirFaire = new Set<string>();  // TOUS les savoir-faire (specialty)
@@ -164,6 +169,8 @@ serve(async (req) => {
         profession,
         activites,
         structures,
+        // Réponses FHIR telles quelles — pour vérification des champs source.
+        brut: { practitioner: practitionerBrut, exercices: bundle },
       });
     }
 

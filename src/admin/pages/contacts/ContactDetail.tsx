@@ -22,6 +22,17 @@ export default function ContactDetail({
   const { updateContact, deleteContact } = useAdminData();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<NetworkContact>(contact);
+  // Onglets : fiche mise en forme / JSON brut (réponse Annuaire Santé).
+  const [onglet, setOnglet] = useState<"fiche" | "json">("fiche");
+  const [copie, setCopie] = useState(false);
+
+  const jsonBrut = JSON.stringify(contact.fhirBrut ?? contact, null, 2);
+  const copierJson = () => {
+    navigator.clipboard?.writeText(jsonBrut).then(() => {
+      setCopie(true);
+      setTimeout(() => setCopie(false), 1500);
+    });
+  };
   // Suppression en deux temps : 1er clic arme la confirmation, 2e clic supprime.
   const [confirmSuppr, setConfirmSuppr] = useState(false);
 
@@ -121,6 +132,43 @@ export default function ContactDetail({
             <Badge className={STATUT_BADGE[contact.statut]}>{contact.statut}</Badge>
           </div>
 
+          {/* Onglets Fiche / JSON (réponse brute Annuaire Santé) */}
+          <div className="mt-4 flex gap-1 rounded-full bg-muted/60 p-1">
+            {([["fiche", "Fiche"], ["json", "JSON"]] as const).map(([k, lbl]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setOnglet(k)}
+                className={cn(
+                  "flex-1 rounded-full py-1.5 text-center text-[12px] font-bold transition-colors",
+                  onglet === k ? "bg-card text-avisdoc-ink shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+
+          {onglet === "json" ? (
+            <div className="mt-3.5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                  {contact.fhirBrut ? "Réponse Annuaire Santé (FHIR)" : "Données du contact (pas de FHIR stocké)"}
+                </span>
+                <button
+                  type="button"
+                  onClick={copierJson}
+                  className="rounded-full border border-border px-3 py-1 text-[11.5px] font-bold text-muted-foreground transition-colors hover:text-avisdoc-ink"
+                >
+                  {copie ? "Copié ✓" : "Copier"}
+                </button>
+              </div>
+              <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-muted/50 p-3 text-[10.5px] leading-relaxed text-foreground/80">
+                {jsonBrut}
+              </pre>
+            </div>
+          ) : (
+            <>
           <div className="mt-5 flex flex-col gap-2.5 text-[13px]">
             <Field k="Email" v={contact.email} />
             <Field k="Téléphone" v={contact.tel} />
@@ -245,6 +293,8 @@ export default function ContactDetail({
             <Trash2 className="size-3.5" />
             {confirmSuppr ? "Confirmer la suppression ?" : "Supprimer le contact"}
           </button>
+            </>
+          )}
         </>
       )}
     </Card>

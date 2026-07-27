@@ -31,9 +31,11 @@ interface FichePro {
   structure?: string;
   telephone?: string;
   email_pro?: string;
+  brut?: unknown;
 }
 
 interface DetailPro {
+  brut?: unknown;
   savoir_faire?: string[];
   specialites: string[];
   diplomes?: string[];
@@ -96,6 +98,7 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
         specialite: sf[0] || f.specialite,
         diplomes: d.diplomes?.length ? d.diplomes : f.diplomes,
         activites: d.activites,
+        brut: d.brut,
         structure: st?.nom || undefined,
         telephone: st?.telephone || undefined,
         email_pro: st?.email || undefined,
@@ -130,6 +133,7 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       structure: fiche?.structure,
       codePostal: fiche?.code_postal || undefined,
       source: fiche ? "annuaire_sante" : "manuel",
+      fhirBrut: fiche?.brut,
       notes: fiche ? "Fiche générée depuis l'Annuaire Santé." : undefined,
     });
     onClose();
