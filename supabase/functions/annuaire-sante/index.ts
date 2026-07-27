@@ -18,7 +18,8 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-const BASE = (Deno.env.get("ANNUAIRE_SANTE_BASE") ?? "https://gateway.api.esante.gouv.fr/fhir").replace(/\/$/, "");
+// v2 = version courante de l'API FHIR Annuaire Santé (libre accès).
+const BASE = (Deno.env.get("ANNUAIRE_SANTE_BASE") ?? "https://gateway.api.esante.gouv.fr/fhir/v2").replace(/\/$/, "");
 const KEY = (Deno.env.get("ANNUAIRE_SANTE_API_KEY") ?? "").trim();
 
 // Fiche compacte extraite d'une ressource FHIR Practitioner.
