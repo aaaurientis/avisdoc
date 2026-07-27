@@ -33,6 +33,8 @@ export interface NetworkContact {
   savoirFaire?: string[];
   diplomes?: string[];
   activites?: ActiviteContact[];
+  /** 0016 — réponse FHIR brute (Practitioner + exercices), pour vérification. */
+  fhirBrut?: unknown;
 }
 
 /** Un exercice (activité) d'un professionnel de santé. */

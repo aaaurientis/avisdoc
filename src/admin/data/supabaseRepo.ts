@@ -41,6 +41,7 @@ function toContact(r: any): NetworkContact {
     savoirFaire: r.savoir_faire ?? [],
     diplomes: r.diplomes ?? [],
     activites: r.activites ?? [],
+    fhirBrut: r.fhir_brut ?? undefined,
   };
 }
 
@@ -58,6 +59,7 @@ function contactStructure(c: NetworkContact) {
     savoir_faire: c.savoirFaire?.length ? c.savoirFaire : null,
     diplomes: c.diplomes?.length ? c.diplomes : null,
     activites: c.activites?.length ? c.activites : null,
+    fhir_brut: c.fhirBrut ?? null,
   };
 }
 
