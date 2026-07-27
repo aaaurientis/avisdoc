@@ -173,7 +173,7 @@ serve(async (req) => {
       first_name: prenom,
       last_name: nom,
       email: email || c!.email_facturation || undefined,
-      tax_identification_number: c!.siren || undefined,
+      tax_identification_number: digits(c!.siren) || undefined,
       vat_number: tvaFR(c!.siren),
       billing_address: adresseQonto(c!.adresse, c!.code_postal, c!.ville),
     };
