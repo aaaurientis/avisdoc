@@ -11,7 +11,10 @@ export interface NetworkContact {
   /** Nom d'affichage complet (compat, dérivé de prénom + nom si connus). */
   name: string;
   role: string;
+  /** Rôle principal (compat) = 1er de `types`. */
   type: ContactType;
+  /** Rôles multiples : un contact peut cumuler Requérant / Expert / Réseau d'Aval. */
+  types?: ContactType[];
   statut: ContactStatut;
   ville: string;
   adresse: string;

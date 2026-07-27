@@ -23,6 +23,7 @@ function toContact(r: any): NetworkContact {
     name: r.name,
     role: r.role ?? "",
     type: r.type,
+    types: r.types ?? (r.type ? [r.type] : []),
     statut: r.statut,
     ville: r.ville ?? "",
     adresse: r.adresse ?? "",
@@ -163,7 +164,8 @@ export class SupabaseRepo implements AdminRepo {
 
   async createContact(c: NetworkContact): Promise<void> {
     const { error } = await sb.from("admin_network_contacts").insert({
-      id: c.id, name: c.name, role: c.role, type: c.type, statut: c.statut,
+      id: c.id, name: c.name, role: c.role, statut: c.statut,
+      type: c.types?.[0] ?? c.type, types: c.types?.length ? c.types : [c.type],
       ville: c.ville, adresse: c.adresse, email: c.email, tel: c.tel,
       last_contact: c.last, notes: c.notes,
       ...contactStructure(c),
@@ -178,7 +180,8 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateContact(c: NetworkContact): Promise<void> {
     const { error } = await sb.from("admin_network_contacts").update({
-      name: c.name, role: c.role, type: c.type, statut: c.statut,
+      name: c.name, role: c.role, statut: c.statut,
+      type: c.types?.[0] ?? c.type, types: c.types?.length ? c.types : [c.type],
       ville: c.ville, adresse: c.adresse, email: c.email, tel: c.tel,
       last_contact: c.last, notes: c.notes,
       ...contactStructure(c),

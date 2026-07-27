@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { MapPin, Trash2, X } from "lucide-react";
-import type { ContactStatut, NetworkContact } from "../../types";
+import type { ContactStatut, ContactType, NetworkContact } from "../../types";
 import { initials } from "../../lib/format";
 import { mapsUrl } from "../../lib/maps";
-import { STATUT_BADGE, TYPE_BADGE } from "../../lib/ui-tokens";
+import { STATUT_BADGE, TYPE_BADGE, typesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Badge, Card, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
@@ -43,15 +43,23 @@ export default function ContactDetail({
   };
 
   const startEdit = () => {
-    setDraft(contact);
+    setDraft({ ...contact, types: typesDe(contact) });
     setEditing(true);
   };
   const save = () => {
-    updateContact(draft);
+    const roles = draft.types?.length ? draft.types : [draft.type];
+    updateContact({ ...draft, type: roles[0], types: roles });
     setEditing(false);
   };
   const set = (field: keyof NetworkContact, value: string) =>
     setDraft((d) => ({ ...d, [field]: value }));
+  const basculerRole = (t: ContactType) =>
+    setDraft((d) => {
+      const roles = typesDe(d);
+      const sans = roles.filter((x) => x !== t);
+      if (sans.length === roles.length) return { ...d, types: [...roles, t] };
+      return sans.length > 0 ? { ...d, types: sans } : d; // au moins un rôle
+    });
 
   return (
     <Card className="sticky top-6 p-6">
@@ -85,6 +93,26 @@ export default function ContactDetail({
             value={draft.notes}
             onChange={(e) => set("notes", e.target.value)}
           />
+          <SectionLabel className="mt-1">Rôles (plusieurs possibles)</SectionLabel>
+          <div className="flex gap-1.5">
+            {(["Requérant", "Expert", "Réseau d'Aval"] as ContactType[]).map((t) => {
+              const on = typesDe(draft).includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => basculerRole(t)}
+                  className={cn(
+                    "flex-1 rounded-full py-2 text-center text-xs font-bold transition-colors",
+                    on ? TYPE_BADGE[t] : "bg-muted/50 text-muted-foreground",
+                  )}
+                >
+                  {on ? "✓ " : ""}{t}
+                </button>
+              );
+            })}
+          </div>
+
           <SectionLabel className="mt-1">Statut</SectionLabel>
           <div className="flex gap-1.5">
             {STATUTS.map((st) => {
@@ -128,7 +156,9 @@ export default function ContactDetail({
           </h2>
           <div className="mt-0.5 text-[13px] text-muted-foreground">{contact.role}</div>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <Badge className={TYPE_BADGE[contact.type]}>{contact.type}</Badge>
+            {typesDe(contact).map((t) => (
+              <Badge key={t} className={TYPE_BADGE[t]}>{t}</Badge>
+            ))}
             <Badge className={STATUT_BADGE[contact.statut]}>{contact.statut}</Badge>
           </div>
 
