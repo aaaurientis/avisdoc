@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { ContactType } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
 import { todayISO } from "../lib/format";
-import { TYPE_DOT } from "../lib/ui-tokens";
+import { TYPE_DOT, typesDe } from "../lib/ui-tokens";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 
 const TYPE_LABELS: { type: ContactType; label: string }[] = [
@@ -18,7 +18,7 @@ export default function Dashboard() {
   const typeStats = useMemo(
     () =>
       TYPE_LABELS.map(({ type, label }) => {
-        const list = contacts.filter((c) => c.type === type);
+        const list = contacts.filter((c) => typesDe(c).includes(type));
         return {
           type,
           label,

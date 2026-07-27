@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import type { ContactType } from "../types";
 import { initials } from "../lib/format";
-import { STATUT_BADGE, TYPE_BADGE } from "../lib/ui-tokens";
+import { STATUT_BADGE, TYPE_BADGE, typesDe } from "../lib/ui-tokens";
 import { useAdminData } from "../data/AdminDataContext";
 import { Avatar, Badge, Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,7 @@ export default function Contacts() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return contacts
-      .filter((c) => filter === "Tous" || c.type === filter)
+      .filter((c) => filter === "Tous" || typesDe(c).includes(filter))
       .filter((c) => !q || `${c.name} ${c.ville} ${c.role}`.toLowerCase().includes(q));
   }, [contacts, filter, search]);
 
@@ -124,7 +124,9 @@ export default function Contacts() {
                 </div>
               </div>
               <div>
-                <Badge className={TYPE_BADGE[c.type]}>{c.type}</Badge>
+                {typesDe(c).map((t) => (
+                  <Badge key={t} className={TYPE_BADGE[t]}>{t}</Badge>
+                ))}
               </div>
               {!selected && (
                 <>

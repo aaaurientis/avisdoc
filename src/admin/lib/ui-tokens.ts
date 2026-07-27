@@ -10,6 +10,11 @@ import type {
   Stage,
 } from "../types";
 
+/** Rôles d'un contact : liste `types` si présente, sinon le rôle historique. */
+export function typesDe(c: { type: ContactType; types?: ContactType[] }): ContactType[] {
+  return c.types?.length ? c.types : [c.type];
+}
+
 /** Badge + avatar par type de contact. */
 export const TYPE_BADGE: Record<ContactType, string> = {
   Requérant: "bg-sky-100 text-sky-700",

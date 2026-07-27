@@ -48,7 +48,14 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
   const { addContact } = useAdminData();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [type, setType] = useState<ContactType>("Requérant");
+  // Rôles multiples : un contact peut cumuler Requérant / Expert / Réseau d'Aval.
+  const [types, setTypes] = useState<ContactType[]>(["Requérant"]);
+  const basculerType = (t: ContactType) =>
+    setTypes((prev) => {
+      const sans = prev.filter((x) => x !== t);
+      if (sans.length === prev.length) return [...prev, t];
+      return sans.length > 0 ? sans : prev; // au moins un rôle
+    });
   // Fiche pré-remplie depuis l'Annuaire Santé (facultatif).
   const [fiche, setFiche] = useState<FichePro | null>(null);
 
@@ -117,7 +124,8 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
     addContact({
       name,
       email,
-      type,
+      type: types[0],
+      types,
       role: fiche?.specialite || fiche?.profession,
       ville: fiche?.ville,
       adresse: fiche?.adresse,
@@ -234,23 +242,28 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <div className="flex gap-2">
-          {TYPES.map((t) => {
-            const on = type === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setType(t)}
-                className={cn(
-                  "flex-1 rounded-full py-2.5 text-center text-[12.5px] font-bold transition-colors",
-                  on ? TYPE_BADGE[t] : "bg-muted/50 text-muted-foreground",
-                )}
-              >
-                {t}
-              </button>
-            );
-          })}
+        <div>
+          <div className="flex gap-2">
+            {TYPES.map((t) => {
+              const on = types.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => basculerType(t)}
+                  className={cn(
+                    "flex-1 rounded-full py-2.5 text-center text-[12.5px] font-bold transition-colors",
+                    on ? TYPE_BADGE[t] : "bg-muted/50 text-muted-foreground",
+                  )}
+                >
+                  {on ? "✓ " : ""}{t}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+            Plusieurs rôles possibles — cliquer pour activer / désactiver.
+          </p>
         </div>
       </div>
 
