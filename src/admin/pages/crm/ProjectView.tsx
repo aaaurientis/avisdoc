@@ -227,9 +227,12 @@ export default function ProjectView({
                   </button>
                 </>
               ) : (
-                <button type="button" onClick={startEdit} className={btnOutline}>
-                  <Pencil className="size-3.5" /> Modifier
-                </button>
+                <>
+                  <button type="button" onClick={startEdit} className={btnOutline}>
+                    <Pencil className="size-3.5" /> Modifier
+                  </button>
+                  <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
+                </>
               )}
               <button
                 type="button"
@@ -373,8 +376,6 @@ export default function ProjectView({
           </div>
         </Card>
 
-        {/* Zone de danger : suppression complète du client */}
-        <DangerZone clientId={client.id} clientName={client.company} onDeleted={onClose} />
       </div>
     </div>
   );

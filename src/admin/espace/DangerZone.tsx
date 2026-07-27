@@ -11,10 +11,13 @@ export default function DangerZone({
   clientId,
   clientName,
   onDeleted,
+  compact = false,
 }: {
   clientId: string;
   clientName: string;
   onDeleted: () => void;
+  /** Bouton seul (en-tête de fiche) au lieu de la carte « Zone de danger ». */
+  compact?: boolean;
 }) {
   const { deleteClient } = useAdminData();
   const [open, setOpen] = useState(false);
@@ -36,21 +39,9 @@ export default function DangerZone({
     }
   }
 
-  return (
-    <Card className="border-rose-300/60 p-[22px]">
-      <SectionLabel className="text-rose-600">Zone de danger</SectionLabel>
-      <p className="mt-2 text-[13px] text-muted-foreground">
-        Supprime définitivement ce client : fiche CRM, contacts, suivis, documents,
-        espace client, utilisateurs et fichiers générés. Action irréversible.
-      </p>
-      <button
-        onClick={() => { setSaisie(""); setErr(null); setOpen(true); }}
-        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-300 px-3.5 py-2 text-[13px] font-medium text-rose-700 transition-colors hover:bg-rose-50"
-      >
-        <Trash2 className="size-4" /> Supprimer ce client
-      </button>
+  const ouvrir = () => { setSaisie(""); setErr(null); setOpen(true); };
 
-      {open && (
+  const modal = open && (
         <Modal onClose={() => !busy && setOpen(false)}>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
             Supprimer « {clientName} » ?
@@ -87,8 +78,39 @@ export default function DangerZone({
               {busy ? "Suppression…" : "Supprimer définitivement"}
             </button>
           </div>
-        </Modal>
-      )}
+    </Modal>
+  );
+
+  if (compact) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={ouvrir}
+          title="Supprimer ce client"
+          className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-rose-300 px-4 py-2 text-[12.5px] font-bold text-rose-700 transition-colors hover:bg-rose-50"
+        >
+          <Trash2 className="size-3.5" /> Supprimer
+        </button>
+        {modal}
+      </>
+    );
+  }
+
+  return (
+    <Card className="border-rose-300/60 p-[22px]">
+      <SectionLabel className="text-rose-600">Zone de danger</SectionLabel>
+      <p className="mt-2 text-[13px] text-muted-foreground">
+        Supprime définitivement ce client : fiche CRM, contacts, suivis, documents,
+        espace client, utilisateurs et fichiers générés. Action irréversible.
+      </p>
+      <button
+        onClick={ouvrir}
+        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-300 px-3.5 py-2 text-[13px] font-medium text-rose-700 transition-colors hover:bg-rose-50"
+      >
+        <Trash2 className="size-4" /> Supprimer ce client
+      </button>
+      {modal}
     </Card>
   );
 }
