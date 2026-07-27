@@ -11,6 +11,7 @@ import DangerZone from "../../espace/DangerZone";
 import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
+import ParcoursBanner from "../../espace/ParcoursBanner";
 import { cn } from "@/lib/utils";
 
 // Rang d'une étape dans le flux (Nouveau < Qualifié < Proposition < Signé).
@@ -112,11 +113,26 @@ export default function ProjectView({
   const today = todayISO();
   const total = client.jours * client.tarif;
 
-  // Déblocage par étape : une section verrouillée tant que l'étape minimale
+  // Déblocage par étape : une fonction verrouillée tant que l'étape minimale
   // requise n'est pas atteinte.
   const cur = stageRank(client.stage);
   const verrou = (min: Stage) => cur < stageRank(min);
   const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
+
+  // Onglets des fonctions, dans l'ordre du parcours.
+  const TABS: { key: string; label: string; min: Stage; compte?: number }[] = [
+    { key: "contacts", label: "Contacts", min: "Nouveau", compte: client.contacts.length },
+    { key: "suivis", label: "Suivis", min: "Nouveau", compte: client.suivis.length },
+    { key: "journal", label: "Journal", min: "Nouveau" },
+    { key: "documents", label: "Documents", min: "Nouveau", compte: client.docs.length },
+    { key: "proposition", label: "Proposition", min: "Proposition" },
+    { key: "qonto", label: "Devis Qonto", min: "Proposition" },
+    { key: "espace", label: "Espace client", min: "Signé" },
+    { key: "rdv", label: "Rendez-vous", min: "Signé" },
+  ];
+  const [tab, setTab] = useState("contacts");
+  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const activeLocked = verrou(activeTab.min);
 
   const startEdit = () => {
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
@@ -302,8 +318,72 @@ export default function ProjectView({
           </div>
         </Section>
 
-        {/* 2. Contacts */}
-        <Section titre="Contacts" compte={client.contacts.length}>
+        {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
+        <ParcoursBanner clientId={client.id} currentStage={client.stage} />
+
+        {/* Onglets des fonctions (sous le bandeau) */}
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 pt-2">
+            {TABS.map((t) => {
+              const locked = verrou(t.min);
+              const active = t.key === tab;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3.5 py-2.5 text-[12.5px] font-bold transition-colors",
+                    active
+                      ? "border-avisdoc-teal text-avisdoc-ink"
+                      : "border-transparent text-muted-foreground hover:text-avisdoc-ink",
+                    locked && "opacity-50",
+                  )}
+                >
+                  {locked && <Lock className="size-3" />}
+                  {t.label}
+                  {t.compte != null && !locked && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                      {t.compte}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="px-5 pb-5 pt-4">
+            {activeLocked ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <Lock className="size-6 text-muted-foreground/50" />
+                <p className="text-[13px] text-muted-foreground">{indice(activeTab.min)}</p>
+              </div>
+            ) : (
+              <>
+                {tab === "contacts" && ContactsTab()}
+                {tab === "suivis" && SuivisTab()}
+                {tab === "journal" && <JournalCard clientId={client.id} />}
+                {tab === "documents" && DocumentsTab()}
+                {tab === "proposition" && PropositionTab()}
+                {tab === "qonto" && <DevisQonto clientId={client.id} />}
+                {tab === "espace" && <EspaceClientCard bare clientId={client.id} clientName={client.company} />}
+                {tab === "rdv" && <RendezVousCard bare clientId={client.id} />}
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* Zone de danger : suppression complète du client */}
+        <DangerZone clientId={client.id} clientName={client.company} onDeleted={onClose} />
+      </div>
+    </div>
+  );
+
+  // ---- Contenus d'onglets (fermetures sur l'état du composant) ----
+
+  function ContactsTab() {
+    return (
+      <>
           <div className="flex flex-col">
             {client.contacts.map((pc) => {
               const tel = pc.tel && pc.tel !== "—" ? pc.tel : "";
@@ -359,10 +439,13 @@ export default function ProjectView({
               Ajouter
             </button>
           </div>
-        </Section>
+      </>
+    );
+  }
 
-        {/* 3. Suivis et échéances */}
-        <Section titre="Suivis et échéances" compte={client.suivis.length}>
+  function SuivisTab() {
+    return (
+      <>
           <div className="flex flex-col">
             {client.suivis.map((ev) => {
               const overdue = ev.deadline && !ev.done && ev.deadline < today;
@@ -427,15 +510,13 @@ export default function ProjectView({
               Ajouter
             </button>
           </div>
-        </Section>
+      </>
+    );
+  }
 
-        {/* 4. Journal (commentaires horodatés) */}
-        <Section titre="Journal" defaultOpen={false}>
-          <JournalCard clientId={client.id} />
-        </Section>
-
-        {/* 5. Documents partagés */}
-        <Section titre="Documents partagés" compte={client.docs.length}>
+  function DocumentsTab() {
+    return (
+      <>
           <div className="flex flex-col">
             {client.docs.map((d) => (
               <div key={d.id} className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-b-0">
@@ -471,10 +552,13 @@ export default function ProjectView({
               Partager
             </button>
           </div>
-        </Section>
+      </>
+    );
+  }
 
-        {/* 6. Proposition financière (débloquée à l'étape Proposition) */}
-        <Section titre="Proposition financière" locked={verrou("Proposition")} lockedHint={indice("Proposition")}>
+  function PropositionTab() {
+    return (
+      <>
           <div className="rounded-2xl bg-avisdoc-ink p-6 text-white">
             <div className="font-display text-[32px] font-bold text-avisdoc-coral">{euro(total)}</div>
             <div className="mt-1 break-words text-[13px] text-white/60">
@@ -537,28 +621,9 @@ export default function ProjectView({
               </p>
             )}
           </div>
-        </Section>
-
-        {/* 7. Devis Qonto (débloqué à l'étape Proposition) */}
-        <Section titre="Devis Qonto" locked={verrou("Proposition")} lockedHint={indice("Proposition")}>
-          <DevisQonto clientId={client.id} />
-        </Section>
-
-        {/* 8. Espace client (débloqué à l'étape Signé) */}
-        <Section titre="Espace client" locked={verrou("Signé")} lockedHint={indice("Signé")}>
-          <EspaceClientCard bare clientId={client.id} clientName={client.company} />
-        </Section>
-
-        {/* 9. Rendez-vous (débloqué à l'étape Signé) */}
-        <Section titre="Rendez-vous" locked={verrou("Signé")} lockedHint={indice("Signé")}>
-          <RendezVousCard bare clientId={client.id} />
-        </Section>
-
-        {/* Zone de danger : suppression complète du client */}
-        <DangerZone clientId={client.id} clientName={client.company} onDeleted={onClose} />
-      </div>
-    </div>
-  );
+      </>
+    );
+  }
 }
 
 function Stepper({
