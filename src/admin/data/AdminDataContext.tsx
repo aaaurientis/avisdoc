@@ -52,7 +52,10 @@ interface DataValue {
 
   getClient: (id: string) => Client | undefined;
 
-  addContact: (input: { name: string; email: string; type: ContactType }) => void;
+  addContact: (input: {
+    name: string; email: string; type: ContactType;
+    role?: string; ville?: string; adresse?: string; tel?: string; notes?: string;
+  }) => void;
   updateContact: (contact: NetworkContact) => void;
 
   addClient: (client: Client) => void;
@@ -127,19 +130,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   // --- Annuaire ---
   const addContact: DataValue["addContact"] = useCallback(
-    ({ name, email, type }) => {
+    ({ name, email, type, role, ville, adresse, tel, notes }) => {
       const contact: NetworkContact = {
         id: uid(),
         name: name.trim() || "Nouveau contact",
-        role: "",
+        role: role?.trim() ?? "",
         type,
         statut: "En attente",
-        ville: "",
-        adresse: "",
+        ville: ville?.trim() ?? "",
+        adresse: adresse?.trim() ?? "",
         email: email.trim(),
-        tel: "",
+        tel: tel?.trim() ?? "",
         last: todayLabel(),
-        notes: "",
+        notes: notes?.trim() ?? "",
       };
       setContacts((prev) => [contact, ...prev]);
       persist(() => repo.createContact(contact));

@@ -30,3 +30,7 @@ verify_jwt = false
 # Devis Qonto — admin @avisdoc.fr vérifié dans la fonction ; clé Qonto côté serveur.
 [functions.qonto]
 verify_jwt = true
+
+# Annuaire Santé (RPPS) — admin @avisdoc.fr vérifié ; clé API côté serveur.
+[functions.annuaire-sante]
+verify_jwt = true
