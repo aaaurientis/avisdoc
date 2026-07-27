@@ -96,11 +96,15 @@ serve(async (req) => {
           .filter(Boolean);
 
       const specialites = new Set<string>();
+      const fonctions = new Set<string>();
       const structures: any[] = [];
       for (const r of ressources) {
         if (r?.resourceType !== "PractitionerRole") continue;
+        // Garde-fou : n'accepter que les exercices de CE praticien.
+        const pid = String(r.practitioner?.reference ?? "").split("/").pop();
+        if (pid && pid !== String(practitioner_id)) continue;
         for (const s of affichages(r.specialty)) specialites.add(s);
-        for (const s of affichages(r.code)) specialites.add(s);
+        for (const s of affichages(r.code)) fonctions.add(s);
         const refOrg = String(r.organization?.reference ?? "").split("/").pop();
         const org = refOrg ? orgs.get(refOrg) : undefined;
         // Telecom : d'abord l'exercice, puis la structure.
@@ -119,7 +123,11 @@ serve(async (req) => {
           });
         }
       }
-      return json({ specialites: [...specialites], structures });
+      // Spécialités d'abord (savoir-faire) ; à défaut, les fonctions génériques.
+      return json({
+        specialites: specialites.size > 0 ? [...specialites] : [...fonctions],
+        structures,
+      });
     }
 
     const q = String(query ?? "").trim();
@@ -152,50 +160,46 @@ serve(async (req) => {
       .filter((r: any) => r?.resourceType === "Practitioner")
       .map(mapPractitioner);
 
-    // Enrichissement de la liste : spécialité + ville d'exercice, via UN appel
-    // groupé PractitionerRole (tous les ids) avec les structures incluses.
+    // Enrichissement de la liste : spécialité + ville d'exercice. UNE requête
+    // PractitionerRole PAR praticien (en parallèle) — l'attribution ne peut
+    // pas se croiser entre homonymes, contrairement à un appel groupé.
     if (resultats.length > 0) {
-      try {
-        const ids = resultats.map((r: any) => r.id).join(",");
-        const uRoles = new URL(`${BASE}/PractitionerRole`);
-        uRoles.searchParams.set("practitioner", ids);
-        uRoles.searchParams.set("_include", "PractitionerRole:organization");
-        uRoles.searchParams.set("_count", "100");
-        const rRoles = await fetch(uRoles.toString(), {
-          headers: { "ESANTE-API-KEY": KEY, Accept: "application/fhir+json" },
-        });
-        if (rRoles.ok) {
+      await Promise.all(resultats.map(async (r: any) => {
+        try {
+          const uRoles = new URL(`${BASE}/PractitionerRole`);
+          uRoles.searchParams.set("practitioner", String(r.id));
+          uRoles.searchParams.set("_include", "PractitionerRole:organization");
+          uRoles.searchParams.set("_count", "10");
+          const rRoles = await fetch(uRoles.toString(), {
+            headers: { "ESANTE-API-KEY": KEY, Accept: "application/fhir+json" },
+          });
+          if (!rRoles.ok) return;
           const bRoles = await rRoles.json();
           const ress = (Array.isArray(bRoles?.entry) ? bRoles.entry : []).map((e: any) => e?.resource);
           const orgs = new Map<string, any>();
-          for (const r of ress)
-            if (r?.resourceType === "Organization" && r.id) orgs.set(String(r.id), r);
-          const parPraticien = new Map<string, { specialite?: string; ville?: string }>();
-          for (const r of ress) {
-            if (r?.resourceType !== "PractitionerRole") continue;
-            const pid = String(r.practitioner?.reference ?? "").split("/").pop();
-            if (!pid) continue;
-            const e = parPraticien.get(pid) ?? {};
-            if (!e.specialite) {
-              e.specialite = [...(r.specialty ?? []), ...(r.code ?? [])]
+          for (const o of ress)
+            if (o?.resourceType === "Organization" && o.id) orgs.set(String(o.id), o);
+          for (const role of ress) {
+            if (role?.resourceType !== "PractitionerRole") continue;
+            // Garde-fou : n'accepter que les exercices de CE praticien.
+            const pid = String(role.practitioner?.reference ?? "").split("/").pop();
+            if (pid && pid !== String(r.id)) continue;
+            if (!r.specialite) {
+              // Spécialité = savoir-faire (specialty) uniquement — les codes
+              // de fonction (code) sont trop génériques (« Médecin »…).
+              r.specialite = (role.specialty ?? [])
                 .flatMap((x: any) => x?.coding ?? [])
                 .map((c: any) => c?.display)
                 .find(Boolean);
             }
-            if (!e.ville) {
-              const refOrg = String(r.organization?.reference ?? "").split("/").pop();
+            if (!r.ville) {
+              const refOrg = String(role.organization?.reference ?? "").split("/").pop();
               const adr = refOrg ? (orgs.get(refOrg)?.address?.[0] ?? {}) : {};
-              e.ville = adr.city ?? undefined;
+              if (adr.city) r.ville = adr.city;
             }
-            parPraticien.set(pid, e);
           }
-          for (const r of resultats) {
-            const e = parPraticien.get(String(r.id));
-            if (e?.specialite) (r as any).specialite = e.specialite;
-            if (!r.ville && e?.ville) r.ville = e.ville;
-          }
-        }
-      } catch { /* enrichissement best-effort — la liste reste utilisable */ }
+        } catch { /* best-effort : la ligne reste sans spécialité/ville */ }
+      }));
     }
 
     return json({ resultats, total: bundle?.total ?? resultats.length });

@@ -127,6 +127,21 @@ export default function ContactDetail({
             <Field k="Dernier contact" v={contact.last} />
           </div>
 
+          {/* Fiche officielle (Annuaire Santé) — champs structurés 0014 */}
+          {(contact.rpps || contact.specialite || contact.profession || contact.structure) && (
+            <div className="mt-3.5 rounded-xl bg-avisdoc-teal/5 p-4">
+              <SectionLabel className="mb-1.5 text-avisdoc-teal">
+                Fiche officielle{contact.source === "annuaire_sante" ? " · Annuaire Santé" : ""}
+              </SectionLabel>
+              <div className="flex flex-col gap-2 text-[13px]">
+                {contact.rpps && <Field k="N° RPPS" v={contact.rpps} />}
+                {contact.profession && <Field k="Profession" v={contact.profession} />}
+                {contact.specialite && <Field k="Spécialité" v={contact.specialite} />}
+                {contact.structure && <Field k="Structure" v={contact.structure} />}
+              </div>
+            </div>
+          )}
+
           <div className="mt-3.5 rounded-xl bg-muted/50 p-4">
             <SectionLabel className="mb-1.5">Adresse</SectionLabel>
             <div className="text-[13px] leading-relaxed text-foreground/80">

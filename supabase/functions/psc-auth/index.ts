@@ -74,8 +74,21 @@ serve(async (req) => {
 
   // 1) Départ : redirection vers l'autorisation PSC (appli e-CPS).
   if (req.method === "GET" && action === "login") {
-    if (!CLIENT_ID || !CLIENT_SECRET)
-      return versApp(`erreur=${encodeURIComponent("PSC_CLIENT_ID / PSC_CLIENT_SECRET non configurés.")}`);
+    // Mode démonstration : tant que l'inscription ANS n'est pas faite (pas de
+    // client_id/secret), on délivre une session de test clairement marquée —
+    // permet de valider l'app avant l'accès Pro Santé Connect. Dès que les
+    // secrets PSC sont configurés, ce mode disparaît automatiquement.
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      const jeton = await signer({
+        sub: "demo",
+        prenom: "Jeanne",
+        nom: "Dupont",
+        idnat: "TEST-810000000000",
+        demo: true,
+        exp: Date.now() / 1000 + DUREE_H * 3600,
+      });
+      return versApp(`jeton=${encodeURIComponent(jeton)}`);
+    }
     // state signé (anti-CSRF, TTL 10 min) — aucun stockage serveur nécessaire.
     const state = await signer({ n: crypto.randomUUID(), exp: Date.now() / 1000 + 600 });
     const aut = new URL(`${BASE}/protocol/openid-connect/auth`);
@@ -139,7 +152,7 @@ serve(async (req) => {
     if (a === "verifier") {
       const p = await verifier(String(jeton ?? ""));
       if (!p) return json({ ok: false });
-      return json({ ok: true, identite: { prenom: p.prenom, nom: p.nom, idnat: p.idnat } });
+      return json({ ok: true, identite: { prenom: p.prenom, nom: p.nom, idnat: p.idnat, demo: p.demo === true } });
     }
   }
 
