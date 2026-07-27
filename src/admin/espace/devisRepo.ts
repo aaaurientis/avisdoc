@@ -35,6 +35,8 @@ export const devisRepo = {
   },
 
   diag: () => invoke({ action: "diag" }),
+  statutClient: (clientId: string) => invoke({ action: "statut_client", client_id: clientId }),
+  associerClient: (clientId: string) => invoke({ action: "associer_client", client_id: clientId }),
   creer: (clientId: string) => invoke({ action: "creer_devis", client_id: clientId }),
   supprimer: (devisId: string) => invoke({ action: "supprimer_devis", devis_id: devisId }),
 

@@ -90,9 +90,29 @@ serve(async (req) => {
     .eq("id", client_id).maybeSingle();
   if (!c) return json({ error: "client introuvable" }, 404);
 
-  // 2) Crée le client Qonto s'il n'existe pas encore, et mémorise son id.
-  async function assurerClient(): Promise<{ id?: string; erreur?: unknown }> {
-    if (c!.qonto_client_id) return { id: c!.qonto_client_id };
+  const digits = (x?: string) => (x ?? "").replace(/\D/g, "");
+  const lower = (x?: string) => (x ?? "").trim().toLowerCase();
+
+  // Cherche un client Qonto existant par SIREN (n° fiscal) ou par raison sociale.
+  async function chercherClient(): Promise<{ id: string; name?: string } | null> {
+    const r = await qonto("/clients?per_page=100");
+    if (!r.ok) return null;
+    const list = (r.data as any)?.clients ?? [];
+    const siren = digits(c!.siren);
+    const f = list.find((cl: any) =>
+      (siren && digits(cl.tax_identification_number) === siren) ||
+      lower(cl.name) === lower(c!.company));
+    return f ? { id: f.id, name: f.name } : null;
+  }
+
+  // Associe (id déjà connu → existant Qonto → sinon crée) et mémorise l'id.
+  async function assurerClient(): Promise<{ id?: string; cree?: boolean; erreur?: unknown }> {
+    if (c!.qonto_client_id) return { id: c!.qonto_client_id, cree: false };
+    const existant = await chercherClient();
+    if (existant) {
+      await admin.from("admin_clients").update({ qonto_client_id: existant.id }).eq("id", c!.id);
+      return { id: existant.id, cree: false };
+    }
     const payload = {
       client: {
         name: c!.company,
@@ -109,13 +129,21 @@ serve(async (req) => {
     if (!r.ok) return { erreur: r.data };
     const id = (r.data as any)?.client?.id ?? (r.data as any)?.id;
     if (id) await admin.from("admin_clients").update({ qonto_client_id: id }).eq("id", c!.id);
-    return { id };
+    return { id, cree: true };
   }
 
-  if (action === "sync_client") {
+  // Statut sans rien modifier : lié, trouvé dans Qonto (non lié), ou absent.
+  if (action === "statut_client") {
+    if (c!.qonto_client_id) return json({ lie: true, id: c!.qonto_client_id });
+    const trouve = await chercherClient();
+    return json({ lie: false, trouve });
+  }
+
+  // Associer/créer explicitement.
+  if (action === "associer_client" || action === "sync_client") {
     const r = await assurerClient();
-    if (r.erreur) return json({ error: "création client Qonto refusée", qonto: r.erreur }, 400);
-    return json({ ok: true, qonto_client_id: r.id });
+    if (r.erreur) return json({ error: "création/association client Qonto refusée", qonto: r.erreur }, 400);
+    return json({ ok: true, qonto_client_id: r.id, cree: r.cree });
   }
 
   if (action === "creer_devis") {

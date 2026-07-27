@@ -8,14 +8,20 @@ import { euro, frDate } from "../lib/format";
 const btnPrimary = "rounded-xl bg-avisdoc-ink px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-40";
 const btnGhost = "rounded-xl border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground hover:border-avisdoc-ink disabled:opacity-40";
 
+interface StatutClient { lie: boolean; id?: string; trouve?: { id: string; name?: string } | null }
+
 export default function DevisQonto({ clientId }: { clientId: string }) {
   const [devis, setDevis] = useState<Devis[]>([]);
+  const [statut, setStatut] = useState<StatutClient | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function recharger() {
-    try { setDevis(await devisRepo.liste(clientId)); } catch (e: any) { setErr(e?.message ?? String(e)); }
+    try {
+      setDevis(await devisRepo.liste(clientId));
+      try { setStatut(await devisRepo.statutClient(clientId)); } catch { /* Qonto non configuré : on n'affiche pas le statut */ }
+    } catch (e: any) { setErr(e?.message ?? String(e)); }
   }
   useEffect(() => { recharger(); /* eslint-disable-next-line */ }, [clientId]);
 
@@ -51,6 +57,33 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
           </button>
         </div>
       </div>
+
+      {/* Statut du client dans Qonto */}
+      {statut && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px]">
+          {statut.lie ? (
+            <span className="rounded-full bg-avisdoc-teal/15 px-2.5 py-0.5 text-avisdoc-teal">Client lié à Qonto ✓</span>
+          ) : statut.trouve ? (
+            <>
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-amber-700">
+                Déjà dans Qonto{statut.trouve.name ? ` (« ${statut.trouve.name} »)` : ""} — non lié
+              </span>
+              <button className={btnGhost} disabled={busy}
+                onClick={() => agir(() => devisRepo.associerClient(clientId), "Client associé à Qonto.")}>
+                Associer
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">Pas encore dans Qonto</span>
+              <button className={btnGhost} disabled={busy}
+                onClick={() => agir(() => devisRepo.associerClient(clientId), "Client créé dans Qonto.")}>
+                Créer le client
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {msg && <p className="mb-3 rounded-xl border border-avisdoc-teal/30 bg-avisdoc-teal/10 px-3.5 py-2 text-[13px]">{msg}</p>}
       {err && <p className="mb-3 break-words rounded-xl border border-orange-400/40 bg-orange-50 px-3.5 py-2 text-[12px] text-orange-700">{err}</p>}
