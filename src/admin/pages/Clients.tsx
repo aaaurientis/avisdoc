@@ -56,6 +56,9 @@ const badge = (map: Record<string, { label: string; cls: string }>, st: string) 
 type Mode = "FY" | "YTD";
 type TriCle = "name" | "devis" | `annee:${string}`;
 
+// Sélection issue d'un clic sur le graphique : année + série, mois optionnel.
+interface SelGraph { annee: string; mois: number | null; serie: "facture" | "devis" }
+
 export default function Clients() {
   const [clients, setClients] = useState<ClientQonto[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -65,6 +68,7 @@ export default function Clients() {
   const [filtre, setFiltre] = useState<"tous" | "devis" | "factures" | "inactifs">("tous");
   const [tri, setTri] = useState<{ cle: TriCle; desc: boolean }>({ cle: "name", desc: false });
   const [ouverts, setOuverts] = useState<Set<string>>(new Set());
+  const [selGraph, setSelGraph] = useState<SelGraph | null>(null);
 
   async function charger() {
     setBusy(true); setErr(null);
@@ -101,8 +105,8 @@ export default function Clients() {
   const anneeN = annees[0]; // plus récente
   const anneeN1 = annees[1]; // précédente
 
-  // Filtres + tri.
-  const lignes = useMemo(() => {
+  // Filtres + tri (hors sélection graphique) — sert aussi de base au graphique.
+  const lignesBase = useMemo(() => {
     const q = recherche.trim().toLowerCase();
     let out = (clients ?? []).filter((c) => {
       if (q && !`${c.name} ${c.tax_id ?? ""} ${c.email ?? ""}`.toLowerCase().includes(q)) return false;
@@ -125,6 +129,18 @@ export default function Clients() {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, recherche, filtre, tri, mode, anneeN]);
+
+  // Sélection graphique appliquée au tableau (le graphe, lui, reste sur la base).
+  const lignes = useMemo(() => {
+    if (!selGraph) return lignesBase;
+    return lignesBase.filter((c) => {
+      const src = selGraph.serie === "facture" ? c.factures : c.devis;
+      const ok = selGraph.serie === "facture" ? factureComptee : devisCompte;
+      return src.some((l) =>
+        ok(l) && !!l.date && l.date.startsWith(selGraph.annee) &&
+        (selGraph.mois == null || Number(l.date.slice(5, 7)) - 1 === selGraph.mois));
+    });
+  }, [lignesBase, selGraph]);
 
   const totalAnnee = (a: string) => lignes.reduce((t, c) => t + facture(c, a), 0);
   const totalDevis = lignes.reduce((t, c) => t + devisTotal(c), 0);
@@ -226,9 +242,9 @@ export default function Clients() {
         </div>
       )}
 
-      {/* CA par mois : facturé vs devisé */}
+      {/* CA par mois : facturé vs devisé — cliquer une barre filtre le tableau */}
       {clients && clients.length > 0 && (
-        <CaMensuel lignes={lignes} annees={annees} />
+        <CaMensuel lignes={lignesBase} annees={annees} selection={selGraph} onSelect={setSelGraph} />
       )}
 
       {/* Filtres */}
@@ -250,6 +266,16 @@ export default function Clients() {
             {f.label}
           </button>
         ))}
+        {/* Sélection active issue du graphique */}
+        {selGraph && (
+          <button type="button" onClick={() => setSelGraph(null)}
+            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-bold text-white transition-opacity hover:opacity-85"
+            style={{ background: selGraph.serie === "facture" ? C_FACT : C_DEVIS }}>
+            {selGraph.serie === "facture" ? "Facturé" : "Devisé"}
+            {selGraph.mois != null ? ` ${MOIS[selGraph.mois]}` : ""} {selGraph.annee}
+            <span aria-hidden>×</span>
+          </button>
+        )}
       </div>
 
       <Card className="overflow-x-auto">
@@ -350,7 +376,14 @@ const C_DEVIS = "#ef752a";
 // Devisé = montants proposés dans le mois (tout sauf annulé).
 const devisCompte = (l: Ligne) => !["canceled", "cancelled"].includes(l.statut);
 
-function CaMensuel({ lignes, annees }: { lignes: ClientQonto[]; annees: string[] }) {
+function CaMensuel({
+  lignes, annees, selection, onSelect,
+}: {
+  lignes: ClientQonto[];
+  annees: string[];
+  selection: SelGraph | null;
+  onSelect: (s: SelGraph | null) => void;
+}) {
   const [annee, setAnnee] = useState<string>(annees[0] ?? String(new Date().getFullYear()));
   useEffect(() => {
     if (annees.length > 0 && !annees.includes(annee)) setAnnee(annees[0]);
@@ -375,11 +408,20 @@ function CaMensuel({ lignes, annees }: { lignes: ClientQonto[]; annees: string[]
   const max = Math.max(...factN, ...factN1, ...devisN, 1);
   const h = (v: number) => (v > 0 ? Math.max((v / max) * 100, 2) : 0); // % de hauteur, min 2 % si non nul
 
-  const SERIES = [
-    { nom: `Facturé ${prec}`, couleur: C_FACT_PREC, valeurs: factN1 },
-    { nom: `Facturé ${annee}`, couleur: C_FACT, valeurs: factN },
-    { nom: `Devisé ${annee}`, couleur: C_DEVIS, valeurs: devisN },
+  const SERIES: { nom: string; couleur: string; valeurs: number[]; an: string; serie: SelGraph["serie"] }[] = [
+    { nom: `Facturé ${prec}`, couleur: C_FACT_PREC, valeurs: factN1, an: prec, serie: "facture" },
+    { nom: `Facturé ${annee}`, couleur: C_FACT, valeurs: factN, an: annee, serie: "facture" },
+    { nom: `Devisé ${annee}`, couleur: C_DEVIS, valeurs: devisN, an: annee, serie: "devis" },
   ];
+
+  // Clic barre (mois) ou légende (année entière) : bascule la sélection.
+  const memeSel = (a: SelGraph, b: SelGraph | null) =>
+    !!b && a.annee === b.annee && a.serie === b.serie && a.mois === b.mois;
+  const cliquer = (sel: SelGraph) => onSelect(memeSel(sel, selection) ? null : sel);
+  // Une barre est estompée si une sélection existe et qu'elle n'y correspond pas.
+  const estompee = (an: string, serie: SelGraph["serie"], mois: number) =>
+    !!selection && !(selection.annee === an && selection.serie === serie &&
+      (selection.mois == null || selection.mois === mois));
 
   return (
     <Card className="p-4">
@@ -388,14 +430,23 @@ function CaMensuel({ lignes, annees }: { lignes: ClientQonto[]; annees: string[]
           CA par mois — facturé vs devisé
         </div>
         <div className="flex items-center gap-3">
-          {/* Légende */}
+          {/* Légende cliquable : filtre la série sur l'année entière */}
           <div className="flex flex-wrap items-center gap-3">
-            {SERIES.map((s) => (
-              <span key={s.nom} className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                <span className="size-2.5 rounded-full" style={{ background: s.couleur }} />
-                {s.nom}
-              </span>
-            ))}
+            {SERIES.map((s) => {
+              const sel: SelGraph = { annee: s.an, mois: null, serie: s.serie };
+              const active = memeSel(sel, selection);
+              return (
+                <button key={s.nom} type="button" onClick={() => cliquer(sel)}
+                  title={`Filtrer le tableau : ${s.nom}`}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] text-muted-foreground transition-colors hover:text-avisdoc-ink",
+                    active && "bg-muted font-bold text-avisdoc-ink",
+                  )}>
+                  <span className="size-2.5 rounded-full" style={{ background: s.couleur }} />
+                  {s.nom}
+                </button>
+              );
+            })}
           </div>
           {/* Choix de l'année */}
           {annees.length > 1 && (
@@ -429,10 +480,17 @@ function CaMensuel({ lignes, annees }: { lignes: ClientQonto[]; annees: string[]
           {MOIS.map((m, i) => (
             <div key={m} className="flex h-full flex-1 items-end justify-center gap-[2px]">
               {SERIES.map((s) => (
-                <div
+                <button
                   key={s.nom}
-                  title={`${m} — ${s.nom} : ${euro(Math.round(s.valeurs[i]))}`}
-                  className="w-full max-w-[14px] rounded-t-[4px] transition-opacity hover:opacity-75"
+                  type="button"
+                  onClick={() => cliquer({ annee: s.an, mois: i, serie: s.serie })}
+                  disabled={s.valeurs[i] <= 0}
+                  title={`${m} — ${s.nom} : ${euro(Math.round(s.valeurs[i]))}${s.valeurs[i] > 0 ? " · cliquer pour filtrer" : ""}`}
+                  className={cn(
+                    "w-full max-w-[14px] rounded-t-[4px] transition-opacity",
+                    s.valeurs[i] > 0 && "cursor-pointer hover:opacity-75",
+                    estompee(s.an, s.serie, i) && "opacity-30",
+                  )}
                   style={{ height: `${h(s.valeurs[i])}%`, background: s.couleur }}
                 />
               ))}
