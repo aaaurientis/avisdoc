@@ -100,7 +100,7 @@ serve(async (req) => {
   async function chercherClient(): Promise<{ id: string; name?: string } | null> {
     const r = await qonto("/clients?per_page=100");
     if (!r.ok) return null;
-    const list = (r.data as any)?.clients ?? [];
+    const list = (r.data as any)?.clients ?? (r.data as any)?.data ?? [];
     const siren = digits(c!.siren);
     const f = list.find((cl: any) =>
       (siren && digits(cl.tax_identification_number) === siren) ||
@@ -116,21 +116,18 @@ serve(async (req) => {
       await admin.from("admin_clients").update({ qonto_client_id: existant.id }).eq("id", c!.id);
       return { id: existant.id, cree: false };
     }
-    const payload = {
-      client: {
-        name: c!.company,
-        type: "company",
-        email: c!.email_facturation || undefined,
-        tax_identification_number: c!.siren || undefined,
-        vat_number: tvaFR(c!.siren),
-        billing_address: c!.adresse ? { street_address: c!.adresse, country_code: "FR" } : undefined,
-        locale: "FR",
-        currency: "EUR",
-      },
+    // Payload à plat (pas de wrapper) ; société => kind=company + name.
+    const payload: Record<string, unknown> = {
+      kind: "company",
+      name: c!.company,
+      email: c!.email_facturation || undefined,
+      tax_identification_number: c!.siren || undefined,
+      vat_number: tvaFR(c!.siren),
+      billing_address: c!.adresse ? { street_address: c!.adresse, country_code: "FR" } : undefined,
     };
     const r = await qonto("/clients", "POST", payload);
     if (!r.ok) return { erreur: r.data };
-    const id = (r.data as any)?.client?.id ?? (r.data as any)?.id;
+    const id = (r.data as any)?.client?.id ?? (r.data as any)?.data?.id ?? (r.data as any)?.id;
     if (id) await admin.from("admin_clients").update({ qonto_client_id: id }).eq("id", c!.id);
     return { id, cree: true };
   }
