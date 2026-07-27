@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { MapPin, Trash2, X } from "lucide-react";
 import type { ContactStatut, NetworkContact } from "../../types";
 import { initials } from "../../lib/format";
 import { mapsUrl } from "../../lib/maps";
@@ -19,9 +19,17 @@ export default function ContactDetail({
   contact: NetworkContact;
   onClose: () => void;
 }) {
-  const { updateContact } = useAdminData();
+  const { updateContact, deleteContact } = useAdminData();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<NetworkContact>(contact);
+  // Suppression en deux temps : 1er clic arme la confirmation, 2e clic supprime.
+  const [confirmSuppr, setConfirmSuppr] = useState(false);
+
+  const supprimer = () => {
+    if (!confirmSuppr) { setConfirmSuppr(true); return; }
+    deleteContact(contact.id);
+    onClose();
+  };
 
   const startEdit = () => {
     setDraft(contact);
@@ -159,6 +167,20 @@ export default function ContactDetail({
               Contacter
             </a>
           </div>
+          <button
+            type="button"
+            onClick={supprimer}
+            onBlur={() => setConfirmSuppr(false)}
+            className={cn(
+              "mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border-[1.5px] py-2.5 text-[13px] font-bold transition-colors",
+              confirmSuppr
+                ? "border-transparent bg-rose-600 text-white hover:bg-rose-700"
+                : "border-rose-300 text-rose-700 hover:bg-rose-50",
+            )}
+          >
+            <Trash2 className="size-3.5" />
+            {confirmSuppr ? "Confirmer la suppression ?" : "Supprimer le contact"}
+          </button>
         </>
       )}
     </Card>

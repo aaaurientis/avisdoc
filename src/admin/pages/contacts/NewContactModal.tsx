@@ -21,6 +21,16 @@ interface FichePro {
   adresse: string;
   code_postal: string;
   ville: string;
+  // Enrichissement (détail exercices + structures)
+  specialite?: string;
+  structure?: string;
+  telephone?: string;
+  email_pro?: string;
+}
+
+interface DetailPro {
+  specialites: string[];
+  structures: { nom: string; adresse: string; code_postal: string; ville: string; telephone: string; email: string }[];
 }
 
 export default function NewContactModal({ onClose }: { onClose: () => void }) {
@@ -57,11 +67,32 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
     finally { setChargement(false); }
   };
 
-  const choisir = (f: FichePro) => {
+  const choisir = async (f: FichePro) => {
     setFiche(f);
     setName(f.nom);
     setResultats(null);
     setQuery("");
+    // Enrichissement : spécialité, structure d'exercice, coordonnées.
+    try {
+      const { data } = await supabaseAdmin.functions.invoke("annuaire-sante", {
+        body: { practitioner_id: f.id },
+      });
+      const d = data as DetailPro | null;
+      if (!d) return;
+      const st = d.structures?.[0];
+      const enrichie: FichePro = {
+        ...f,
+        specialite: d.specialites?.[0],
+        structure: st?.nom || undefined,
+        telephone: st?.telephone || undefined,
+        email_pro: st?.email || undefined,
+        adresse: f.adresse || st?.adresse || "",
+        code_postal: f.code_postal || st?.code_postal || "",
+        ville: f.ville || st?.ville || "",
+      };
+      setFiche(enrichie);
+      if (st?.email) setEmail((e) => e || st.email);
+    } catch { /* enrichissement best-effort */ }
   };
 
   const save = () => {
@@ -70,11 +101,19 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       name,
       email,
       type,
-      role: fiche?.profession,
+      role: fiche?.specialite || fiche?.profession,
       ville: fiche?.ville,
       adresse: [fiche?.adresse, [fiche?.code_postal, fiche?.ville].filter(Boolean).join(" ")]
         .filter(Boolean).join(", "),
-      notes: fiche?.rpps ? `RPPS ${fiche.rpps} — fiche générée depuis l'Annuaire Santé.` : undefined,
+      tel: fiche?.telephone,
+      notes: fiche
+        ? [
+            fiche.rpps ? `RPPS ${fiche.rpps}` : null,
+            fiche.profession && fiche.specialite ? fiche.profession : null,
+            fiche.structure ? `Exerce : ${fiche.structure}` : null,
+            "Fiche générée depuis l'Annuaire Santé.",
+          ].filter(Boolean).join(" · ")
+        : undefined,
     });
     onClose();
   };
@@ -149,8 +188,13 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
         {fiche && (
           <div className="rounded-xl border border-avisdoc-teal/30 bg-avisdoc-teal/5 px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
             <span className="font-semibold text-avisdoc-teal">Fiche Annuaire Santé ✓</span>{" "}
-            {[fiche.profession, [fiche.adresse, fiche.code_postal, fiche.ville].filter(Boolean).join(" "),
-              fiche.rpps ? `RPPS ${fiche.rpps}` : null].filter(Boolean).join(" · ")}
+            {[
+              fiche.specialite || fiche.profession,
+              fiche.structure,
+              [fiche.adresse, fiche.code_postal, fiche.ville].filter(Boolean).join(" "),
+              fiche.telephone,
+              fiche.rpps ? `RPPS ${fiche.rpps}` : null,
+            ].filter(Boolean).join(" · ")}
           </div>
         )}
         <input
