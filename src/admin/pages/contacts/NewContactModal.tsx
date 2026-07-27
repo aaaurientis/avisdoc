@@ -15,7 +15,9 @@ const TYPES: ContactType[] = ["Requérant", "Expert", "Réseau d'Aval"];
 // Fiche renvoyée par l'Edge Function annuaire-sante (base officielle RPPS).
 interface FichePro {
   id: string;
-  nom: string;
+  nom: string; // nom d'affichage complet (préfixe + prénom + nom)
+  prenom?: string;
+  famille?: string; // nom de famille seul
   rpps: string | null;
   profession: string;
   adresse: string;
@@ -97,23 +99,24 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
 
   const save = () => {
     if (!name.trim()) return;
+    // Chaque valeur dans sa colonne (0014) ; les notes restent libres.
     addContact({
       name,
       email,
       type,
       role: fiche?.specialite || fiche?.profession,
       ville: fiche?.ville,
-      adresse: [fiche?.adresse, [fiche?.code_postal, fiche?.ville].filter(Boolean).join(" ")]
-        .filter(Boolean).join(", "),
+      adresse: fiche?.adresse,
       tel: fiche?.telephone,
-      notes: fiche
-        ? [
-            fiche.rpps ? `RPPS ${fiche.rpps}` : null,
-            fiche.profession && fiche.specialite ? fiche.profession : null,
-            fiche.structure ? `Exerce : ${fiche.structure}` : null,
-            "Fiche générée depuis l'Annuaire Santé.",
-          ].filter(Boolean).join(" · ")
-        : undefined,
+      prenom: fiche?.prenom,
+      nom: fiche?.famille,
+      rpps: fiche?.rpps ?? undefined,
+      profession: fiche?.profession || undefined,
+      specialite: fiche?.specialite,
+      structure: fiche?.structure,
+      codePostal: fiche?.code_postal || undefined,
+      source: fiche ? "annuaire_sante" : "manuel",
+      notes: fiche ? "Fiche générée depuis l'Annuaire Santé." : undefined,
     });
     onClose();
   };

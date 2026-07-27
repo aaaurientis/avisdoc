@@ -30,6 +30,28 @@ function toContact(r: any): NetworkContact {
     tel: r.tel ?? "",
     last: r.last_contact ?? "",
     notes: r.notes ?? "",
+    prenom: r.prenom ?? "",
+    nom: r.nom ?? "",
+    rpps: r.rpps ?? "",
+    profession: r.profession ?? "",
+    specialite: r.specialite ?? "",
+    structure: r.structure ?? "",
+    codePostal: r.code_postal ?? "",
+    source: r.source ?? "manuel",
+  };
+}
+
+// Colonnes structurées d'un contact réseau (0014), en snake_case SQL.
+function contactStructure(c: NetworkContact) {
+  return {
+    prenom: c.prenom || null,
+    nom: c.nom || null,
+    rpps: c.rpps || null,
+    profession: c.profession || null,
+    specialite: c.specialite || null,
+    structure: c.structure || null,
+    code_postal: c.codePostal || null,
+    source: c.source || "manuel",
   };
 }
 
@@ -136,6 +158,7 @@ export class SupabaseRepo implements AdminRepo {
       id: c.id, name: c.name, role: c.role, type: c.type, statut: c.statut,
       ville: c.ville, adresse: c.adresse, email: c.email, tel: c.tel,
       last_contact: c.last, notes: c.notes,
+      ...contactStructure(c),
     });
     this.assert(error);
   }
@@ -150,6 +173,7 @@ export class SupabaseRepo implements AdminRepo {
       name: c.name, role: c.role, type: c.type, statut: c.statut,
       ville: c.ville, adresse: c.adresse, email: c.email, tel: c.tel,
       last_contact: c.last, notes: c.notes,
+      ...contactStructure(c),
     }).eq("id", c.id);
     this.assert(error);
   }

@@ -8,6 +8,7 @@ export type ContactStatut = "Accepté" | "En attente" | "Refusé";
 /** Annuaire du réseau (requérants, experts, réseau d'aval). */
 export interface NetworkContact {
   id: string;
+  /** Nom d'affichage complet (compat, dérivé de prénom + nom si connus). */
   name: string;
   role: string;
   type: ContactType;
@@ -18,6 +19,15 @@ export interface NetworkContact {
   tel: string;
   last: string; // dernier contact, libellé fr ("12 juil.")
   notes: string;
+  // Champs structurés (0014) — remplis par l'Annuaire Santé ou à la main.
+  prenom?: string;
+  nom?: string;
+  rpps?: string;
+  profession?: string;
+  specialite?: string;
+  structure?: string;
+  codePostal?: string;
+  source?: string; // 'manuel' | 'annuaire_sante'
 }
 
 export type Stage = "Nouveau" | "Qualifié" | "Proposition" | "Signé";
