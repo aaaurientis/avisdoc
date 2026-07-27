@@ -59,7 +59,9 @@ export interface Client {
   company: string;
   siren: string;
   naf: string;
-  adresse: string;
+  adresse: string; // adresse complète (affichage)
+  codePostal?: string;
+  ville?: string;
   effectif: string;
   stage: Stage;
   jours: number;

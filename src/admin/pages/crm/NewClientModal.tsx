@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Client, PappersResult } from "../../types";
-import { euro, todayLabel, uid } from "../../lib/format";
+import { euro, todayLabel, uid, splitAdresse } from "../../lib/format";
 import { searchPappers } from "../../data/pappers";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Modal } from "../../components/ui";
@@ -21,8 +21,6 @@ export default function NewClientModal({
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PappersResult | null>(null);
-  const [contactPrenom, setContactPrenom] = useState("");
-  const [contactNom, setContactNom] = useState("");
   const [jours, setJours] = useState(2);
   const [tarif, setTarif] = useState(1200);
 
@@ -31,12 +29,7 @@ export default function NewClientModal({
     setLoading(true);
     setResult(null);
     try {
-      const r = await searchPappers(query);
-      setResult(r);
-      // Pré-remplit prénom / nom depuis le dirigeant, éditable ensuite.
-      const dir = (r.dirigeant || "").trim().split(/\s+/).filter(Boolean);
-      setContactPrenom(dir[0] ?? "");
-      setContactNom(dir.slice(1).join(" "));
+      setResult(await searchPappers(query));
     } catch (e) {
       console.error(e);
       toast.error("La recherche Pappers a échoué.");
@@ -48,12 +41,15 @@ export default function NewClientModal({
   const create = () => {
     if (!result) return;
     const id = uid();
+    const adr = splitAdresse(result.adresse);
     const client: Client = {
       id,
       company: result.company,
       siren: result.siren,
       naf: result.naf,
       adresse: result.adresse,
+      codePostal: adr.cp,
+      ville: adr.ville,
       effectif: result.effectif,
       stage: "Nouveau",
       jours: jours || 1,
@@ -62,23 +58,7 @@ export default function NewClientModal({
       orientes: 0,
       resultat: null,
       statutPropo: "Brouillon",
-      contacts: [
-        (() => {
-          // Prénom / nom saisis explicitement ; à défaut, découpage du dirigeant.
-          const dir = (result.dirigeant || "").trim().split(/\s+/).filter(Boolean);
-          const prenom = contactPrenom.trim() || (dir[0] ?? "");
-          const nom = contactNom.trim() || dir.slice(1).join(" ");
-          return {
-            id: uid(),
-            name: [prenom, nom].filter(Boolean).join(" "),
-            prenom,
-            nom,
-            role: "Contact référent",
-            email: "—",
-            tel: "—",
-          };
-        })(),
-      ],
+      contacts: [],
       docs: [],
       suivis: [
         {
@@ -140,20 +120,6 @@ export default function NewClientModal({
           </div>
 
           <div className="mt-4 flex flex-col gap-2.5">
-            <div className="flex gap-2.5">
-              <input
-                className={inputCls}
-                placeholder="Contact référent — prénom"
-                value={contactPrenom}
-                onChange={(e) => setContactPrenom(e.target.value)}
-              />
-              <input
-                className={inputCls}
-                placeholder="Nom"
-                value={contactNom}
-                onChange={(e) => setContactNom(e.target.value)}
-              />
-            </div>
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="whitespace-nowrap text-[12.5px] font-bold text-muted-foreground">
                 Campagne :

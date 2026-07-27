@@ -35,19 +35,33 @@ function tvaFR(siren?: string): string | undefined {
   return `FR${String(cle).padStart(2, "0")}${s}`;
 }
 
-// Découpe une adresse libre (Pappers) en rue / code postal / ville pour Qonto.
-// Repère le code postal FR (5 chiffres) : ce qui précède = rue, ce qui suit = ville.
-function adresseQonto(adr?: string): Record<string, string> | undefined {
+// Construit la billing_address Qonto. Utilise en priorité le code postal et la
+// ville saisis explicitement (colonnes dédiées) ; à défaut, découpe l'adresse
+// libre en repérant le code postal FR (5 chiffres).
+function adresseQonto(adr?: string, cp?: string, ville?: string): Record<string, string> | undefined {
   const s = (adr ?? "").trim();
+  const cpx = (cp ?? "").trim();
+  const villex = (ville ?? "").trim();
+  if (cpx || villex) {
+    // Rue = adresse complète amputée du CP/ville s'ils y figurent.
+    let rue = s;
+    const m = s.match(/\b(\d{5})\b/);
+    if (m && m.index !== undefined) rue = s.slice(0, m.index).replace(/[,\s]+$/, "").trim();
+    const out: Record<string, string> = { country_code: "FR" };
+    if (rue) out.street_address = rue;
+    if (cpx) out.zip_code = cpx;
+    if (villex) out.city = villex;
+    return out;
+  }
   if (!s) return undefined;
   const m = s.match(/\b(\d{5})\b/);
   if (!m || m.index === undefined) return { street_address: s, country_code: "FR" };
   const zip = m[1];
   const rue = s.slice(0, m.index).replace(/[,\s]+$/, "").trim();
-  const ville = s.slice(m.index + zip.length).replace(/^[,\s]+/, "").trim();
+  const villeParsed = s.slice(m.index + zip.length).replace(/^[,\s]+/, "").trim();
   const out: Record<string, string> = { country_code: "FR", zip_code: zip };
   if (rue) out.street_address = rue;
-  if (ville) out.city = ville;
+  if (villeParsed) out.city = villeParsed;
   return out;
 }
 
@@ -110,7 +124,7 @@ serve(async (req) => {
 
   if (!client_id) return json({ error: "client_id requis" }, 400);
   const { data: c, error: cErr } = await admin.from("admin_clients")
-    .select("id, company, siren, adresse, email_facturation, jours, tarif, qonto_client_id")
+    .select("id, company, siren, adresse, code_postal, ville, email_facturation, jours, tarif, qonto_client_id")
     .eq("id", client_id).maybeSingle();
   // Erreur de lecture (souvent : colonnes qonto_client_id/email_facturation
   // absentes = migration 0008 non appliquée) → on la remonte telle quelle.
@@ -161,7 +175,7 @@ serve(async (req) => {
       email: email || c!.email_facturation || undefined,
       tax_identification_number: c!.siren || undefined,
       vat_number: tvaFR(c!.siren),
-      billing_address: adresseQonto(c!.adresse),
+      billing_address: adresseQonto(c!.adresse, c!.code_postal, c!.ville),
     };
     const r = await qonto("/clients", "POST", payload);
     if (!r.ok) return { erreur: r.data };

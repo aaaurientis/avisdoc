@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, ChevronDown, Minus, Pencil, Plus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
-import { euro, frDate, initials, todayISO } from "../../lib/format";
+import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card } from "../../components/ui";
@@ -78,7 +78,7 @@ export default function ProjectView({
   } = useAdminData();
 
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", adresse: "" });
+  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "" });
   const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
   const [ns, setNs] = useState({ text: "", deadline: "" });
@@ -87,11 +87,20 @@ export default function ProjectView({
   const total = client.jours * client.tarif;
 
   const startEdit = () => {
-    setDraft({ company: client.company, siren: client.siren, naf: client.naf, adresse: client.adresse });
+    // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
+    const p = splitAdresse(client.adresse);
+    setDraft({
+      company: client.company, siren: client.siren, naf: client.naf,
+      rue: p.rue, cp: client.codePostal || p.cp, ville: client.ville || p.ville,
+    });
     setEditing(true);
   };
   const saveEdit = () => {
-    updateClientFields(client.id, draft);
+    updateClientFields(client.id, {
+      company: draft.company, siren: draft.siren, naf: draft.naf,
+      adresse: joinAdresse(draft.rue, draft.cp, draft.ville),
+      codePostal: draft.cp.trim(), ville: draft.ville.trim(),
+    });
     setEditing(false);
   };
 
@@ -209,10 +218,24 @@ export default function ProjectView({
               </div>
               <input
                 className={inputCls}
-                placeholder="Adresse du siège"
-                value={draft.adresse}
-                onChange={(e) => setDraft({ ...draft, adresse: e.target.value })}
+                placeholder="Adresse (n° et voie)"
+                value={draft.rue}
+                onChange={(e) => setDraft({ ...draft, rue: e.target.value })}
               />
+              <div className="flex flex-wrap gap-2">
+                <input
+                  className={cn(inputCls, "w-[110px]")}
+                  placeholder="Code postal"
+                  value={draft.cp}
+                  onChange={(e) => setDraft({ ...draft, cp: e.target.value })}
+                />
+                <input
+                  className={cn(inputCls, "min-w-0 flex-1")}
+                  placeholder="Ville"
+                  value={draft.ville}
+                  onChange={(e) => setDraft({ ...draft, ville: e.target.value })}
+                />
+              </div>
             </div>
           ) : (
             <div>

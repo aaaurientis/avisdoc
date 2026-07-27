@@ -45,6 +45,23 @@ export function todayLabel(): string {
   });
 }
 
+/** Découpe une adresse libre en { rue, cp, ville } via le code postal FR (5 chiffres). */
+export function splitAdresse(full?: string): { rue: string; cp: string; ville: string } {
+  const s = (full ?? "").trim();
+  const m = s.match(/\b(\d{5})\b/);
+  if (!m || m.index === undefined) return { rue: s, cp: "", ville: "" };
+  const cp = m[1];
+  const rue = s.slice(0, m.index).replace(/[,\s]+$/, "").trim();
+  const ville = s.slice(m.index + cp.length).replace(/^[,\s]+/, "").trim();
+  return { rue, cp, ville };
+}
+
+/** Recompose une adresse complète « rue, CP ville » à partir des 3 champs. */
+export function joinAdresse(rue?: string, cp?: string, ville?: string): string {
+  const loc = [(cp ?? "").trim(), (ville ?? "").trim()].filter(Boolean).join(" ");
+  return [(rue ?? "").trim(), loc].filter(Boolean).join(", ");
+}
+
 /** Identifiant unique (uuid si dispo, fallback sinon). */
 export function uid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
