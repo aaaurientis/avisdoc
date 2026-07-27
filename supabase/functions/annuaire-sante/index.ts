@@ -22,20 +22,36 @@ const json = (b: unknown, s = 200) =>
 const BASE = (Deno.env.get("ANNUAIRE_SANTE_BASE") ?? "https://gateway.api.esante.gouv.fr/fhir/v2").replace(/\/$/, "");
 const KEY = (Deno.env.get("ANNUAIRE_SANTE_API_KEY") ?? "").trim();
 
-// Qualifications d'un Practitioner : profession (référentiel professions) et
-// diplômes d'État, distingués par le système de codage (ou le libellé).
-function qualifs(p: Record<string, any>): { profession: string; diplomes: string[] } {
+// La spécialité voulue = référentiel TRE_R38 « Spécialité Ordinale »
+// (ex. system …/TRE_R38-SpecialiteOrdinale/…, display « Dermatologie et
+// Vénéréologie (SM) »). Présent dans Practitioner.qualification et/ou
+// PractitionerRole.specialty selon les fiches.
+const estR38 = (sys: string) => /specialiteordinale|r38/i.test(sys);
+
+// Extrait les libellés R38 d'une liste de CodeableConcept.
+function specialitesR38(concepts: any[]): string[] {
+  return (Array.isArray(concepts) ? concepts : [])
+    .flatMap((x: any) => x?.coding ?? [])
+    .filter((c: any) => estR38(String(c?.system ?? "")))
+    .map((c: any) => c?.display)
+    .filter(Boolean);
+}
+
+// Qualifications d'un Practitioner : profession, diplômes d'État et
+// spécialités ordinales (R38), distingués par le système de codage.
+function qualifs(p: Record<string, any>): { profession: string; diplomes: string[]; specialites: string[] } {
   const items = (Array.isArray(p.qualification) ? p.qualification : [])
     .flatMap((q: any) => q?.code?.coding ?? [])
     .map((c: any) => ({ sys: String(c?.system ?? ""), aff: c?.display as string | undefined }))
     .filter((x: any) => x.aff);
+  const specialites = [...new Set(items.filter((x) => estR38(x.sys)).map((x) => x.aff!))];
   const diplomes = [...new Set(
     items.filter((x) => /diplome|r14/i.test(x.sys) || /^dipl/i.test(x.aff!)).map((x) => x.aff!),
   )];
   const profession =
     items.find((x) => /profession|g15/i.test(x.sys))?.aff ??
-    items.find((x) => !diplomes.includes(x.aff!))?.aff ?? "";
-  return { profession, diplomes };
+    items.find((x) => !diplomes.includes(x.aff!) && !specialites.includes(x.aff!))?.aff ?? "";
+  return { profession, diplomes, specialites };
 }
 
 // Fiche compacte extraite d'une ressource FHIR Practitioner.
@@ -46,7 +62,7 @@ function mapPractitioner(p: Record<string, any>) {
   const rpps = (Array.isArray(p.identifier) ? p.identifier : [])
     .map((i: any) => String(i?.value ?? ""))
     .find((v: string) => /^\d{9,11}$/.test(v)) ?? null;
-  const { profession, diplomes } = qualifs(p);
+  const { profession, diplomes, specialites } = qualifs(p);
   const adr = Array.isArray(p.address) ? p.address[0] ?? {} : {};
   return {
     id: p.id ?? rpps ?? crypto.randomUUID(),
@@ -56,6 +72,8 @@ function mapPractitioner(p: Record<string, any>) {
     rpps,
     profession,
     diplomes,
+    savoir_faire: specialites, // R38 déjà présentes sur la fiche personne
+    specialite: specialites[0],
     adresse: Array.isArray(adr.line) ? adr.line.filter(Boolean).join(", ") : "",
     code_postal: adr.postalCode ?? "",
     ville: adr.city ?? "",
@@ -112,6 +130,7 @@ serve(async (req) => {
       // On garde aussi la ressource brute (onglet JSON de la fiche contact).
       let diplomes: string[] = [];
       let profession = "";
+      let sfPersonne: string[] = []; // spécialités ordinales (R38) de la fiche
       let practitionerBrut: unknown = null;
       try {
         const rP = await fetch(`${BASE}/Practitioner/${practitioner_id}`, {
@@ -119,11 +138,12 @@ serve(async (req) => {
         });
         if (rP.ok) {
           practitionerBrut = await rP.json();
-          ({ profession, diplomes } = qualifs(practitionerBrut as Record<string, any>));
+          ({ profession, diplomes, specialites: sfPersonne } = qualifs(practitionerBrut as Record<string, any>));
         }
       } catch { /* best-effort */ }
 
-      const savoirFaire = new Set<string>();  // TOUS les savoir-faire (specialty)
+      const savoirFaire = new Set<string>(sfPersonne); // R38 en priorité
+      const sfAutres = new Set<string>();
       const fonctions = new Set<string>();
       const activites: any[] = [];            // une entrée par exercice
       const structures: any[] = [];           // compat front précédent
@@ -132,8 +152,9 @@ serve(async (req) => {
         // Garde-fou : n'accepter que les exercices de CE praticien.
         const pid = String(r.practitioner?.reference ?? "").split("/").pop();
         if (pid && pid !== String(practitioner_id)) continue;
-        const sfRole = affichages(r.specialty);
+        const sfRole = specialitesR38(r.specialty);
         for (const s of sfRole) savoirFaire.add(s);
+        for (const s of affichages(r.specialty)) if (!sfRole.includes(s)) sfAutres.add(s);
         for (const s of affichages(r.code)) fonctions.add(s);
         const refOrg = String(r.organization?.reference ?? "").split("/").pop();
         const org = refOrg ? orgs.get(refOrg) : undefined;
@@ -161,10 +182,12 @@ serve(async (req) => {
           });
         }
       }
+      // R38 en priorité ; repli sur les autres specialty puis les fonctions.
+      const sfFinal = savoirFaire.size > 0 ? [...savoirFaire]
+        : sfAutres.size > 0 ? [...sfAutres] : [];
       return json({
-        // savoir_faire = les vraies spécialités ; specialites conservé (compat).
-        savoir_faire: [...savoirFaire],
-        specialites: savoirFaire.size > 0 ? [...savoirFaire] : [...fonctions],
+        savoir_faire: sfFinal,
+        specialites: sfFinal.length > 0 ? sfFinal : [...fonctions],
         diplomes,
         profession,
         activites,
@@ -223,24 +246,28 @@ serve(async (req) => {
           const orgs = new Map<string, any>();
           for (const o of ress)
             if (o?.resourceType === "Organization" && o.id) orgs.set(String(o.id), o);
-          // TOUS les savoir-faire du praticien (specialty) — les codes de
-          // fonction (code) sont trop génériques (« Médecin »…).
-          const sf = new Set<string>();
+          // Spécialités ordinales (R38) en priorité — repli sur les autres
+          // libellés de specialty si le praticien n'a pas de R38.
+          const r38 = new Set<string>(r.savoir_faire ?? []); // R38 de la fiche personne
+          const autres = new Set<string>();
           for (const role of ress) {
             if (role?.resourceType !== "PractitionerRole") continue;
             // Garde-fou : n'accepter que les exercices de CE praticien.
             const pid = String(role.practitioner?.reference ?? "").split("/").pop();
             if (pid && pid !== String(r.id)) continue;
-            for (const c of (role.specialty ?? []).flatMap((x: any) => x?.coding ?? []))
-              if (c?.display) sf.add(c.display);
+            for (const c of (role.specialty ?? []).flatMap((x: any) => x?.coding ?? [])) {
+              if (!c?.display) continue;
+              if (estR38(String(c.system ?? ""))) r38.add(c.display);
+              else autres.add(c.display);
+            }
             if (!r.ville) {
               const refOrg = String(role.organization?.reference ?? "").split("/").pop();
               const adr = refOrg ? (orgs.get(refOrg)?.address?.[0] ?? {}) : {};
               if (adr.city) r.ville = adr.city;
             }
           }
-          r.savoir_faire = [...sf];
-          r.specialite = r.specialite || r.savoir_faire[0];
+          r.savoir_faire = r38.size > 0 ? [...r38] : [...autres];
+          r.specialite = r.savoir_faire[0];
         } catch { /* best-effort : la ligne reste sans spécialité/ville */ }
       }));
     }
