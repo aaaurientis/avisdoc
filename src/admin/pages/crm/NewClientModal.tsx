@@ -21,7 +21,8 @@ export default function NewClientModal({
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PappersResult | null>(null);
-  const [contactName, setContactName] = useState("");
+  const [contactPrenom, setContactPrenom] = useState("");
+  const [contactNom, setContactNom] = useState("");
   const [jours, setJours] = useState(2);
   const [tarif, setTarif] = useState(1200);
 
@@ -30,7 +31,12 @@ export default function NewClientModal({
     setLoading(true);
     setResult(null);
     try {
-      setResult(await searchPappers(query));
+      const r = await searchPappers(query);
+      setResult(r);
+      // Pré-remplit prénom / nom depuis le dirigeant, éditable ensuite.
+      const dir = (r.dirigeant || "").trim().split(/\s+/).filter(Boolean);
+      setContactPrenom(dir[0] ?? "");
+      setContactNom(dir.slice(1).join(" "));
     } catch (e) {
       console.error(e);
       toast.error("La recherche Pappers a échoué.");
@@ -58,13 +64,13 @@ export default function NewClientModal({
       statutPropo: "Brouillon",
       contacts: [
         (() => {
-          const full = (contactName.trim() || result.dirigeant || "").trim();
-          const parts = full.split(/\s+/).filter(Boolean);
-          const prenom = parts[0] ?? "";
-          const nom = parts.slice(1).join(" ");
+          // Prénom / nom saisis explicitement ; à défaut, découpage du dirigeant.
+          const dir = (result.dirigeant || "").trim().split(/\s+/).filter(Boolean);
+          const prenom = contactPrenom.trim() || (dir[0] ?? "");
+          const nom = contactNom.trim() || dir.slice(1).join(" ");
           return {
             id: uid(),
-            name: full,
+            name: [prenom, nom].filter(Boolean).join(" "),
             prenom,
             nom,
             role: "Contact référent",
@@ -134,12 +140,20 @@ export default function NewClientModal({
           </div>
 
           <div className="mt-4 flex flex-col gap-2.5">
-            <input
-              className={inputCls}
-              placeholder="Contact référent (nom)"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-            />
+            <div className="flex gap-2.5">
+              <input
+                className={inputCls}
+                placeholder="Contact référent — prénom"
+                value={contactPrenom}
+                onChange={(e) => setContactPrenom(e.target.value)}
+              />
+              <input
+                className={inputCls}
+                placeholder="Nom"
+                value={contactNom}
+                onChange={(e) => setContactNom(e.target.value)}
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="whitespace-nowrap text-[12.5px] font-bold text-muted-foreground">
                 Campagne :
