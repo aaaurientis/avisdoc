@@ -226,6 +226,11 @@ export default function Clients() {
         </div>
       )}
 
+      {/* CA par mois : facturé vs devisé */}
+      {clients && clients.length > 0 && (
+        <CaMensuel lignes={lignes} annees={annees} />
+      )}
+
       {/* Filtres */}
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -331,6 +336,118 @@ export default function Clients() {
 // <tr>, on passe donc par un Fragment nommé (deux <tr> par client).
 function FragmentRow({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
+}
+
+// ---------------------------------------------------------------------------
+// CA par mois : barres groupées Facturé N-1 / Facturé N / Devisé N.
+// Palette validée (CVD + clarté) : teal clair #5db4dd, teal foncé #1478a2,
+// coral #ef752a — l'identité est doublée par la légende et le tableau.
+// ---------------------------------------------------------------------------
+const MOIS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+const C_FACT_PREC = "#5db4dd";
+const C_FACT = "#1478a2";
+const C_DEVIS = "#ef752a";
+// Devisé = montants proposés dans le mois (tout sauf annulé).
+const devisCompte = (l: Ligne) => !["canceled", "cancelled"].includes(l.statut);
+
+function CaMensuel({ lignes, annees }: { lignes: ClientQonto[]; annees: string[] }) {
+  const [annee, setAnnee] = useState<string>(annees[0] ?? String(new Date().getFullYear()));
+  useEffect(() => {
+    if (annees.length > 0 && !annees.includes(annee)) setAnnee(annees[0]);
+  }, [annees, annee]);
+  const prec = String(Number(annee) - 1);
+
+  // Sommes mensuelles (index 0 = janvier).
+  const somme = (filtreLigne: (l: Ligne) => boolean, an: string, src: "factures" | "devis") => {
+    const out = Array(12).fill(0) as number[];
+    for (const c of lignes)
+      for (const l of c[src]) {
+        if (!filtreLigne(l) || !l.date || !l.date.startsWith(an)) continue;
+        const m = Number(l.date.slice(5, 7)) - 1;
+        if (m >= 0 && m < 12) out[m] += l.montant;
+      }
+    return out;
+  };
+  const factN = somme(factureComptee, annee, "factures");
+  const factN1 = somme(factureComptee, prec, "factures");
+  const devisN = somme(devisCompte, annee, "devis");
+
+  const max = Math.max(...factN, ...factN1, ...devisN, 1);
+  const h = (v: number) => (v > 0 ? Math.max((v / max) * 100, 2) : 0); // % de hauteur, min 2 % si non nul
+
+  const SERIES = [
+    { nom: `Facturé ${prec}`, couleur: C_FACT_PREC, valeurs: factN1 },
+    { nom: `Facturé ${annee}`, couleur: C_FACT, valeurs: factN },
+    { nom: `Devisé ${annee}`, couleur: C_DEVIS, valeurs: devisN },
+  ];
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          CA par mois — facturé vs devisé
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Légende */}
+          <div className="flex flex-wrap items-center gap-3">
+            {SERIES.map((s) => (
+              <span key={s.nom} className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                <span className="size-2.5 rounded-full" style={{ background: s.couleur }} />
+                {s.nom}
+              </span>
+            ))}
+          </div>
+          {/* Choix de l'année */}
+          {annees.length > 1 && (
+            <div className="flex overflow-hidden rounded-full border border-border">
+              {annees.map((a) => (
+                <button key={a} type="button" onClick={() => setAnnee(a)}
+                  className={cn(
+                    "px-3 py-1.5 text-[11.5px] font-bold transition-colors",
+                    annee === a ? "bg-avisdoc-ink text-white" : "bg-card text-muted-foreground hover:text-avisdoc-ink",
+                  )}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="relative h-44">
+        {/* Grille discrète : 0 / moitié / max */}
+        {[0, 0.5, 1].map((t) => (
+          <div key={t} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${t * 100}%` }}>
+            <span className="w-14 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70">
+              {euro(Math.round((max * t) / 100) * 100)}
+            </span>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+        ))}
+        {/* Barres */}
+        <div className="absolute inset-y-0 left-16 right-0 flex items-end gap-[6px]">
+          {MOIS.map((m, i) => (
+            <div key={m} className="flex h-full flex-1 items-end justify-center gap-[2px]">
+              {SERIES.map((s) => (
+                <div
+                  key={s.nom}
+                  title={`${m} — ${s.nom} : ${euro(Math.round(s.valeurs[i]))}`}
+                  className="w-full max-w-[14px] rounded-t-[4px] transition-opacity hover:opacity-75"
+                  style={{ height: `${h(s.valeurs[i])}%`, background: s.couleur }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Mois */}
+      <div className="ml-16 mt-1.5 flex gap-[6px]">
+        {MOIS.map((m) => (
+          <div key={m} className="flex-1 text-center text-[10px] text-muted-foreground/80">{m}</div>
+        ))}
+      </div>
+    </Card>
+  );
 }
 
 function Detail({
