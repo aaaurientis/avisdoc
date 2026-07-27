@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, Minus, Pencil, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Lock, Minus, Pencil, Plus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
@@ -10,26 +10,52 @@ import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
 import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
+import JournalCard from "../../espace/JournalCard";
 import { cn } from "@/lib/utils";
+
+// Rang d'une étape dans le flux (Nouveau < Qualifié < Proposition < Signé).
+const stageRank = (s: Stage) => STAGES.findIndex((x) => x.name === s);
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 // Section repliable pleine largeur (accordéon de la fiche projet).
+// `locked` : étape non atteinte → en-tête grisé, cadenas, contenu masqué.
 function Section({
   titre,
   compte,
   defaultOpen = true,
   actions,
   children,
+  locked = false,
+  lockedHint,
 }: {
   titre: string;
   compte?: number;
   defaultOpen?: boolean;
   actions?: ReactNode;
   children: ReactNode;
+  locked?: boolean;
+  lockedHint?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+
+  if (locked) {
+    return (
+      <Card className="overflow-hidden opacity-60">
+        <div className="flex items-center gap-3 px-5 py-3.5">
+          <Lock className="size-4 shrink-0 text-muted-foreground/60" />
+          <span className="truncate font-display text-[15px] font-semibold text-muted-foreground">{titre}</span>
+          {lockedHint && (
+            <span className="ml-auto shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {lockedHint}
+            </span>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-3.5">
@@ -85,6 +111,12 @@ export default function ProjectView({
 
   const today = todayISO();
   const total = client.jours * client.tarif;
+
+  // Déblocage par étape : une section verrouillée tant que l'étape minimale
+  // requise n'est pas atteinte.
+  const cur = stageRank(client.stage);
+  const verrou = (min: Stage) => cur < stageRank(min);
+  const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
 
   const startEdit = () => {
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
@@ -329,78 +361,7 @@ export default function ProjectView({
           </div>
         </Section>
 
-        {/* 3. Proposition financière */}
-        <Section titre="Proposition financière">
-          <div className="rounded-2xl bg-avisdoc-ink p-6 text-white">
-            <div className="font-display text-[32px] font-bold text-avisdoc-coral">{euro(total)}</div>
-            <div className="mt-1 break-words text-[13px] text-white/60">
-              {client.jours} {client.jours > 1 ? "journées" : "journée"} × {euro(client.tarif)} / jour
-            </div>
-            <div className="mt-4 flex flex-col gap-2.5">
-              <Stepper
-                label="Journées"
-                value={String(client.jours)}
-                onMinus={() => updateClientFields(client.id, { jours: Math.max(1, client.jours - 1) })}
-                onPlus={() => updateClientFields(client.id, { jours: client.jours + 1 })}
-              />
-              <Stepper
-                label="Tarif / journée"
-                value={euro(client.tarif)}
-                onMinus={() => updateClientFields(client.id, { tarif: Math.max(0, client.tarif - 50) })}
-                onPlus={() => updateClientFields(client.id, { tarif: client.tarif + 50 })}
-              />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {PROPO_STATUTS.map((st) => {
-                const active = client.statutPropo === st;
-                return (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => updateClientFields(client.id, { statutPropo: st })}
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-[11.5px] font-bold transition-colors",
-                      active ? "bg-avisdoc-coral text-avisdoc-ink" : "bg-white/10 text-white/60 hover:bg-white/20",
-                    )}
-                  >
-                    {st}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Résultat de campagne */}
-          <div className="mt-4 rounded-2xl border border-border p-5">
-            <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Résultat</div>
-            {client.resultat ? (
-              <>
-                <div className="mb-2.5 flex gap-3.5">
-                  <div>
-                    <div className="font-display text-2xl font-bold text-avisdoc-ink">{client.depistes}</div>
-                    <div className="text-[11px] text-muted-foreground/80">dépistés</div>
-                  </div>
-                  <div>
-                    <div className="font-display text-2xl font-bold text-avisdoc-coral">{client.orientes}</div>
-                    <div className="text-[11px] text-muted-foreground/80">orientés</div>
-                  </div>
-                </div>
-                <p className="text-[13px] leading-relaxed text-foreground/80">{client.resultat}</p>
-              </>
-            ) : (
-              <p className="text-[13px] italic text-muted-foreground">
-                Campagne non réalisée — résultats disponibles après les journées de dépistage.
-              </p>
-            )}
-          </div>
-
-          {/* Devis Qonto (à partir de l'offre financière) */}
-          <div className="mt-4">
-            <DevisQonto clientId={client.id} />
-          </div>
-        </Section>
-
-        {/* 4. Suivis et échéances */}
+        {/* 3. Suivis et échéances */}
         <Section titre="Suivis et échéances" compte={client.suivis.length}>
           <div className="flex flex-col">
             {client.suivis.map((ev) => {
@@ -468,6 +429,11 @@ export default function ProjectView({
           </div>
         </Section>
 
+        {/* 4. Journal (commentaires horodatés) */}
+        <Section titre="Journal" defaultOpen={false}>
+          <JournalCard clientId={client.id} />
+        </Section>
+
         {/* 5. Documents partagés */}
         <Section titre="Documents partagés" compte={client.docs.length}>
           <div className="flex flex-col">
@@ -507,13 +473,84 @@ export default function ProjectView({
           </div>
         </Section>
 
-        {/* 6. Espace client */}
-        <Section titre="Espace client">
+        {/* 6. Proposition financière (débloquée à l'étape Proposition) */}
+        <Section titre="Proposition financière" locked={verrou("Proposition")} lockedHint={indice("Proposition")}>
+          <div className="rounded-2xl bg-avisdoc-ink p-6 text-white">
+            <div className="font-display text-[32px] font-bold text-avisdoc-coral">{euro(total)}</div>
+            <div className="mt-1 break-words text-[13px] text-white/60">
+              {client.jours} {client.jours > 1 ? "journées" : "journée"} × {euro(client.tarif)} / jour
+            </div>
+            <div className="mt-4 flex flex-col gap-2.5">
+              <Stepper
+                label="Journées"
+                value={String(client.jours)}
+                onMinus={() => updateClientFields(client.id, { jours: Math.max(1, client.jours - 1) })}
+                onPlus={() => updateClientFields(client.id, { jours: client.jours + 1 })}
+              />
+              <Stepper
+                label="Tarif / journée"
+                value={euro(client.tarif)}
+                onMinus={() => updateClientFields(client.id, { tarif: Math.max(0, client.tarif - 50) })}
+                onPlus={() => updateClientFields(client.id, { tarif: client.tarif + 50 })}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {PROPO_STATUTS.map((st) => {
+                const active = client.statutPropo === st;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => updateClientFields(client.id, { statutPropo: st })}
+                    className={cn(
+                      "rounded-full px-3.5 py-1.5 text-[11.5px] font-bold transition-colors",
+                      active ? "bg-avisdoc-coral text-avisdoc-ink" : "bg-white/10 text-white/60 hover:bg-white/20",
+                    )}
+                  >
+                    {st}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Résultat de campagne */}
+          <div className="mt-4 rounded-2xl border border-border p-5">
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Résultat</div>
+            {client.resultat ? (
+              <>
+                <div className="mb-2.5 flex gap-3.5">
+                  <div>
+                    <div className="font-display text-2xl font-bold text-avisdoc-ink">{client.depistes}</div>
+                    <div className="text-[11px] text-muted-foreground/80">dépistés</div>
+                  </div>
+                  <div>
+                    <div className="font-display text-2xl font-bold text-avisdoc-coral">{client.orientes}</div>
+                    <div className="text-[11px] text-muted-foreground/80">orientés</div>
+                  </div>
+                </div>
+                <p className="text-[13px] leading-relaxed text-foreground/80">{client.resultat}</p>
+              </>
+            ) : (
+              <p className="text-[13px] italic text-muted-foreground">
+                Campagne non réalisée — résultats disponibles après les journées de dépistage.
+              </p>
+            )}
+          </div>
+        </Section>
+
+        {/* 7. Devis Qonto (débloqué à l'étape Proposition) */}
+        <Section titre="Devis Qonto" locked={verrou("Proposition")} lockedHint={indice("Proposition")}>
+          <DevisQonto clientId={client.id} />
+        </Section>
+
+        {/* 8. Espace client (débloqué à l'étape Signé) */}
+        <Section titre="Espace client" locked={verrou("Signé")} lockedHint={indice("Signé")}>
           <EspaceClientCard bare clientId={client.id} clientName={client.company} />
         </Section>
 
-        {/* 7. Rendez-vous (journées de dépistage) */}
-        <Section titre="Rendez-vous">
+        {/* 9. Rendez-vous (débloqué à l'étape Signé) */}
+        <Section titre="Rendez-vous" locked={verrou("Signé")} lockedHint={indice("Signé")}>
           <RendezVousCard bare clientId={client.id} />
         </Section>
 
