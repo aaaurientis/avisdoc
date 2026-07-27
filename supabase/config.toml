@@ -26,3 +26,7 @@ verify_jwt = false
 # Rappels de RDV par e-mail (cron) — protégée par un secret partagé (x-secret).
 [functions.rdv-rappels]
 verify_jwt = false
+
+# Devis Qonto — admin @avisdoc.fr vérifié dans la fonction ; clé Qonto côté serveur.
+[functions.qonto]
+verify_jwt = true
