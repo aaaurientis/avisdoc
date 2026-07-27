@@ -35,6 +35,7 @@ export interface AdminRepo {
   // Annuaire
   createContact(c: NetworkContact): Promise<void>;
   updateContact(c: NetworkContact): Promise<void>;
+  deleteContact(id: string): Promise<void>;
 
   // Projets CRM
   createClient(c: Client): Promise<void>;
@@ -72,6 +73,7 @@ export class MockRepo implements AdminRepo {
   // En mode mock, l'état vit dans le contexte React ; rien à persister.
   async createContact(): Promise<void> {}
   async updateContact(): Promise<void> {}
+  async deleteContact(): Promise<void> {}
   async createClient(): Promise<void> {}
   async updateClientFields(): Promise<void> {}
   async addProjectContact(): Promise<void> {}

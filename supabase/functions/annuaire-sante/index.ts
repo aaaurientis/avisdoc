@@ -66,7 +66,62 @@ serve(async (req) => {
 
     if (!KEY) return json({ error: "ANNUAIRE_SANTE_API_KEY non configurée." }, 500);
 
-    const { query } = await req.json().catch(() => ({}));
+    const { query, practitioner_id } = await req.json().catch(() => ({}));
+
+    // Détail d'un professionnel : exercices (PractitionerRole) + structures
+    // (Organization incluses) → spécialités, mode d'exercice, adresses, telecom.
+    if (practitioner_id) {
+      const url = new URL(`${BASE}/PractitionerRole`);
+      url.searchParams.set("practitioner", String(practitioner_id));
+      url.searchParams.set("_include", "PractitionerRole:organization");
+      url.searchParams.set("_count", "20");
+      const res = await fetch(url.toString(), {
+        headers: { "ESANTE-API-KEY": KEY, Accept: "application/fhir+json" },
+      });
+      if (!res.ok) {
+        const corps = await res.text();
+        return json({ error: `Annuaire Santé a répondu ${res.status}.`, details: corps.slice(0, 300) }, 502);
+      }
+      const bundle = await res.json();
+      const ressources = (Array.isArray(bundle?.entry) ? bundle.entry : []).map((e: any) => e?.resource);
+
+      const orgs = new Map<string, any>();
+      for (const r of ressources)
+        if (r?.resourceType === "Organization" && r.id) orgs.set(String(r.id), r);
+
+      const affichages = (arr: any[]): string[] =>
+        (Array.isArray(arr) ? arr : [])
+          .flatMap((x: any) => x?.coding ?? [])
+          .map((c: any) => c?.display)
+          .filter(Boolean);
+
+      const specialites = new Set<string>();
+      const structures: any[] = [];
+      for (const r of ressources) {
+        if (r?.resourceType !== "PractitionerRole") continue;
+        for (const s of affichages(r.specialty)) specialites.add(s);
+        for (const s of affichages(r.code)) specialites.add(s);
+        const refOrg = String(r.organization?.reference ?? "").split("/").pop();
+        const org = refOrg ? orgs.get(refOrg) : undefined;
+        // Telecom : d'abord l'exercice, puis la structure.
+        const tels = [...(r.telecom ?? []), ...(org?.telecom ?? [])];
+        const telephone = tels.find((t: any) => t?.system === "phone")?.value ?? "";
+        const email = tels.find((t: any) => t?.system === "email")?.value ?? "";
+        const adr = Array.isArray(org?.address) ? org.address[0] ?? {} : {};
+        if (org || telephone || email) {
+          structures.push({
+            nom: org?.name ?? "",
+            adresse: Array.isArray(adr.line) ? adr.line.filter(Boolean).join(", ") : "",
+            code_postal: adr.postalCode ?? "",
+            ville: adr.city ?? "",
+            telephone,
+            email,
+          });
+        }
+      }
+      return json({ specialites: [...specialites], structures });
+    }
+
     const q = String(query ?? "").trim();
     if (!q) return json({ error: "Requête vide." }, 400);
 

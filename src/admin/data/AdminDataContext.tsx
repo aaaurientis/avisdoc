@@ -57,6 +57,7 @@ interface DataValue {
     role?: string; ville?: string; adresse?: string; tel?: string; notes?: string;
   }) => void;
   updateContact: (contact: NetworkContact) => void;
+  deleteContact: (id: string) => void;
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
@@ -154,6 +155,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     (contact) => {
       setContacts((prev) => prev.map((c) => (c.id === contact.id ? contact : c)));
       persist(() => repo.updateContact(contact));
+    },
+    [persist, repo],
+  );
+
+  const deleteContact: DataValue["deleteContact"] = useCallback(
+    (id) => {
+      setContacts((prev) => prev.filter((c) => c.id !== id));
+      persist(() => repo.deleteContact(id));
     },
     [persist, repo],
   );
@@ -350,6 +359,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       getClient,
       addContact,
       updateContact,
+      deleteContact,
       addClient,
       updateClientFields,
       deleteClient,
@@ -367,7 +377,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
-      addContact, updateContact, addClient, updateClientFields, deleteClient,
+      addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, deleteDoc, bumpDocVersion,
       addDocType, removeDocType,

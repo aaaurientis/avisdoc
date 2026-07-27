@@ -140,6 +140,11 @@ export class SupabaseRepo implements AdminRepo {
     this.assert(error);
   }
 
+  async deleteContact(id: string): Promise<void> {
+    const { error } = await sb.from("admin_network_contacts").delete().eq("id", id);
+    this.assert(error);
+  }
+
   async updateContact(c: NetworkContact): Promise<void> {
     const { error } = await sb.from("admin_network_contacts").update({
       name: c.name, role: c.role, type: c.type, statut: c.statut,
