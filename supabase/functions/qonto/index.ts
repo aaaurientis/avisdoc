@@ -140,30 +140,32 @@ serve(async (req) => {
     const montant = (x: any): number =>
       Number(x?.total_amount?.value ?? x?.amount?.value ?? x?.total_amount ?? 0) || 0;
 
-    // Factures comptées : ni brouillon ni annulée. Regroupées par client et année.
-    const FACT_EXCLUES = new Set(["draft", "canceled", "cancelled"]);
-    // Devis « en cours » : ni annulé/refusé/expiré, ni déjà facturé/converti.
-    const DEVIS_FINIS = new Set(["canceled", "cancelled", "declined", "expired", "invoiced", "converted"]);
-
-    const parClient: Record<string, { facture_par_annee: Record<string, number>; devis_en_cours: number }> = {};
-    const entree = (id: string) =>
-      (parClient[id] ??= { facture_par_annee: {}, devis_en_cours: 0 });
+    // Détail par client : lignes factures + devis (l'agrégation FY / YTD se
+    // fait côté front, qui a besoin des dates ligne à ligne).
+    const parClient: Record<string, { factures: any[]; devis: any[] }> = {};
+    const entree = (id: string) => (parClient[id] ??= { factures: [], devis: [] });
 
     for (const f of factures) {
-      const st = String(f?.status ?? "").toLowerCase();
-      if (FACT_EXCLUES.has(st)) continue;
       const cid = f?.client_id ?? f?.client?.id;
       if (!cid) continue;
-      const annee = String(f?.issue_date ?? f?.created_at ?? "").slice(0, 4) || "?";
-      const e = entree(cid);
-      e.facture_par_annee[annee] = (e.facture_par_annee[annee] ?? 0) + montant(f);
+      entree(cid).factures.push({
+        id: f.id,
+        numero: f.invoice_number ?? f.number ?? null,
+        date: f.issue_date ?? String(f.created_at ?? "").slice(0, 10) ?? null,
+        statut: String(f.status ?? "").toLowerCase(),
+        montant: montant(f),
+      });
     }
     for (const q of devis) {
-      const st = String(q?.status ?? "").toLowerCase();
-      if (DEVIS_FINIS.has(st)) continue;
       const cid = q?.client_id ?? q?.client?.id;
       if (!cid) continue;
-      entree(cid).devis_en_cours += montant(q);
+      entree(cid).devis.push({
+        id: q.id,
+        numero: q.quote_number ?? q.number ?? null,
+        date: q.issue_date ?? String(q.created_at ?? "").slice(0, 10) ?? null,
+        statut: String(q.status ?? "").toLowerCase(),
+        montant: montant(q),
+      });
     }
 
     return json({
