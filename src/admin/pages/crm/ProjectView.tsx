@@ -79,7 +79,7 @@ export default function ProjectView({
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", adresse: "" });
-  const [nc, setNc] = useState({ name: "", role: "", email: "" });
+  const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
   const [ns, setNs] = useState({ text: "", deadline: "" });
 
@@ -96,9 +96,9 @@ export default function ProjectView({
   };
 
   const submitContact = () => {
-    if (!nc.name.trim()) return;
+    if (!nc.prenom.trim() && !nc.nom.trim()) return;
     addProjectContact(client.id, nc);
-    setNc({ name: "", role: "", email: "" });
+    setNc({ prenom: "", nom: "", role: "", email: "" });
   };
   const submitDoc = () => {
     if (!ndName.trim()) return;
@@ -277,10 +277,16 @@ export default function ProjectView({
           </div>
           <div className="mt-3.5 flex flex-wrap gap-2">
             <input
-              className={cn(inputCls, "min-w-[110px] flex-[1.2] rounded-full py-2.5")}
+              className={cn(inputCls, "min-w-[90px] flex-1 rounded-full py-2.5")}
+              placeholder="Prénom"
+              value={nc.prenom}
+              onChange={(e) => setNc({ ...nc, prenom: e.target.value })}
+            />
+            <input
+              className={cn(inputCls, "min-w-[90px] flex-1 rounded-full py-2.5")}
               placeholder="Nom"
-              value={nc.name}
-              onChange={(e) => setNc({ ...nc, name: e.target.value })}
+              value={nc.nom}
+              onChange={(e) => setNc({ ...nc, nom: e.target.value })}
             />
             <input
               className={cn(inputCls, "min-w-[90px] flex-1 rounded-full py-2.5")}

@@ -1,10 +1,10 @@
 -- ============================================================================
--- 0009 — Contact de facturation Qonto (prénom / nom / e-mail explicites)
+-- 0009 — Contact référent : prénom / nom séparés
 -- ----------------------------------------------------------------------------
--- Champs séparés pour éviter tout découpage automatique du nom. Pré-remplis
--- depuis le 1er contact CRM côté UI, mais éditables. Additif et idempotent.
+-- Deux champs distincts sur le contact CRM pour éviter tout découpage
+-- automatique du nom (source des erreurs côté Qonto). La colonne `name` est
+-- conservée (affichage + compat) et vaut « prénom nom ». Additif et idempotent.
 -- ============================================================================
-alter table public.admin_clients
-  add column if not exists contact_prenom text,
-  add column if not exists contact_nom    text,
-  add column if not exists contact_email  text;
+alter table public.admin_client_contacts
+  add column if not exists prenom text,
+  add column if not exists nom    text;

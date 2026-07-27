@@ -2,7 +2,7 @@
 // Créer un devis à partir de l'offre financière, le télécharger, le supprimer.
 // Le client Qonto est créé/associé automatiquement (données Pappers) au 1er devis.
 import { useEffect, useState } from "react";
-import { devisRepo, type Devis, type ContactFact } from "./devisRepo";
+import { devisRepo, type Devis } from "./devisRepo";
 import { euro, frDate } from "../lib/format";
 
 const btnPrimary = "rounded-xl bg-avisdoc-ink px-3.5 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-40";
@@ -17,8 +17,6 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [contact, setContact] = useState<ContactFact>({ prenom: "", nom: "", email: "" });
-  const [contactSaved, setContactSaved] = useState(false);
 
   async function recharger() {
     try {
@@ -27,20 +25,7 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
       catch (e: any) { setStatut(null); setStatutErr(e?.message ?? String(e)); }
     } catch (e: any) { setErr(e?.message ?? String(e)); }
   }
-  useEffect(() => {
-    recharger();
-    devisRepo.contactFact(clientId).then(setContact).catch(() => {});
-    /* eslint-disable-next-line */
-  }, [clientId]);
-
-  function majContact(patch: Partial<ContactFact>) {
-    setContact((c) => ({ ...c, ...patch }));
-    setContactSaved(false);
-  }
-  async function enregistrerContact() {
-    await agir(() => devisRepo.setContactFact(clientId, contact));
-    setContactSaved(true);
-  }
+  useEffect(() => { recharger(); /* eslint-disable-next-line */ }, [clientId]);
 
   async function agir(fn: () => Promise<any>, ok?: string) {
     setBusy(true); setErr(null); setMsg(null);
@@ -106,33 +91,6 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
               </button>
             </>
           )}
-        </div>
-      )}
-
-      {/* Contact de facturation — prénom / nom séparés pour éviter les erreurs de découpage.
-          Pré-rempli depuis le 1er contact CRM ; utilisé à la création du client Qonto. */}
-      {!statut?.lie && (
-        <div className="mb-3 rounded-xl border border-border bg-muted/30 p-3">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-            Contact (facturation)
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px]"
-              placeholder="Prénom" value={contact.prenom}
-              onChange={(e) => majContact({ prenom: e.target.value })} />
-            <input className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px]"
-              placeholder="Nom" value={contact.nom}
-              onChange={(e) => majContact({ nom: e.target.value })} />
-            <input className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px]"
-              type="email" placeholder="E-mail" value={contact.email}
-              onChange={(e) => majContact({ email: e.target.value })} />
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <button className={btnGhost} disabled={busy} onClick={enregistrerContact}>
-              Enregistrer le contact
-            </button>
-            {contactSaved && <span className="text-[12px] text-avisdoc-teal">Enregistré ✓</span>}
-          </div>
         </div>
       )}
 

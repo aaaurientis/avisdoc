@@ -58,7 +58,7 @@ interface DataValue {
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
   deleteClient: (id: string) => Promise<void>;
-  addProjectContact: (clientId: string, input: { name: string; role: string; email: string }) => void;
+  addProjectContact: (clientId: string, input: { prenom: string; nom: string; role: string; email: string }) => void;
   removeProjectContact: (clientId: string, contactId: string) => void;
   addProjectDoc: (clientId: string, name: string) => void;
   removeProjectDoc: (clientId: string, docId: string) => void;
@@ -174,9 +174,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const addProjectContact: DataValue["addProjectContact"] = useCallback(
     (clientId, input) => {
+      const prenom = input.prenom.trim();
+      const nom = input.nom.trim();
       const pc = {
         id: uid(),
-        name: input.name.trim(),
+        name: [prenom, nom].filter(Boolean).join(" "),
+        prenom,
+        nom,
         role: input.role.trim() || "Contact",
         email: input.email.trim() || "—",
         tel: "—",

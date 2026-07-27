@@ -12,12 +12,6 @@ export interface Devis {
   cree_le: string;
 }
 
-export interface ContactFact {
-  prenom: string;
-  nom: string;
-  email: string;
-}
-
 // Remonte le détail d'erreur de la fonction (y compris le corps Qonto).
 async function invoke(body: Record<string, unknown>): Promise<any> {
   const { data, error } = await sb.functions.invoke("qonto", { body });
@@ -49,34 +43,5 @@ export const devisRepo = {
   async pdfUrl(path: string): Promise<string | null> {
     const { data } = await sb.storage.from("admin-devis").createSignedUrl(path, 3600);
     return data?.signedUrl ?? null;
-  },
-
-  // Contact de facturation (prénom / nom / e-mail). Renvoie les champs dédiés
-  // s'ils existent, sinon un pré-remplissage depuis le 1er contact CRM.
-  async contactFact(clientId: string): Promise<ContactFact> {
-    const { data: c } = await sb.from("admin_clients")
-      .select("contact_prenom, contact_nom, contact_email")
-      .eq("id", clientId).maybeSingle();
-    let prenom = (c as any)?.contact_prenom ?? "";
-    let nom = (c as any)?.contact_nom ?? "";
-    let email = (c as any)?.contact_email ?? "";
-    if (!prenom && !nom && !email) {
-      const { data: ct } = await sb.from("admin_client_contacts")
-        .select("name, email").eq("client_id", clientId).limit(1).maybeSingle();
-      const parts = ((ct as any)?.name ?? "").trim().split(/\s+/).filter(Boolean);
-      if (parts.length === 1) { prenom = parts[0]; }
-      else if (parts.length > 1) { prenom = parts[0]; nom = parts.slice(1).join(" "); }
-      email = (ct as any)?.email ?? "";
-    }
-    return { prenom, nom, email };
-  },
-
-  async setContactFact(clientId: string, v: ContactFact): Promise<void> {
-    const { error } = await sb.from("admin_clients").update({
-      contact_prenom: v.prenom.trim() || null,
-      contact_nom: v.nom.trim() || null,
-      contact_email: v.email.trim() || null,
-    }).eq("id", clientId);
-    if (error) throw new Error(error.message);
   },
 };

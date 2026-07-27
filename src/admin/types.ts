@@ -27,7 +27,10 @@ export type DocExt = "PDF" | "DOC" | "XLS";
 /** Contact rattaché à un projet CRM. */
 export interface ProjectContact {
   id: string;
+  /** Nom d'affichage complet (« prénom nom ») — conservé pour compat. */
   name: string;
+  prenom: string;
+  nom: string;
   role: string;
   email: string;
   tel: string;

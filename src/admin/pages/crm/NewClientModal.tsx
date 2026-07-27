@@ -57,13 +57,21 @@ export default function NewClientModal({
       resultat: null,
       statutPropo: "Brouillon",
       contacts: [
-        {
-          id: uid(),
-          name: contactName.trim() || result.dirigeant,
-          role: "Contact référent",
-          email: "—",
-          tel: "—",
-        },
+        (() => {
+          const full = (contactName.trim() || result.dirigeant || "").trim();
+          const parts = full.split(/\s+/).filter(Boolean);
+          const prenom = parts[0] ?? "";
+          const nom = parts.slice(1).join(" ");
+          return {
+            id: uid(),
+            name: full,
+            prenom,
+            nom,
+            role: "Contact référent",
+            email: "—",
+            tel: "—",
+          };
+        })(),
       ],
       docs: [],
       suivis: [

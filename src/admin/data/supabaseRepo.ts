@@ -34,7 +34,11 @@ function toContact(r: any): NetworkContact {
 }
 
 function toProjectContact(r: any): ProjectContact {
-  return { id: r.id, name: r.name, role: r.role ?? "", email: r.email ?? "", tel: r.tel ?? "" };
+  return {
+    id: r.id, name: r.name,
+    prenom: r.prenom ?? "", nom: r.nom ?? "",
+    role: r.role ?? "", email: r.email ?? "", tel: r.tel ?? "",
+  };
 }
 
 function toProjectDoc(r: any): ProjectDoc {
@@ -168,7 +172,9 @@ export class SupabaseRepo implements AdminRepo {
 
   async addProjectContact(clientId: string, c: ProjectContact): Promise<void> {
     const { error } = await sb.from("admin_client_contacts").insert({
-      id: c.id, client_id: clientId, name: c.name, role: c.role, email: c.email, tel: c.tel,
+      id: c.id, client_id: clientId, name: c.name,
+      prenom: c.prenom || null, nom: c.nom || null,
+      role: c.role, email: c.email, tel: c.tel,
     });
     this.assert(error);
   }
