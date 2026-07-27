@@ -8,6 +8,7 @@ import { Avatar, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
+import DevisQonto from "../../espace/DevisQonto";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -360,6 +361,11 @@ export default function ProjectView({
                 Campagne non réalisée — résultats disponibles après les journées de dépistage.
               </p>
             )}
+          </div>
+
+          {/* Devis Qonto (à partir de l'offre financière) */}
+          <div className="mt-4">
+            <DevisQonto clientId={client.id} />
           </div>
         </Section>
 
