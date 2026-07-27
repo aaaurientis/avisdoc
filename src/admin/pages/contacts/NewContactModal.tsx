@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
-import type { ContactType } from "../../types";
+import type { ActiviteContact, ContactType } from "../../types";
 import { TYPE_BADGE } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
@@ -25,13 +25,20 @@ interface FichePro {
   ville: string;
   // Enrichissement (détail exercices + structures)
   specialite?: string;
+  savoir_faire?: string[];
+  diplomes?: string[];
+  activites?: ActiviteContact[];
   structure?: string;
   telephone?: string;
   email_pro?: string;
 }
 
 interface DetailPro {
+  savoir_faire?: string[];
   specialites: string[];
+  diplomes?: string[];
+  profession?: string;
+  activites?: ActiviteContact[];
   structures: { nom: string; adresse: string; code_postal: string; ville: string; telephone: string; email: string }[];
 }
 
@@ -82,9 +89,13 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       const d = data as DetailPro | null;
       if (!d) return;
       const st = d.structures?.[0];
+      const sf = d.savoir_faire?.length ? d.savoir_faire : (f.savoir_faire ?? []);
       const enrichie: FichePro = {
         ...f,
-        specialite: d.specialites?.[0] || f.specialite,
+        savoir_faire: sf,
+        specialite: sf[0] || f.specialite,
+        diplomes: d.diplomes?.length ? d.diplomes : f.diplomes,
+        activites: d.activites,
         structure: st?.nom || undefined,
         telephone: st?.telephone || undefined,
         email_pro: st?.email || undefined,
@@ -113,6 +124,9 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       rpps: fiche?.rpps ?? undefined,
       profession: fiche?.profession || undefined,
       specialite: fiche?.specialite,
+      savoirFaire: fiche?.savoir_faire,
+      diplomes: fiche?.diplomes,
+      activites: fiche?.activites,
       structure: fiche?.structure,
       codePostal: fiche?.code_postal || undefined,
       source: fiche ? "annuaire_sante" : "manuel",
@@ -172,8 +186,11 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
               >
                 <div className="text-[13px] font-semibold text-avisdoc-ink">{f.nom}</div>
                 <div className="text-[11.5px] text-muted-foreground">
-                  {[f.specialite || f.profession, f.ville, f.rpps ? `RPPS ${f.rpps}` : null]
-                    .filter(Boolean).join(" · ") || "—"}
+                  {[
+                    f.savoir_faire?.length ? f.savoir_faire.join(", ") : f.profession,
+                    f.ville,
+                    f.rpps ? `RPPS ${f.rpps}` : null,
+                  ].filter(Boolean).join(" · ") || "—"}
                 </div>
               </button>
             ))}
@@ -193,12 +210,18 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
           <div className="rounded-xl border border-avisdoc-teal/30 bg-avisdoc-teal/5 px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
             <span className="font-semibold text-avisdoc-teal">Fiche Annuaire Santé ✓</span>{" "}
             {[
-              fiche.specialite || fiche.profession,
+              fiche.savoir_faire?.length ? fiche.savoir_faire.join(", ") : fiche.profession,
               fiche.structure,
               [fiche.adresse, fiche.code_postal, fiche.ville].filter(Boolean).join(" "),
               fiche.telephone,
               fiche.rpps ? `RPPS ${fiche.rpps}` : null,
             ].filter(Boolean).join(" · ")}
+            {(fiche.diplomes?.length ?? 0) > 0 && (
+              <div className="mt-1">Diplômes : {fiche.diplomes!.join(" · ")}</div>
+            )}
+            {(fiche.activites?.length ?? 0) > 1 && (
+              <div className="mt-0.5">{fiche.activites!.length} activités enregistrées.</div>
+            )}
           </div>
         )}
         <input

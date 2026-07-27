@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { espaceRepo } from "../espace/espaceRepo";
 import type {
+  ActiviteContact,
   ActivityItem,
   Client,
   ContactType,
@@ -57,6 +58,7 @@ interface DataValue {
     role?: string; ville?: string; adresse?: string; tel?: string; notes?: string;
     prenom?: string; nom?: string; rpps?: string; profession?: string;
     specialite?: string; structure?: string; codePostal?: string; source?: string;
+    savoirFaire?: string[]; diplomes?: string[]; activites?: ActiviteContact[];
   }) => void;
   updateContact: (contact: NetworkContact) => void;
   deleteContact: (id: string) => void;

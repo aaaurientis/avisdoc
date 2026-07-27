@@ -38,6 +38,9 @@ function toContact(r: any): NetworkContact {
     structure: r.structure ?? "",
     codePostal: r.code_postal ?? "",
     source: r.source ?? "manuel",
+    savoirFaire: r.savoir_faire ?? [],
+    diplomes: r.diplomes ?? [],
+    activites: r.activites ?? [],
   };
 }
 
@@ -52,6 +55,9 @@ function contactStructure(c: NetworkContact) {
     structure: c.structure || null,
     code_postal: c.codePostal || null,
     source: c.source || "manuel",
+    savoir_faire: c.savoirFaire?.length ? c.savoirFaire : null,
+    diplomes: c.diplomes?.length ? c.diplomes : null,
+    activites: c.activites?.length ? c.activites : null,
   };
 }
 
