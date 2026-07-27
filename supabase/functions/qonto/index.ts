@@ -85,10 +85,13 @@ serve(async (req) => {
   }
 
   if (!client_id) return json({ error: "client_id requis" }, 400);
-  const { data: c } = await admin.from("admin_clients")
+  const { data: c, error: cErr } = await admin.from("admin_clients")
     .select("id, company, siren, adresse, email_facturation, jours, tarif, qonto_client_id")
     .eq("id", client_id).maybeSingle();
-  if (!c) return json({ error: "client introuvable" }, 404);
+  // Erreur de lecture (souvent : colonnes qonto_client_id/email_facturation
+  // absentes = migration 0008 non appliquée) → on la remonte telle quelle.
+  if (cErr) return json({ error: "lecture client échouée (migration 0008 appliquée ?)", details: cErr.message }, 500);
+  if (!c) return json({ error: "client introuvable dans admin_clients" }, 404);
 
   const digits = (x?: string) => (x ?? "").replace(/\D/g, "");
   const lower = (x?: string) => (x ?? "").trim().toLowerCase();
