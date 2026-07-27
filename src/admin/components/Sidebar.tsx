@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   Building2,
   FileText,
   LayoutDashboard,
+  Moon,
   Power,
   Settings,
+  Sun,
   Users,
   Wallet,
 } from "lucide-react";
@@ -12,6 +15,7 @@ import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
 import { initials } from "../lib/format";
+import { appliquerTheme, themeCourant, type Theme } from "../lib/theme";
 import { Avatar } from "./ui";
 
 const NAV = [
@@ -25,6 +29,12 @@ const NAV = [
 
 export default function Sidebar() {
   const { user, signOut } = useAuth();
+  const [theme, setTheme] = useState<Theme>(themeCourant());
+  const basculerTheme = () => {
+    const t: Theme = theme === "dark" ? "light" : "dark";
+    appliquerTheme(t);
+    setTheme(t);
+  };
 
   return (
     <aside className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-card px-4 py-6">
@@ -55,7 +65,21 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto flex items-center gap-2.5 border-t border-border pt-4">
+      {/* Bascule clair / sombre */}
+      <button
+        type="button"
+        onClick={basculerTheme}
+        className="mt-auto flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-avisdoc-ink"
+      >
+        {theme === "dark" ? (
+          <Sun className="size-[18px]" strokeWidth={2.2} />
+        ) : (
+          <Moon className="size-[18px]" strokeWidth={2.2} />
+        )}
+        {theme === "dark" ? "Mode clair" : "Mode sombre"}
+      </button>
+
+      <div className="flex items-center gap-2.5 border-t border-border pt-4">
         <Avatar initials={user ? initials(user.name) : "?"} size={36} />
         <div className="flex min-w-0 flex-col">
           <div className="truncate text-[13px] font-semibold text-avisdoc-ink">
