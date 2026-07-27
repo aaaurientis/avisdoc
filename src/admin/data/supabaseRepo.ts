@@ -98,6 +98,7 @@ export class SupabaseRepo implements AdminRepo {
       id: r.id,
       company: r.company,
       siren: r.siren ?? "",
+      siret: r.siret ?? "",
       naf: r.naf ?? "",
       adresse: r.adresse ?? "",
       codePostal: r.code_postal ?? "",
@@ -150,7 +151,8 @@ export class SupabaseRepo implements AdminRepo {
 
   async createClient(c: Client): Promise<void> {
     const { error } = await sb.from("admin_clients").insert({
-      id: c.id, company: c.company, siren: c.siren, naf: c.naf, adresse: c.adresse,
+      id: c.id, company: c.company, siren: c.siren, siret: c.siret || null,
+      naf: c.naf, adresse: c.adresse,
       code_postal: c.codePostal || null, ville: c.ville || null,
       effectif: c.effectif, stage: c.stage, jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,

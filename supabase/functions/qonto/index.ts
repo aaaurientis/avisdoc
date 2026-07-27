@@ -124,7 +124,7 @@ serve(async (req) => {
 
   if (!client_id) return json({ error: "client_id requis" }, 400);
   const { data: c, error: cErr } = await admin.from("admin_clients")
-    .select("id, company, siren, adresse, code_postal, ville, email_facturation, jours, tarif, qonto_client_id")
+    .select("id, company, siren, siret, adresse, code_postal, ville, email_facturation, jours, tarif, qonto_client_id")
     .eq("id", client_id).maybeSingle();
   // Erreur de lecture (souvent : colonnes qonto_client_id/email_facturation
   // absentes = migration 0008 non appliquée) → on la remonte telle quelle.
@@ -139,9 +139,11 @@ serve(async (req) => {
     const r = await qonto("/clients?per_page=100");
     if (!r.ok) return null;
     const list = (r.data as any)?.clients ?? (r.data as any)?.data ?? [];
-    const siren = digits(c!.siren);
+    // Comparaison sur les 9 premiers chiffres : Qonto peut stocker un SIRET (14)
+    // ou un SIREN (9), notre référence est le SIREN.
+    const siren = digits(c!.siren).slice(0, 9) || digits(c!.siret).slice(0, 9);
     const f = list.find((cl: any) =>
-      (siren && digits(cl.tax_identification_number) === siren) ||
+      (siren && digits(cl.tax_identification_number).slice(0, 9) === siren) ||
       lower(cl.name) === lower(c!.company));
     return f ? { id: f.id, name: f.name } : null;
   }
@@ -173,7 +175,9 @@ serve(async (req) => {
       first_name: prenom,
       last_name: nom,
       email: email || c!.email_facturation || undefined,
-      tax_identification_number: digits(c!.siren) || undefined,
+      // SIRET (14 ch.) en priorité — Qonto valide automatiquement l'entreprise ;
+      // repli sur le SIREN (9 ch.) si le SIRET n'est pas connu.
+      tax_identification_number: digits(c!.siret) || digits(c!.siren) || undefined,
       vat_number: tvaFR(c!.siren),
       billing_address: adresseQonto(c!.adresse, c!.code_postal, c!.ville),
     };

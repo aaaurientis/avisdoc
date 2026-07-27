@@ -46,6 +46,7 @@ export default function NewClientModal({
       id,
       company: result.company,
       siren: result.siren,
+      siret: result.siret,
       naf: result.naf,
       adresse: result.adresse,
       codePostal: adr.cp,

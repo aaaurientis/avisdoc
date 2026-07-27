@@ -58,6 +58,7 @@ export interface Client {
   id: string;
   company: string;
   siren: string;
+  siret?: string;
   naf: string;
   adresse: string; // adresse complète (affichage)
   codePostal?: string;
@@ -104,6 +105,7 @@ export interface AdminUser {
 export interface PappersResult {
   company: string;
   siren: string;
+  siret?: string;
   naf: string;
   adresse: string;
   effectif: string;

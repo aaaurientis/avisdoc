@@ -27,6 +27,7 @@ const json = (body: unknown, status = 200) =>
 interface PappersResult {
   company: string;
   siren: string;
+  siret: string;
   naf: string;
   adresse: string;
   effectif: string;
@@ -51,6 +52,7 @@ function mapResult(r: Record<string, any>): PappersResult {
   return {
     company: r.nom_entreprise ?? r.denomination ?? r.nom ?? "",
     siren: r.siren_formate ?? r.siren ?? "",
+    siret: (siege.siret ?? siege.siret_formate ?? r.siret_siege ?? "").replace(/\s/g, ""),
     naf: [r.code_naf, r.libelle_code_naf].filter(Boolean).join(" — "),
     adresse,
     effectif: r.tranche_effectif ?? r.effectif ?? "—",
