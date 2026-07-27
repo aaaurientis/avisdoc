@@ -111,6 +111,79 @@ serve(async (req) => {
     return json({ ok: r.ok, status: r.status, organisation: r.ok ? (r.data as any)?.organization?.slug ?? "ok" : undefined, qonto: r.ok ? undefined : r.data });
   }
 
+  // Vue « Clients Qonto » : tous les clients, montant facturé par année et
+  // montant des devis en cours. Source de vérité : Qonto (3 listes paginées).
+  if (action === "apercu_clients") {
+    // Liste paginée générique (clients / client_invoices / quotes).
+    async function toutes(path: string, cle: string): Promise<any[]> {
+      const out: any[] = [];
+      let page = 1;
+      for (let i = 0; i < 20; i++) { // garde-fou 20 pages (2000 lignes)
+        const r = await qonto(`${path}?per_page=100&page=${page}`);
+        if (!r.ok) break;
+        const d = r.data as any;
+        const rows = d?.[cle] ?? d?.data ?? [];
+        out.push(...rows);
+        const next = d?.meta?.next_page;
+        if (!next) break;
+        page = Number(next);
+      }
+      return out;
+    }
+
+    const [clients, factures, devis] = await Promise.all([
+      toutes("/clients", "clients"),
+      toutes("/client_invoices", "client_invoices"),
+      toutes("/quotes", "quotes"),
+    ]);
+
+    const montant = (x: any): number =>
+      Number(x?.total_amount?.value ?? x?.amount?.value ?? x?.total_amount ?? 0) || 0;
+
+    // Factures comptées : ni brouillon ni annulée. Regroupées par client et année.
+    const FACT_EXCLUES = new Set(["draft", "canceled", "cancelled"]);
+    // Devis « en cours » : ni annulé/refusé/expiré, ni déjà facturé/converti.
+    const DEVIS_FINIS = new Set(["canceled", "cancelled", "declined", "expired", "invoiced", "converted"]);
+
+    const parClient: Record<string, { facture_par_annee: Record<string, number>; devis_en_cours: number }> = {};
+    const entree = (id: string) =>
+      (parClient[id] ??= { facture_par_annee: {}, devis_en_cours: 0 });
+
+    for (const f of factures) {
+      const st = String(f?.status ?? "").toLowerCase();
+      if (FACT_EXCLUES.has(st)) continue;
+      const cid = f?.client_id ?? f?.client?.id;
+      if (!cid) continue;
+      const annee = String(f?.issue_date ?? f?.created_at ?? "").slice(0, 4) || "?";
+      const e = entree(cid);
+      e.facture_par_annee[annee] = (e.facture_par_annee[annee] ?? 0) + montant(f);
+    }
+    for (const q of devis) {
+      const st = String(q?.status ?? "").toLowerCase();
+      if (DEVIS_FINIS.has(st)) continue;
+      const cid = q?.client_id ?? q?.client?.id;
+      if (!cid) continue;
+      entree(cid).devis_en_cours += montant(q);
+    }
+
+    return json({
+      ok: true,
+      clients: clients.map((cl: any) => {
+        const ba = cl.billing_address ?? {};
+        return {
+          id: cl.id,
+          name: cl.name ?? [cl.first_name, cl.last_name].filter(Boolean).join(" "),
+          tax_id: cl.tax_identification_number ?? null,
+          email: cl.email ?? null,
+          rue: ba.street_address ?? null,
+          code_postal: ba.zip_code ?? null,
+          ville: ba.city ?? null,
+          ...entree(cl.id),
+        };
+      }),
+    });
+  }
+
   // Supprimer un devis : Qonto (best-effort) + PDF + ligne locale.
   if (action === "supprimer_devis") {
     if (!devis_id) return json({ error: "devis_id requis" }, 400);

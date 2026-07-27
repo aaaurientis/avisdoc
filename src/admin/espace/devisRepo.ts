@@ -35,6 +35,7 @@ export const devisRepo = {
   },
 
   diag: () => invoke({ action: "diag" }),
+  apercuClients: () => invoke({ action: "apercu_clients" }),
   statutClient: (clientId: string) => invoke({ action: "statut_client", client_id: clientId }),
   associerClient: (clientId: string) => invoke({ action: "associer_client", client_id: clientId }),
   creer: (clientId: string) => invoke({ action: "creer_devis", client_id: clientId }),
@@ -43,5 +44,11 @@ export const devisRepo = {
   async pdfUrl(path: string): Promise<string | null> {
     const { data } = await sb.storage.from("admin-devis").createSignedUrl(path, 3600);
     return data?.signedUrl ?? null;
+  },
+
+  // Lie un client CRM à un client Qonto existant (best-effort en mode démo).
+  async lierQonto(clientId: string, qontoId: string): Promise<void> {
+    try { await sb.from("admin_clients").update({ qonto_client_id: qontoId }).eq("id", clientId); }
+    catch { /* mode démo : colonne absente */ }
   },
 };

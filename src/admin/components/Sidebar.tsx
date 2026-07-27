@@ -6,6 +6,7 @@ import {
   Power,
   Settings,
   Users,
+  Wallet,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import { Avatar } from "./ui";
 const NAV = [
   { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { to: "/crm", label: "CRM", icon: Building2 },
+  { to: "/clients", label: "Clients", icon: Wallet },
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/documents", label: "Documents", icon: FileText },
   { to: "/settings", label: "Réglages", icon: Settings },
