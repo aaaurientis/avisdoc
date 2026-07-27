@@ -127,8 +127,9 @@ export default function ContactDetail({
             <Field k="Dernier contact" v={contact.last} />
           </div>
 
-          {/* Fiche officielle (Annuaire Santé) — champs structurés 0014 */}
-          {(contact.rpps || contact.specialite || contact.profession || contact.structure) && (
+          {/* Fiche officielle (Annuaire Santé) — champs structurés 0014/0015 */}
+          {(contact.rpps || contact.specialite || contact.profession || contact.structure ||
+            (contact.savoirFaire?.length ?? 0) > 0 || (contact.diplomes?.length ?? 0) > 0) && (
             <div className="mt-3.5 rounded-xl bg-avisdoc-teal/5 p-4">
               <SectionLabel className="mb-1.5 text-avisdoc-teal">
                 Fiche officielle{contact.source === "annuaire_sante" ? " · Annuaire Santé" : ""}
@@ -136,9 +137,57 @@ export default function ContactDetail({
               <div className="flex flex-col gap-2 text-[13px]">
                 {contact.rpps && <Field k="N° RPPS" v={contact.rpps} />}
                 {contact.profession && <Field k="Profession" v={contact.profession} />}
-                {contact.specialite && <Field k="Spécialité" v={contact.specialite} />}
-                {contact.structure && <Field k="Structure" v={contact.structure} />}
               </div>
+
+              {/* Savoir-faire (spécialités) — un praticien peut en avoir plusieurs */}
+              {(contact.savoirFaire?.length ?? 0) > 0 ? (
+                <div className="mt-2.5">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">Savoir-faire</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {contact.savoirFaire!.map((s) => (
+                      <span key={s} className="rounded-full bg-avisdoc-teal/15 px-2.5 py-0.5 text-[11.5px] font-medium text-avisdoc-teal">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : contact.specialite ? (
+                <div className="mt-2 text-[13px]"><Field k="Spécialité" v={contact.specialite} /></div>
+              ) : null}
+
+              {/* Diplômes d'État */}
+              {(contact.diplomes?.length ?? 0) > 0 && (
+                <div className="mt-2.5">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">Diplômes</div>
+                  <ul className="flex flex-col gap-0.5 text-[12.5px] text-foreground/80">
+                    {contact.diplomes!.map((d) => <li key={d}>• {d}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {/* Activités (exercices) */}
+              {(contact.activites?.length ?? 0) > 0 && (
+                <div className="mt-2.5">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                    Activités ({contact.activites!.length})
+                  </div>
+                  <ul className="flex flex-col gap-1 text-[12.5px] text-foreground/80">
+                    {contact.activites!.map((a, i) => (
+                      <li key={i} className="leading-snug">
+                        • {[a.fonction, a.structure, [a.code_postal, a.ville].filter(Boolean).join(" ")]
+                          .filter(Boolean).join(" — ") || "—"}
+                        {(a.telephone || a.email) && (
+                          <span className="text-muted-foreground"> · {[a.telephone, a.email].filter(Boolean).join(" · ")}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!contact.activites?.length && contact.structure && (
+                <div className="mt-2 text-[13px]"><Field k="Structure" v={contact.structure} /></div>
+              )}
             </div>
           )}
 

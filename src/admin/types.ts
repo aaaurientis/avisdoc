@@ -24,10 +24,27 @@ export interface NetworkContact {
   nom?: string;
   rpps?: string;
   profession?: string;
+  /** 1er savoir-faire (affichage court). */
   specialite?: string;
   structure?: string;
   codePostal?: string;
   source?: string; // 'manuel' | 'annuaire_sante'
+  // 0015 — listes complètes de l'Annuaire Santé
+  savoirFaire?: string[];
+  diplomes?: string[];
+  activites?: ActiviteContact[];
+}
+
+/** Un exercice (activité) d'un professionnel de santé. */
+export interface ActiviteContact {
+  fonction?: string;
+  savoir_faire?: string[];
+  structure?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  telephone?: string;
+  email?: string;
 }
 
 export type Stage = "Nouveau" | "Qualifié" | "Proposition" | "Signé";
