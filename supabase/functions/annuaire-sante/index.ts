@@ -27,6 +27,17 @@ const KEY = (Deno.env.get("ANNUAIRE_SANTE_API_KEY") ?? "").trim();
 // Vénéréologie (SM) »). Présent dans Practitioner.qualification et/ou
 // PractitionerRole.specialty selon les fiches.
 const estR38 = (sys: string) => /specialiteordinale|r38/i.test(sys);
+// Profession (« Médecin », « Infirmier »…) = référentiel TRE_G15 ProfessionSante.
+const estG15 = (sys: string) => /professionsante|g15/i.test(sys);
+
+// 1er libellé G15 d'une liste de CodeableConcept (PractitionerRole.code).
+function professionG15(concepts: any[]): string | undefined {
+  return (Array.isArray(concepts) ? concepts : [])
+    .flatMap((x: any) => x?.coding ?? [])
+    .filter((c: any) => estG15(String(c?.system ?? "")))
+    .map((c: any) => c?.display)
+    .find(Boolean);
+}
 
 // Extrait les libellés R38 d'une liste de CodeableConcept.
 function specialitesR38(concepts: any[]): string[] {
@@ -49,7 +60,7 @@ function qualifs(p: Record<string, any>): { profession: string; diplomes: string
     items.filter((x) => /diplome|r14/i.test(x.sys) || /^dipl/i.test(x.aff!)).map((x) => x.aff!),
   )];
   const profession =
-    items.find((x) => /profession|g15/i.test(x.sys))?.aff ??
+    items.find((x) => estG15(x.sys))?.aff ??
     items.find((x) => !diplomes.includes(x.aff!) && !specialites.includes(x.aff!))?.aff ?? "";
   return { profession, diplomes, specialites };
 }
@@ -155,6 +166,7 @@ serve(async (req) => {
         const sfRole = specialitesR38(r.specialty);
         for (const s of sfRole) savoirFaire.add(s);
         for (const s of affichages(r.specialty)) if (!sfRole.includes(s)) sfAutres.add(s);
+        if (!profession) profession = professionG15(r.code) ?? "";
         for (const s of affichages(r.code)) fonctions.add(s);
         const refOrg = String(r.organization?.reference ?? "").split("/").pop();
         const org = refOrg ? orgs.get(refOrg) : undefined;
@@ -260,6 +272,9 @@ serve(async (req) => {
               if (estR38(String(c.system ?? ""))) r38.add(c.display);
               else autres.add(c.display);
             }
+            // Profession (G15) portée par l'exercice — repli si la fiche
+            // personne n'en avait pas (ex. professions ADELI).
+            if (!r.profession) r.profession = professionG15(role.code) ?? "";
             if (!r.ville) {
               const refOrg = String(role.organization?.reference ?? "").split("/").pop();
               const adr = refOrg ? (orgs.get(refOrg)?.address?.[0] ?? {}) : {};

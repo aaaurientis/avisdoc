@@ -44,6 +44,15 @@ interface DetailPro {
   structures: { nom: string; adresse: string; code_postal: string; ville: string; telephone: string; email: string }[];
 }
 
+// Règle d'affichage de l'annuaire officiel : « Profession - Savoir-faire »
+// (ex. « Médecin - Dermatologie et Vénéréologie »), profession seule sinon
+// (ex. « Infirmier »).
+function libellePro(f: { profession?: string; savoir_faire?: string[]; specialite?: string }): string {
+  const sf = f.savoir_faire?.length ? f.savoir_faire.join(", ") : (f.specialite ?? "");
+  if (f.profession && sf) return `${f.profession} - ${sf}`;
+  return f.profession || sf || "";
+}
+
 export default function NewContactModal({ onClose }: { onClose: () => void }) {
   const { addContact } = useAdminData();
   const [name, setName] = useState("");
@@ -126,7 +135,8 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
       email,
       type: types[0],
       types,
-      role: fiche?.specialite || fiche?.profession,
+      // Fonction affichée = règle annuaire : « Profession - Savoir-faire ».
+      role: fiche ? libellePro({ ...fiche, savoir_faire: fiche.savoir_faire?.slice(0, 1) }) : undefined,
       ville: fiche?.ville,
       adresse: fiche?.adresse,
       tel: fiche?.telephone,
@@ -198,11 +208,8 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
               >
                 <div className="text-[13px] font-semibold text-avisdoc-ink">{f.nom}</div>
                 <div className="text-[11.5px] text-muted-foreground">
-                  {[
-                    f.savoir_faire?.length ? f.savoir_faire.join(", ") : f.profession,
-                    f.ville,
-                    f.rpps ? `RPPS ${f.rpps}` : null,
-                  ].filter(Boolean).join(" · ") || "—"}
+                  {[libellePro(f), f.ville, f.rpps ? `RPPS ${f.rpps}` : null]
+                    .filter(Boolean).join(" · ") || "—"}
                 </div>
               </button>
             ))}
@@ -222,7 +229,7 @@ export default function NewContactModal({ onClose }: { onClose: () => void }) {
           <div className="rounded-xl border border-avisdoc-teal/30 bg-avisdoc-teal/5 px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
             <span className="font-semibold text-avisdoc-teal">Fiche Annuaire Santé ✓</span>{" "}
             {[
-              fiche.savoir_faire?.length ? fiche.savoir_faire.join(", ") : fiche.profession,
+              libellePro(fiche),
               fiche.structure,
               [fiche.adresse, fiche.code_postal, fiche.ville].filter(Boolean).join(" "),
               fiche.telephone,
