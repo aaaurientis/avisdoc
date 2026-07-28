@@ -244,9 +244,12 @@ serve(async (req) => {
     const email = ct?.email || undefined;
 
     // Payload à plat (pas de wrapper) ; société => kind=company + name.
+    // locale + currency : exigés ensuite pour créer un devis sur ce client.
     const payload: Record<string, unknown> = {
       kind: "company",
       name: c!.company,
+      locale: "fr",
+      currency: "EUR",
       first_name: prenom,
       last_name: nom,
       email: email || c!.email_facturation || undefined,
@@ -280,6 +283,10 @@ serve(async (req) => {
   if (action === "creer_devis") {
     const cl = await assurerClient();
     if (cl.erreur || !cl.id) return json({ error: "client Qonto indisponible", qonto: cl.erreur }, 400);
+
+    // Rattrapage : les clients créés avant n'ont ni locale ni currency, que
+    // Qonto exige pour émettre un devis. Complétion best-effort (idempotent).
+    await qonto(`/clients/${cl.id}`, "PATCH", { locale: "fr", currency: "EUR" }).catch(() => {});
 
     const jours = Number(c!.jours) || 1;
     const tarif = Number(c!.tarif) || 0;
