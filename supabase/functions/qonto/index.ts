@@ -197,6 +197,56 @@ serve(async (req) => {
     return json({ ok: true });
   }
 
+  // Télécharger le PDF d'un devis : récupéré À LA DEMANDE depuis Qonto (le
+  // PDF est généré en asynchrone — il n'est pas dans la réponse de création),
+  // mis en cache dans le bucket admin-devis, puis servi en URL signée.
+  if (action === "telecharger_devis") {
+    if (!devis_id) return json({ error: "devis_id requis" }, 400);
+    const { data: d } = await admin.from("admin_devis")
+      .select("id, client_id, qonto_quote_id, pdf_path").eq("id", devis_id).maybeSingle();
+    if (!d) return json({ error: "devis introuvable" }, 404);
+
+    const signer = async (chemin: string) => {
+      const { data: s } = await admin.storage.from("admin-devis").createSignedUrl(chemin, 3600);
+      return s?.signedUrl ?? null;
+    };
+
+    // 1) Déjà en cache dans le Storage.
+    if (d.pdf_path) {
+      const url = await signer(d.pdf_path);
+      if (url) return json({ ok: true, url });
+    }
+
+    if (!d.qonto_quote_id) return json({ error: "devis sans identifiant Qonto" }, 400);
+
+    // 2) Relire le devis chez Qonto et chercher l'URL du PDF.
+    const r = await qonto(`/quotes/${d.qonto_quote_id}`);
+    if (!r.ok) return json({ error: "lecture du devis Qonto refusée", qonto: r.data }, 400);
+    const q = (r.data as any)?.quote ?? r.data;
+    let pdfUrl: string | undefined =
+      q?.pdf_url ?? q?.invoice_url ?? q?.attachment?.url ?? q?.attachment?.file_url;
+    // 3) À défaut, via la pièce jointe (GET /attachments/{id} → url temporaire).
+    const attId = q?.attachment_id ?? q?.attachment?.id;
+    if (!pdfUrl && attId) {
+      const ra = await qonto(`/attachments/${attId}`);
+      if (ra.ok) {
+        const a = (ra.data as any)?.attachment ?? ra.data;
+        pdfUrl = a?.url ?? a?.file_url;
+      }
+    }
+    if (!pdfUrl) return json({ error: "PDF pas encore disponible chez Qonto — réessaie dans quelques secondes.", qonto: q }, 404);
+
+    // 4) Rapatrier + mettre en cache + servir.
+    const bin = new Uint8Array(await (await fetch(pdfUrl)).arrayBuffer());
+    const chemin = `${d.client_id}/${d.qonto_quote_id}.pdf`;
+    const { error: upErr } = await admin.storage.from("admin-devis")
+      .upload(chemin, bin, { contentType: "application/pdf", upsert: true });
+    if (upErr) return json({ error: "stockage du PDF échoué", details: upErr.message }, 500);
+    await admin.from("admin_devis").update({ pdf_path: chemin }).eq("id", d.id);
+    const url = await signer(chemin);
+    return json({ ok: true, url });
+  }
+
   if (!client_id) return json({ error: "client_id requis" }, 400);
   const { data: c, error: cErr } = await admin.from("admin_clients")
     .select("id, company, siren, siret, adresse, code_postal, ville, email_facturation, jours, tarif, qonto_client_id")

@@ -35,9 +35,14 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
   }
 
   async function telecharger(d: Devis) {
-    if (!d.pdf_path) { setErr("PDF indisponible pour ce devis."); return; }
-    const url = await devisRepo.pdfUrl(d.pdf_path);
-    if (url) window.open(url, "_blank", "noopener");
+    setBusy(true); setErr(null);
+    try {
+      // Le PDF est récupéré à la demande depuis Qonto (généré en asynchrone).
+      const r = await devisRepo.telecharger(d.id);
+      if (r?.url) window.open(r.url, "_blank", "noopener");
+      else setErr("PDF indisponible pour ce devis.");
+    } catch (e: any) { setErr(e?.message ?? String(e)); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -104,7 +109,7 @@ export default function DevisQonto({ clientId }: { clientId: string }) {
               {d.numero ?? "Devis"} · <span className="text-muted-foreground">{frDate(d.cree_le.slice(0, 10))}</span>
             </span>
             <span className="shrink-0 font-semibold text-avisdoc-ink">{d.montant_ttc != null ? euro(Math.round(d.montant_ttc)) : "—"} TTC</span>
-            <button className="shrink-0 text-avisdoc-teal hover:underline disabled:opacity-40" disabled={!d.pdf_path}
+            <button className="shrink-0 text-avisdoc-teal hover:underline disabled:opacity-40" disabled={busy}
               onClick={() => telecharger(d)}>Télécharger</button>
             <button className="shrink-0 text-muted-foreground hover:text-orange-600" disabled={busy}
               onClick={() => agir(() => devisRepo.supprimer(d.id), "Devis supprimé.")}>Supprimer</button>
