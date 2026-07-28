@@ -19,7 +19,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 ];
 
 const COLS_FULL = "minmax(150px,2fr) 110px minmax(70px,0.8fr) minmax(110px,1.2fr) 96px";
-const COLS_COMPACT = "minmax(140px,1fr) 96px";
+const COLS_COMPACT = "minmax(140px,1.3fr) minmax(110px,1fr)";
 
 export default function Contacts() {
   const { contacts } = useAdminData();
@@ -84,7 +84,8 @@ export default function Contacts() {
 
       <div
         className="grid items-start gap-5"
-        style={{ gridTemplateColumns: selected ? "minmax(0,1fr) 320px" : "1fr" }}
+        // Fiche sélectionnée : partage équilibré liste / fiche (~50 / 50).
+        style={{ gridTemplateColumns: selected ? "minmax(0,1fr) minmax(380px,1fr)" : "1fr" }}
       >
         <Card className="overflow-hidden">
           {/* En-tête de colonnes */}
@@ -123,7 +124,7 @@ export default function Contacts() {
                   <div className="truncate text-[11.5px] text-muted-foreground">{c.role}</div>
                 </div>
               </div>
-              <div>
+              <div className="flex flex-wrap gap-1">
                 {typesDe(c).map((t) => (
                   <Badge key={t} className={TYPE_BADGE[t]}>{t}</Badge>
                 ))}
