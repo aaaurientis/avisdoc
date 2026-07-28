@@ -285,19 +285,19 @@ serve(async (req) => {
     const tarif = Number(c!.tarif) || 0;
     const today = new Date().toISOString().slice(0, 10);
     const exp = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    // Payload à plat (pas de wrapper `quote`) — comme pour la création de
+    // client, Qonto ignore l'enveloppe et réclame sinon tous les champs.
     const devis = {
-      quote: {
-        client_id: cl.id,
-        issue_date: today,
-        expiry_date: exp,
-        currency: "EUR",
-        items: [{
-          title: "Journée de dépistage dermatologique",
-          quantity: String(jours),
-          unit_price: { value: String(tarif), currency: "EUR" },
-          vat_rate: String(TVA),
-        }],
-      },
+      client_id: cl.id,
+      issue_date: today,
+      expiry_date: exp,
+      currency: "EUR",
+      items: [{
+        title: "Journée de dépistage dermatologique",
+        quantity: String(jours),
+        unit_price: { value: String(tarif), currency: "EUR" },
+        vat_rate: String(TVA),
+      }],
     };
     const r = await qonto("/quotes", "POST", devis);
     if (!r.ok) return json({ error: "création devis Qonto refusée", qonto: r.data }, 400);
