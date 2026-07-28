@@ -40,6 +40,8 @@ export const devisRepo = {
   associerClient: (clientId: string) => invoke({ action: "associer_client", client_id: clientId }),
   creer: (clientId: string) => invoke({ action: "creer_devis", client_id: clientId }),
   supprimer: (devisId: string) => invoke({ action: "supprimer_devis", devis_id: devisId }),
+  // Récupère le PDF à la demande (cache Storage côté serveur) → URL signée.
+  telecharger: (devisId: string) => invoke({ action: "telecharger_devis", devis_id: devisId }),
 
   async pdfUrl(path: string): Promise<string | null> {
     const { data } = await sb.storage.from("admin-devis").createSignedUrl(path, 3600);
