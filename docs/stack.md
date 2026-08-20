@@ -4,6 +4,12 @@
 de développement. Rédigé à partir du code, pas des intentions : chaque point est
 vérifiable dans les fichiers cités.
 
+> **Maintenance** — ce document décrit le code, il vieillit donc avec lui.
+> À relire et corriger dès qu'un de ces points bouge : ajout ou retrait d'une
+> dépendance dans `package.json`, nouvelle Edge Function ou nouvelle migration,
+> changement d'hébergement, nouveau bucket Storage, modification des workflows
+> GitHub Actions. Dernière vérification : **20 août 2026** (commit `0e6196c`).
+
 ---
 
 ## Vue d'ensemble
