@@ -68,6 +68,9 @@ export default {
           ink: "hsl(var(--avisdoc-ink))",
           "ink-soft": "hsl(var(--avisdoc-ink-soft))",
           mist: "hsl(var(--avisdoc-mist))",
+          // Texte lisible sur fond clair (jamais teal/coral en texte)
+          "teal-ink": "hsl(var(--avisdoc-teal-ink))",
+          "coral-ink": "hsl(var(--avisdoc-coral-ink))",
           // Aliases rétro-compatibles
           turquoise: "hsl(var(--avisdoc-turquoise))",
           "turquoise-light": "hsl(var(--avisdoc-turquoise-light))",

@@ -8,6 +8,8 @@ import CGU from "./pages/CGU";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import MentionsLegales from "./pages/MentionsLegales";
 import SuppressionDonnees from "./pages/SuppressionDonnees";
+import ProspectionInformation from "./pages/ProspectionInformation";
+import ProspectionOpposition from "./pages/ProspectionOpposition";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
@@ -27,6 +29,8 @@ const App = () => (
           <Route path="/politique-de-confidentialite" element={<PolitiqueConfidentialite />} />
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/suppression-donnees" element={<SuppressionDonnees />} />
+          <Route path="/prospection-information" element={<ProspectionInformation />} />
+          <Route path="/prospection-opposition" element={<ProspectionOpposition />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

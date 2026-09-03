@@ -83,6 +83,23 @@ Pappers) via `VITE_ADMIN_BACKEND=supabase` et `VITE_ADMIN_AUTH=supabase`.
 
 📖 Architecture, migration SQL et runbook Supabase : **[`docs/admin-app.md`](docs/admin-app.md)**.
 
+## Module de prospection (`prospection.avisdoc.fr`)
+
+Troisième application du dépôt (`prospection.html` → `src/prospection/main.tsx`) :
+sourcing, qualification, contact et suivi des prescripteurs et entreprises cibles,
+**sans aucun envoi LinkedIn automatisé**. Elle vit sur le **projet Supabase
+vitrine**, schéma dédié `prospection`, cloisonné du back-office par le lint et les
+tests (aucun import croisé, un seul point d'accès aux données).
+
+📖 Architecture, mise en place, recette : **[`docs/prospection.md`](docs/prospection.md)** ·
+fiche de registre RGPD : **[`docs/prospection-registre-rgpd.md`](docs/prospection-registre-rgpd.md)**.
+
+```bash
+npm run typecheck:prospection   # TypeScript strict du module
+npm run recette:sql             # recette du schéma sur un Postgres local
+npm run types:prospection       # régénère src/prospection/data/types.gen.ts
+```
+
 ## SEO & GEO
 
 Chaque page appelle `useSEO({ title, description, canonical, jsonLd })` pour :

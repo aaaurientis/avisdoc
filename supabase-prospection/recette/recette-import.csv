@@ -1,0 +1,11 @@
+First Name;Last Name;Title;Company;Profile URL;Company Size;Geography;Email
+Alice;Recette-1;Associée gérante;Recette Courtage Est;https://www.linkedin.com/in/recette-1/;11-50;Grand Est;
+Bruno;Recette-2;Directeur;Recette Courtage Est;linkedin.com/in/recette-2?trk=x;11-50;Grand Est;
+Chloé;Recette-3;Responsable QVCT;Recette QVCT Île-de-France;https://fr.linkedin.com/in/recette-3;51-200;Île-de-France;c.recette3@exemple.fr
+David;Recette-4;DRH;Recette Industrie;https://www.linkedin.com/in/recette-4;1 001-5 000;Grand Est;
+Emma;Recette-5;Chargée de prévention;Recette Industrie;https://www.linkedin.com/in/recette-5;1 001-5 000;Grand Est;
+Alice;Recette-1;;Recette Courtage Est;https://www.linkedin.com/in/recette-1;;;alice@exemple.fr
+Farid;Recette-6;VP Partenariats;Recette Mutuelle;https://www.linkedin.com/in/recette-6;501-1 000;France;
+Gaëlle;Recette-7;Directrice;Recette Grossiste;https://www.linkedin.com/in/recette-7;201-500;France;
+Hugo;Recette-exclu;Associé;Recette Exclu SARL;https://www.linkedin.com/in/recette-exclu;2-10;Grand Est;
+David;Recette-4;DRH;Recette Industrie;HTTPS://WWW.LINKEDIN.COM/IN/RECETTE-4/;;;

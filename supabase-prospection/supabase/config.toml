@@ -1,0 +1,10 @@
+# Projet Supabase VITRINE — module de prospection (schéma « prospection »).
+# Dossier de travail distinct de ./supabase (projet plateforme, données de santé) :
+#   supabase --workdir supabase-prospection functions deploy --project-ref fmchuaxxchghfagfpvwn
+# Le config.toml racine pointe aussi sur ce projet alors que ses fonctions sont
+# déployées sur la plateforme : toujours passer --project-ref explicitement.
+project_id = "fmchuaxxchghfagfpvwn"
+
+# Droit d'opposition (lien dans chaque email) — public, jeton opaque par contact.
+[functions.prospection-opposition]
+verify_jwt = false

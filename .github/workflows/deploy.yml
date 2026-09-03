@@ -29,10 +29,14 @@ on:
       cibles:
         description: "Cibles front"
         type: choice
-        options: [all, "admin client", admin, client, www, pro]
+        options: [all, "admin client", admin, client, www, pro, prospection]
         default: all
       fonctions:
-        description: "Déployer les fonctions Supabase"
+        description: "Déployer les fonctions Supabase (plateforme)"
+        type: boolean
+        default: true
+      fonctions_prospection:
+        description: "Déployer les fonctions Supabase du module de prospection (projet vitrine)"
         type: boolean
         default: true
 
@@ -81,3 +85,21 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy --project-ref wtovhzxymlqnfxyjxrdq
+
+  # Module de prospection : projet Supabase VITRINE, dossier de travail dédié.
+  # Jamais sur le projet plateforme (cloisonnement, voir docs/prospection.md).
+  fonctions-prospection:
+    name: Fonctions prospection → Supabase (vitrine)
+    if: github.event_name == 'push' || inputs.fonctions_prospection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Déployer les Edge Functions du module de prospection
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --workdir supabase-prospection --project-ref fmchuaxxchghfagfpvwn

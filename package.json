@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy:ovh": "bash scripts/deploy-ovh.sh"
+    "deploy:ovh": "bash scripts/deploy-ovh.sh",
+    "typecheck:prospection": "tsc -p tsconfig.prospection.json",
+    "types:prospection": "supabase gen types typescript --project-id fmchuaxxchghfagfpvwn --schema prospection > src/prospection/data/types.gen.ts",
+    "recette:sql": "bash scripts/prospection-recette-sql.sh"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.11",

@@ -1,0 +1,7 @@
+/* Responsive de la coquille du module de prospection. Le design system vient
+   de src/index.css, identique au site vitrine. */
+@media (max-width: 900px) {
+  .pr-coquille { flex-direction: column; }
+  .pr-barre { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid hsl(var(--border)); }
+  .pr-contenu { padding: 1.5rem 1.25rem; }
+}

@@ -7,19 +7,20 @@
 #   admin.avisdoc.fr      → home/admin
 #   client.avisdoc.fr     → home/client
 #   pro.avisdoc.fr        → home/pro
+#   prospection.avisdoc.fr → home/prospection
 #
 # Chaque dossier doit donc être autonome : son propre index.html (l'entrée de
 # l'app), une copie des assets versionnés, et un .htaccess de repli SPA.
 # On évite ainsi toute détection par host (fragile) : dossier = sous-domaine.
 #
-# Produit : dist-deploy/{www,admin,client,pro}
+# Produit : dist-deploy/{www,admin,client,pro,prospection}
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
 racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$racine"
 
-echo "▸ Build Vite (3 entrées)…"
+echo "▸ Build Vite (5 entrées)…"
 npm run build >/dev/null
 
 sortie="dist-deploy"
@@ -77,7 +78,7 @@ monter() {
   # Tout dist/ (dont les fichiers cachés) puis on retire ce qui ne va pas
   # dans un dossier autonome : les .html d'entrée et le .htaccess partagé.
   cp -a dist/. "$cible/"
-  rm -f "$cible/index.html" "$cible/admin.html" "$cible/client.html" "$cible/pro.html" "$cible/.htaccess"
+  rm -f "$cible/index.html" "$cible/admin.html" "$cible/client.html" "$cible/pro.html" "$cible/prospection.html" "$cible/.htaccess"
   cp "dist/$entree" "$cible/index.html"
   htaccess_spa > "$cible/.htaccess"
   echo "  ✓ $cible  (index.html ← $entree)"
@@ -88,6 +89,7 @@ monter www    index.html
 monter admin  admin.html
 monter client client.html
 monter pro    pro.html
+monter prospection prospection.html
 
 echo
 echo "Prêt. Dossiers autonomes dans $sortie/ :"
@@ -95,3 +97,4 @@ echo "  $sortie/www    → home/www    (avisdoc.fr)"
 echo "  $sortie/admin  → home/admin  (admin.avisdoc.fr)"
 echo "  $sortie/client → home/client (client.avisdoc.fr)"
 echo "  $sortie/pro    → home/pro    (pro.avisdoc.fr)"
+echo "  $sortie/prospection → home/prospection (prospection.avisdoc.fr)"

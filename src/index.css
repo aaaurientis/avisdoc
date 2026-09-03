@@ -18,6 +18,10 @@
     --avisdoc-ink: 206 45% 13%;            /* encre bleutée */
     --avisdoc-ink-soft: 206 35% 26%;
     --avisdoc-mist: 210 40% 97%;
+    /* Déclinaisons lisibles du cyan et de l'orange pour du TEXTE sur fond clair
+       (#087497, #BC4E17) : les couleurs logo ne passent pas le seuil de 3:1. */
+    --avisdoc-teal-ink: 195 90% 31%;
+    --avisdoc-coral-ink: 20 78% 41%;
     /* Legacy aliases (compat classes existantes) */
     --avisdoc-turquoise: var(--avisdoc-teal);
     --avisdoc-turquoise-light: var(--avisdoc-teal-soft);
@@ -110,6 +114,8 @@
     --border: 206 25% 20%;
     --input: 206 25% 20%;
     --ring: 197 80% 62%;
+    --avisdoc-teal-ink: 197 80% 62%;
+    --avisdoc-coral-ink: 23 86% 65%;
 
     --sidebar-background: 206 45% 7%;
     --sidebar-foreground: 210 40% 98%;

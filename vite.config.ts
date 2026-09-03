@@ -25,6 +25,8 @@ export default defineConfig({
         client: path.resolve(__dirname, "client.html"),
         // Espace professionnel (pro.avisdoc.fr)
         pro: path.resolve(__dirname, "pro.html"),
+        // Module de prospection (prospection.avisdoc.fr) — projet Supabase vitrine
+        prospection: path.resolve(__dirname, "prospection.html"),
       },
     },
   },

@@ -6,6 +6,7 @@
 #   admin.avisdoc.fr   → OVH_DIR_ADMIN  (défaut : admin)
 #   client.avisdoc.fr  → OVH_DIR_CLIENT (défaut : client)
 #   pro.avisdoc.fr     → OVH_DIR_PRO    (défaut : pro)
+#   prospection.avisdoc.fr → OVH_DIR_PROSPECTION (défaut : prospection)
 #
 # On build d'abord trois dossiers autonomes (scripts/build-deploy.sh), puis on
 # téléverse chacun vers son sous-domaine. Chaque dossier étant propre à une
@@ -13,7 +14,7 @@
 #
 # Usage :
 #   ./scripts/deploy-ovh.sh                # admin + client (défaut)
-#   ./scripts/deploy-ovh.sh all            # admin + client + www
+#   ./scripts/deploy-ovh.sh all            # admin + client + www + pro + prospection
 #   ./scripts/deploy-ovh.sh admin          # une seule cible
 #   ./scripts/deploy-ovh.sh client www     # plusieurs cibles
 #
@@ -44,6 +45,7 @@ fi
 : "${OVH_DIR_ADMIN:=admin}"
 : "${OVH_DIR_CLIENT:=client}"
 : "${OVH_DIR_PRO:=pro}"
+: "${OVH_DIR_PROSPECTION:=prospection}"
 
 if ! command -v lftp >/dev/null 2>&1; then
   echo "✗ lftp est requis. macOS → brew install lftp"
@@ -59,7 +61,7 @@ for a in "$@"; do
   cibles+=("$a")
 done
 [[ ${#cibles[@]} -eq 0 ]] && cibles=(admin client)
-if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www pro); fi
+if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www pro prospection); fi
 
 # Résout le dossier distant d'une cible.
 dir_distant() {
@@ -68,7 +70,8 @@ dir_distant() {
     admin)  echo "$OVH_DIR_ADMIN" ;;
     client) echo "$OVH_DIR_CLIENT" ;;
     pro)    echo "$OVH_DIR_PRO" ;;
-    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | pro | all)" >&2; exit 1 ;;
+    prospection) echo "$OVH_DIR_PROSPECTION" ;;
+    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | pro | prospection | all)" >&2; exit 1 ;;
   esac
 }
 
@@ -103,5 +106,6 @@ for cible in "${cibles[@]}"; do
     admin)  echo "  https://admin.avisdoc.fr" ;;
     client) echo "  https://client.avisdoc.fr" ;;
     pro)    echo "  https://pro.avisdoc.fr" ;;
+    prospection) echo "  https://prospection.avisdoc.fr" ;;
   esac
 done
