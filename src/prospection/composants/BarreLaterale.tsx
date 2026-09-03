@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Ban, CalendarCheck, Moon, Power, Sun, Upload, Users } from "lucide-react";
+import { Ban, CalendarCheck, Filter, Moon, Power, Sun, Upload, Users } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
@@ -13,6 +13,7 @@ const NAV = [
   { to: "/jour", libelle: L.nav.jour, Icone: CalendarCheck },
   { to: "/contacts", libelle: L.nav.contacts, Icone: Users },
   { to: "/import", libelle: L.nav.import, Icone: Upload },
+  { to: "/sourcing", libelle: L.nav.sourcing, Icone: Filter },
   { to: "/exclusions", libelle: L.nav.exclusions, Icone: Ban },
 ];
 

@@ -5,6 +5,10 @@
 # déployées sur la plateforme : toujours passer --project-ref explicitement.
 project_id = "fmchuaxxchghfagfpvwn"
 
+# Génération de message (Bedrock eu-west-3) — membre @avisdoc.fr vérifié dans la fonction.
+[functions.prospection-message]
+verify_jwt = true
+
 # Droit d'opposition (lien dans chaque email) — public, jeton opaque par contact.
 [functions.prospection-opposition]
 verify_jwt = false

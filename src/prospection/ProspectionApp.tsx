@@ -9,6 +9,7 @@ import Contacts from "./ecrans/Contacts";
 import FicheContact from "./ecrans/FicheContact";
 import Message from "./ecrans/Message";
 import Import from "./ecrans/Import";
+import Sourcing from "./ecrans/Sourcing";
 import Exclusions from "./ecrans/Exclusions";
 
 // Toute réponse hors 2xx lève : on ne réessaie pas en silence, l'erreur s'affiche.
@@ -34,6 +35,7 @@ function Aiguillage() {
         <Route path="/contacts/:id" element={<FicheContact />} />
         <Route path="/contacts/:id/message/:type" element={<Message />} />
         <Route path="/import" element={<Import />} />
+        <Route path="/sourcing" element={<Sourcing />} />
         <Route path="/exclusions" element={<Exclusions />} />
         <Route path="*" element={<Navigate to="/jour" replace />} />
       </Route>
