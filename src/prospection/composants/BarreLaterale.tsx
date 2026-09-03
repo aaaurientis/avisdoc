@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Ban, CalendarCheck, Filter, Moon, Power, Sun, Upload, Users } from "lucide-react";
+import { Ban, BarChart3, CalendarCheck, Filter, Moon, Power, Sun, Upload, Users } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
@@ -15,6 +15,7 @@ const NAV = [
   { to: "/import", libelle: L.nav.import, Icone: Upload },
   { to: "/sourcing", libelle: L.nav.sourcing, Icone: Filter },
   { to: "/exclusions", libelle: L.nav.exclusions, Icone: Ban },
+  { to: "/synthese", libelle: L.nav.synthese, Icone: BarChart3 },
 ];
 
 export default function BarreLaterale() {

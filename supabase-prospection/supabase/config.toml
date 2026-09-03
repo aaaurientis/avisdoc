@@ -9,6 +9,11 @@ project_id = "fmchuaxxchghfagfpvwn"
 [functions.prospection-message]
 verify_jwt = true
 
+# Rattachement Gmail (métadonnées + résumé, jamais le corps) — membre @avisdoc.fr,
+# ou planificateur avec x-secret.
+[functions.prospection-gmail]
+verify_jwt = true
+
 # Droit d'opposition (lien dans chaque email) — public, jeton opaque par contact.
 [functions.prospection-opposition]
 verify_jwt = false

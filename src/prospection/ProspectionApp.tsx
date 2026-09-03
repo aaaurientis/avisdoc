@@ -11,6 +11,7 @@ import Message from "./ecrans/Message";
 import Import from "./ecrans/Import";
 import Sourcing from "./ecrans/Sourcing";
 import Exclusions from "./ecrans/Exclusions";
+import Synthese from "./ecrans/Synthese";
 
 // Toute réponse hors 2xx lève : on ne réessaie pas en silence, l'erreur s'affiche.
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false }, mutations: { retry: false } } });
@@ -37,6 +38,7 @@ function Aiguillage() {
         <Route path="/import" element={<Import />} />
         <Route path="/sourcing" element={<Sourcing />} />
         <Route path="/exclusions" element={<Exclusions />} />
+        <Route path="/synthese" element={<Synthese />} />
         <Route path="*" element={<Navigate to="/jour" replace />} />
       </Route>
     </Routes>
