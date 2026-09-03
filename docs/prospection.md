@@ -156,6 +156,24 @@ qu'un cache de tri, recalculé par `repo.ts` à chaque écriture.
 Variables front : uniquement `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY`
 (déjà présentes dans `.env`).
 
+## 6 bis. Tester sans Supabase : le mode démo
+
+```bash
+VITE_PROSPECTION_MODE=demo npm run dev
+# puis http://localhost:8080/prospection.html
+```
+
+Données fictives en mémoire (persistées dans le `localStorage` du navigateur),
+mêmes règles que les fonctions serveur (transitions, plafond, relances, import
+avec dédoublonnage et exclusion, purge), connexion simulée, génération de message
+et rattachement Gmail simulés. Aucun appel réseau, aucun projet Supabase touché.
+Pour repartir de zéro : vider le stockage du site dans le navigateur.
+Le fichier `supabase-prospection/recette/recette-import.csv` joue le point 1 de
+la recette (l'exclusion `recette-exclu` est déjà présente dans la démo).
+
+Ne jamais mettre `VITE_PROSPECTION_MODE=demo` dans `.env` : le build de
+production lit ce fichier.
+
 ## 7. Recette (§8 du brief)
 
 Un seul environnement : la production, sur données fictives, avant tout usage réel.

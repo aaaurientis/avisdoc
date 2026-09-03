@@ -18,17 +18,19 @@ import type {
 import { calculerScore } from "../domaine/signaux";
 import type { LigneImport } from "../domaine/importCsv";
 import type { GenreMessage, CleObjection } from "../domaine/gardeFousMessage";
-import { DOMAINE_AUTORISE } from "../lib/config";
+import { DOMAINE_AUTORISE, MODE_DEMO } from "../lib/config";
 import { ErreurRepo } from "./erreurs";
+import * as demo from "./demo";
 
 const URL_VITRINE = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const CLE_VITRINE = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
-if (!URL_VITRINE || !CLE_VITRINE) {
+if (!MODE_DEMO && (!URL_VITRINE || !CLE_VITRINE)) {
   throw new Error("VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY manquants (projet vitrine).");
 }
 
-const sb = createClient<Database>(URL_VITRINE, CLE_VITRINE, {
+// En mode démo le client n'est jamais sollicité (chaque fonction délègue à ./demo).
+const sb = createClient<Database>(URL_VITRINE ?? "https://demo.invalid", CLE_VITRINE ?? "demo", {
   db: { schema: "prospection" },
   auth: {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
@@ -91,17 +93,32 @@ async function invoquer<T>(nom: string, corps: Record<string, unknown>): Promise
 // Authentification (SSO Google, projet vitrine, restreint @avisdoc.fr)
 // ----------------------------------------------------------------------------
 
+const CLE_SESSION_DEMO = "avisdoc-prospection-demo-session";
+const sessionDemo = (): Session | null =>
+  localStorage.getItem(CLE_SESSION_DEMO)
+    ? ({ user: { email: demo.UTILISATEUR_DEMO.email, user_metadata: { full_name: demo.UTILISATEUR_DEMO.nom } } } as unknown as Session)
+    : null;
+let surChangementDemo: ((s: Session | null) => void) | null = null;
+
 export const authentification = {
   async session(): Promise<Session | null> {
+    if (MODE_DEMO) return sessionDemo();
     const { data, error } = await sb.auth.getSession();
     if (error) throw new ErreurRepo("acces_refuse", error.message);
     return data.session;
   },
   surChangement(cb: (s: Session | null) => void): () => void {
+    if (MODE_DEMO) { surChangementDemo = cb; return () => { surChangementDemo = null; }; }
     const { data } = sb.auth.onAuthStateChange((_e, s) => cb(s));
     return () => data.subscription.unsubscribe();
   },
   async connecter(redirection: string): Promise<void> {
+    if (MODE_DEMO) {
+      await new Promise((r) => setTimeout(r, 500));
+      localStorage.setItem(CLE_SESSION_DEMO, "1");
+      surChangementDemo?.(sessionDemo());
+      return;
+    }
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: redirection, queryParams: { hd: DOMAINE_AUTORISE, prompt: "select_account" } },
@@ -109,6 +126,7 @@ export const authentification = {
     if (error) throw new ErreurRepo("acces_refuse", error.message);
   },
   async deconnecter(): Promise<void> {
+    if (MODE_DEMO) { localStorage.removeItem(CLE_SESSION_DEMO); return; }
     await sb.auth.signOut();
   },
 };
@@ -127,6 +145,7 @@ export type EcranDuJour = {
 };
 
 export async function chargerJour(): Promise<EcranDuJour> {
+  if (MODE_DEMO) return demo.chargerJour();
   const [relances, reponses, aQualifier, nbInvitations] = await Promise.all([
     exiger(sb.from("v_relances_a_faire").select("*").order("du_le", { ascending: true })),
     exiger(sb.from("v_reponses_non_traitees").select("*").order("survenu_le", { ascending: false })),
@@ -138,10 +157,12 @@ export async function chargerJour(): Promise<EcranDuJour> {
 }
 
 export async function invitationsDuJour(): Promise<number> {
+  if (MODE_DEMO) return demo.invitationsDuJour();
   return exiger(sb.rpc("invitations_du_jour"));
 }
 
 export async function listerContacts(): Promise<ContactAvecCompte[]> {
+  if (MODE_DEMO) return demo.listerContacts();
   return exiger(
     sb.from("contact").select(SELECTION_CONTACT).order("score", { ascending: false }).order("maj_le", { ascending: false })
       .overrideTypes<ContactAvecCompte[], { merge: false }>(),
@@ -151,6 +172,7 @@ export async function listerContacts(): Promise<ContactAvecCompte[]> {
 export type FicheContact = { contact: ContactAvecCompte; interactions: Interaction[]; relances: Relance[] };
 
 export async function lireContact(id: string): Promise<FicheContact | null> {
+  if (MODE_DEMO) return demo.lireContact(id);
   const { data, error } = await sb.from("contact").select(SELECTION_CONTACT).eq("id", id).maybeSingle()
     .overrideTypes<ContactAvecCompte, { merge: false }>();
   if (error) lever(error);
@@ -163,22 +185,27 @@ export async function lireContact(id: string): Promise<FicheContact | null> {
 }
 
 export async function listerComptes(): Promise<Compte[]> {
+  if (MODE_DEMO) return demo.listerComptes();
   return exiger(sb.from("compte").select("*").order("nom", { ascending: true }));
 }
 
 export async function listerImports(): Promise<Import[]> {
+  if (MODE_DEMO) return demo.listerImports();
   return exiger(sb.from("import").select("*").order("importe_le", { ascending: false }).limit(50));
 }
 
 export async function listerExclusions(): Promise<Exclusion[]> {
+  if (MODE_DEMO) return demo.listerExclusions();
   return exiger(sb.from("exclusion").select("*").order("cree_le", { ascending: false }).limit(500));
 }
 
 export async function listerSyntheses(): Promise<SyntheseHebdo[]> {
+  if (MODE_DEMO) return demo.listerSyntheses();
   return exiger(sb.from("synthese_hebdo").select("*").order("semaine", { ascending: false }).limit(26));
 }
 
 export async function vueParCercle(): Promise<LigneParCercle[]> {
+  if (MODE_DEMO) return demo.vueParCercle();
   return exiger(sb.from("v_par_cercle").select("*"));
 }
 
@@ -188,6 +215,7 @@ export async function vueParCercle(): Promise<LigneParCercle[]> {
 
 /** Met à jour la fiche et recalcule le cache de score à chaque écriture. */
 export async function mettreAJourContact(contact: ContactAvecCompte, champs: ModificationContact): Promise<Contact> {
+  if (MODE_DEMO) return demo.mettreAJourContact(contact, champs);
   const fusion = { ...contact, ...champs };
   const score = calculerScore(fusion, contact.compte).total;
   return exiger(sb.from("contact").update({ ...champs, score }).eq("id", contact.id).select("*").single());
@@ -195,6 +223,7 @@ export async function mettreAJourContact(contact: ContactAvecCompte, champs: Mod
 
 /** Met à jour un compte, puis le cache de score de ses contacts (cercle, exposition, effectif). */
 export async function mettreAJourCompte(compteId: string, champs: ModificationCompte): Promise<Compte> {
+  if (MODE_DEMO) return demo.mettreAJourCompte(compteId, champs);
   const compte = await exiger(sb.from("compte").update(champs).eq("id", compteId).select("*").single());
   const contacts = await exiger(sb.from("contact").select("*").eq("compte_id", compteId));
   await Promise.all(contacts.map((c) =>
@@ -203,15 +232,18 @@ export async function mettreAJourCompte(compteId: string, champs: ModificationCo
 }
 
 export async function creerCompte(champs: Insertion<"compte">): Promise<Compte> {
+  if (MODE_DEMO) return demo.creerCompte(champs);
   return exiger(sb.from("compte").insert(champs).select("*").single());
 }
 
 export async function rattacherCompte(contact: ContactAvecCompte, compte: Compte): Promise<void> {
+  if (MODE_DEMO) return demo.rattacherCompte(contact, compte);
   const score = calculerScore(contact, compte).total;
   await exigerSansDonnee(sb.from("contact").update({ compte_id: compte.id, score }).eq("id", contact.id));
 }
 
 export async function ajouterExclusion(champs: Insertion<"exclusion">): Promise<Exclusion> {
+  if (MODE_DEMO) return demo.ajouterExclusion(champs);
   return exiger(sb.from("exclusion").insert(champs).select("*").single());
 }
 
@@ -220,6 +252,7 @@ export async function ajouterExclusion(champs: Insertion<"exclusion">): Promise<
 // ----------------------------------------------------------------------------
 
 export async function transition(contactId: string, vers: StatutContact): Promise<StatutContact> {
+  if (MODE_DEMO) return demo.transition(contactId, vers);
   return exiger(sb.rpc("transition_contact", { p_contact_id: contactId, p_vers: vers }));
 }
 
@@ -230,6 +263,7 @@ function lireObjet(j: Json): Record<string, Json | undefined> {
 }
 
 export async function marquerEnvoye(contactId: string, type: TypeInteraction, contenu: string): Promise<ResultatEnvoi> {
+  if (MODE_DEMO) return demo.marquerEnvoye(contactId, type, contenu);
   const j = lireObjet(await exiger(sb.rpc("marquer_envoye", { p_contact_id: contactId, p_type: type, p_contenu: contenu })));
   return {
     interaction_id: String(j.interaction_id ?? ""),
@@ -239,15 +273,18 @@ export async function marquerEnvoye(contactId: string, type: TypeInteraction, co
 }
 
 export async function enregistrerReponse(contactId: string, canal: Canal, contenu: string): Promise<StatutContact> {
+  if (MODE_DEMO) return demo.enregistrerReponse(contactId, canal, contenu);
   const j = lireObjet(await exiger(sb.rpc("enregistrer_reponse", { p_contact_id: contactId, p_canal: canal, p_contenu: contenu })));
   return j.statut as StatutContact;
 }
 
 export async function ajouterNote(contactId: string, canal: Canal, contenu: string): Promise<string> {
+  if (MODE_DEMO) return demo.ajouterNote(contactId, canal, contenu);
   return exiger(sb.rpc("ajouter_note", { p_contact_id: contactId, p_canal: canal, p_contenu: contenu }));
 }
 
 export async function marquerTraitee(interactionId: string): Promise<void> {
+  if (MODE_DEMO) return demo.marquerTraitee(interactionId);
   await exigerSansDonnee(sb.rpc("marquer_traitee", { p_interaction_id: interactionId }));
 }
 
@@ -261,6 +298,7 @@ export type ResultatImport = {
 };
 
 export async function importer(libelle: string, fichier: string, lignes: LigneImport[], ecrire: boolean): Promise<ResultatImport> {
+  if (MODE_DEMO) return demo.importer(libelle, fichier, lignes, ecrire);
   const j = lireObjet(await exiger(sb.rpc("importer", { p_libelle: libelle, p_fichier: fichier, p_lignes: lignes, p_ecrire: ecrire })));
   const ign = lireObjet(j.ignorees ?? null);
   return {
@@ -274,6 +312,7 @@ export async function importer(libelle: string, fichier: string, lignes: LigneIm
 }
 
 export async function genererSynthese(lundi?: string): Promise<SyntheseHebdo> {
+  if (MODE_DEMO) return demo.genererSynthese(lundi);
   return exiger(sb.rpc("generer_synthese_hebdo", lundi ? { p_lundi: lundi } : {}));
 }
 
@@ -298,6 +337,7 @@ export type DemandeMessage = {
 export type ReponseMessage = { texte: string; modele: string };
 
 export async function genererMessage(demande: DemandeMessage): Promise<ReponseMessage> {
+  if (MODE_DEMO) return demo.genererMessage(demande);
   const r = await invoquer<{ texte?: string; modele?: string }>("prospection-message", demande);
   return { texte: String(r.texte ?? ""), modele: String(r.modele ?? "") };
 }
@@ -305,6 +345,7 @@ export async function genererMessage(demande: DemandeMessage): Promise<ReponseMe
 export type ResultatGmail = { contacts: number; emails: number; erreurs: string[] };
 
 export async function synchroniserGmail(): Promise<ResultatGmail> {
+  if (MODE_DEMO) return demo.synchroniserGmail();
   const r = await invoquer<{ contacts?: number; emails?: number; erreurs?: string[] }>("prospection-gmail", { action: "synchroniser" });
   return { contacts: Number(r.contacts ?? 0), emails: Number(r.emails ?? 0), erreurs: r.erreurs ?? [] };
 }

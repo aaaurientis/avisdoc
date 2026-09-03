@@ -95,6 +95,7 @@ tests (aucun import croisé, un seul point d'accès aux données).
 fiche de registre RGPD : **[`docs/prospection-registre-rgpd.md`](docs/prospection-registre-rgpd.md)**.
 
 ```bash
+VITE_PROSPECTION_MODE=demo npm run dev   # mode démo : données fictives, sans Supabase
 npm run typecheck:prospection   # TypeScript strict du module
 npm run recette:sql             # recette du schéma sur un Postgres local
 npm run types:prospection       # régénère src/prospection/data/types.gen.ts

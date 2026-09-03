@@ -2,6 +2,13 @@
 // Projet Supabase VITRINE uniquement (VITE_SUPABASE_*). Les variables
 // VITE_ADMIN_SUPABASE_* désignent le projet plateforme : jamais lues ici.
 
+/**
+ * Mode démo : données fictives en mémoire, aucun appel réseau. Sert à tester
+ * les écrans avant la mise en place du projet vitrine.
+ *   VITE_PROSPECTION_MODE=demo npm run dev
+ */
+export const MODE_DEMO = import.meta.env.VITE_PROSPECTION_MODE === "demo";
+
 /** Domaine Google autorisé à se connecter. */
 export const DOMAINE_AUTORISE = "avisdoc.fr";
 

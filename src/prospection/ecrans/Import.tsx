@@ -33,8 +33,15 @@ export default function Import() {
     [csv, mapping, typeCompte, cercle, expose],
   );
 
+  const recommencer = () => {
+    setLibelle(""); setFichier(""); setCsv(null); setMapping({}); setApercu(null); setResultat(null);
+    if (refFichier.current) refFichier.current.value = "";
+  };
+
   const lireFichier = async (f: File | undefined) => {
     if (!f) return;
+    // Le même fichier re-sélectionné doit redéclencher la lecture : on vide la valeur.
+    if (refFichier.current) refFichier.current.value = "";
     const texte = await f.text();
     const analyse = pr60AnalyserCsv(texte);
     setFichier(f.name);
@@ -133,9 +140,12 @@ export default function Import() {
               <div className="mb-4">
                 <div className="mb-2 rounded-xl bg-emerald-50 px-4 py-3 text-[13px] font-semibold text-emerald-800">{L.import.importe}</div>
                 <Compteurs r={resultat} />
-                <Link to={`/contacts?import=${resultat.import_id ?? ""}`} className={cn(CIBLE, "inline-flex items-center px-1 text-sm font-semibold text-avisdoc-teal-ink hover:underline")}>
-                  {L.import.voirContacts}
-                </Link>
+                <div className="flex flex-wrap items-center gap-4">
+                  <Link to={`/contacts?import=${resultat.import_id ?? ""}`} className={cn(CIBLE, "inline-flex items-center px-1 text-sm font-semibold text-avisdoc-teal-ink hover:underline")}>
+                    {L.import.voirContacts}
+                  </Link>
+                  <Bouton libelle={L.import.nouvel} onClick={recommencer} />
+                </div>
               </div>
             )}
             {!resultat && (

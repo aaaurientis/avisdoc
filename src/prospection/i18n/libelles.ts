@@ -376,6 +376,7 @@ const brut = {
     importer: "Importer",
     importe: "Import terminé",
     voirContacts: "Voir les contacts importés",
+    nouvel: "Nouvel import",
     motifAucuneLigne: "Aucune ligne à importer.",
     motifLibelle: "Nommez la liste.",
     motifApercu: "Calculez d'abord l'aperçu.",
