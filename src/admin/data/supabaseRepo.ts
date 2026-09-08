@@ -90,8 +90,11 @@ function toDoc(r: any): DocItem {
     date: r.date_label ?? "",
     owner: r.owner ?? "",
     version: r.version ?? 1,
+    storagePath: r.storage_path ?? undefined,
   };
 }
+
+const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
@@ -258,13 +261,60 @@ export class SupabaseRepo implements AdminRepo {
     this.assert(error);
   }
 
-  async deleteDoc(id: string): Promise<void> {
-    const { error } = await sb.from("admin_documents").delete().eq("id", id);
+  async createDoc(doc: DocItem, file: File): Promise<void> {
+    const path = doc.storagePath!;
+    const up = await sb.storage
+      .from(DOCS_BUCKET)
+      .upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (up.error) throw up.error;
+    const { error } = await sb.from("admin_documents").insert({
+      id: doc.id,
+      name: doc.name,
+      ext: doc.ext,
+      cat: doc.cat,
+      size: doc.size,
+      date_label: doc.date,
+      owner: doc.owner,
+      version: doc.version,
+      storage_path: path,
+    });
     this.assert(error);
   }
 
-  async bumpDocVersion(id: string, version: number, date: string, owner: string): Promise<void> {
-    const { error } = await sb.from("admin_documents").update({ version, date_label: date, owner }).eq("id", id);
+  async newDocVersion(doc: DocItem, file: File): Promise<void> {
+    const path = doc.storagePath!;
+    const up = await sb.storage
+      .from(DOCS_BUCKET)
+      .upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (up.error) throw up.error;
+    const { error } = await sb
+      .from("admin_documents")
+      .update({
+        version: doc.version,
+        date_label: doc.date,
+        owner: doc.owner,
+        size: doc.size,
+        ext: doc.ext,
+        storage_path: path,
+      })
+      .eq("id", doc.id);
+    this.assert(error);
+  }
+
+  async docUrl(doc: DocItem): Promise<string | null> {
+    if (!doc.storagePath) return null;
+    const { data, error } = await sb.storage
+      .from(DOCS_BUCKET)
+      .createSignedUrl(doc.storagePath, 3600, { download: doc.name });
+    this.assert(error);
+    return data?.signedUrl ?? null;
+  }
+
+  async deleteDoc(id: string, storagePath?: string): Promise<void> {
+    if (storagePath) {
+      await sb.storage.from(DOCS_BUCKET).remove([storagePath]);
+    }
+    const { error } = await sb.from("admin_documents").delete().eq("id", id);
     this.assert(error);
   }
 

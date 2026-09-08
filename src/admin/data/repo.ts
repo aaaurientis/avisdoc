@@ -48,9 +48,11 @@ export interface AdminRepo {
   updateSuivi(clientId: string, suiviId: string, done: boolean): Promise<void>;
   removeSuivi(clientId: string, suiviId: string): Promise<void>;
 
-  // Documents
-  deleteDoc(id: string): Promise<void>;
-  bumpDocVersion(id: string, version: number, date: string, owner: string): Promise<void>;
+  // Documents (upload réel dans le bucket Storage `admin-documents`)
+  createDoc(doc: DocItem, file: File): Promise<void>;
+  newDocVersion(doc: DocItem, file: File): Promise<void>;
+  docUrl(doc: DocItem): Promise<string | null>;
+  deleteDoc(id: string, storagePath?: string): Promise<void>;
 
   // Réglages
   addDocType(name: string): Promise<void>;
@@ -83,8 +85,12 @@ export class MockRepo implements AdminRepo {
   async addSuivi(): Promise<void> {}
   async updateSuivi(): Promise<void> {}
   async removeSuivi(): Promise<void> {}
+  async createDoc(): Promise<void> {}
+  async newDocVersion(): Promise<void> {}
+  async docUrl(): Promise<string | null> {
+    return null;
+  }
   async deleteDoc(): Promise<void> {}
-  async bumpDocVersion(): Promise<void> {}
   async addDocType(): Promise<void> {}
   async removeDocType(): Promise<void> {}
 }

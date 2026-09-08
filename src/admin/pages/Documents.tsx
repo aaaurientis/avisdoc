@@ -1,27 +1,58 @@
-import { useMemo, useState } from "react";
-import { ArrowUp, Upload, X } from "lucide-react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { ArrowUp, Download, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { DOC_EXT } from "../lib/ui-tokens";
-import { ADMIN_BACKEND } from "../lib/config";
 import { useAdminData } from "../data/AdminDataContext";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 
-const COLS = "minmax(180px,2.4fr) 100px 60px 84px minmax(64px,0.8fr) 130px";
+const COLS = "minmax(180px,2.4fr) 100px 60px 84px minmax(64px,0.8fr) 150px";
 
 export default function Documents() {
-  const { docs, docTypes, deleteDoc, bumpDocVersion } = useAdminData();
+  const { docs, docTypes, deleteDoc, importDoc, newDocVersion, downloadDoc } = useAdminData();
   const [cat, setCat] = useState("Tous");
+  const [busy, setBusy] = useState(false);
+
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const versionInputRef = useRef<HTMLInputElement>(null);
+  const versionTargetId = useRef<string | null>(null);
 
   const tabs = useMemo(() => ["Tous", ...docTypes], [docTypes]);
   const rows = docs.filter((d) => cat === "Tous" || d.cat === cat);
 
-  const onImport = () => {
-    toast.info(
-      ADMIN_BACKEND === "supabase"
-        ? "L'upload de fichiers se branche sur Supabase Storage (voir docs)."
-        : "L'import de fichiers sera disponible une fois le backend Supabase configuré.",
-    );
+  // Catégorie d'affectation à l'import : l'onglet actif, sinon le 1er type.
+  const targetCat = cat !== "Tous" ? cat : docTypes[0] ?? "Autre";
+
+  const onPickImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permet de réimporter le même fichier
+    if (!file) return;
+    setBusy(true);
+    try {
+      await importDoc(file, targetCat);
+      toast.success(`« ${file.name} » importé dans « ${targetCat} ».`);
+    } catch {
+      /* toast d'erreur géré dans le contexte */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPickVersion = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const id = versionTargetId.current;
+    e.target.value = "";
+    versionTargetId.current = null;
+    if (!file || !id) return;
+    setBusy(true);
+    try {
+      await newDocVersion(id, file);
+      toast.success("Nouvelle version enregistrée.");
+    } catch {
+      /* toast d'erreur géré dans le contexte */
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -32,13 +63,18 @@ export default function Documents() {
         action={
           <button
             type="button"
-            onClick={onImport}
-            className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2.5 text-sm font-bold text-white transition-colors"
+            onClick={() => importInputRef.current?.click()}
+            disabled={busy}
+            className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-60"
           >
-            <Upload className="size-4" /> Importer un document
+            <Upload className="size-4" /> {busy ? "Import…" : "Importer un document"}
           </button>
         }
       />
+
+      {/* Inputs fichiers masqués */}
+      <input ref={importInputRef} type="file" hidden onChange={onPickImport} />
+      <input ref={versionInputRef} type="file" hidden onChange={onPickVersion} />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map((t) => {
@@ -63,7 +99,7 @@ export default function Documents() {
       </div>
 
       <Card className="overflow-x-auto">
-        <div style={{ minWidth: 700 }}>
+        <div style={{ minWidth: 720 }}>
           <div
             className="grid gap-2.5 whitespace-nowrap border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
             style={{ gridTemplateColumns: COLS }}
@@ -92,9 +128,14 @@ export default function Documents() {
                   {d.ext}
                 </span>
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-[13.5px] font-semibold text-avisdoc-ink">
+                  <button
+                    type="button"
+                    onClick={() => downloadDoc(d.id)}
+                    title="Télécharger"
+                    className="truncate text-left text-[13.5px] font-semibold text-avisdoc-ink hover:text-avisdoc-teal hover:underline"
+                  >
                     {d.name}
-                  </span>
+                  </button>
                   <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                     v{d.version}
                   </span>
@@ -107,9 +148,21 @@ export default function Documents() {
               <div className="flex justify-end gap-1.5">
                 <button
                   type="button"
-                  onClick={() => bumpDocVersion(d.id)}
-                  title="Ajouter une nouvelle version"
-                  className="ad-chip inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition-[filter]"
+                  onClick={() => downloadDoc(d.id)}
+                  title="Télécharger le document"
+                  className="ad-chip inline-flex items-center rounded-full bg-muted px-2 py-1.5 text-muted-foreground transition-[filter] hover:text-avisdoc-ink"
+                >
+                  <Download className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    versionTargetId.current = d.id;
+                    versionInputRef.current?.click();
+                  }}
+                  title="Importer une nouvelle version"
+                  className="ad-chip inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition-[filter] disabled:opacity-60"
                 >
                   <ArrowUp className="size-3" /> Version
                 </button>

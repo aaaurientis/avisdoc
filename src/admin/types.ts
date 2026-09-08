@@ -118,6 +118,8 @@ export interface DocItem {
   date: string;
   owner: string;
   version: number;
+  /** Chemin de l'objet dans le bucket Storage `admin-documents` (backend Supabase). */
+  storagePath?: string;
 }
 
 export interface ActivityItem {

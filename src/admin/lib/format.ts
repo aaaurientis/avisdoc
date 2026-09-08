@@ -62,6 +62,35 @@ export function joinAdresse(rue?: string, cp?: string, ville?: string): string {
   return [(rue ?? "").trim(), loc].filter(Boolean).join(", ");
 }
 
+/** Taille de fichier lisible, format fr : 1234567 → "1,2 Mo". */
+export function humanSize(bytes: number): string {
+  if (!bytes || bytes < 0) return "0 Ko";
+  if (bytes < 1024) return `${bytes} o`;
+  const ko = bytes / 1024;
+  if (ko < 1024) return `${ko < 10 ? ko.toFixed(1) : Math.round(ko)} Ko`.replace(".", ",");
+  const mo = ko / 1024;
+  if (mo < 1024) return `${mo < 10 ? mo.toFixed(1) : Math.round(mo)} Mo`.replace(".", ",");
+  const go = mo / 1024;
+  return `${go.toFixed(1)} Go`.replace(".", ",");
+}
+
+/** Nom de fichier « slugifié » sûr pour une clé Storage (sans accents ni espaces). */
+export function safeFileName(name: string): string {
+  return (
+    name
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "") // diacritiques (marques combinantes)
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "fichier"
+  );
+}
+
+/** Chemin d'un document dans le bucket `admin-documents` : `<id>/v<version>-<nom sûr>`. */
+export function docStoragePath(id: string, version: number, name: string): string {
+  return `${id}/v${version}-${safeFileName(name)}`;
+}
+
 /** Identifiant unique (uuid si dispo, fallback sinon). */
 export function uid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

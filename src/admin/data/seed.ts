@@ -30,7 +30,7 @@ export const SEED_CLIENTS: Client[] = [
     id: "cl-1", company: "CHU de Grenoble", siren: "263 800 302", naf: "8610Z — Activités hospitalières", adresse: "Bd de la Chantourne, 38700 La Tronche", effectif: "5 000+",
     stage: "Signé", jours: 4, tarif: 1400, depistes: 312, orientes: 18, statutPropo: "Acceptée",
     resultat: "Convention filière rapide active. 4 journées réalisées au T2, taux d'orientation de 5,8% — reconduction proposée pour 2027.",
-    contacts: [{ id: "pc-1", name: "Pr D. Salomon", role: "Chef de service dermatologie", email: "d.salomon@chu-grenoble.fr", tel: "04 76 76 75 75" }],
+    contacts: [{ id: "pc-1", name: "Pr D. Salomon", prenom: "D.", nom: "Salomon", role: "Chef de service dermatologie", email: "d.salomon@chu-grenoble.fr", tel: "04 76 76 75 75" }],
     docs: [
       { id: "pd-1", name: "Convention filière rapide.pdf", ext: "PDF", date: "9 juil." },
       { id: "pd-2", name: "Bilan campagne T2.pdf", ext: "PDF", date: "30 juin" },
@@ -45,14 +45,14 @@ export const SEED_CLIENTS: Client[] = [
   {
     id: "cl-2", company: "Mutuelle Alpes Santé", siren: "538 209 771", naf: "6512Z — Autres assurances", adresse: "18 av. Félix Viallet, 38000 Grenoble", effectif: "250-499",
     stage: "Nouveau", jours: 2, tarif: 1200, depistes: 0, orientes: 0, statutPropo: "Brouillon", resultat: null,
-    contacts: [{ id: "pc-2", name: "Claire Dumont", role: "Responsable prévention", email: "c.dumont@alpes-sante.fr", tel: "04 76 12 40 88" }],
+    contacts: [{ id: "pc-2", name: "Claire Dumont", prenom: "Claire", nom: "Dumont", role: "Responsable prévention", email: "c.dumont@alpes-sante.fr", tel: "04 76 12 40 88" }],
     docs: [{ id: "pd-4", name: "Plaquette AvisDoc entreprises.pdf", ext: "PDF", date: "10 juil." }],
     suivis: [{ id: "sv-4", text: "Premier échange téléphonique — intérêt pour 2 journées adhérents.", deadline: null, done: true, when: "10 juil." }],
   },
   {
     id: "cl-3", company: "SST Haute-Savoie", siren: "776 528 041", naf: "8621Z — Médecine générale", adresse: "8 av. de Genève, 74000 Annecy", effectif: "50-99",
     stage: "Qualifié", jours: 3, tarif: 1200, depistes: 0, orientes: 0, statutPropo: "Brouillon", resultat: null,
-    contacts: [{ id: "pc-3", name: "Dr Inès Marchal", role: "Médecin du travail", email: "i.marchal@sst74.fr", tel: "06 33 90 12 84" }],
+    contacts: [{ id: "pc-3", name: "Dr Inès Marchal", prenom: "Inès", nom: "Marchal", role: "Médecin du travail", email: "i.marchal@sst74.fr", tel: "06 33 90 12 84" }],
     docs: [{ id: "pd-5", name: "Note de cadrage T4.docx", ext: "DOC", date: "4 juil." }],
     suivis: [
       { id: "sv-5", text: "Préparer la proposition 3 journées sites industriels", deadline: "2026-07-12", done: false },
@@ -62,7 +62,7 @@ export const SEED_CLIENTS: Client[] = [
   {
     id: "cl-4", company: "CC du Diois", siren: "242 600 252", naf: "8411Z — Administration publique", adresse: "42 rue Camille Buffardel, 26150 Die", effectif: "100-249",
     stage: "Proposition", jours: 5, tarif: 1100, depistes: 0, orientes: 0, statutPropo: "Envoyée", resultat: null,
-    contacts: [{ id: "pc-4", name: "Marie Faure", role: "Élue déléguée à la santé", email: "m.faure@paysdiois.fr", tel: "04 75 22 29 44" }],
+    contacts: [{ id: "pc-4", name: "Marie Faure", prenom: "Marie", nom: "Faure", role: "Élue déléguée à la santé", email: "m.faure@paysdiois.fr", tel: "04 75 22 29 44" }],
     docs: [
       { id: "pd-6", name: "Proposition campagne 5 jours.pdf", ext: "PDF", date: "8 juil." },
       { id: "pd-7", name: "Devis DEP-2026-041.pdf", ext: "PDF", date: "8 juil." },
@@ -77,7 +77,7 @@ export const SEED_CLIENTS: Client[] = [
     id: "cl-5", company: "Clinique Belledonne", siren: "057 505 470", naf: "8610Z — Activités hospitalières", adresse: "83 av. Gabriel Péri, 38400 Saint-Martin-d'Hères", effectif: "500-999",
     stage: "Signé", jours: 2, tarif: 1400, depistes: 145, orientes: 11, statutPropo: "Acceptée",
     resultat: "Campagne salariés réalisée en juin : 145 dépistés sur 2 journées, 11 orientations dont 2 exérèses programmées.",
-    contacts: [{ id: "pc-5", name: "Dr M. Costa", role: "Chirurgien dermatologue", email: "m.costa@belledonne.fr", tel: "04 76 90 11 22" }],
+    contacts: [{ id: "pc-5", name: "Dr M. Costa", prenom: "M.", nom: "Costa", role: "Chirurgien dermatologue", email: "m.costa@belledonne.fr", tel: "04 76 90 11 22" }],
     docs: [
       { id: "pd-8", name: "Convention exérèses.pdf", ext: "PDF", date: "18 juin" },
       { id: "pd-9", name: "Bilan campagne salariés.pdf", ext: "PDF", date: "28 juin" },
@@ -90,7 +90,7 @@ export const SEED_CLIENTS: Client[] = [
   {
     id: "cl-6", company: "Groupe scolaire Champollion", siren: "779 559 852", naf: "8531Z — Enseignement secondaire", adresse: "1 cours Lafontaine, 38000 Grenoble", effectif: "100-249",
     stage: "Proposition", jours: 1, tarif: 950, depistes: 0, orientes: 0, statutPropo: "Envoyée", resultat: null,
-    contacts: [{ id: "pc-6", name: "Nathalie Perrin", role: "Infirmière scolaire", email: "n.perrin@champollion.fr", tel: "04 76 44 08 51" }],
+    contacts: [{ id: "pc-6", name: "Nathalie Perrin", prenom: "Nathalie", nom: "Perrin", role: "Infirmière scolaire", email: "n.perrin@champollion.fr", tel: "04 76 44 08 51" }],
     docs: [{ id: "pd-10", name: "Proposition sensibilisation.pdf", ext: "PDF", date: "1 juil." }],
     suivis: [{ id: "sv-12", text: "Proposition 1 journée sensibilisation + dépistage personnels.", deadline: null, done: true, when: "1 juil." }],
   },

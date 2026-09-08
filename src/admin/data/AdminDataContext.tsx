@@ -25,7 +25,7 @@ import type {
   Stage,
   Suivi,
 } from "../types";
-import { extFromName, todayLabel, uid } from "../lib/format";
+import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
 import { MockRepo, type AdminRepo } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
@@ -75,8 +75,10 @@ interface DataValue {
   toggleSuivi: (clientId: string, suiviId: string) => void;
   removeSuivi: (clientId: string, suiviId: string) => void;
 
+  importDoc: (file: File, cat: string) => Promise<void>;
+  newDocVersion: (id: string, file: File) => Promise<void>;
+  downloadDoc: (id: string) => Promise<void>;
   deleteDoc: (id: string) => void;
-  bumpDocVersion: (id: string) => void;
 
   addDocType: (name: string) => void;
   removeDocType: (name: string) => void;
@@ -309,27 +311,88 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   // --- Documents ---
   const deleteDoc: DataValue["deleteDoc"] = useCallback(
     (id) => {
+      const storagePath = docs.find((d) => d.id === id)?.storagePath;
       setDocs((prev) => prev.filter((d) => d.id !== id));
-      persist(() => repo.deleteDoc(id));
+      persist(() => repo.deleteDoc(id, storagePath));
     },
-    [persist, repo],
+    [persist, repo, docs],
   );
 
-  const bumpDocVersion: DataValue["bumpDocVersion"] = useCallback(
-    (id) => {
-      const owner = user?.name ?? "—";
-      const date = todayLong();
-      let version = 1;
-      setDocs((prev) =>
-        prev.map((d) => {
-          if (d.id !== id) return d;
-          version = d.version + 1;
-          return { ...d, version, date, owner };
-        }),
-      );
-      persist(() => repo.bumpDocVersion(id, version, date, owner));
+  /** Import d'un vrai fichier → upload Storage + enregistrement. */
+  const importDoc: DataValue["importDoc"] = useCallback(
+    async (file, cat) => {
+      const id = uid();
+      const version = 1;
+      const doc: DocItem = {
+        id,
+        name: file.name,
+        ext: extFromName(file.name),
+        cat,
+        size: humanSize(file.size),
+        date: todayLong(),
+        owner: user?.name ?? "—",
+        version,
+        storagePath: docStoragePath(id, version, file.name),
+      };
+      setDocs((prev) => [doc, ...prev]);
+      try {
+        await repo.createDoc(doc, file);
+      } catch (e) {
+        console.error(e);
+        setDocs((prev) => prev.filter((d) => d.id !== id)); // rollback
+        toast.error("L'import du document a échoué.");
+        throw e;
+      }
     },
-    [persist, repo, user],
+    [repo, user],
+  );
+
+  /** Nouvelle version : remplace le fichier stocké et incrémente la version. */
+  const newDocVersion: DataValue["newDocVersion"] = useCallback(
+    async (id, file) => {
+      const current = docs.find((d) => d.id === id);
+      if (!current) return;
+      const version = current.version + 1;
+      const updated: DocItem = {
+        ...current,
+        version,
+        date: todayLong(),
+        owner: user?.name ?? "—",
+        ext: extFromName(file.name),
+        size: humanSize(file.size),
+        storagePath: docStoragePath(id, version, file.name),
+      };
+      setDocs((prev) => prev.map((d) => (d.id === id ? updated : d)));
+      try {
+        await repo.newDocVersion(updated, file);
+      } catch (e) {
+        console.error(e);
+        setDocs((prev) => prev.map((d) => (d.id === id ? current : d))); // rollback
+        toast.error("L'ajout de version a échoué.");
+        throw e;
+      }
+    },
+    [repo, user, docs],
+  );
+
+  /** Télécharge un document via une URL signée (backend Supabase). */
+  const downloadDoc: DataValue["downloadDoc"] = useCallback(
+    async (id) => {
+      const doc = docs.find((d) => d.id === id);
+      if (!doc) return;
+      try {
+        const url = await repo.docUrl(doc);
+        if (!url) {
+          toast.info("Fichier non disponible (mode démo).");
+          return;
+        }
+        window.open(url, "_blank", "noopener");
+      } catch (e) {
+        console.error(e);
+        toast.error("Le téléchargement a échoué.");
+      }
+    },
+    [repo, docs],
   );
 
   // --- Réglages ---
@@ -378,8 +441,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addSuivi,
       toggleSuivi,
       removeSuivi,
+      importDoc,
+      newDocVersion,
+      downloadDoc,
       deleteDoc,
-      bumpDocVersion,
       addDocType,
       removeDocType,
     }),
@@ -387,7 +452,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
-      addSuivi, toggleSuivi, removeSuivi, deleteDoc, bumpDocVersion,
+      addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, deleteDoc,
       addDocType, removeDocType,
     ],
   );
