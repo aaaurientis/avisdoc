@@ -42,11 +42,17 @@ export default function Dashboard() {
     return { total: open.length, overdue: overdue.length };
   }, [clients, today]);
 
+  // Mois courant (ex. « Septembre 2026 »).
+  const moisCourant = (() => {
+    const s = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
+
   return (
     <div>
       <PageHeader
         title="Tableau de bord"
-        subtitle="Vue d'ensemble de l'activité — Juillet 2026"
+        subtitle={`Vue d'ensemble de l'activité — ${moisCourant}`}
         action={
           <span className="rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-muted-foreground">
             30 derniers jours
@@ -55,8 +61,8 @@ export default function Dashboard() {
       />
 
       <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label="Demandes ce mois" value="214" foot="+18% vs juin" footClass="text-emerald-600" />
-        <Kpi label="Délai moyen d'avis" value="68h" valueClass="text-avisdoc-teal" foot="Objectif : 96h" />
+        <Kpi label="Demandes ce mois" value="0" foot="—" />
+        <Kpi label="Délai moyen d'avis" value="—" foot="Objectif : 96 h" />
         <Kpi label="Contacts actifs" value={String(contacts.length)} foot={contactBreakdown} />
         <Kpi
           label="Relances à traiter"

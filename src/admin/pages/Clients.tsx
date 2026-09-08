@@ -204,7 +204,7 @@ export default function Clients() {
         <div>
           <h1 className="font-display text-[22px] font-bold text-avisdoc-ink">Clients</h1>
           <p className="text-[12.5px] text-muted-foreground">
-            Données Qonto — facturation par année et devis en cours.
+            Données Qonto — facturation par année et devis en cours. Montants HT.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export default function Clients() {
           {annees.slice(0, 2).map((a) => (
             <Card key={a} className="min-w-[170px] flex-1 p-4">
               <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                Facturé {a}{mode === "YTD" ? " · YTD" : ""}
+                Facturé {a} HT{mode === "YTD" ? " · YTD" : ""}
               </div>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="font-display text-[24px] font-bold text-avisdoc-ink">{euro(Math.round(totalAnnee(a)))}</span>
@@ -261,7 +261,7 @@ export default function Clients() {
             <div className="mt-1 font-display text-[24px] font-bold text-avisdoc-coral">{euro(Math.round(totalDevis))}</div>
           </Card>
           <Card className="min-w-[170px] flex-1 p-4">
-            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">En attente de paiement</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">En attente de paiement (HT)</div>
             <div className="mt-1 font-display text-[24px] font-bold text-amber-600">{euro(Math.round(enAttente.total))}</div>
             <div className="mt-0.5 text-[11px] text-muted-foreground">
               {enAttente.n} facture{enAttente.n > 1 ? "s" : ""}
@@ -318,7 +318,7 @@ export default function Clients() {
               <th className="w-8 px-3 py-3" />
               <Th cle="name">Client</Th>
               {annees.map((a) => (
-                <Th key={a} cle={`annee:${a}`} right>Facturé {a}{mode === "YTD" ? " · YTD" : ""}</Th>
+                <Th key={a} cle={`annee:${a}`} right>Facturé {a} HT{mode === "YTD" ? " · YTD" : ""}</Th>
               ))}
               <Th cle="devis" right>Devis en cours</Th>
             </tr>
@@ -473,7 +473,7 @@ function CaMensuel({
     <Card className="p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-          CA par mois — facturé vs devisé
+          CA par mois — facturé vs devisé (HT)
         </div>
         <div className="flex items-center gap-3">
           {/* Légende cliquable : filtre la série sur l'année entière */}
