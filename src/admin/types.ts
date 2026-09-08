@@ -120,6 +120,8 @@ export interface DocItem {
   version: number;
   /** Chemin de l'objet dans le bucket Storage `admin-documents` (backend Supabase). */
   storagePath?: string;
+  /** Chemin du PDF d'aperçu généré (documents Office convertis via Gotenberg). */
+  previewPath?: string;
 }
 
 export interface ActivityItem {
