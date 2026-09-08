@@ -27,6 +27,8 @@ interface ClientQonto {
 
 // Facture comptée dans le CA : ni brouillon ni annulée.
 const factureComptee = (l: Ligne) => !["draft", "canceled", "cancelled"].includes(l.statut);
+// Facture en attente de paiement : émise mais pas encaissée (à encaisser ou en retard).
+const factureImpayee = (l: Ligne) => ["unpaid", "overdue"].includes(l.statut);
 // Devis « en cours » : en attente d'issue.
 const devisEnCours = (l: Ligne) =>
   !["canceled", "cancelled", "declined", "expired", "invoiced", "converted"].includes(l.statut);
@@ -65,7 +67,7 @@ export default function Clients() {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>("FY");
   const [recherche, setRecherche] = useState("");
-  const [filtre, setFiltre] = useState<"tous" | "devis" | "factures" | "inactifs">("tous");
+  const [filtre, setFiltre] = useState<"tous" | "devis" | "factures" | "impayes" | "inactifs">("tous");
   const [tri, setTri] = useState<{ cle: TriCle; desc: boolean }>({ cle: "name", desc: false });
   const [ouverts, setOuverts] = useState<Set<string>>(new Set());
   const [selGraph, setSelGraph] = useState<SelGraph | null>(null);
@@ -75,7 +77,7 @@ export default function Clients() {
     try {
       const r = await devisRepo.apercuClients();
       setClients(r?.clients ?? []);
-    } catch (e: any) { setErr(e?.message ?? String(e)); }
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   }
   useEffect(() => { charger(); }, []);
@@ -114,6 +116,7 @@ export default function Clients() {
       const dev = devisTotal(c);
       if (filtre === "devis") return dev > 0;
       if (filtre === "factures") return factN > 0;
+      if (filtre === "impayes") return c.factures.some(factureImpayee);
       if (filtre === "inactifs") return factN === 0 && dev === 0;
       return true;
     });
@@ -145,6 +148,23 @@ export default function Clients() {
   const totalAnnee = (a: string) => lignes.reduce((t, c) => t + facture(c, a), 0);
   const totalDevis = lignes.reduce((t, c) => t + devisTotal(c), 0);
 
+  // Factures émises non encaissées (à encaisser + en retard), toutes années.
+  const enAttente = lignes.reduce(
+    (acc, c) => {
+      for (const f of c.factures) {
+        if (!factureImpayee(f)) continue;
+        acc.total += f.montant;
+        acc.n += 1;
+        if (f.statut === "overdue") {
+          acc.retard += f.montant;
+          acc.nRetard += 1;
+        }
+      }
+      return acc;
+    },
+    { total: 0, retard: 0, n: 0, nRetard: 0 },
+  );
+
   // Évolution N vs N-1 (selon le mode) — pour les cartes du haut.
   const evolution = useMemo(() => {
     if (!anneeN || !anneeN1) return null;
@@ -158,7 +178,7 @@ export default function Clients() {
     setTri((t) => (t.cle === cle ? { cle, desc: !t.desc } : { cle, desc: cle !== "name" }));
 
   const deplier = (id: string) =>
-    setOuverts((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setOuverts((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const Th = ({ cle, children, right }: { cle: TriCle; children: React.ReactNode; right?: boolean }) => (
     <th className={cn("px-4 py-3", right && "text-right")}>
@@ -174,6 +194,7 @@ export default function Clients() {
     { key: "tous", label: "Tous" },
     { key: "devis", label: "Devis en cours" },
     { key: "factures", label: anneeN ? `Facturés ${anneeN}` : "Facturés" },
+    { key: "impayes", label: "Impayés" },
     { key: "inactifs", label: "Inactifs" },
   ];
 
@@ -238,6 +259,18 @@ export default function Clients() {
           <Card className="min-w-[170px] flex-1 p-4">
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Devis en cours</div>
             <div className="mt-1 font-display text-[24px] font-bold text-avisdoc-coral">{euro(Math.round(totalDevis))}</div>
+          </Card>
+          <Card className="min-w-[170px] flex-1 p-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">En attente de paiement</div>
+            <div className="mt-1 font-display text-[24px] font-bold text-amber-600">{euro(Math.round(enAttente.total))}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {enAttente.n} facture{enAttente.n > 1 ? "s" : ""}
+              {enAttente.nRetard > 0 && (
+                <span className="font-semibold text-rose-600">
+                  {" · "}{enAttente.nRetard} en retard ({euro(Math.round(enAttente.retard))})
+                </span>
+              )}
+            </div>
           </Card>
         </div>
       )}
@@ -370,6 +403,16 @@ function FragmentRow({ children }: { children: React.ReactNode }) {
 // coral #ef752a — l'identité est doublée par la légende et le tableau.
 // ---------------------------------------------------------------------------
 const MOIS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+
+// Montant abrégé pour l'étiquette d'une barre : 4800 → « 4,8k », 12000 → « 12k ».
+function montantCourt(v: number): string {
+  if (v >= 1000) {
+    const k = v / 1000;
+    return (k >= 10 ? Math.round(k).toString() : k.toFixed(1).replace(".", ",")) + "k";
+  }
+  return String(Math.round(v));
+}
+
 const C_FACT_PREC = "#5db4dd";
 const C_FACT = "#1478a2";
 const C_DEVIS = "#ef752a";
@@ -406,7 +449,10 @@ function CaMensuel({
   const devisN = somme(devisCompte, annee, "devis");
 
   const max = Math.max(...factN, ...factN1, ...devisN, 1);
-  const h = (v: number) => (v > 0 ? Math.max((v / max) * 100, 2) : 0); // % de hauteur, min 2 % si non nul
+  // On plafonne les barres à 82 % de la hauteur pour laisser la marge haute
+  // où s'affichent les étiquettes de valeur.
+  const SCALE = 82;
+  const h = (v: number) => (v > 0 ? Math.max((v / max) * SCALE, 2) : 0);
 
   const SERIES: { nom: string; couleur: string; valeurs: number[]; an: string; serie: SelGraph["serie"] }[] = [
     { nom: `Facturé ${prec}`, couleur: C_FACT_PREC, valeurs: factN1, an: prec, serie: "facture" },
@@ -468,7 +514,7 @@ function CaMensuel({
       <div className="relative h-44">
         {/* Grille discrète : 0 / moitié / max */}
         {[0, 0.5, 1].map((t) => (
-          <div key={t} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${t * 100}%` }}>
+          <div key={t} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${t * SCALE}%` }}>
             <span className="w-14 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70">
               {euro(Math.round((max * t) / 100) * 100)}
             </span>
@@ -487,12 +533,20 @@ function CaMensuel({
                   disabled={s.valeurs[i] <= 0}
                   title={`${m} — ${s.nom} : ${euro(Math.round(s.valeurs[i]))}${s.valeurs[i] > 0 ? " · cliquer pour filtrer" : ""}`}
                   className={cn(
-                    "w-full max-w-[14px] rounded-t-[4px] transition-opacity",
+                    "relative w-full max-w-[14px] rounded-t-[4px] transition-opacity",
                     s.valeurs[i] > 0 && "cursor-pointer hover:opacity-75",
                     estompee(s.an, s.serie, i) && "opacity-30",
                   )}
                   style={{ height: `${h(s.valeurs[i])}%`, background: s.couleur }}
-                />
+                >
+                  {s.valeurs[i] > 0 && (
+                    <span className="pointer-events-none absolute inset-x-0 bottom-full mb-1 flex justify-center">
+                      <span className="rotate-180 text-[9px] font-bold leading-none tabular-nums text-avisdoc-ink/75 [writing-mode:vertical-rl]">
+                        {montantCourt(s.valeurs[i])}
+                      </span>
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           ))}
