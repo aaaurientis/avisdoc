@@ -137,8 +137,18 @@ serve(async (req) => {
       toutes("/quotes", "quotes"),
     ]);
 
-    const montant = (x: any): number =>
-      Number(x?.total_amount?.value ?? x?.amount?.value ?? x?.total_amount ?? 0) || 0;
+    const num = (a: any): number => Number(a?.value ?? a ?? 0) || 0;
+    // Montant HORS TAXES : total TTC − TVA quand les deux sont dispo (cas Qonto
+    // standard) ; sinon somme des sous-totaux HT des lignes ; sinon on retombe
+    // sur le total disponible.
+    const montant = (x: any): number => {
+      const ttc = num(x?.total_amount) || num(x?.amount);
+      const tva = num(x?.vat_amount) || num(x?.total_vat);
+      if (ttc && tva) return Math.round((ttc - tva) * 100) / 100;
+      const items = Array.isArray(x?.items) ? x.items : [];
+      const htLignes = items.reduce((t: number, it: any) => t + num(it?.subtotal), 0);
+      return htLignes || ttc;
+    };
 
     // Détail par client : lignes factures + devis (l'agrégation FY / YTD se
     // fait côté front, qui a besoin des dates ligne à ligne).
