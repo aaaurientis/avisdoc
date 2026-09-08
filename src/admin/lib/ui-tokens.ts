@@ -58,6 +58,7 @@ export const DOC_EXT: Record<DocExt, string> = {
   PDF: "bg-rose-500",
   DOC: "bg-blue-600",
   XLS: "bg-emerald-600",
+  PPT: "bg-orange-500",
 };
 
 export const PROPO_STATUTS: PropoStatut[] = [

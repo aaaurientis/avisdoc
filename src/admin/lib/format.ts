@@ -25,10 +25,11 @@ export function initials(name: string): string {
 }
 
 /** Extension déduite d'un nom de fichier. */
-export function extFromName(name: string): "PDF" | "DOC" | "XLS" {
+export function extFromName(name: string): "PDF" | "DOC" | "XLS" | "PPT" {
   const n = name.toLowerCase();
   if (n.endsWith(".xlsx") || n.endsWith(".xls")) return "XLS";
   if (n.endsWith(".docx") || n.endsWith(".doc")) return "DOC";
+  if (n.endsWith(".pptx") || n.endsWith(".ppt")) return "PPT";
   return "PDF";
 }
 
