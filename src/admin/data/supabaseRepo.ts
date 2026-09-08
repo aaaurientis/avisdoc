@@ -301,13 +301,20 @@ export class SupabaseRepo implements AdminRepo {
     this.assert(error);
   }
 
-  async docUrl(doc: DocItem): Promise<string | null> {
+  async docUrl(doc: DocItem, download = true): Promise<string | null> {
     if (!doc.storagePath) return null;
+    // download:true → téléchargement forcé ; sinon URL affichable en ligne (aperçu).
+    const options = download ? { download: doc.name } : {};
     const { data, error } = await sb.storage
       .from(DOCS_BUCKET)
-      .createSignedUrl(doc.storagePath, 3600, { download: doc.name });
+      .createSignedUrl(doc.storagePath, 3600, options);
     this.assert(error);
     return data?.signedUrl ?? null;
+  }
+
+  async setDocCat(id: string, cat: string): Promise<void> {
+    const { error } = await sb.from("admin_documents").update({ cat }).eq("id", id);
+    this.assert(error);
   }
 
   async deleteDoc(id: string, storagePath?: string): Promise<void> {

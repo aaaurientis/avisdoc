@@ -27,8 +27,9 @@ import type {
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
-import { MockRepo, type AdminRepo } from "./repo";
+import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
+import { supabaseAdmin } from "./supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 
 function makeRepo(): AdminRepo {
@@ -78,6 +79,9 @@ interface DataValue {
   importDoc: (file: File, cat: string) => Promise<void>;
   newDocVersion: (id: string, file: File) => Promise<void>;
   downloadDoc: (id: string) => Promise<void>;
+  /** URL signée d'un document : download=false pour l'aperçu en ligne. */
+  documentUrl: (id: string, download?: boolean) => Promise<string | null>;
+  setDocCategory: (id: string, cat: string) => void;
   deleteDoc: (id: string) => void;
 
   addDocType: (name: string) => void;
@@ -98,21 +102,31 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
-  // Chargement quand l'utilisateur est authentifié.
+  const applySnapshot = useCallback((snap: AdminSnapshot) => {
+    setContacts(snap.contacts);
+    setClients(snap.clients);
+    setDocs(snap.docs);
+    setDocTypes(snap.docTypes);
+    setActivity(snap.activity);
+  }, []);
+
+  // Recharge silencieuse (utilisée par le temps réel).
+  const reload = useCallback(async () => {
+    try {
+      applySnapshot(await repo.load());
+    } catch (e) {
+      console.error(e);
+    }
+  }, [repo, applySnapshot]);
+
+  // Chargement initial quand l'utilisateur est authentifié.
   useEffect(() => {
     if (status !== "authenticated") return;
     let active = true;
     setLoading(true);
     repo
       .load()
-      .then((snap) => {
-        if (!active) return;
-        setContacts(snap.contacts);
-        setClients(snap.clients);
-        setDocs(snap.docs);
-        setDocTypes(snap.docTypes);
-        setActivity(snap.activity);
-      })
+      .then((snap) => active && applySnapshot(snap))
       .catch((e) => {
         console.error(e);
         toast.error("Impossible de charger les données.");
@@ -121,7 +135,36 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [status, repo]);
+  }, [status, repo, applySnapshot]);
+
+  // Temps réel (Supabase) : dès qu'un collègue ajoute/modifie/supprime une
+  // donnée, on recharge (débounce) — la RLS n'expose que les @avisdoc.fr.
+  useEffect(() => {
+    if (status !== "authenticated" || ADMIN_BACKEND !== "supabase") return;
+    const tables = [
+      "admin_network_contacts", "admin_clients", "admin_client_contacts",
+      "admin_client_docs", "admin_suivis", "admin_documents",
+      "admin_doc_types", "admin_activity",
+    ];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void reload(), 400);
+    };
+    let channel = supabaseAdmin.channel("admin-db-changes");
+    for (const table of tables) {
+      channel = channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table },
+        bump,
+      );
+    }
+    channel.subscribe();
+    return () => {
+      clearTimeout(timer);
+      void supabaseAdmin.removeChannel(channel);
+    };
+  }, [status, reload]);
 
   // Persistance best-effort : notifie en cas d'échec, sans rollback (optimiste).
   const persist = useCallback((op: () => Promise<void>) => {
@@ -375,6 +418,31 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [repo, user, docs],
   );
 
+  /** URL signée d'un document (aperçu en ligne si download=false). */
+  const documentUrl: DataValue["documentUrl"] = useCallback(
+    async (id, download = true) => {
+      const doc = docs.find((d) => d.id === id);
+      if (!doc) return null;
+      try {
+        return await repo.docUrl(doc, download);
+      } catch (e) {
+        console.error(e);
+        toast.error("Lien du document indisponible.");
+        return null;
+      }
+    },
+    [repo, docs],
+  );
+
+  /** Change la catégorie d'un document sans le ré-uploader. */
+  const setDocCategory: DataValue["setDocCategory"] = useCallback(
+    (id, cat) => {
+      setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, cat } : d)));
+      persist(() => repo.setDocCat(id, cat));
+    },
+    [persist, repo],
+  );
+
   /** Télécharge un document via une URL signée (backend Supabase). */
   const downloadDoc: DataValue["downloadDoc"] = useCallback(
     async (id) => {
@@ -444,6 +512,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       importDoc,
       newDocVersion,
       downloadDoc,
+      documentUrl,
+      setDocCategory,
       deleteDoc,
       addDocType,
       removeDocType,
@@ -452,8 +522,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
-      addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, deleteDoc,
-      addDocType, removeDocType,
+      addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
+      setDocCategory, deleteDoc, addDocType, removeDocType,
     ],
   );
 
