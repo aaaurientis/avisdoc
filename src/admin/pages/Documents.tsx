@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowUp, Download, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
@@ -25,10 +25,16 @@ export default function Documents() {
   const [cat, setCat] = useState("Tous");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [renderError, setRenderError] = useState(false);
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const versionInputRef = useRef<HTMLInputElement>(null);
   const versionTargetId = useRef<string | null>(null);
+  const officeRef = useRef<HTMLDivElement>(null);
+
+  // Formats prévisualisables dans le navigateur.
+  const canRenderInline = (ext: DocItem["ext"]) =>
+    ext === "PDF" || ext === "DOC" || ext === "XLS";
 
   const tabs = useMemo(() => ["Tous", ...docTypes], [docTypes]);
   const rows = docs.filter((d) => cat === "Tous" || d.cat === cat);
@@ -58,9 +64,11 @@ export default function Documents() {
     } catch { /* toast géré dans le contexte */ } finally { setBusy(false); }
   };
 
-  // Ouvre l'aperçu intégré (PDF affiché en ligne ; autres formats → téléchargement).
+  // Ouvre l'aperçu intégré. PDF → iframe ; Word/Excel → rendu local ;
+  // PowerPoint et autres → repli (téléchargement / conversion à venir).
   const openPreview = async (d: DocItem) => {
-    if (d.ext !== "PDF") {
+    setRenderError(false);
+    if (!canRenderInline(d.ext)) {
       setPreview({ id: d.id, name: d.name, ext: d.ext, url: null, loading: false });
       return;
     }
@@ -68,6 +76,44 @@ export default function Documents() {
     const url = await documentUrl(d.id, false);
     setPreview((p) => (p && p.id === d.id ? { ...p, url, loading: false } : p));
   };
+
+  // Rendu Word (.docx) / Excel (.xlsx) directement dans le navigateur — les
+  // bibliothèques sont chargées à la demande (aucun fichier n'est envoyé à un tiers).
+  useEffect(() => {
+    if (!preview || preview.loading || !preview.url) return;
+    if (preview.ext !== "DOC" && preview.ext !== "XLS") return;
+    const el = officeRef.current;
+    if (!el) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(preview.url as string);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = await res.arrayBuffer();
+        if (cancelled) return;
+        el.innerHTML = "";
+        if (preview.ext === "XLS") {
+          const XLSX = await import("xlsx");
+          const wb = XLSX.read(buf, { type: "array" });
+          if (cancelled) return;
+          el.innerHTML = wb.SheetNames
+            .map((n) => `<div class="ad-sheet">${n}</div>` + XLSX.utils.sheet_to_html(wb.Sheets[n]))
+            .join("");
+        } else {
+          const { renderAsync } = await import("docx-preview");
+          await renderAsync(buf, el, undefined, { inWrapper: true });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error(e);
+          setRenderError(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preview]);
 
   return (
     <div>
@@ -255,6 +301,13 @@ export default function Documents() {
             <div className="min-h-0 flex-1 bg-muted/30">
               {preview.ext === "PDF" && preview.url ? (
                 <iframe title={preview.name} src={preview.url} className="size-full border-0" />
+              ) : (preview.ext === "DOC" || preview.ext === "XLS") && preview.url && !renderError ? (
+                <div className="h-full overflow-auto p-4">
+                  <div
+                    ref={officeRef}
+                    className="mx-auto max-w-[900px] rounded-lg bg-white p-6 text-[13px] text-avisdoc-ink shadow-sm [&_.ad-sheet:first-child]:mt-0 [&_.ad-sheet]:mb-2 [&_.ad-sheet]:mt-5 [&_.ad-sheet]:text-[13px] [&_.ad-sheet]:font-bold [&_.ad-sheet]:uppercase [&_.ad-sheet]:tracking-wide [&_.ad-sheet]:text-muted-foreground [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1"
+                  />
+                </div>
               ) : preview.loading ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   Chargement de l'aperçu…
@@ -262,9 +315,11 @@ export default function Documents() {
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="text-sm text-muted-foreground">
-                    {preview.ext === "PDF"
-                      ? "Le document n'a pas pu être chargé pour l'aperçu."
-                      : `L'aperçu en ligne n'est pas disponible pour ce format (${preview.ext}). Téléchargez le fichier pour le consulter.`}
+                    {preview.ext === "PPT"
+                      ? "L'aperçu PowerPoint (conversion PDF) n'est pas encore activé — téléchargez le fichier en attendant."
+                      : preview.ext === "PDF"
+                        ? "Le document n'a pas pu être chargé pour l'aperçu."
+                        : "Impossible d'afficher l'aperçu de ce document. Téléchargez-le pour le consulter."}
                   </p>
                   <button
                     type="button"

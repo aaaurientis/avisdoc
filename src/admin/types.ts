@@ -54,7 +54,7 @@ export interface ActiviteContact {
 
 export type Stage = "Nouveau" | "Qualifié" | "Proposition" | "Signé";
 export type PropoStatut = "Brouillon" | "Envoyée" | "Acceptée" | "Refusée";
-export type DocExt = "PDF" | "DOC" | "XLS";
+export type DocExt = "PDF" | "DOC" | "XLS" | "PPT";
 
 /** Contact rattaché à un projet CRM. */
 export interface ProjectContact {
