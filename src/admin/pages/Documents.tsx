@@ -20,7 +20,7 @@ interface Preview {
 export default function Documents() {
   const {
     docs, docTypes, deleteDoc, importDoc, newDocVersion,
-    downloadDoc, documentUrl, setDocCategory,
+    downloadDoc, documentUrl, documentPdf, setDocCategory,
   } = useAdminData();
   const [cat, setCat] = useState("Tous");
   const [busy, setBusy] = useState(false);
@@ -68,6 +68,13 @@ export default function Documents() {
   // PowerPoint et autres → repli (téléchargement / conversion à venir).
   const openPreview = async (d: DocItem) => {
     setRenderError(false);
+    // PowerPoint : converti en PDF côté serveur (Gotenberg auto-hébergé).
+    if (d.ext === "PPT") {
+      setPreview({ id: d.id, name: d.name, ext: d.ext, url: null, loading: true });
+      const url = await documentPdf(d.id);
+      setPreview((p) => (p && p.id === d.id ? { ...p, url, loading: false } : p));
+      return;
+    }
     if (!canRenderInline(d.ext)) {
       setPreview({ id: d.id, name: d.name, ext: d.ext, url: null, loading: false });
       return;
@@ -299,7 +306,7 @@ export default function Documents() {
               </button>
             </div>
             <div className="min-h-0 flex-1 bg-muted/30">
-              {preview.ext === "PDF" && preview.url ? (
+              {(preview.ext === "PDF" || preview.ext === "PPT") && preview.url ? (
                 <iframe title={preview.name} src={preview.url} className="size-full border-0" />
               ) : (preview.ext === "DOC" || preview.ext === "XLS") && preview.url && !renderError ? (
                 <div className="h-full overflow-auto p-4">

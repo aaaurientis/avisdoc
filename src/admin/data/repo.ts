@@ -54,6 +54,8 @@ export interface AdminRepo {
   /** URL signée du fichier. download=true force le téléchargement,
    *  download=false renvoie une URL affichable en ligne (aperçu). */
   docUrl(doc: DocItem, download?: boolean): Promise<string | null>;
+  /** Convertit un document Office en PDF (Gotenberg) et renvoie l'URL du PDF. */
+  convertToPdf(id: string): Promise<string | null>;
   setDocCat(id: string, cat: string): Promise<void>;
   deleteDoc(id: string, storagePath?: string): Promise<void>;
 
@@ -91,6 +93,9 @@ export class MockRepo implements AdminRepo {
   async createDoc(): Promise<void> {}
   async newDocVersion(): Promise<void> {}
   async docUrl(): Promise<string | null> {
+    return null;
+  }
+  async convertToPdf(): Promise<string | null> {
     return null;
   }
   async setDocCat(): Promise<void> {}
