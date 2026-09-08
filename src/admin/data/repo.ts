@@ -51,7 +51,10 @@ export interface AdminRepo {
   // Documents (upload réel dans le bucket Storage `admin-documents`)
   createDoc(doc: DocItem, file: File): Promise<void>;
   newDocVersion(doc: DocItem, file: File): Promise<void>;
-  docUrl(doc: DocItem): Promise<string | null>;
+  /** URL signée du fichier. download=true force le téléchargement,
+   *  download=false renvoie une URL affichable en ligne (aperçu). */
+  docUrl(doc: DocItem, download?: boolean): Promise<string | null>;
+  setDocCat(id: string, cat: string): Promise<void>;
   deleteDoc(id: string, storagePath?: string): Promise<void>;
 
   // Réglages
@@ -90,6 +93,7 @@ export class MockRepo implements AdminRepo {
   async docUrl(): Promise<string | null> {
     return null;
   }
+  async setDocCat(): Promise<void> {}
   async deleteDoc(): Promise<void> {}
   async addDocType(): Promise<void> {}
   async removeDocType(): Promise<void> {}
