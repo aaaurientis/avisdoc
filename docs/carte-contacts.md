@@ -11,16 +11,25 @@ et respecte les filtres et la recherche en cours.
    - *Restrictions d'application* → **Référents HTTP** → `https://admin.avisdoc.fr/*`
      (ajouter `http://localhost:*` pour le développement) ;
    - *Restrictions d'API* → limiter à *Maps JavaScript API* + *Geocoding API*.
-3. Renseigner la clé dans `.env` :
+3. Enregistrer la clé comme **secret Supabase** (projet admin) :
 
    ```
-   VITE_GOOGLE_MAPS_KEY="votre_clé"
+   supabase secrets set GOOGLE_MAPS_KEY=votre_clé
    ```
 
-4. Rebuild / redéploiement (le front lit la clé au build).
+   (ou Dashboard → Edge Functions → Secrets). Le front la récupère via l'Edge
+   Function `maps-cle`, réservée aux comptes `@avisdoc.fr` — la clé n'est donc
+   pas commitée dans le dépôt.
 
-Tant que la clé est vide, l'onglet **Carte** affiche un message de configuration
-(aucune erreur bloquante).
+Tant qu'aucune clé n'est disponible, l'onglet **Carte** affiche un message de
+configuration (aucune erreur bloquante).
+
+> **Note.** Une clé Maps JavaScript est de toute façon visible dans le
+> navigateur (le SDK s'exécute côté client) ; sa protection réelle est la
+> restriction par référent HTTP ci-dessus, pas le fait de la stocker côté serveur.
+>
+> **Dev local.** `VITE_GOOGLE_MAPS_KEY` dans `.env` sert d'override optionnel
+> (prioritaire s'il est renseigné), pratique hors ligne du backend.
 
 ## Géocodage & cache
 

@@ -7,7 +7,31 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { ADMIN_BACKEND, GOOGLE_MAPS_KEY } from "./config";
+import { supabaseAdmin } from "../data/supabaseAdmin";
+
 let loader: Promise<any> | null = null;
+let keyCache: string | null = null;
+
+/**
+ * Récupère la clé Maps : priorité à VITE_GOOGLE_MAPS_KEY (utile en dev local),
+ * sinon via l'Edge Function `maps-cle` qui lit le secret Supabase (réservée aux
+ * comptes @avisdoc.fr). Renvoie "" si aucune source n'est disponible → l'UI
+ * affiche alors un message de configuration.
+ */
+export async function fetchMapsKey(): Promise<string> {
+  if (GOOGLE_MAPS_KEY) return GOOGLE_MAPS_KEY;
+  if (keyCache !== null) return keyCache;
+  if (ADMIN_BACKEND !== "supabase") return "";
+  try {
+    const { data, error } = await supabaseAdmin.functions.invoke("maps-cle");
+    if (error) return "";
+    keyCache = (data as { key?: string } | null)?.key ?? "";
+    return keyCache;
+  } catch {
+    return "";
+  }
+}
 
 export function loadGoogleMaps(key: string): Promise<any> {
   if (typeof window === "undefined") return Promise.reject(new Error("no-window"));
