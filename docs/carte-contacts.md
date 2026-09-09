@@ -34,9 +34,16 @@ configuration (aucune erreur bloquante).
 ## Géocodage & cache
 
 Les contacts n'ont pas de coordonnées au départ. À l'ouverture de la carte, les
-contacts sans coordonnées sont **géocodés** depuis leur adresse (API Geocoding),
-puis la latitude/longitude est **mise en cache en base** (colonnes `lat`/`lng`,
-migration `0020_contact_geo.sql`). Un contact n'est donc géocodé qu'**une fois**.
+contacts sans coordonnées sont **géocodés** depuis leur adresse, puis la
+latitude/longitude est **mise en cache en base** (colonnes `lat`/`lng`, migration
+`0020_contact_geo.sql`). Un contact n'est donc géocodé qu'**une fois**.
+
+Le géocodage utilise **en priorité l'API Adresse française (BAN,
+`api-adresse.data.gouv.fr`)** : gratuite, sans clé, optimisée pour les adresses
+françaises — la *Geocoding API* de Google n'est donc **pas nécessaire**. Google
+n'est utilisé qu'en **repli** (adresses hors France, ou que la BAN ne résout pas) ;
+si sa *Geocoding API* n'est pas activée sur la clé, ce repli échoue simplement, sans
+gêner l'affichage de la carte.
 
 Migration à exécuter dans le SQL Editor du projet admin (`wtovhzxymlqnfxyjxrdq`) :
 `supabase/migrations/0020_contact_geo.sql`.
@@ -44,7 +51,9 @@ Migration à exécuter dans le SQL Editor du projet admin (`wtovhzxymlqnfxyjxrdq
 ## RGPD
 
 Les coordonnées sont dérivées de l'adresse **professionnelle** déjà enregistrée
-(aucune donnée nouvelle sensible). En utilisant Google Maps, Google agit comme
-sous-traitant : les adresses des contacts visibles sur la carte sont transmises à
-Google pour l'affichage et le géocodage — à mentionner dans le registre des
-traitements / la politique de confidentialité.
+(aucune donnée nouvelle sensible). Le géocodage interroge l'**API Adresse
+française** (service public, data.gouv.fr). L'affichage de la carte passe par
+**Google Maps** (sous-traitant) : les adresses des contacts visibles sont donc
+transmises à Google pour le rendu (et, en repli de géocodage, à sa Geocoding
+API). À mentionner dans le registre des traitements / la politique de
+confidentialité.

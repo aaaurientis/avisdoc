@@ -29,6 +29,24 @@ function adresseDe(c: NetworkContact): string {
   return base?.trim() ?? "";
 }
 
+// Géocodage via l'API Adresse française (BAN, data.gouv.fr) : gratuit, sans clé,
+// optimisé pour les adresses FR. CORS ouvert → utilisable depuis le navigateur.
+async function geocodeBAN(query: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const coords = data?.features?.[0]?.geometry?.coordinates;
+    if (Array.isArray(coords) && coords.length === 2) {
+      return { lat: coords[1], lng: coords[0] }; // GeoJSON = [lng, lat]
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ContactsMap({
   contacts,
   onSelect,
@@ -162,21 +180,37 @@ export default function ContactsMap({
       let placedOne = false;
       let rateLimited = false;
       let lastStatus = "";
+
+      // 1) API Adresse (BAN) — gratuite, sans clé, adresses françaises.
       for (const addr of candidates) {
-        const { results, status } = await geocodeOnce(addr);
         if (stop) return;
-        lastStatus = status;
-        if (status === "OK" && results?.[0]) {
-          const loc = results[0].geometry.location;
-          setContactGeo(c.id, loc.lat(), loc.lng());
+        const hit = await geocodeBAN(addr);
+        if (stop) return;
+        if (hit) {
+          setContactGeo(c.id, hit.lat, hit.lng);
           placedOne = true;
           break;
         }
-        if (status === "OVER_QUERY_LIMIT") {
-          rateLimited = true;
-          break;
+      }
+
+      // 2) Repli sur le géocodeur Google (adresses hors FR, ou BAN muet).
+      if (!placedOne) {
+        for (const addr of candidates) {
+          const { results, status } = await geocodeOnce(addr);
+          if (stop) return;
+          lastStatus = status;
+          if (status === "OK" && results?.[0]) {
+            const loc = results[0].geometry.location;
+            setContactGeo(c.id, loc.lat(), loc.lng());
+            placedOne = true;
+            break;
+          }
+          if (status === "OVER_QUERY_LIMIT") {
+            rateLimited = true;
+            break;
+          }
+          console.warn(`[carte] géocodage « ${c.name} » (${addr}) : ${status}`);
         }
-        console.warn(`[carte] géocodage « ${c.name} » (${addr}) : ${status}`);
       }
 
       if (rateLimited) {
