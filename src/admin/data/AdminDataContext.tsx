@@ -81,8 +81,6 @@ interface DataValue {
   downloadDoc: (id: string) => Promise<void>;
   /** URL signée d'un document : download=false pour l'aperçu en ligne. */
   documentUrl: (id: string, download?: boolean) => Promise<string | null>;
-  /** URL du PDF d'aperçu (convertit le document Office via Gotenberg si besoin). */
-  documentPdf: (id: string) => Promise<string | null>;
   setDocCategory: (id: string, cat: string) => void;
   deleteDoc: (id: string) => void;
 
@@ -436,20 +434,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [repo, docs],
   );
 
-  /** URL du PDF d'aperçu d'un document Office (conversion Gotenberg, mise en cache). */
-  const documentPdf: DataValue["documentPdf"] = useCallback(
-    async (id) => {
-      try {
-        return await repo.convertToPdf(id);
-      } catch (e) {
-        console.error(e);
-        toast.error("La conversion en PDF pour l'aperçu a échoué.");
-        return null;
-      }
-    },
-    [repo],
-  );
-
   /** Change la catégorie d'un document sans le ré-uploader. */
   const setDocCategory: DataValue["setDocCategory"] = useCallback(
     (id, cat) => {
@@ -529,7 +513,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       newDocVersion,
       downloadDoc,
       documentUrl,
-      documentPdf,
       setDocCategory,
       deleteDoc,
       addDocType,
@@ -540,7 +523,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
-      documentPdf, setDocCategory, deleteDoc, addDocType, removeDocType,
+      setDocCategory, deleteDoc, addDocType, removeDocType,
     ],
   );
 

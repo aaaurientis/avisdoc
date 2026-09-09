@@ -91,7 +91,6 @@ function toDoc(r: any): DocItem {
     owner: r.owner ?? "",
     version: r.version ?? 1,
     storagePath: r.storage_path ?? undefined,
-    previewPath: r.preview_path ?? undefined,
   };
 }
 
@@ -311,12 +310,6 @@ export class SupabaseRepo implements AdminRepo {
       .createSignedUrl(doc.storagePath, 3600, options);
     this.assert(error);
     return data?.signedUrl ?? null;
-  }
-
-  async convertToPdf(id: string): Promise<string | null> {
-    const { data, error } = await sb.functions.invoke("convertir-pdf", { body: { id } });
-    if (error) throw error;
-    return (data as { url?: string } | null)?.url ?? null;
   }
 
   async setDocCat(id: string, cat: string): Promise<void> {
