@@ -65,6 +65,8 @@ interface DataValue {
   }) => void;
   updateContact: (contact: NetworkContact) => void;
   deleteContact: (id: string) => void;
+  /** Mémorise les coordonnées géocodées d'un contact (cache carte). */
+  setContactGeo: (id: string, lat: number, lng: number) => void;
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
@@ -231,6 +233,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     (id) => {
       setContacts((prev) => prev.filter((c) => c.id !== id));
       persist(() => repo.deleteContact(id));
+    },
+    [persist, repo],
+  );
+
+  const setContactGeo: DataValue["setContactGeo"] = useCallback(
+    (id, lat, lng) => {
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, lat, lng } : c)));
+      persist(() => repo.setContactGeo(id, lat, lng));
     },
     [persist, repo],
   );
@@ -514,6 +524,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addContact,
       updateContact,
       deleteContact,
+      setContactGeo,
       addClient,
       updateClientFields,
       deleteClient,
@@ -535,7 +546,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
-      addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
+      addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addDocType, removeDocType,

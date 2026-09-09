@@ -32,6 +32,9 @@ export interface NetworkContact {
   structure?: string;
   codePostal?: string;
   source?: string; // 'manuel' | 'annuaire_sante'
+  // Coordonnées géographiques (0020) — géocodées depuis l'adresse, mises en cache.
+  lat?: number;
+  lng?: number;
   // 0015 — listes complètes de l'Annuaire Santé
   savoirFaire?: string[];
   diplomes?: string[];

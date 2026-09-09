@@ -36,6 +36,8 @@ export interface AdminRepo {
   createContact(c: NetworkContact): Promise<void>;
   updateContact(c: NetworkContact): Promise<void>;
   deleteContact(id: string): Promise<void>;
+  /** Mémorise les coordonnées géocodées d'un contact (cache carte). */
+  setContactGeo(id: string, lat: number, lng: number): Promise<void>;
 
   // Projets CRM
   createClient(c: Client): Promise<void>;
@@ -79,6 +81,7 @@ export class MockRepo implements AdminRepo {
   async createContact(): Promise<void> {}
   async updateContact(): Promise<void> {}
   async deleteContact(): Promise<void> {}
+  async setContactGeo(): Promise<void> {}
   async createClient(): Promise<void> {}
   async updateClientFields(): Promise<void> {}
   async addProjectContact(): Promise<void> {}

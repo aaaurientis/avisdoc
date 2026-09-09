@@ -19,6 +19,13 @@ export const ADMIN_AUTH: "demo" | "supabase" =
 /** Domaine Google autorisé à se connecter. */
 export const ALLOWED_DOMAIN = "avisdoc.fr";
 
+/**
+ * Clé API Google Maps JavaScript (visualisation cartographique des contacts).
+ * Clé publique côté front : la restreindre par référent HTTP (admin.avisdoc.fr)
+ * dans la console Google Cloud. Vide → la carte affiche un message de config.
+ */
+export const GOOGLE_MAPS_KEY: string = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? "";
+
 /** true si l'email appartient au domaine autorisé. */
 export function isAllowedEmail(email: string | undefined | null): boolean {
   return !!email && email.toLowerCase().endsWith("@" + ALLOWED_DOMAIN);

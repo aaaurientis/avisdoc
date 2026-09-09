@@ -43,6 +43,8 @@ function toContact(r: any): NetworkContact {
     diplomes: r.diplomes ?? [],
     activites: r.activites ?? [],
     fhirBrut: r.fhir_brut ?? undefined,
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
   };
 }
 
@@ -61,6 +63,8 @@ function contactStructure(c: NetworkContact) {
     diplomes: c.diplomes?.length ? c.diplomes : null,
     activites: c.activites?.length ? c.activites : null,
     fhir_brut: c.fhirBrut ?? null,
+    lat: c.lat ?? null,
+    lng: c.lng ?? null,
   };
 }
 
@@ -178,6 +182,11 @@ export class SupabaseRepo implements AdminRepo {
 
   async deleteContact(id: string): Promise<void> {
     const { error } = await sb.from("admin_network_contacts").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  async setContactGeo(id: string, lat: number, lng: number): Promise<void> {
+    const { error } = await sb.from("admin_network_contacts").update({ lat, lng }).eq("id", id);
     this.assert(error);
   }
 
