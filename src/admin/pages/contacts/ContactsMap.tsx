@@ -11,8 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import type { ContactType, NetworkContact } from "../../types";
 import { typesDe } from "../../lib/ui-tokens";
-import { GOOGLE_MAPS_KEY } from "../../lib/config";
-import { loadGoogleMaps } from "../../lib/googleMaps";
+import { fetchMapsKey, loadGoogleMaps } from "../../lib/googleMaps";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Card } from "../../components/ui";
 
@@ -49,7 +48,8 @@ export default function ContactsMap({
   // Chargement de l'API + initialisation de la carte (une fois).
   useEffect(() => {
     let cancelled = false;
-    loadGoogleMaps(GOOGLE_MAPS_KEY)
+    fetchMapsKey()
+      .then((key) => loadGoogleMaps(key))
       .then((google) => {
         if (cancelled || !divRef.current) return;
         mapRef.current = new google.maps.Map(divRef.current, {

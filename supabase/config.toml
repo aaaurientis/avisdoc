@@ -38,3 +38,8 @@ verify_jwt = true
 # Pro Santé Connect (pro.avisdoc.fr) — flux OIDC public, sessions signées HMAC.
 [functions.psc-auth]
 verify_jwt = false
+
+# Clé Google Maps (carte des contacts) — admin @avisdoc.fr vérifié ; clé lue
+# depuis le secret GOOGLE_MAPS_KEY côté serveur.
+[functions.maps-cle]
+verify_jwt = true
