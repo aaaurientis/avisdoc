@@ -135,6 +135,23 @@ export interface AdminUser {
   email: string;
 }
 
+/** Catégorie d'un événement du journal d'audit. */
+export type AuditCategory = "auth" | "data" | "error";
+
+/** Une entrée du journal d'auditabilité (lecture super-admin). */
+export interface AuditEntry {
+  id: string;
+  at: string; // ISO
+  actorEmail: string;
+  category: AuditCategory;
+  action: string;
+  entity: string | null;
+  entityId: string | null;
+  success: boolean | null;
+  detail: Record<string, unknown> | null;
+  userAgent: string | null;
+}
+
 /** Résultat d'une recherche entreprise via l'API Pappers. */
 export interface PappersResult {
   company: string;

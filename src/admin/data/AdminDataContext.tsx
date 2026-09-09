@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
+import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
 import { supabaseAdmin } from "./supabaseAdmin";
@@ -130,12 +131,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .catch((e) => {
         console.error(e);
         toast.error("Impossible de charger les données.");
+        void logAudit({
+          actorEmail: user?.email ?? "",
+          category: "error",
+          action: "load_error",
+          success: false,
+          detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
+        });
       })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [status, repo, applySnapshot]);
+  }, [status, repo, applySnapshot, user]);
 
   // Temps réel (Supabase) : dès qu'un collègue ajoute/modifie/supprime une
   // donnée, on recharge (débounce) — la RLS n'expose que les @avisdoc.fr.
@@ -171,8 +179,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     op().catch((e) => {
       console.error(e);
       toast.error("La modification n'a pas pu être enregistrée.");
+      void logAudit({
+        actorEmail: user?.email ?? "",
+        category: "error",
+        action: "persist_error",
+        success: false,
+        detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
+      });
     });
-  }, []);
+  }, [user]);
 
   const getClient = useCallback(
     (id: string) => clients.find((c) => c.id === id),
