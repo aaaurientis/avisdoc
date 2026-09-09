@@ -38,8 +38,3 @@ verify_jwt = true
 # Pro Santé Connect (pro.avisdoc.fr) — flux OIDC public, sessions signées HMAC.
 [functions.psc-auth]
 verify_jwt = false
-
-# Conversion Office → PDF (aperçu) via Gotenberg auto-hébergé — admin @avisdoc.fr
-# vérifié dans la fonction ; URL du convertisseur côté serveur.
-[functions.convertir-pdf]
-verify_jwt = true
