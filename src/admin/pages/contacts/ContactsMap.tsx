@@ -44,6 +44,7 @@ export default function ContactsMap({
   const geocoderRef = useRef<any>(null);
   const triedGeo = useRef<Set<string>>(new Set());
   const [state, setState] = useState<"loading" | "ready" | "no-key" | "error">("loading");
+  const [unplaceable, setUnplaceable] = useState(0);
 
   // Chargement de l'API + initialisation de la carte (une fois).
   useEffect(() => {
@@ -122,32 +123,76 @@ export default function ContactsMap({
       if (placed === 1) mapRef.current.setZoom(11);
     }
 
-    // Géocodage différé des contacts sans coordonnées (une tentative par id).
-    const toGeocode = contacts.filter(
-      (c) =>
-        (typeof c.lat !== "number" || typeof c.lng !== "number") &&
-        !triedGeo.current.has(c.id) &&
-        adresseDe(c),
+    // Contacts sans coordonnées : ceux qui n'ont AUCUNE adresse ne peuvent pas
+    // être géocodés → comptés directement comme « non localisés ».
+    const missing = contacts.filter(
+      (c) => (typeof c.lat !== "number" || typeof c.lng !== "number") && !triedGeo.current.has(c.id),
     );
+    for (const c of missing) {
+      if (!adresseDe(c) && ![c.codePostal, c.ville].some(Boolean)) {
+        triedGeo.current.add(c.id);
+        setUnplaceable((n) => n + 1);
+        console.warn(`[carte] « ${c.name} » : aucune adresse/ville renseignée → non localisable.`);
+      }
+    }
+
+    // Géocodage différé des contacts restants (adresse complète, puis repli sur
+    // code postal + ville). Une tentative par id, avec gestion du quota Google.
+    const toGeocode = missing.filter((c) => !triedGeo.current.has(c.id));
     let i = 0;
     let stop = false;
-    const next = () => {
-      if (stop || i >= toGeocode.length) return;
-      const c = toGeocode[i++];
-      triedGeo.current.add(c.id);
-      geocoderRef.current.geocode(
-        { address: adresseDe(c), componentRestrictions: { country: "FR" } },
-        (results: any[], status: string) => {
-          if (status === "OK" && results?.[0]) {
-            const loc = results[0].geometry.location;
-            setContactGeo(c.id, loc.lat(), loc.lng());
-          }
-          // Throttle : ~5 requêtes/seconde max.
-          window.setTimeout(next, 220);
-        },
+    const rateRetries = new Map<string, number>();
+
+    const geocodeOnce = (address: string): Promise<{ results: any[]; status: string }> =>
+      new Promise((resolve) =>
+        geocoderRef.current.geocode(
+          { address, componentRestrictions: { country: "FR" } },
+          (results: any[], status: string) => resolve({ results, status }),
+        ),
       );
+
+    const next = async () => {
+      if (stop || i >= toGeocode.length) return;
+      const c = toGeocode[i];
+      const candidates = [adresseDe(c), [c.codePostal, c.ville].filter(Boolean).join(" ").trim()]
+        .filter((a, idx, arr) => a && arr.indexOf(a) === idx);
+
+      let placedOne = false;
+      let rateLimited = false;
+      for (const addr of candidates) {
+        const { results, status } = await geocodeOnce(addr);
+        if (stop) return;
+        if (status === "OK" && results?.[0]) {
+          const loc = results[0].geometry.location;
+          setContactGeo(c.id, loc.lat(), loc.lng());
+          placedOne = true;
+          break;
+        }
+        if (status === "OVER_QUERY_LIMIT") {
+          rateLimited = true;
+          break;
+        }
+        console.warn(`[carte] géocodage « ${c.name} » (${addr}) : ${status}`);
+      }
+
+      if (rateLimited) {
+        const n = (rateRetries.get(c.id) ?? 0) + 1;
+        rateRetries.set(c.id, n);
+        if (n <= 3) {
+          console.warn(`[carte] quota Google atteint — pause avant réessai (« ${c.name} »).`);
+          await new Promise((r) => setTimeout(r, 1800));
+          if (!stop) void next(); // on réessaie le MÊME contact (i inchangé)
+          return;
+        }
+        console.warn(`[carte] quota Google : abandon pour « ${c.name} ».`);
+      }
+
+      triedGeo.current.add(c.id);
+      i++;
+      if (!placedOne) setUnplaceable((n) => n + 1);
+      if (!stop) window.setTimeout(next, 260);
     };
-    next();
+    void next();
 
     return () => {
       stop = true;
@@ -207,6 +252,11 @@ export default function ContactsMap({
         </div>
         <div className="mt-2 border-t border-border pt-1.5 text-[11px] text-muted-foreground/80">
           {geoloc}/{contacts.length} localisés
+          {unplaceable > 0 && (
+            <span className="block text-avisdoc-coral">
+              {unplaceable} sans adresse exploitable
+            </span>
+          )}
         </div>
       </div>
     </Card>
