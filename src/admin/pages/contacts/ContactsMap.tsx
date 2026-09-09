@@ -44,7 +44,9 @@ export default function ContactsMap({
   const geocoderRef = useRef<any>(null);
   const triedGeo = useRef<Set<string>>(new Set());
   const [state, setState] = useState<"loading" | "ready" | "no-key" | "error">("loading");
-  const [unplaceable, setUnplaceable] = useState(0);
+  const [noAddr, setNoAddr] = useState(0); // contacts sans aucune adresse/ville
+  const [geoFail, setGeoFail] = useState(0); // adresse présente mais géocodage KO
+  const [geoStatus, setGeoStatus] = useState<string | null>(null); // dernier statut d'erreur Google
 
   // Chargement de l'API + initialisation de la carte (une fois).
   useEffect(() => {
@@ -131,7 +133,7 @@ export default function ContactsMap({
     for (const c of missing) {
       if (!adresseDe(c) && ![c.codePostal, c.ville].some(Boolean)) {
         triedGeo.current.add(c.id);
-        setUnplaceable((n) => n + 1);
+        setNoAddr((n) => n + 1);
         console.warn(`[carte] « ${c.name} » : aucune adresse/ville renseignée → non localisable.`);
       }
     }
@@ -159,9 +161,11 @@ export default function ContactsMap({
 
       let placedOne = false;
       let rateLimited = false;
+      let lastStatus = "";
       for (const addr of candidates) {
         const { results, status } = await geocodeOnce(addr);
         if (stop) return;
+        lastStatus = status;
         if (status === "OK" && results?.[0]) {
           const loc = results[0].geometry.location;
           setContactGeo(c.id, loc.lat(), loc.lng());
@@ -189,7 +193,10 @@ export default function ContactsMap({
 
       triedGeo.current.add(c.id);
       i++;
-      if (!placedOne) setUnplaceable((n) => n + 1);
+      if (!placedOne) {
+        setGeoFail((n) => n + 1);
+        if (lastStatus) setGeoStatus(lastStatus);
+      }
       if (!stop) window.setTimeout(next, 260);
     };
     void next();
@@ -252,9 +259,20 @@ export default function ContactsMap({
         </div>
         <div className="mt-2 border-t border-border pt-1.5 text-[11px] text-muted-foreground/80">
           {geoloc}/{contacts.length} localisés
-          {unplaceable > 0 && (
-            <span className="block text-avisdoc-coral">
-              {unplaceable} sans adresse exploitable
+          {noAddr > 0 && (
+            <span className="block text-avisdoc-coral">{noAddr} sans adresse renseignée</span>
+          )}
+          {geoFail > 0 && (
+            <span className="block text-avisdoc-coral">{geoFail} adresse(s) non géolocalisée(s)</span>
+          )}
+          {geoStatus === "REQUEST_DENIED" && (
+            <span className="mt-1 block max-w-[220px] font-semibold text-avisdoc-coral">
+              ⚠ Activez la « Geocoding API » sur votre clé Google (Cloud Console).
+            </span>
+          )}
+          {geoStatus === "ZERO_RESULTS" && (
+            <span className="mt-1 block max-w-[220px] text-avisdoc-coral">
+              Adresse non reconnue par Google — à préciser dans la fiche.
             </span>
           )}
         </div>
