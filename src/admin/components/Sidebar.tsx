@@ -7,6 +7,7 @@ import {
   Moon,
   Power,
   Settings,
+  ShieldCheck,
   Sun,
   Users,
   Wallet,
@@ -27,8 +28,14 @@ const NAV = [
   { to: "/settings", label: "Réglages", icon: Settings },
 ];
 
+// Entrées réservées au super-admin (journal d'audit).
+const NAV_SUPERADMIN = [
+  { to: "/audit", label: "Auditabilité", icon: ShieldCheck },
+];
+
 export default function Sidebar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isSuperAdmin } = useAuth();
+  const nav = isSuperAdmin ? [...NAV, ...NAV_SUPERADMIN] : NAV;
   const [theme, setTheme] = useState<Theme>(themeCourant());
   const basculerTheme = () => {
     const t: Theme = theme === "dark" ? "light" : "dark";
@@ -46,7 +53,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {nav.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

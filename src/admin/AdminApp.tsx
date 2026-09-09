@@ -10,6 +10,7 @@ import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
 import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
+import Audit from "./pages/Audit";
 
 function FullScreenLoader() {
   return (
@@ -36,6 +37,7 @@ function Gate() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/documents" element={<Documents />} />
+          <Route path="/audit" element={<Audit />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>

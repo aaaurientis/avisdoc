@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { List, MapIcon, Plus } from "lucide-react";
 import type { ContactType } from "../types";
 import { initials } from "../lib/format";
 import { STATUT_BADGE, TYPE_BADGE, typesDe } from "../lib/ui-tokens";
@@ -7,6 +7,7 @@ import { useAdminData } from "../data/AdminDataContext";
 import { Avatar, Badge, Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 import ContactDetail from "./contacts/ContactDetail";
+import ContactsMap from "./contacts/ContactsMap";
 import NewContactModal from "./contacts/NewContactModal";
 
 type Filter = "Tous" | ContactType;
@@ -27,6 +28,7 @@ export default function Contacts() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [view, setView] = useState<"liste" | "carte">("liste");
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -80,7 +82,37 @@ export default function Contacts() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+
+        {/* Bascule Liste / Carte */}
+        <div className="ml-auto flex gap-1 rounded-full border border-border bg-card p-1">
+          {([
+            { v: "liste", label: "Liste", icon: List },
+            { v: "carte", label: "Carte", icon: MapIcon },
+          ] as const).map(({ v, label, icon: Icon }) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors",
+                view === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
+              )}
+            >
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {view === "carte" ? (
+        <div
+          className="grid items-start gap-5"
+          style={{ gridTemplateColumns: selected ? "minmax(0,1fr) minmax(380px,1fr)" : "1fr" }}
+        >
+          <ContactsMap contacts={rows} onSelect={setSelectedId} />
+          {selected && <ContactDetail contact={selected} onClose={() => setSelectedId(null)} />}
+        </div>
+      ) : (
 
       <div
         className="grid items-start gap-5"
@@ -152,6 +184,7 @@ export default function Contacts() {
 
         {selected && <ContactDetail contact={selected} onClose={() => setSelectedId(null)} />}
       </div>
+      )}
 
       {showModal && <NewContactModal onClose={() => setShowModal(false)} />}
     </div>

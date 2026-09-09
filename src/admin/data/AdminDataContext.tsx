@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
+import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
 import { supabaseAdmin } from "./supabaseAdmin";
@@ -64,6 +65,8 @@ interface DataValue {
   }) => void;
   updateContact: (contact: NetworkContact) => void;
   deleteContact: (id: string) => void;
+  /** Mémorise les coordonnées géocodées d'un contact (cache carte). */
+  setContactGeo: (id: string, lat: number, lng: number) => void;
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
@@ -130,12 +133,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .catch((e) => {
         console.error(e);
         toast.error("Impossible de charger les données.");
+        void logAudit({
+          actorEmail: user?.email ?? "",
+          category: "error",
+          action: "load_error",
+          success: false,
+          detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
+        });
       })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [status, repo, applySnapshot]);
+  }, [status, repo, applySnapshot, user]);
 
   // Temps réel (Supabase) : dès qu'un collègue ajoute/modifie/supprime une
   // donnée, on recharge (débounce) — la RLS n'expose que les @avisdoc.fr.
@@ -171,8 +181,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     op().catch((e) => {
       console.error(e);
       toast.error("La modification n'a pas pu être enregistrée.");
+      void logAudit({
+        actorEmail: user?.email ?? "",
+        category: "error",
+        action: "persist_error",
+        success: false,
+        detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
+      });
     });
-  }, []);
+  }, [user]);
 
   const getClient = useCallback(
     (id: string) => clients.find((c) => c.id === id),
@@ -216,6 +233,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     (id) => {
       setContacts((prev) => prev.filter((c) => c.id !== id));
       persist(() => repo.deleteContact(id));
+    },
+    [persist, repo],
+  );
+
+  const setContactGeo: DataValue["setContactGeo"] = useCallback(
+    (id, lat, lng) => {
+      setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, lat, lng } : c)));
+      persist(() => repo.setContactGeo(id, lat, lng));
     },
     [persist, repo],
   );
@@ -499,6 +524,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addContact,
       updateContact,
       deleteContact,
+      setContactGeo,
       addClient,
       updateClientFields,
       deleteClient,
@@ -520,7 +546,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
-      addContact, updateContact, deleteContact, addClient, updateClientFields, deleteClient,
+      addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addDocType, removeDocType,

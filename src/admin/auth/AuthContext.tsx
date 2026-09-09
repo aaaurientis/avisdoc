@@ -17,6 +17,7 @@ import {
 import type { AdminUser } from "../types";
 import { ADMIN_AUTH, ALLOWED_DOMAIN, isAllowedEmail } from "../lib/config";
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { logAudit } from "../lib/audit";
 
 type Status = "loading" | "authenticated" | "unauthenticated";
 
@@ -24,6 +25,8 @@ interface AuthValue {
   status: Status;
   user: AdminUser | null;
   error: string | null;
+  /** true si le compte connecté peut consulter le journal d'audit. */
+  isSuperAdmin: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<AdminUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Hydratation initiale.
   useEffect(() => {
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const raw = localStorage.getItem(DEMO_KEY);
         if (raw) {
           setUser(JSON.parse(raw));
+          setIsSuperAdmin(true); // en démo, l'écran d'audit est explorable
           setStatus("authenticated");
           return;
         }
@@ -69,19 +74,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Mode supabase
-    const applySession = (session: { user?: { email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+    // Mode supabase. `isSignIn` = vrai à une connexion effective (≠ rechargement
+    // de page ou rafraîchissement de jeton) → sert à ne journaliser qu'une fois.
+    const applySession = async (
+      session: { user?: { email?: string; user_metadata?: Record<string, unknown> } } | null,
+      isSignIn: boolean,
+    ) => {
       if (!active) return;
       const email = session?.user?.email;
       if (!email) {
         setUser(null);
+        setIsSuperAdmin(false);
         setStatus("unauthenticated");
         return;
       }
       if (!isAllowedEmail(email)) {
+        // Tentative refusée : on trace AVANT la déconnexion (le JWT est encore
+        // valide), puis on déconnecte.
+        await logAudit({
+          actorEmail: email,
+          category: "auth",
+          action: "login_refused",
+          success: false,
+          detail: { reason: `domaine non autorisé (@${ALLOWED_DOMAIN} requis)` },
+        });
         setError(`Accès réservé aux adresses @${ALLOWED_DOMAIN}.`);
         void supabaseAdmin.auth.signOut();
         setUser(null);
+        setIsSuperAdmin(false);
         setStatus("unauthenticated");
         return;
       }
@@ -91,11 +111,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
       });
       setStatus("authenticated");
+      if (isSignIn) {
+        void logAudit({ actorEmail: email, category: "auth", action: "login", success: true });
+      }
+      // Statut super-admin (RLS : chacun ne voit que sa propre ligne).
+      supabaseAdmin
+        .from("admin_superadmins")
+        .select("email")
+        .eq("email", email)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active) setIsSuperAdmin(!!data);
+        });
     };
 
-    supabaseAdmin.auth.getSession().then(({ data }) => applySession(data.session));
-    const { data: sub } = supabaseAdmin.auth.onAuthStateChange((_e, session) =>
-      applySession(session),
+    supabaseAdmin.auth.getSession().then(({ data }) => void applySession(data.session, false));
+    const { data: sub } = supabaseAdmin.auth.onAuthStateChange((event, session) =>
+      void applySession(session, event === "SIGNED_IN"),
     );
     return () => {
       active = false;
@@ -129,15 +161,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (ADMIN_AUTH === "demo") {
       localStorage.removeItem(DEMO_KEY);
     } else {
+      // Trace la déconnexion tant que le JWT est valide, puis déconnecte.
+      if (user?.email) {
+        await logAudit({ actorEmail: user.email, category: "auth", action: "logout", success: true });
+      }
       await supabaseAdmin.auth.signOut();
     }
     setUser(null);
+    setIsSuperAdmin(false);
     setStatus("unauthenticated");
-  }, []);
+  }, [user]);
 
   const value = useMemo<AuthValue>(
-    () => ({ status, user, error, signIn, signOut }),
-    [status, user, error, signIn, signOut],
+    () => ({ status, user, error, isSuperAdmin, signIn, signOut }),
+    [status, user, error, isSuperAdmin, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

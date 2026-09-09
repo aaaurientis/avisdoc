@@ -32,6 +32,9 @@ export interface NetworkContact {
   structure?: string;
   codePostal?: string;
   source?: string; // 'manuel' | 'annuaire_sante'
+  // Coordonnées géographiques (0020) — géocodées depuis l'adresse, mises en cache.
+  lat?: number;
+  lng?: number;
   // 0015 — listes complètes de l'Annuaire Santé
   savoirFaire?: string[];
   diplomes?: string[];
@@ -133,6 +136,23 @@ export interface ActivityItem {
 export interface AdminUser {
   name: string;
   email: string;
+}
+
+/** Catégorie d'un événement du journal d'audit. */
+export type AuditCategory = "auth" | "data" | "error";
+
+/** Une entrée du journal d'auditabilité (lecture super-admin). */
+export interface AuditEntry {
+  id: string;
+  at: string; // ISO
+  actorEmail: string;
+  category: AuditCategory;
+  action: string;
+  entity: string | null;
+  entityId: string | null;
+  success: boolean | null;
+  detail: Record<string, unknown> | null;
+  userAgent: string | null;
 }
 
 /** Résultat d'une recherche entreprise via l'API Pappers. */
