@@ -37,6 +37,7 @@ const brut = {
     domaine: "@avisdoc.fr",
     pied: "Traitement de prospection B2B distinct de la plateforme de téléexpertise",
     erreurDomaine: "Accès réservé aux adresses @avisdoc.fr.",
+    demo: "Mode démonstration : connexion simulée, données fictives, aucun appel Supabase.",
   },
   commun: {
     chargement: "Chargement…",

@@ -159,9 +159,14 @@ Variables front : uniquement `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_K
 ## 6 bis. Tester sans Supabase : le mode démo
 
 ```bash
-VITE_PROSPECTION_MODE=demo npm run dev
+npm run demo:prospection
 # puis http://localhost:8080/prospection.html
 ```
+
+La commande charge `.env.demo` (mode Vite `demo`), sur tout système. L'écran de
+connexion affiche un bandeau « Mode démonstration » : s'il n'apparaît pas, le
+mode démo n'est pas actif et le bouton appellerait le vrai projet Supabase
+(erreur « provider is not enabled » tant que Google n'y est pas activé).
 
 Données fictives en mémoire (persistées dans le `localStorage` du navigateur),
 mêmes règles que les fonctions serveur (transitions, plafond, relances, import
@@ -172,7 +177,7 @@ Le fichier `supabase-prospection/recette/recette-import.csv` joue le point 1 de
 la recette (l'exclusion `recette-exclu` est déjà présente dans la démo).
 
 Ne jamais mettre `VITE_PROSPECTION_MODE=demo` dans `.env` : le build de
-production lit ce fichier.
+production lit ce fichier. `.env.demo` n'est lu qu'avec `--mode demo`.
 
 ## 7. Recette (§8 du brief)
 

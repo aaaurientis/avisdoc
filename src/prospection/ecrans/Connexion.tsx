@@ -3,6 +3,7 @@ import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
 import { L } from "../i18n/libelles";
+import { MODE_DEMO } from "../lib/config";
 import { CIBLE } from "../composants/ui";
 
 export default function Connexion() {
@@ -42,6 +43,11 @@ export default function Connexion() {
           {L.connexion.reserve} <strong className="text-avisdoc-ink">{L.connexion.domaine}</strong>
         </div>
         <div className="mt-[34px] text-center text-[11.5px] text-muted-foreground/80">{L.connexion.pied}</div>
+        {MODE_DEMO && (
+          <div className="mt-3 rounded-full bg-avisdoc-coral-soft px-4 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-avisdoc-coral-ink">
+            {L.connexion.demo}
+          </div>
+        )}
       </div>
     </div>
   );
