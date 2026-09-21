@@ -30,6 +30,8 @@ interface Enfant {
   label: string;
   /** Réservé aux super-admins (ex. journal d'audit). */
   superadmin?: boolean;
+  /** Module propre à cette page, quand il diffère de celui du groupe (ex. Merx). */
+  module?: Module;
 }
 interface Entree {
   /** Module de droits ; null = visible par tous (tableau de bord). */
@@ -48,6 +50,7 @@ const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
     { to: "/crm", label: "CRM" },
+    { to: "/merx", label: "Merx", module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
@@ -68,9 +71,9 @@ const lienCls = (actif: boolean) =>
     actif ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
   );
 
-function Groupe({ entree, isSuperAdmin }: { entree: Entree; isSuperAdmin: boolean }) {
+function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: boolean; peut: (m: Module) => boolean }) {
   const { pathname } = useLocation();
-  const enfants = (entree.enfants ?? []).filter((e) => !e.superadmin || isSuperAdmin);
+  const enfants = (entree.enfants ?? []).filter((e) => (!e.superadmin || isSuperAdmin) && (!e.module || peut(e.module)));
   const enfantActif = enfants.some((e) => pathname.startsWith(e.to));
   const [ouvert, setOuvert] = useState(enfantActif);
   const Icon = entree.icon;
@@ -144,7 +147,7 @@ export default function Sidebar() {
               </div>
             );
           }
-          if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} />;
+          if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} peut={peut} />;
           return (
             <NavLink key={m.to} to={m.to!} className={({ isActive }) => lienCls(isActive)}>
               <Icon className="size-[18px]" strokeWidth={2.2} />
