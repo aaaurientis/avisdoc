@@ -1,6 +1,9 @@
-import type { Client } from "../../types";
+import { useState } from "react";
+import { GripVertical } from "lucide-react";
+import type { Client, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { STAGES } from "../../lib/ui-tokens";
+import { cn } from "@/lib/utils";
 
 function joursLabel(j: number) {
   return j + (j > 1 ? " journées" : " journée");
@@ -9,16 +12,48 @@ function joursLabel(j: number) {
 export default function Kanban({
   clients,
   onSelect,
+  onDeplacer,
 }: {
   clients: Client[];
   onSelect: (id: string) => void;
+  /** Changement d'étape par glisser-déposer. */
+  onDeplacer?: (id: string, stage: Stage) => void;
 }) {
+  const [saisi, setSaisi] = useState<string | null>(null);
+  const [survolee, setSurvolee] = useState<Stage | null>(null);
+
+  const deposer = (stage: Stage) => {
+    const id = saisi;
+    setSaisi(null);
+    setSurvolee(null);
+    if (!id || !onDeplacer) return;
+    const client = clients.find((c) => c.id === id);
+    if (client && client.stage !== stage) onDeplacer(id, stage);
+  };
+
   return (
     <div className="ad-kanban grid grid-cols-2 gap-3 lg:grid-cols-4">
       {STAGES.map((stage) => {
         const list = clients.filter((c) => c.stage === stage.name);
+        const cible = survolee === stage.name;
         return (
-          <div key={stage.name} className="min-h-[260px] rounded-xl bg-muted/60 p-3">
+          <div
+            key={stage.name}
+            onDragOver={(e) => {
+              if (!saisi) return;
+              e.preventDefault();
+              setSurvolee(stage.name);
+            }}
+            onDragLeave={() => setSurvolee((s) => (s === stage.name ? null : s))}
+            onDrop={(e) => {
+              e.preventDefault();
+              deposer(stage.name);
+            }}
+            className={cn(
+              "min-h-[260px] rounded-xl bg-muted/60 p-3 transition-colors",
+              cible && "bg-avisdoc-teal/10 ring-2 ring-avisdoc-teal/40",
+            )}
+          >
             <div className="mb-2.5 flex items-center justify-between">
               <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
                 {stage.name}
@@ -30,27 +65,48 @@ export default function Kanban({
 
             <div className="flex flex-col gap-2">
               {list.map((c) => (
-                <button
+                <div
                   key={c.id}
-                  type="button"
-                  onClick={() => onSelect(c.id)}
-                  className="ad-card-clickable w-full rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-avisdoc-teal"
+                  draggable={Boolean(onDeplacer)}
+                  onDragStart={() => setSaisi(c.id)}
+                  onDragEnd={() => {
+                    setSaisi(null);
+                    setSurvolee(null);
+                  }}
+                  className={cn(
+                    "ad-card-clickable group flex items-start gap-1.5 rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal",
+                    saisi === c.id && "opacity-50",
+                  )}
                 >
-                  <div className="text-[13px] font-semibold leading-snug text-avisdoc-ink">
-                    {c.company}
-                  </div>
-                  <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    {c.contacts[0]?.name ?? "—"}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
-                      {joursLabel(c.jours)}
+                  {/* Poignée : indique que la fiche se déplace. Masquée au doigt — sur téléphone,
+                      l'étape se change dans la fiche. */}
+                  {onDeplacer && (
+                    <span
+                      aria-hidden
+                      title="Glisser pour changer d'étape"
+                      className="-ml-1 mt-0.5 hidden shrink-0 cursor-grab text-muted-foreground/50 transition-colors group-hover:text-muted-foreground active:cursor-grabbing [@media(hover:hover)]:block"
+                    >
+                      <GripVertical className="size-4" />
                     </span>
-                    <span className="text-[12px] font-bold text-avisdoc-ink">
-                      {euro(c.jours * c.tarif)}
-                    </span>
-                  </div>
-                </button>
+                  )}
+
+                  <button type="button" onClick={() => onSelect(c.id)} className="min-w-0 flex-1 text-left">
+                    <div className="text-[13px] font-semibold leading-snug text-avisdoc-ink">
+                      {c.company}
+                    </div>
+                    <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                      {c.contacts[0]?.name ?? "—"}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
+                        {joursLabel(c.jours)}
+                      </span>
+                      <span className="text-[12px] font-bold text-avisdoc-ink">
+                        {euro(c.jours * c.tarif)}
+                      </span>
+                    </div>
+                  </button>
+                </div>
               ))}
             </div>
           </div>

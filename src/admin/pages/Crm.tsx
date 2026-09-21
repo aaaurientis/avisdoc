@@ -10,7 +10,7 @@ import NewClientModal from "./crm/NewClientModal";
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients } = useAdminData();
+  const { clients, updateClientFields } = useAdminData();
   const [showModal, setShowModal] = useState(false);
 
   const selected = clientId ? clients.find((c) => c.id === clientId) : undefined;
@@ -39,7 +39,11 @@ export default function Crm() {
           onClose={() => navigate("/crm")}
         />
       ) : (
-        <Kanban clients={clients} onSelect={(id) => navigate(`/crm/${id}`)} />
+        <Kanban
+          clients={clients}
+          onSelect={(id) => navigate(`/crm/${id}`)}
+          onDeplacer={(id, stage) => updateClientFields(id, { stage })}
+        />
       )}
 
       {showModal && (
