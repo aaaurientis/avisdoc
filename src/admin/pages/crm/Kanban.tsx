@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { GripVertical } from "lucide-react";
-import type { Client, Stage } from "../../types";
+import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
-import { STAGES } from "../../lib/ui-tokens";
+import { TONES } from "../../lib/ui-tokens";
 import { cn } from "@/lib/utils";
 
 function joursLabel(j: number) {
@@ -11,10 +11,13 @@ function joursLabel(j: number) {
 
 export default function Kanban({
   clients,
+  stages,
   onSelect,
   onDeplacer,
 }: {
   clients: Client[];
+  /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
+  stages: PipelineStage[];
   onSelect: (id: string) => void;
   /** Changement d'étape par glisser-déposer. */
   onDeplacer?: (id: string, stage: Stage) => void;
@@ -32,22 +35,27 @@ export default function Kanban({
   };
 
   return (
-    <div className="ad-kanban grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {STAGES.map((stage) => {
-        const list = clients.filter((c) => c.stage === stage.name);
-        const cible = survolee === stage.name;
+    // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
+    <div
+      className="ad-kanban grid gap-3 overflow-x-auto pb-1"
+      style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(190px, 1fr))` }}
+    >
+      {stages.map((stage) => {
+        const list = clients.filter((c) => c.stage === stage.label);
+        const cible = survolee === stage.label;
+        const ton = TONES[stage.tone];
         return (
           <div
-            key={stage.name}
+            key={stage.id}
             onDragOver={(e) => {
               if (!saisi) return;
               e.preventDefault();
-              setSurvolee(stage.name);
+              setSurvolee(stage.label);
             }}
-            onDragLeave={() => setSurvolee((s) => (s === stage.name ? null : s))}
+            onDragLeave={() => setSurvolee((s) => (s === stage.label ? null : s))}
             onDrop={(e) => {
               e.preventDefault();
-              deposer(stage.name);
+              deposer(stage.label);
             }}
             className={cn(
               "min-h-[260px] rounded-xl bg-muted/60 p-3 transition-colors",
@@ -56,9 +64,9 @@ export default function Kanban({
           >
             <div className="mb-2.5 flex items-center justify-between">
               <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                {stage.name}
+                {stage.label}
               </div>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${stage.dot}`}>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${ton.dot}`}>
                 {list.length}
               </span>
             </div>

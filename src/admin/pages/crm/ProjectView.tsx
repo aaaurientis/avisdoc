@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronDown, Lock, Minus, Pencil, Plus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
-import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
+import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
@@ -13,9 +13,6 @@ import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
 import ParcoursBanner from "../../espace/ParcoursBanner";
 import { cn } from "@/lib/utils";
-
-// Rang d'une étape dans le flux (Nouveau < Qualifié < Proposition < Signé).
-const stageRank = (s: Stage) => STAGES.findIndex((x) => x.name === s);
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -102,6 +99,7 @@ export default function ProjectView({
     addSuivi,
     toggleSuivi,
     removeSuivi,
+    stages,
   } = useAdminData();
 
   const [editing, setEditing] = useState(false);
@@ -115,8 +113,13 @@ export default function ProjectView({
 
   // Déblocage par étape : une fonction verrouillée tant que l'étape minimale
   // requise n'est pas atteinte.
-  const cur = stageRank(client.stage);
-  const verrou = (min: Stage) => cur < stageRank(min);
+  // Rang d'une étape dans le parcours, d'après les colonnes de l'équipe.
+  // Une colonne supprimée ou renommée rend -1 : on ne verrouille alors rien.
+  const cur = stageRank(client.stage, stages);
+  const verrou = (min: Stage) => {
+    const rang = stageRank(min, stages);
+    return rang >= 0 && cur >= 0 && cur < rang;
+  };
   const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
 
   // Onglets des fonctions, dans l'ordre du parcours.
@@ -178,7 +181,7 @@ export default function ProjectView({
       <Card className="overflow-hidden">
         {allClients.map((c) => {
           const active = c.id === client.id;
-          const sm = stageMeta(c.stage);
+          const sm = stageMeta(c.stage, stages);
           return (
             <button
               key={c.id}
@@ -300,21 +303,21 @@ export default function ProjectView({
 
           {/* Pastilles d'étape */}
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {STAGES.map((s) => {
-              const active = client.stage === s.name;
+            {stages.map((s) => {
+              const active = client.stage === s.label;
               return (
                 <button
-                  key={s.name}
+                  key={s.id}
                   type="button"
-                  onClick={() => updateClientFields(client.id, { stage: s.name as Stage })}
+                  onClick={() => updateClientFields(client.id, { stage: s.label })}
                   className={cn(
                     "rounded-full border px-4 py-1.5 text-xs font-bold transition-colors",
                     active
-                      ? cn(s.dot, "border-transparent text-white")
+                      ? cn(TONES[s.tone].dot, "border-transparent text-white")
                       : "border-border bg-card text-muted-foreground hover:border-avisdoc-ink",
                   )}
                 >
-                  {s.name}
+                  {s.label}
                 </button>
               );
             })}

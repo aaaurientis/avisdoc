@@ -22,11 +22,14 @@ import type {
   ContactType,
   DocItem,
   NetworkContact,
+  PipelineStage,
   Stage,
+  StageTone,
   Suivi,
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
+import { STAGES_DEFAUT } from "../lib/ui-tokens";
 import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
@@ -89,6 +92,15 @@ interface DataValue {
 
   addDocType: (name: string) => void;
   removeDocType: (name: string) => void;
+
+  // Colonnes du pipeline (migration 0023)
+  stages: PipelineStage[];
+  addStage: (label: string, tone: StageTone) => void;
+  renameStage: (id: string, nouveau: string) => void;
+  setStageTone: (id: string, tone: StageTone) => void;
+  /** Supprime une colonne ; ses fiches partent vers `versLabel` (obligatoire si elle n'est pas vide). */
+  deleteStage: (id: string, versLabel: string | null) => void;
+  moveStage: (id: string, sens: -1 | 1) => void;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -104,6 +116,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
 
   const applySnapshot = useCallback((snap: AdminSnapshot) => {
     setContacts(snap.contacts);
@@ -111,6 +124,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setDocs(snap.docs);
     setDocTypes(snap.docTypes);
     setActivity(snap.activity);
+    setStages(snap.stages);
   }, []);
 
   // Recharge silencieuse (utilisée par le temps réel).
@@ -512,6 +526,94 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+
+  // ── Colonnes du pipeline ────────────────────────────────────────────────
+  // L'état applicatif change tout de suite (mutation optimiste), le repository suit.
+
+  const addStage: DataValue["addStage"] = useCallback(
+    (label, tone) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setStages((prev) => {
+        if (prev.some((s) => s.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        const stage: PipelineStage = {
+          id: crypto.randomUUID(),
+          label: propre,
+          position: (prev.at(-1)?.position ?? 0) + 1,
+          tone,
+        };
+        persist(() => repo.createStage(stage));
+        return [...prev, stage];
+      });
+    },
+    [persist, repo],
+  );
+
+  const renameStage: DataValue["renameStage"] = useCallback(
+    (id, nouveau) => {
+      const propre = nouveau.trim();
+      if (!propre) return;
+      setStages((prev) => {
+        const stage = prev.find((s) => s.id === id);
+        if (!stage || stage.label === propre) return prev;
+        if (prev.some((s) => s.id !== id && s.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        const ancien = stage.label;
+        // Les fiches suivent le renommage, sinon elles n'auraient plus de colonne.
+        setClients((cs) => cs.map((c) => (c.stage === ancien ? { ...c, stage: propre } : c)));
+        persist(() => repo.renameStage(id, ancien, propre));
+        return prev.map((s) => (s.id === id ? { ...s, label: propre } : s));
+      });
+    },
+    [persist, repo],
+  );
+
+  const setStageTone: DataValue["setStageTone"] = useCallback(
+    (id, tone) => {
+      setStages((prev) => prev.map((s) => (s.id === id ? { ...s, tone } : s)));
+      persist(() => repo.setStageTone(id, tone));
+    },
+    [persist, repo],
+  );
+
+  const deleteStage: DataValue["deleteStage"] = useCallback(
+    (id, versLabel) => {
+      setStages((prev) => {
+        const stage = prev.find((s) => s.id === id);
+        if (!stage) return prev;
+        if (prev.length <= 1) {
+          toast.error("Le pipeline garde au moins une colonne.");
+          return prev;
+        }
+        setClients((cs) => (versLabel ? cs.map((c) => (c.stage === stage.label ? { ...c, stage: versLabel } : c)) : cs));
+        persist(() => repo.deleteStage(id, stage.label, versLabel));
+        return prev.filter((s) => s.id !== id);
+      });
+    },
+    [persist, repo],
+  );
+
+  const moveStage: DataValue["moveStage"] = useCallback(
+    (id, sens) => {
+      setStages((prev) => {
+        const i = prev.findIndex((s) => s.id === id);
+        const j = i + sens;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const suite = [...prev];
+        [suite[i], suite[j]] = [suite[j], suite[i]];
+        const ordonne = suite.map((s, k) => ({ ...s, position: k + 1 }));
+        persist(() => repo.reorderStages(ordonne.map((s) => ({ id: s.id, position: s.position }))));
+        return ordonne;
+      });
+    },
+    [persist, repo],
+  );
+
   const value = useMemo<DataValue>(
     () => ({
       loading,
@@ -527,6 +629,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setContactGeo,
       addClient,
       updateClientFields,
+      stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       deleteClient,
       addProjectContact,
       removeProjectContact,
@@ -547,6 +650,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
+      stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addDocType, removeDocType,

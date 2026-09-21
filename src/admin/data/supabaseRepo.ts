@@ -7,12 +7,14 @@ import type {
   Client,
   DocItem,
   NetworkContact,
+  PipelineStage,
   ProjectContact,
   ProjectDoc,
   Stage,
   Suivi,
 } from "../types";
 import { supabaseAdmin as sb } from "./supabaseAdmin";
+import { STAGES_DEFAUT } from "../lib/ui-tokens";
 import type { AdminRepo, AdminSnapshot } from "./repo";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -102,7 +104,7 @@ const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
-    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes] =
+    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
         sb.from("admin_clients").select("*").order("created_at", { ascending: true }),
@@ -112,6 +114,7 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_documents").select("*").order("created_at", { ascending: false }),
         sb.from("admin_doc_types").select("*").order("name", { ascending: true }),
         sb.from("admin_activity").select("*").order("created_at", { ascending: false }).limit(20),
+        sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
       ]);
 
     const firstError =
@@ -162,6 +165,10 @@ export class SupabaseRepo implements AdminRepo {
       activity: (actRes.data ?? []).map(
         (r: any): ActivityItem => ({ id: r.id, dot: r.dot, text: r.text, when: r.when_label ?? "" }),
       ),
+      // Tant que la migration 0023 n'est pas appliquée, on affiche les colonnes de départ.
+      stages: stagesRes.error || !stagesRes.data?.length
+        ? structuredClone(STAGES_DEFAUT)
+        : stagesRes.data.map((r: any): PipelineStage => ({ id: r.id, label: r.label, position: r.position, tone: r.tone })),
     };
   }
 
@@ -332,6 +339,44 @@ export class SupabaseRepo implements AdminRepo {
     }
     const { error } = await sb.from("admin_documents").delete().eq("id", id);
     this.assert(error);
+  }
+
+  // ── Colonnes du pipeline (migration 0023) ────────────────────────────
+  async createStage(stage: PipelineStage): Promise<void> {
+    const { error } = await sb
+      .from("admin_pipeline_stages")
+      .insert({ id: stage.id, label: stage.label, position: stage.position, tone: stage.tone });
+    this.assert(error);
+  }
+
+  /** Renommer une colonne renomme aussi l'étape des fiches qui la citent. */
+  async renameStage(id: string, ancien: string, nouveau: string): Promise<void> {
+    const { error } = await sb.from("admin_pipeline_stages").update({ label: nouveau }).eq("id", id);
+    this.assert(error);
+    const { error: e2 } = await sb.from("admin_clients").update({ stage: nouveau }).eq("stage", ancien);
+    this.assert(e2);
+  }
+
+  async setStageTone(id: string, tone: PipelineStage["tone"]): Promise<void> {
+    const { error } = await sb.from("admin_pipeline_stages").update({ tone }).eq("id", id);
+    this.assert(error);
+  }
+
+  /** Les fiches sont déplacées AVANT la suppression : aucune ne reste sans colonne. */
+  async deleteStage(id: string, label: string, versLabel: string | null): Promise<void> {
+    if (versLabel) {
+      const { error } = await sb.from("admin_clients").update({ stage: versLabel }).eq("stage", label);
+      this.assert(error);
+    }
+    const { error } = await sb.from("admin_pipeline_stages").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  async reorderStages(ordre: { id: string; position: number }[]): Promise<void> {
+    for (const { id, position } of ordre) {
+      const { error } = await sb.from("admin_pipeline_stages").update({ position }).eq("id", id);
+      this.assert(error);
+    }
   }
 
   async addDocType(name: string): Promise<void> {

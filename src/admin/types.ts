@@ -55,7 +55,19 @@ export interface ActiviteContact {
   email?: string;
 }
 
-export type Stage = "Nouveau" | "Qualifié" | "Proposition" | "Signé";
+/** Étape du pipeline : le LIBELLÉ d'une colonne (`admin_pipeline_stages`).
+ *  Libre depuis la migration 0023 — l'équipe ajoute et renomme ses colonnes. */
+export type Stage = string;
+
+/** Une colonne du pipeline, telle que l'équipe l'a définie. */
+export interface PipelineStage {
+  id: string;
+  label: string;
+  position: number;
+  tone: StageTone;
+}
+
+export type StageTone = "slate" | "teal" | "coral" | "emerald" | "violet" | "rose";
 export type PropoStatut = "Brouillon" | "Envoyée" | "Acceptée" | "Refusée";
 export type DocExt = "PDF" | "DOC" | "XLS" | "PPT";
 

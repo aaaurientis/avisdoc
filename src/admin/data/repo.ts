@@ -9,10 +9,12 @@ import type {
   Client,
   DocItem,
   NetworkContact,
+  PipelineStage,
   ProjectContact,
   ProjectDoc,
   Suivi,
 } from "../types";
+import { STAGES_DEFAUT } from "../lib/ui-tokens";
 import {
   SEED_ACTIVITY,
   SEED_CLIENTS,
@@ -27,6 +29,8 @@ export interface AdminSnapshot {
   docs: DocItem[];
   docTypes: string[];
   activity: ActivityItem[];
+  /** Colonnes du pipeline, dans l'ordre (migration 0023). */
+  stages: PipelineStage[];
 }
 
 export interface AdminRepo {
@@ -59,6 +63,15 @@ export interface AdminRepo {
   setDocCat(id: string, cat: string): Promise<void>;
   deleteDoc(id: string, storagePath?: string): Promise<void>;
 
+  // Colonnes du pipeline
+  createStage(stage: PipelineStage): Promise<void>;
+  /** Renomme la colonne ET les fiches qui la citent : aucune fiche ne reste orpheline. */
+  renameStage(id: string, ancien: string, nouveau: string): Promise<void>;
+  setStageTone(id: string, tone: PipelineStage["tone"]): Promise<void>;
+  /** Supprime la colonne après avoir déplacé ses fiches vers `versLabel`. */
+  deleteStage(id: string, label: string, versLabel: string | null): Promise<void>;
+  reorderStages(ordre: { id: string; position: number }[]): Promise<void>;
+
   // Réglages
   addDocType(name: string): Promise<void>;
   removeDocType(name: string): Promise<void>;
@@ -74,6 +87,7 @@ export class MockRepo implements AdminRepo {
       docs: structuredClone(SEED_DOCS),
       docTypes: [...SEED_DOC_TYPES],
       activity: structuredClone(SEED_ACTIVITY),
+      stages: structuredClone(STAGES_DEFAUT),
     };
   }
 
@@ -91,6 +105,11 @@ export class MockRepo implements AdminRepo {
   async addSuivi(): Promise<void> {}
   async updateSuivi(): Promise<void> {}
   async removeSuivi(): Promise<void> {}
+  async createStage(): Promise<void> {}
+  async renameStage(): Promise<void> {}
+  async setStageTone(): Promise<void> {}
+  async deleteStage(): Promise<void> {}
+  async reorderStages(): Promise<void> {}
   async createDoc(): Promise<void> {}
   async newDocVersion(): Promise<void> {}
   async docUrl(): Promise<string | null> {
