@@ -3,6 +3,8 @@
 // Supabase lors de la première configuration.
 
 import type {
+  Account,
+  AccountField,
   ActivityItem,
   Client,
   DocItem,
@@ -127,4 +129,22 @@ export const SEED_ACTIVITY: ActivityItem[] = [
 export const PAPPERS_DEMO: PappersResult[] = [
   { company: "Vercors Emballages SAS", siren: "812 445 903", naf: "1721A — Fabrication de carton ondulé", adresse: "14 ZA des Blanchisseries, 38160 Saint-Marcellin", effectif: "100-249", dirigeant: "Thomas Reynaud (Président)" },
   { company: "Alpes Logistique Groupe", siren: "423 887 165", naf: "5210B — Entreposage et stockage", adresse: "220 rue des Sagnes, 38430 Moirans", effectif: "250-499", dirigeant: "Sandrine Villard (DG)" },
+];
+
+/* ── Fichier client (démonstration) ───────────────────────────────────── */
+
+export const SEED_ACCOUNT_FIELDS: AccountField[] = [
+  { id: "f1", key: "etablissement", label: "Établissement", type: "texte", position: 1, protege: true },
+  { id: "f2", key: "date_client", label: "Date", type: "date", position: 2, protege: true },
+  { id: "f3", key: "secteur", label: "Secteur", type: "texte", position: 3, protege: true },
+  { id: "f4", key: "referent", label: "Référent", type: "texte", position: 4, protege: false },
+  { id: "f5", key: "email", label: "E-mail", type: "email", position: 5, protege: false },
+  { id: "f6", key: "journees", label: "Journées", type: "nombre", position: 6, protege: false },
+];
+
+export const SEED_ACCOUNTS: Account[] = [
+  { id: "a1", name: "CHU de Grenoble", signedOn: "2026-06-12", sector: "Hôpital", clientId: null,
+    data: { referent: "Pr D. Salomon", email: "d.salomon@chu-grenoble.fr", journees: "4" } },
+  { id: "a2", name: "Clinique Belledonne", signedOn: "2026-07-03", sector: "Clinique", clientId: null,
+    data: { referent: "Dr M. Costa", email: "m.costa@belledonne.fr", journees: "2" } },
 ];

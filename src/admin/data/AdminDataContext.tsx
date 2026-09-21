@@ -16,11 +16,14 @@ import {
 import { toast } from "sonner";
 import { espaceRepo } from "../espace/espaceRepo";
 import type {
+  Account,
+  AccountField,
   ActiviteContact,
   ActivityItem,
   Client,
   ContactType,
   DocItem,
+  FieldType,
   NetworkContact,
   PipelineStage,
   Stage,
@@ -101,6 +104,19 @@ interface DataValue {
   /** Supprime une colonne ; ses fiches partent vers `versLabel` (obligatoire si elle n'est pas vide). */
   deleteStage: (id: string, versLabel: string | null) => void;
   moveStage: (id: string, sens: -1 | 1) => void;
+
+  // Fichier client (migration 0024)
+  accounts: Account[];
+  accountFields: AccountField[];
+  addAccount: (name: string) => void;
+  /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
+  setAccountCell: (id: string, key: string, value: string) => void;
+  deleteAccount: (id: string) => void;
+  addManyAccounts: (fiches: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }[]) => void;
+  addField: (label: string, type: FieldType) => void;
+  renameField: (id: string, label: string) => void;
+  moveField: (id: string, sens: -1 | 1) => void;
+  deleteField: (id: string) => void;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -117,6 +133,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountFields, setAccountFields] = useState<AccountField[]>([]);
 
   const applySnapshot = useCallback((snap: AdminSnapshot) => {
     setContacts(snap.contacts);
@@ -125,6 +143,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setDocTypes(snap.docTypes);
     setActivity(snap.activity);
     setStages(snap.stages);
+    setAccounts(snap.accounts);
+    setAccountFields(snap.accountFields);
   }, []);
 
   // Recharge silencieuse (utilisée par le temps réel).
@@ -614,6 +634,138 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+
+  // ── Fichier client ──────────────────────────────────────────────────────
+
+  const addAccount: DataValue["addAccount"] = useCallback(
+    (name) => {
+      const propre = name.trim();
+      if (!propre) return;
+      const fiche: Account = { id: crypto.randomUUID(), name: propre, signedOn: null, sector: null, data: {}, clientId: null };
+      setAccounts((prev) => [...prev, fiche]);
+      persist(() => repo.createAccount(fiche));
+    },
+    [persist, repo],
+  );
+
+  const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
+    (fiches) => {
+      const nouvelles: Account[] = fiches
+        .filter((f) => f.name.trim())
+        .map((f) => ({ id: crypto.randomUUID(), name: f.name.trim(), signedOn: f.signedOn, sector: f.sector, data: f.data, clientId: null }));
+      if (!nouvelles.length) return;
+      setAccounts((prev) => [...prev, ...nouvelles]);
+      persist(async () => {
+        for (const f of nouvelles) await repo.createAccount(f);
+      });
+    },
+    [persist, repo],
+  );
+
+  const setAccountCell: DataValue["setAccountCell"] = useCallback(
+    (id, key, value) => {
+      setAccounts((prev) => {
+        const fiche = prev.find((a) => a.id === id);
+        if (!fiche) return prev;
+        // Les trois colonnes du socle ont leur champ ; les autres vivent dans `data`.
+        const maj: Account =
+          key === "etablissement"
+            ? { ...fiche, name: value }
+            : key === "date_client"
+              ? { ...fiche, signedOn: value || null }
+              : key === "secteur"
+                ? { ...fiche, sector: value || null }
+                : { ...fiche, data: { ...fiche.data, [key]: value } };
+        persist(() => repo.updateAccount(maj));
+        return prev.map((a) => (a.id === id ? maj : a));
+      });
+    },
+    [persist, repo],
+  );
+
+  const deleteAccount: DataValue["deleteAccount"] = useCallback(
+    (id) => {
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      persist(() => repo.deleteAccount(id));
+    },
+    [persist, repo],
+  );
+
+  const addField: DataValue["addField"] = useCallback(
+    (label, type) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setAccountFields((prev) => {
+        if (prev.some((f) => f.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        // Clé technique dérivée du nom : stable même si la colonne est renommée ensuite.
+        const base = propre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "colonne";
+        let key = base;
+        let n = 2;
+        while (prev.some((f) => f.key === key)) key = `${base}_${n++}`;
+        const champ: AccountField = { id: crypto.randomUUID(), key, label: propre, type, position: (prev.at(-1)?.position ?? 0) + 1, protege: false };
+        persist(() => repo.createField(champ));
+        return [...prev, champ];
+      });
+    },
+    [persist, repo],
+  );
+
+  const renameField: DataValue["renameField"] = useCallback(
+    (id, label) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setAccountFields((prev) => {
+        if (prev.some((f) => f.id !== id && f.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        persist(() => repo.renameField(id, propre));
+        return prev.map((f) => (f.id === id ? { ...f, label: propre } : f));
+      });
+    },
+    [persist, repo],
+  );
+
+  const moveField: DataValue["moveField"] = useCallback(
+    (id, sens) => {
+      setAccountFields((prev) => {
+        const i = prev.findIndex((f) => f.id === id);
+        const j = i + sens;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const suite = [...prev];
+        [suite[i], suite[j]] = [suite[j], suite[i]];
+        const ordonne = suite.map((f, k) => ({ ...f, position: k + 1 }));
+        persist(() => repo.moveField(ordonne.map((f) => ({ id: f.id, position: f.position }))));
+        return ordonne;
+      });
+    },
+    [persist, repo],
+  );
+
+  const deleteField: DataValue["deleteField"] = useCallback(
+    (id) => {
+      setAccountFields((prev) => {
+        const champ = prev.find((f) => f.id === id);
+        if (!champ || champ.protege) return prev;
+        // Les valeurs de la colonne disparaissent avec elle, sinon elles resteraient invisibles.
+        setAccounts((as) =>
+          as.map((a) => {
+            if (!(champ.key in a.data)) return a;
+            const data = { ...a.data };
+            delete data[champ.key];
+            return { ...a, data };
+          }),
+        );
+        persist(() => repo.deleteField(id, champ.key));
+        return prev.filter((f) => f.id !== id);
+      });
+    },
+    [persist, repo],
+  );
+
   const value = useMemo<DataValue>(
     () => ({
       loading,
@@ -630,6 +782,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addClient,
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, deleteAccount,
+      addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
       removeProjectContact,
@@ -651,6 +805,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, deleteAccount,
+      addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addDocType, removeDocType,

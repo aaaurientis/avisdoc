@@ -5,6 +5,8 @@
 // séparation rend les modes mock et Supabase strictement interchangeables.
 
 import type {
+  Account,
+  AccountField,
   ActivityItem,
   Client,
   DocItem,
@@ -16,6 +18,8 @@ import type {
 } from "../types";
 import { STAGES_DEFAUT } from "../lib/ui-tokens";
 import {
+  SEED_ACCOUNTS,
+  SEED_ACCOUNT_FIELDS,
   SEED_ACTIVITY,
   SEED_CLIENTS,
   SEED_CONTACTS,
@@ -31,6 +35,9 @@ export interface AdminSnapshot {
   activity: ActivityItem[];
   /** Colonnes du pipeline, dans l'ordre (migration 0023). */
   stages: PipelineStage[];
+  /** Fichier client : ses colonnes et ses fiches (migration 0024). */
+  accountFields: AccountField[];
+  accounts: Account[];
 }
 
 export interface AdminRepo {
@@ -72,6 +79,16 @@ export interface AdminRepo {
   deleteStage(id: string, label: string, versLabel: string | null): Promise<void>;
   reorderStages(ordre: { id: string; position: number }[]): Promise<void>;
 
+  // Fichier client
+  createAccount(a: Account): Promise<void>;
+  updateAccount(a: Account): Promise<void>;
+  deleteAccount(id: string): Promise<void>;
+  createField(f: AccountField): Promise<void>;
+  renameField(id: string, label: string): Promise<void>;
+  moveField(ordre: { id: string; position: number }[]): Promise<void>;
+  /** Supprime la colonne ET les valeurs qu'elle portait dans les fiches. */
+  deleteField(id: string, key: string): Promise<void>;
+
   // Réglages
   addDocType(name: string): Promise<void>;
   removeDocType(name: string): Promise<void>;
@@ -88,6 +105,8 @@ export class MockRepo implements AdminRepo {
       docTypes: [...SEED_DOC_TYPES],
       activity: structuredClone(SEED_ACTIVITY),
       stages: structuredClone(STAGES_DEFAUT),
+      accountFields: structuredClone(SEED_ACCOUNT_FIELDS),
+      accounts: structuredClone(SEED_ACCOUNTS),
     };
   }
 
@@ -105,6 +124,13 @@ export class MockRepo implements AdminRepo {
   async addSuivi(): Promise<void> {}
   async updateSuivi(): Promise<void> {}
   async removeSuivi(): Promise<void> {}
+  async createAccount(): Promise<void> {}
+  async updateAccount(): Promise<void> {}
+  async deleteAccount(): Promise<void> {}
+  async createField(): Promise<void> {}
+  async renameField(): Promise<void> {}
+  async moveField(): Promise<void> {}
+  async deleteField(): Promise<void> {}
   async createStage(): Promise<void> {}
   async renameStage(): Promise<void> {}
   async setStageTone(): Promise<void> {}

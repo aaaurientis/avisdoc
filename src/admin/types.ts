@@ -177,3 +177,30 @@ export interface PappersResult {
   effectif: string;
   dirigeant: string;
 }
+
+/* ── Fichier client (migration 0024) ──────────────────────────────────── */
+
+export type FieldType = "texte" | "nombre" | "date" | "email" | "telephone" | "lien" | "multiligne";
+
+/** Une colonne du fichier client, telle que l'équipe l'a définie. */
+export interface AccountField {
+  id: string;
+  /** Clé technique : range la valeur dans `data`. Jamais affichée. */
+  key: string;
+  label: string;
+  type: FieldType;
+  position: number;
+  /** Colonne du socle (Établissement, Date, Secteur) : renommable, pas supprimable. */
+  protege: boolean;
+}
+
+/** Une fiche client. Les trois colonnes du socle ont leur champ ; le reste vit dans `data`. */
+export interface Account {
+  id: string;
+  name: string;
+  signedOn: string | null;
+  sector: string | null;
+  data: Record<string, string>;
+  /** L'affaire du Pipeline dont la fiche est née, s'il y en a une. */
+  clientId: string | null;
+}

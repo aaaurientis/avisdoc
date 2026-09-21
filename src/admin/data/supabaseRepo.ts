@@ -3,6 +3,8 @@
 // supabase/migrations/0001_admin_schema.sql et docs/admin-app.md.
 
 import type {
+  Account,
+  AccountField,
   ActivityItem,
   Client,
   DocItem,
@@ -104,7 +106,7 @@ const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
-    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes] =
+    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
         sb.from("admin_clients").select("*").order("created_at", { ascending: true }),
@@ -115,6 +117,8 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_doc_types").select("*").order("name", { ascending: true }),
         sb.from("admin_activity").select("*").order("created_at", { ascending: false }).limit(20),
         sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
+        sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
+        sb.from("admin_accounts").select("*").order("name", { ascending: true }),
       ]);
 
     const firstError =
@@ -169,6 +173,17 @@ export class SupabaseRepo implements AdminRepo {
       stages: stagesRes.error || !stagesRes.data?.length
         ? structuredClone(STAGES_DEFAUT)
         : stagesRes.data.map((r: any): PipelineStage => ({ id: r.id, label: r.label, position: r.position, tone: r.tone })),
+      // La migration 0024 peut ne pas être appliquée : le fichier client est alors vide.
+      accountFields: fieldsRes.error
+        ? []
+        : (fieldsRes.data ?? []).map((r: any): AccountField => ({
+            id: r.id, key: r.key, label: r.label, type: r.type, position: r.position, protege: r.protege,
+          })),
+      accounts: accountsRes.error
+        ? []
+        : (accountsRes.data ?? []).map((r: any): Account => ({
+            id: r.id, name: r.name, signedOn: r.signed_on, sector: r.sector, data: r.data ?? {}, clientId: r.client_id,
+          })),
     };
   }
 
@@ -339,6 +354,60 @@ export class SupabaseRepo implements AdminRepo {
     }
     const { error } = await sb.from("admin_documents").delete().eq("id", id);
     this.assert(error);
+  }
+
+  // ── Fichier client (migration 0024) ──────────────────────────────────
+  async createAccount(a: Account): Promise<void> {
+    const { error } = await sb.from("admin_accounts").insert({
+      id: a.id, name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data, client_id: a.clientId,
+    });
+    this.assert(error);
+  }
+
+  async updateAccount(a: Account): Promise<void> {
+    const { error } = await sb
+      .from("admin_accounts")
+      .update({ name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data })
+      .eq("id", a.id);
+    this.assert(error);
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    const { error } = await sb.from("admin_accounts").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  async createField(f: AccountField): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").insert({
+      id: f.id, key: f.key, label: f.label, type: f.type, position: f.position, protege: f.protege,
+    });
+    this.assert(error);
+  }
+
+  async renameField(id: string, label: string): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").update({ label }).eq("id", id);
+    this.assert(error);
+  }
+
+  async moveField(ordre: { id: string; position: number }[]): Promise<void> {
+    for (const { id, position } of ordre) {
+      const { error } = await sb.from("admin_account_fields").update({ position }).eq("id", id);
+      this.assert(error);
+    }
+  }
+
+  /** La colonne part avec ses valeurs : sinon elles resteraient invisibles dans `data`. */
+  async deleteField(id: string, key: string): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").delete().eq("id", id);
+    this.assert(error);
+    const { data } = await sb.from("admin_accounts").select("id, data");
+    for (const row of data ?? []) {
+      const d = { ...((row as any).data ?? {}) };
+      if (key in d) {
+        delete d[key];
+        await sb.from("admin_accounts").update({ data: d }).eq("id", (row as any).id);
+      }
+    }
   }
 
   // ── Colonnes du pipeline (migration 0023) ────────────────────────────
