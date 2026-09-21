@@ -11,6 +11,8 @@ import Contacts from "./pages/Contacts";
 import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
+import Droits from "./pages/Droits";
+import type { Module } from "./lib/modules";
 
 function FullScreenLoader() {
   return (
@@ -18,6 +20,13 @@ function FullScreenLoader() {
       <div className="size-8 animate-spin rounded-full border-[3px] border-border border-t-avisdoc-teal" />
     </div>
   );
+}
+
+/** Garde d'accès : la page n'est servie que si le module est autorisé. */
+function Garde({ module, children }: { module: Module; children: React.ReactNode }) {
+  const { peut } = useAuth();
+  if (!peut(module)) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
 }
 
 /** Aiguillage selon l'état d'authentification. */
@@ -32,13 +41,14 @@ function Gate() {
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/crm" element={<Crm />} />
-          <Route path="/crm/:clientId" element={<Crm />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/audit" element={<Audit />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/crm" element={<Garde module="crm"><Crm /></Garde>} />
+          <Route path="/crm/:clientId" element={<Garde module="crm"><Crm /></Garde>} />
+          <Route path="/clients" element={<Garde module="finance"><Clients /></Garde>} />
+          <Route path="/contacts" element={<Garde module="contacts"><Contacts /></Garde>} />
+          <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
+          <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
+          <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
+          <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

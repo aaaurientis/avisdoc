@@ -1,41 +1,117 @@
+// Barre latérale du Hub — menu à 2 niveaux, filtré par les modules autorisés
+// (admin_droits ; un super-admin voit tout). Les groupes se déplient et
+// s'ouvrent automatiquement quand une de leurs pages est active.
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   Building2,
+  ChevronDown,
   FileText,
   LayoutDashboard,
+  Megaphone,
   Moon,
   Power,
   Settings,
-  ShieldCheck,
   Sun,
   Users,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
 import { initials } from "../lib/format";
+import type { Module } from "../lib/modules";
 import { appliquerTheme, themeCourant, type Theme } from "../lib/theme";
 import { Avatar } from "./ui";
 
-const NAV = [
-  { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { to: "/crm", label: "CRM", icon: Building2 },
-  { to: "/clients", label: "Clients", icon: Wallet },
-  { to: "/contacts", label: "Contacts", icon: Users },
-  { to: "/documents", label: "Documents", icon: FileText },
-  { to: "/settings", label: "Réglages", icon: Settings },
+interface Enfant {
+  to: string;
+  label: string;
+  /** Réservé aux super-admins (ex. journal d'audit). */
+  superadmin?: boolean;
+}
+interface Entree {
+  /** Module de droits ; null = visible par tous (tableau de bord). */
+  module: Module | null;
+  label: string;
+  icon: LucideIcon;
+  /** Lien direct… */
+  to?: string;
+  /** …ou groupe déroulant de 2e niveau. */
+  enfants?: Enfant[];
+  /** Module annoncé mais pas encore livré. */
+  aVenir?: boolean;
+}
+
+const MENU: Entree[] = [
+  { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
+  { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
+    { to: "/crm", label: "CRM" },
+  ] },
+  { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
+  { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
+  { module: "finance", label: "Finance", icon: Wallet, enfants: [
+    { to: "/clients", label: "Facturation" },
+  ] },
+  { module: "documents", label: "Documents", icon: FileText, to: "/documents" },
+  { module: "admin", label: "Admin", icon: Settings, enfants: [
+    { to: "/settings", label: "Réglages" },
+    { to: "/droits", label: "Droits d'accès", superadmin: true },
+    { to: "/audit", label: "Auditabilité", superadmin: true },
+  ] },
 ];
 
-// Entrées réservées au super-admin (journal d'audit).
-const NAV_SUPERADMIN = [
-  { to: "/audit", label: "Auditabilité", icon: ShieldCheck },
-];
+const lienCls = (actif: boolean) =>
+  cn(
+    "flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors",
+    actif ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
+  );
+
+function Groupe({ entree, isSuperAdmin }: { entree: Entree; isSuperAdmin: boolean }) {
+  const { pathname } = useLocation();
+  const enfants = (entree.enfants ?? []).filter((e) => !e.superadmin || isSuperAdmin);
+  const enfantActif = enfants.some((e) => pathname.startsWith(e.to));
+  const [ouvert, setOuvert] = useState(enfantActif);
+  const Icon = entree.icon;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOuvert((o) => !o)}
+        className={cn(lienCls(false), "w-full", enfantActif && "text-avisdoc-ink")}
+      >
+        <Icon className="size-[18px]" strokeWidth={2.2} />
+        <span className="min-w-0 flex-1 truncate text-left">{entree.label}</span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", (ouvert || enfantActif) && "rotate-180")} />
+      </button>
+      {(ouvert || enfantActif) && (
+        <div className="ml-[26px] flex flex-col gap-0.5 border-l border-border pl-2.5 pt-0.5">
+          {enfants.map((e) => (
+            <NavLink
+              key={e.to}
+              to={e.to}
+              className={({ isActive }) =>
+                cn(
+                  "rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                  isActive
+                    ? "bg-avisdoc-ink text-white"
+                    : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
+                )
+              }
+            >
+              {e.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Sidebar() {
-  const { user, signOut, isSuperAdmin } = useAuth();
-  const nav = isSuperAdmin ? [...NAV, ...NAV_SUPERADMIN] : NAV;
+  const { user, signOut, isSuperAdmin, peut } = useAuth();
   const [theme, setTheme] = useState<Theme>(themeCourant());
   const basculerTheme = () => {
     const t: Theme = theme === "dark" ? "light" : "dark";
@@ -43,33 +119,39 @@ export default function Sidebar() {
     setTheme(t);
   };
 
+  const menu = MENU.filter((m) => m.module === null || peut(m.module));
+
   return (
-    <aside className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-card px-4 py-6">
+    <aside className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6">
       <div className="flex flex-col gap-1.5 px-2.5 pb-6">
         <AvisdocLogo className="h-12 w-auto self-start" />
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Administration
+          Hub
         </div>
       </div>
 
       <nav className="flex flex-col gap-1">
-        {nav.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors",
-                isActive
-                  ? "bg-avisdoc-ink text-white"
-                  : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
-              )
-            }
-          >
-            <Icon className="size-[18px]" strokeWidth={2.2} />
-            {label}
-          </NavLink>
-        ))}
+        {menu.map((m) => {
+          const Icon = m.icon;
+          if (m.aVenir) {
+            return (
+              <div key={m.label} className={cn(lienCls(false), "cursor-default opacity-60")}>
+                <Icon className="size-[18px]" strokeWidth={2.2} />
+                <span className="min-w-0 flex-1 truncate">{m.label}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  À venir
+                </span>
+              </div>
+            );
+          }
+          if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} />;
+          return (
+            <NavLink key={m.to} to={m.to!} className={({ isActive }) => lienCls(isActive)}>
+              <Icon className="size-[18px]" strokeWidth={2.2} />
+              {m.label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bascule clair / sombre */}

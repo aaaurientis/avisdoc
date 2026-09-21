@@ -202,7 +202,7 @@ export default function Clients() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-[22px] font-bold text-avisdoc-ink">Clients</h1>
+          <h1 className="font-display text-[22px] font-bold text-avisdoc-ink">Facturation</h1>
           <p className="text-[12.5px] text-muted-foreground">
             Données Qonto — facturation par année et devis en cours. Montants HT.
           </p>

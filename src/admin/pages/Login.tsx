@@ -25,7 +25,7 @@ export default function Login() {
         <AvisdocLogo className="h-[110px] w-auto" />
 
         <div className="mt-3.5 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-          Espace d'administration
+          Hub AvisDoc
         </div>
 
         <h1 className="mb-2 mt-7 text-center font-display text-[28px] font-semibold leading-tight text-avisdoc-ink">
