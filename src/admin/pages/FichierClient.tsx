@@ -39,7 +39,7 @@ export default function FichierClient() {
   const [recherche, setRecherche] = useState("");
   const [vue, setVue] = useState<"liste" | "kanban">("liste");
   const [colonnes, setColonnes] = useState(false);
-  const [fiche, setFiche] = useState<Account | "nouvelle" | null>(null);
+  const [fiche, setFiche] = useState<{ compte?: Account; mode: "lecture" | "edition" } | null>(null);
   const [aSupprimer, setASupprimer] = useState<Account | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fichierRef = useRef<HTMLInputElement>(null);
@@ -140,7 +140,7 @@ export default function FichierClient() {
             </button>
             <button
               type="button"
-              onClick={() => setFiche("nouvelle")}
+              onClick={() => setFiche({ mode: "edition" })}
               className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
             >
               <Plus className="size-4" /> Nouveau client
@@ -224,7 +224,11 @@ export default function FichierClient() {
             </thead>
             <tbody>
               {visibles.map((a) => (
-                <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                <tr
+                  key={a.id}
+                  onClick={() => setFiche({ compte: a, mode: "lecture" })}
+                  className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
+                >
                   {accountFields.map((f) => (
                     <td
                       key={f.id}
@@ -237,10 +241,10 @@ export default function FichierClient() {
                       {affiche(a, f) || "—"}
                     </td>
                   ))}
-                  <td className="whitespace-nowrap px-2">
+                  <td className="whitespace-nowrap px-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => setFiche(a)}
+                      onClick={() => setFiche({ compte: a, mode: "edition" })}
                       aria-label={`Modifier ${a.name}`}
                       title="Modifier"
                       className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-avisdoc-teal"
@@ -291,14 +295,18 @@ export default function FichierClient() {
                     return (
                       <div
                         key={a.id}
-                        className="group rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal"
+                        onClick={() => setFiche({ compte: a, mode: "lecture" })}
+                        className="group cursor-pointer rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
-                          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+                          <div
+                            className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <button
                               type="button"
-                              onClick={() => setFiche(a)}
+                              onClick={() => setFiche({ compte: a, mode: "edition" })}
                               aria-label={`Modifier ${a.name}`}
                               className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
                             >
@@ -331,9 +339,7 @@ export default function FichierClient() {
       )}
 
       {colonnes && <ColonnesClient onClose={() => setColonnes(false)} />}
-      {fiche && (
-        <FicheClient fiche={fiche === "nouvelle" ? undefined : fiche} onClose={() => setFiche(null)} />
-      )}
+      {fiche && <FicheClient fiche={fiche.compte} mode={fiche.mode} onClose={() => setFiche(null)} />}
       {aSupprimer && (
         <Modal onClose={() => setASupprimer(null)} width={440}>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Supprimer ce client ?</h2>
