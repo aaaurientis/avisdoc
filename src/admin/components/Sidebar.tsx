@@ -49,9 +49,9 @@ interface Entree {
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
-    { to: "/crm", label: "Pipeline" },
     { to: "/merx", label: "Merx", module: "merx" },
-    { to: "/prospects", label: "Prospects", module: "merx" },
+    { to: "/prospects", label: "Prospection", module: "merx" },
+    { to: "/crm", label: "Pipeline" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },

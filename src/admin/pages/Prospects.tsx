@@ -88,7 +88,7 @@ export default function Prospects() {
   return (
     <div>
       <PageHeader
-        title="Prospects"
+        title="Prospection"
         subtitle={
           chargement
             ? "Chargement…"
