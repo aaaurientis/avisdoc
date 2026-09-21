@@ -19,7 +19,7 @@ const TYPES: { id: FieldType; label: string }[] = [
   { id: "lien", label: "Lien" },
 ];
 
-export const typeLabel = (t: FieldType) => TYPES.find((x) => x.id === t)?.label ?? t;
+const typeLabel = (t: FieldType) => TYPES.find((x) => x.id === t)?.label ?? t;
 
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
