@@ -149,7 +149,7 @@ create policy "prospects_equipe" on public.admin_prospects
   using (public.is_avisdoc_user())
   with check (public.is_avisdoc_user());
 
--- Demandes : chacun voit et lance les siennes.
+-- Demandes : chacun voit et lance les siennes (le travail de Merx passe par la fonction, clé de service).
 drop policy if exists "merx_demandes_proprietaire" on public.admin_merx_demandes;
 create policy "merx_demandes_proprietaire" on public.admin_merx_demandes
   for all to authenticated
@@ -161,3 +161,15 @@ create policy "merx_demandes_proprietaire" on public.admin_merx_demandes
     public.is_avisdoc_user()
     and lower(requested_by) = lower(coalesce(auth.jwt() ->> 'email', ''))
   );
+
+-- ----------------------------------------------------------------------------
+-- Ouverture du module « merx » — à Olivier seul pour commencer.
+-- Il n'est pas dans les droits par défaut (src/admin/lib/modules.ts) : personne
+-- d'autre ne voit l'écran. Un super-admin, lui, a tous les modules d'office.
+-- Pour l'ouvrir à quelqu'un d'autre plus tard : même requête avec son adresse,
+-- ou une case à cocher dans Admin › Droits d'accès.
+-- ----------------------------------------------------------------------------
+update public.admin_droits
+set modules = array_append(modules, 'merx')
+where lower(email) = 'olivier@avisdoc.fr'
+  and not ('merx' = any (modules));
