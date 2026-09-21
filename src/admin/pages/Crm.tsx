@@ -18,7 +18,7 @@ export default function Crm() {
   return (
     <div>
       <PageHeader
-        title="CRM"
+        title="Pipeline"
         subtitle={`${clients.length} clients — campagnes de dépistage et conventions`}
         action={
           <button
