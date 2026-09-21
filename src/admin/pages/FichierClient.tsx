@@ -9,6 +9,7 @@ import type { Account, AccountField } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
 import { PageHeader } from "../components/ui";
 import ColonnesClient from "./clients/ColonnesClient";
+import NouvelleFiche from "./clients/NouvelleFiche";
 import { cn } from "@/lib/utils";
 
 /** Valeur d’une case : les trois colonnes du socle ont leur champ, les autres sont dans `data`. */
@@ -23,10 +24,10 @@ const inputType = (t: AccountField["type"]) =>
   t === "date" ? "date" : t === "nombre" ? "number" : t === "email" ? "email" : t === "telephone" ? "tel" : "text";
 
 export default function FichierClient() {
-  const { accounts, accountFields, addAccount, addManyAccounts, setAccountCell, deleteAccount } = useAdminData();
+  const { accounts, accountFields, addManyAccounts, setAccountCell, deleteAccount } = useAdminData();
   const [recherche, setRecherche] = useState("");
   const [colonnes, setColonnes] = useState(false);
-  const [nouvelle, setNouvelle] = useState("");
+  const [nouvelleFiche, setNouvelleFiche] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fichierRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +127,13 @@ export default function FichierClient() {
             >
               <Download className="size-4" /> Exporter
             </button>
+            <button
+              type="button"
+              onClick={() => setNouvelleFiche(true)}
+              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            >
+              <Plus className="size-4" /> Nouveau client
+            </button>
           </div>
         }
       />
@@ -146,42 +154,15 @@ export default function FichierClient() {
         <div className="mb-4 rounded-2xl bg-sky-100 px-4 py-3 text-[13px] font-semibold text-sky-700">{message}</div>
       )}
 
-      {/* Recherche + ajout rapide */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="Rechercher un client…"
-            className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={nouvelle}
-            onChange={(e) => setNouvelle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && nouvelle.trim()) {
-                addAccount(nouvelle);
-                setNouvelle("");
-              }
-            }}
-            placeholder="Nom de l’établissement…"
-            className="ad-input rounded-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
-          />
-          <button
-            type="button"
-            disabled={!nouvelle.trim()}
-            onClick={() => {
-              addAccount(nouvelle);
-              setNouvelle("");
-            }}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-          >
-            <Plus className="size-4" /> Nouvelle fiche
-          </button>
-        </div>
+      {/* Recherche */}
+      <div className="relative mb-3 max-w-md">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher un client…"
+          className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+        />
       </div>
 
       {/* Le tableur */}
@@ -244,6 +225,7 @@ export default function FichierClient() {
       </div>
 
       {colonnes && <ColonnesClient onClose={() => setColonnes(false)} />}
+      {nouvelleFiche && <NouvelleFiche onClose={() => setNouvelleFiche(false)} />}
     </div>
   );
 }
