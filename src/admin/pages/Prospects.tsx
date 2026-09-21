@@ -35,6 +35,13 @@ function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
   );
 }
 
+/** Une table absente veut dire « migration pas encore appliquée » : on le dit en français. */
+function messageErreur(brut: string): string {
+  return /Could not find the table|does not exist/i.test(brut)
+    ? "Cet écran attend sa migration : le SQL n’a pas encore été exécuté sur la base."
+    : brut;
+}
+
 export default function Prospects() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
@@ -49,7 +56,7 @@ export default function Prospects() {
       .select("*")
       .order("score_total", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
-    if (error) setErreur(error.message);
+    if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
     setChargement(false);
   }, []);

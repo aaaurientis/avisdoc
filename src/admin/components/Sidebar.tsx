@@ -53,6 +53,7 @@ const MENU: Entree[] = [
     { to: "/prospects", label: "Prospection", module: "merx" },
     { to: "/crm", label: "Pipeline" },
     { to: "/fichier-client", label: "Clients", module: "merx" },
+    { to: "/notes-dictees", label: "Notes dictées", module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
