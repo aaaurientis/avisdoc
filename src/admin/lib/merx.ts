@@ -62,6 +62,8 @@ export interface Prospect {
   contact_source: string | null;
   approach: string | null;
   enriched_at: string | null;
+  /** L'affaire née de ce prospect (migration 0026), s'il est passé au Pipeline. */
+  converted_client_id: string | null;
   status: string;
   created_at: string;
 }

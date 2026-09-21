@@ -108,7 +108,7 @@ interface DataValue {
   // Fichier client (migration 0024)
   accounts: Account[];
   accountFields: AccountField[];
-  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }) => void;
+  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null }) => void;
   /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
   setAccountCell: (id: string, key: string, value: string) => void;
   /** Enregistre une fiche entière (formulaire de modification), en une seule écriture. */
@@ -649,7 +649,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         signedOn: saisie.signedOn,
         sector: saisie.sector,
         data: saisie.data,
-        clientId: null,
+        clientId: saisie.clientId ?? null,
       };
       setAccounts((prev) => [...prev, fiche]);
       persist(() => repo.createAccount(fiche));

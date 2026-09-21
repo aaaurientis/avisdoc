@@ -82,6 +82,19 @@ export default function Prospects() {
     [charger],
   );
 
+  /** Le lien est gardé sur la fiche : un prospect ne devient une affaire qu'une fois. */
+  const mettreAuPipeline = useCallback(
+    async (p: Prospect, clientId: string) => {
+      const { error } = await supabaseAdmin
+        .from("admin_prospects")
+        .update({ converted_client_id: clientId, status: "a_contacter" })
+        .eq("id", p.id);
+      if (error) throw new Error(error.message);
+      await charger();
+    },
+    [charger],
+  );
+
   const ecarter = useCallback(
     async (p: Prospect) => {
       const { error } = await supabaseAdmin.from("admin_prospects").update({ status: "ecarte" }).eq("id", p.id);
@@ -166,6 +179,7 @@ export default function Prospects() {
           onClose={() => setOuverte(null)}
           onApprofondir={approfondir}
           onEcarter={ecarter}
+          onMettreAuPipeline={mettreAuPipeline}
         />
       )}
     </div>

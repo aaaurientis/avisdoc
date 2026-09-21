@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, Lock, Minus, Pencil, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Lock, Minus, Pencil, Plus, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -100,6 +100,8 @@ export default function ProjectView({
     toggleSuivi,
     removeSuivi,
     stages,
+    accounts,
+    addAccount,
   } = useAdminData();
 
   const [editing, setEditing] = useState(false);
@@ -115,6 +117,7 @@ export default function ProjectView({
   // requise n'est pas atteinte.
   // Rang d'une étape dans le parcours, d'après les colonnes de l'équipe.
   // Une colonne supprimée ou renommée rend -1 : on ne verrouille alors rien.
+  const ficheClient = accounts.find((a) => a.clientId === client.id);
   const cur = stageRank(client.stage, stages);
   const verrou = (min: Stage) => {
     const rang = stageRank(min, stages);
@@ -300,6 +303,31 @@ export default function ProjectView({
               <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
             </div>
           )}
+
+          {/* Le fichier client : une affaire gagnée y entre une fois, sur décision. */}
+          <div className="mt-4">
+            {ficheClient ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-bold text-emerald-700">
+                <Check className="size-3.5" /> Dans le fichier client
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  addAccount({
+                    name: client.company,
+                    signedOn: new Date().toISOString().slice(0, 10),
+                    sector: null,
+                    data: {},
+                    clientId: client.id,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-xs font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+              >
+                <UserPlus className="size-3.5" /> Créer la fiche client
+              </button>
+            )}
+          </div>
 
           {/* Pastilles d'étape */}
           <div className="mt-4 flex flex-wrap gap-1.5">

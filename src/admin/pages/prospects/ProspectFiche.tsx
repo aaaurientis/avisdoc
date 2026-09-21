@@ -2,9 +2,13 @@
 // et les pages réellement consultées. « Approfondir » va chercher le registre officiel et le site.
 
 import { useState } from "react";
-import { ExternalLink, Loader2, Mail, Phone, Search, X } from "lucide-react";
+import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, Phone, Search, X } from "lucide-react";
+import type { Client } from "../../types";
+import { useAdminData } from "../../data/AdminDataContext";
+import { uid } from "../../lib/format";
 import { Badge, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
+import { cn } from "@/lib/utils";
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -20,16 +24,66 @@ export default function ProspectFiche({
   onClose,
   onApprofondir,
   onEcarter,
+  onMettreAuPipeline,
 }: {
   prospect: Prospect;
   onClose: () => void;
   onApprofondir: (p: Prospect) => Promise<void>;
   onEcarter: (p: Prospect) => Promise<void>;
+  /** Crée l'affaire dans le Pipeline et garde le lien sur la fiche. */
+  onMettreAuPipeline: (p: Prospect, clientId: string) => Promise<void>;
 }) {
-  const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | null>(null);
+  const { stages, addClient, addProjectContact } = useAdminData();
+  const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | null>(null);
+  const [choixEtape, setChoixEtape] = useState(false);
   const p = prospect;
   const siege = p.head_office;
   const effectif = effectifLabel(p.headcount_band);
+
+  /** Le prospect devient une affaire : on reprend ce que Merx a trouvé, sans rien réinventer. */
+  const versLePipeline = async (etape: string) => {
+    if (enCours) return;
+    setEnCours("pipeline");
+    setChoixEtape(false);
+    try {
+      const id = uid();
+      const client: Client = {
+        id,
+        company: p.legal_name || p.name,
+        siren: p.siren ?? "",
+        siret: "",
+        naf: "",
+        adresse: p.head_office?.address ?? "",
+        codePostal: "",
+        ville: p.head_office?.city ?? p.city ?? "",
+        effectif: effectifLabel(p.headcount_band) ?? "",
+        stage: etape,
+        jours: 1,
+        tarif: 0,
+        depistes: 0,
+        orientes: 0,
+        resultat: null,
+        statutPropo: "Brouillon",
+        contacts: [],
+        docs: [],
+        suivis: [],
+      };
+      addClient(client);
+      // L'interlocuteur trouvé par Merx suit l'affaire.
+      if (p.contact_name) {
+        const [prenom, ...reste] = p.contact_name.trim().split(" ");
+        addProjectContact(id, {
+          prenom,
+          nom: reste.join(" "),
+          role: p.contact_role ?? "",
+          email: p.contact_email ?? "",
+        });
+      }
+      await onMettreAuPipeline(p, id);
+    } finally {
+      setEnCours(null);
+    }
+  };
 
   const lancer = async (quoi: "approfondir" | "ecarter") => {
     if (enCours) return;
@@ -194,12 +248,50 @@ export default function ProspectFiche({
         )}
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {p.converted_client_id ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2.5 text-sm font-bold text-emerald-700">
+              <Check className="size-4" /> Dans le Pipeline
+            </span>
+          ) : choixEtape ? (
+            <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-muted/60 p-2.5">
+              <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
+              {stages.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => void versLePipeline(s.label)}
+                  className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                >
+                  {s.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setChoixEtape(false)}
+                className="text-[12.5px] font-semibold text-muted-foreground hover:text-avisdoc-ink"
+              >
+                Annuler
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setChoixEtape(true)}
+              disabled={enCours !== null}
+              className={cn(
+                "ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60",
+              )}
+            >
+              {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <ArrowRightCircle className="size-4" />}
+              Mettre dans le Pipeline
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void lancer("approfondir")}
             disabled={enCours !== null}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
           >
             {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
