@@ -143,8 +143,9 @@ export default function NotesDictees() {
       {ecoute && (
         <Modal onClose={() => setEcoute(null)} width={420}>
           <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Réécouter la note</h2>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio src={ecoute.url} controls className="mt-4 w-full" />
+          <audio src={ecoute.url} controls className="mt-4 w-full">
+            <track kind="captions" />
+          </audio>
           <button
             type="button"
             onClick={() => setEcoute(null)}
