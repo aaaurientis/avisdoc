@@ -111,6 +111,8 @@ interface DataValue {
   addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }) => void;
   /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
   setAccountCell: (id: string, key: string, value: string) => void;
+  /** Enregistre une fiche entière (formulaire de modification), en une seule écriture. */
+  saveAccount: (id: string, valeurs: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }) => void;
   deleteAccount: (id: string) => void;
   addManyAccounts: (fiches: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }[]) => void;
   addField: (label: string, type: FieldType) => void;
@@ -690,6 +692,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+  const saveAccount: DataValue["saveAccount"] = useCallback(
+    (id, valeurs) => {
+      const propre = valeurs.name.trim();
+      if (!propre) return;
+      setAccounts((prev) => {
+        const fiche = prev.find((a) => a.id === id);
+        if (!fiche) return prev;
+        const maj: Account = { ...fiche, name: propre, signedOn: valeurs.signedOn, sector: valeurs.sector, data: valeurs.data };
+        persist(() => repo.updateAccount(maj));
+        return prev.map((a) => (a.id === id ? maj : a));
+      });
+    },
+    [persist, repo],
+  );
+
   const deleteAccount: DataValue["deleteAccount"] = useCallback(
     (id) => {
       setAccounts((prev) => prev.filter((a) => a.id !== id));
@@ -789,7 +806,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addClient,
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, deleteAccount,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount,
       addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
@@ -812,7 +829,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, deleteAccount,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount,
       addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,

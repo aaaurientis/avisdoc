@@ -1,15 +1,16 @@
-// Clients — le fichier commun à l’équipe, comme un tableur.
-// Chacun remplit les cases, ajoute ses colonnes, importe un fichier Excel ou exporte l’affiché.
+// Clients — le fichier commun à l’équipe, en tableau ou en kanban par secteur.
+// Le tableau est en LECTURE SEULE : on ne modifie jamais une information par mégarde.
+// Chaque ligne a son crayon (formulaire de modification) et sa corbeille (avec confirmation).
 // Les trois colonnes du socle (Établissement, Date, Secteur) ont leur champ propre en base ;
 // toutes les autres vivent dans `data`, sous la clé de leur colonne.
 
 import { useMemo, useRef, useState } from "react";
-import { Columns3, Download, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Columns3, Download, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import type { Account, AccountField } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
-import { PageHeader } from "../components/ui";
+import { Modal, PageHeader, SectionLabel } from "../components/ui";
 import ColonnesClient from "./clients/ColonnesClient";
-import NouvelleFiche from "./clients/NouvelleFiche";
+import FicheClient from "./clients/FicheClient";
 import { cn } from "@/lib/utils";
 
 /** Valeur d’une case : les trois colonnes du socle ont leur champ, les autres sont dans `data`. */
@@ -20,14 +21,26 @@ function valeur(a: Account, f: AccountField): string {
   return a.data[f.key] ?? "";
 }
 
-const inputType = (t: AccountField["type"]) =>
-  t === "date" ? "date" : t === "nombre" ? "number" : t === "email" ? "email" : t === "telephone" ? "tel" : "text";
+/** Une date se lit en français ; le reste s’affiche tel quel. */
+function affiche(a: Account, f: AccountField): string {
+  const v = valeur(a, f);
+  if (!v) return "";
+  if (f.type === "date") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("fr-FR");
+  }
+  return v;
+}
+
+const SANS_SECTEUR = "Sans secteur";
 
 export default function FichierClient() {
-  const { accounts, accountFields, addManyAccounts, setAccountCell, deleteAccount } = useAdminData();
+  const { accounts, accountFields, addManyAccounts, deleteAccount } = useAdminData();
   const [recherche, setRecherche] = useState("");
+  const [vue, setVue] = useState<"liste" | "kanban">("liste");
   const [colonnes, setColonnes] = useState(false);
-  const [nouvelleFiche, setNouvelleFiche] = useState(false);
+  const [fiche, setFiche] = useState<Account | "nouvelle" | null>(null);
+  const [aSupprimer, setASupprimer] = useState<Account | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fichierRef = useRef<HTMLInputElement>(null);
 
@@ -39,12 +52,19 @@ export default function FichierClient() {
     );
   }, [accounts, recherche]);
 
+  /** Colonnes du kanban : les secteurs réellement utilisés, puis les fiches sans secteur. */
+  const secteurs = useMemo(() => {
+    const noms = [...new Set(visibles.map((a) => (a.sector ?? "").trim()).filter(Boolean))].sort((x, y) =>
+      x.localeCompare(y, "fr"),
+    );
+    const sans = visibles.some((a) => !(a.sector ?? "").trim());
+    return sans ? [...noms, SANS_SECTEUR] : noms;
+  }, [visibles]);
+
   /** Export de ce qui est affiché : mêmes colonnes, mêmes lignes, même ordre. */
   const exporter = async () => {
     const XLSX = await import("xlsx");
-    const lignes = visibles.map((a) =>
-      Object.fromEntries(accountFields.map((f) => [f.label, valeur(a, f)])),
-    );
+    const lignes = visibles.map((a) => Object.fromEntries(accountFields.map((f) => [f.label, valeur(a, f)])));
     const feuille = XLSX.utils.json_to_sheet(lignes, { header: accountFields.map((f) => f.label) });
     const classeur = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(classeur, feuille, "Clients");
@@ -99,37 +119,28 @@ export default function FichierClient() {
     }
   };
 
+  const boutonSecondaire =
+    "inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal";
+
   return (
     <div>
       <PageHeader
         title="Clients"
         subtitle={`${accounts.length} fiche${accounts.length > 1 ? "s" : ""} — le fichier commun de l’équipe`}
         action={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setColonnes(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-            >
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setColonnes(true)} className={boutonSecondaire}>
               <Columns3 className="size-4" /> Colonnes
             </button>
-            <button
-              type="button"
-              onClick={() => fichierRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-            >
+            <button type="button" onClick={() => fichierRef.current?.click()} className={boutonSecondaire}>
               <Upload className="size-4" /> Importer
             </button>
-            <button
-              type="button"
-              onClick={() => void exporter()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-            >
+            <button type="button" onClick={() => void exporter()} className={boutonSecondaire}>
               <Download className="size-4" /> Exporter
             </button>
             <button
               type="button"
-              onClick={() => setNouvelleFiche(true)}
+              onClick={() => setFiche("nouvelle")}
               className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
             >
               <Plus className="size-4" /> Nouveau client
@@ -154,78 +165,203 @@ export default function FichierClient() {
         <div className="mb-4 rounded-2xl bg-sky-100 px-4 py-3 text-[13px] font-semibold text-sky-700">{message}</div>
       )}
 
-      {/* Recherche */}
-      <div className="relative mb-3 max-w-md">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
-          placeholder="Rechercher un client…"
-          className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
-        />
+      {/* Recherche + bascule des vues */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher un client…"
+            className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+          />
+        </div>
+        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+          {([
+            { id: "liste", label: "Liste", Icone: List },
+            { id: "kanban", label: "Kanban", Icone: LayoutGrid },
+          ] as const).map(({ id, label, Icone }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setVue(id)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors",
+                vue === id ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
+              )}
+            >
+              <Icone className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Le tableur */}
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[720px] border-collapse">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              {accountFields.map((f) => (
-                <th key={f.id} className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                  {f.label}
-                </th>
-              ))}
-              <th className="w-10" />
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map((a) => (
-              <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+      {visibles.length === 0 ? (
+        <div className="rounded-2xl bg-muted/60 p-8 text-center">
+          <SectionLabel>{accounts.length === 0 ? "Fichier vide" : "Aucun résultat"}</SectionLabel>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            {accounts.length === 0
+              ? "Ajoutez un client, ou importez votre fichier Excel : les colonnes sont reconnues par leur nom."
+              : "Aucune fiche ne correspond à cette recherche."}
+          </p>
+        </div>
+      ) : vue === "liste" ? (
+        /* ── Tableau, en lecture seule ── */
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full min-w-[720px] border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
                 {accountFields.map((f) => (
-                  <td key={f.id} className="px-1.5 py-1">
-                    <input
-                      type={inputType(f.type)}
-                      defaultValue={valeur(a, f)}
-                      onBlur={(e) => {
-                        if (e.target.value !== valeur(a, f)) setAccountCell(a.id, f.key, e.target.value);
-                      }}
-                      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                      aria-label={`${f.label} — ${a.name}`}
-                      className={cn(
-                        "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-[13px] text-avisdoc-ink outline-none transition-colors",
-                        "hover:border-border focus:border-avisdoc-teal focus:bg-card",
-                        f.key === "etablissement" && "font-semibold",
-                      )}
-                    />
-                  </td>
-                ))}
-                <td className="px-1.5">
-                  <button
-                    type="button"
-                    onClick={() => deleteAccount(a.id)}
-                    aria-label={`Supprimer ${a.name}`}
-                    className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:text-rose-700"
+                  <th
+                    key={f.id}
+                    className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
                   >
-                    <Trash2 className="size-4" />
-                  </button>
-                </td>
+                    {f.label}
+                  </th>
+                ))}
+                <th className="w-20" />
               </tr>
-            ))}
-            {visibles.length === 0 && (
-              <tr>
-                <td colSpan={accountFields.length + 1} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  {accounts.length === 0
-                    ? "Aucune fiche pour l’instant. Ajoutez un établissement, ou importez votre fichier Excel."
-                    : "Aucune fiche ne correspond à cette recherche."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {visibles.map((a) => (
+                <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  {accountFields.map((f) => (
+                    <td
+                      key={f.id}
+                      className={cn(
+                        "px-4 py-2.5 text-[13px] text-avisdoc-ink",
+                        f.key === "etablissement" && "font-semibold",
+                        !affiche(a, f) && "text-muted-foreground/50",
+                      )}
+                    >
+                      {affiche(a, f) || "—"}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap px-2">
+                    <button
+                      type="button"
+                      onClick={() => setFiche(a)}
+                      aria-label={`Modifier ${a.name}`}
+                      title="Modifier"
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-avisdoc-teal"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setASupprimer(a)}
+                      aria-label={`Supprimer ${a.name}`}
+                      title="Supprimer"
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-rose-700"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* ── Kanban par secteur ── */
+        <div
+          className="ad-kanban grid gap-3 overflow-x-auto pb-1"
+          style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(210px, 1fr))` }}
+        >
+          {secteurs.map((secteur) => {
+            const liste = visibles.filter((a) =>
+              secteur === SANS_SECTEUR ? !(a.sector ?? "").trim() : (a.sector ?? "").trim() === secteur,
+            );
+            return (
+              <div key={secteur} className="min-h-[260px] rounded-xl bg-muted/60 p-3">
+                <div className="mb-2.5 flex items-center justify-between gap-2">
+                  <div className="truncate text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                    {secteur}
+                  </div>
+                  <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                    {liste.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {liste.map((a) => {
+                    // Sur la carte : les premières colonnes renseignées, hors établissement et secteur.
+                    const infos = accountFields
+                      .filter((f) => f.key !== "etablissement" && f.key !== "secteur" && affiche(a, f))
+                      .slice(0, 3);
+                    return (
+                      <div
+                        key={a.id}
+                        className="group rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
+                          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => setFiche(a)}
+                              aria-label={`Modifier ${a.name}`}
+                              className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setASupprimer(a)}
+                              aria-label={`Supprimer ${a.name}`}
+                              className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        {infos.map((f) => (
+                          <div key={f.id} className="mt-1 truncate text-[11.5px] text-muted-foreground">
+                            <span className="text-muted-foreground/70">{f.label} · </span>
+                            {affiche(a, f)}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {colonnes && <ColonnesClient onClose={() => setColonnes(false)} />}
-      {nouvelleFiche && <NouvelleFiche onClose={() => setNouvelleFiche(false)} />}
+      {fiche && (
+        <FicheClient fiche={fiche === "nouvelle" ? undefined : fiche} onClose={() => setFiche(null)} />
+      )}
+      {aSupprimer && (
+        <Modal onClose={() => setASupprimer(null)} width={440}>
+          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Supprimer ce client ?</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-avisdoc-ink">{aSupprimer.name}</span> et toutes ses informations
+            seront retirés du fichier. Cette suppression ne se défait pas.
+          </p>
+          <div className="mt-5 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                deleteAccount(aSupprimer.id);
+                setASupprimer(null);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-avisdoc-coral px-5 py-2.5 text-sm font-bold text-white"
+            >
+              <Trash2 className="size-4" /> Supprimer
+            </button>
+            <button
+              type="button"
+              onClick={() => setASupprimer(null)}
+              className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink hover:text-avisdoc-ink"
+            >
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

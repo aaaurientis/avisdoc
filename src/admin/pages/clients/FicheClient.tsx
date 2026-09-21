@@ -1,9 +1,9 @@
-// Nouvelle fiche client : un formulaire avec les colonnes du fichier, telles que l'équipe les a définies.
-// Seul l'établissement est obligatoire — le reste se remplit maintenant ou plus tard, dans le tableau.
+// Fiche client : le formulaire de création et de modification, bâti sur les colonnes du fichier.
+// On ne modifie jamais une information par mégarde : le tableau est en lecture seule, tout passe par ici.
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { AccountField } from "../../types";
+import type { Account, AccountField } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Modal } from "../../components/ui";
 import { cn } from "@/lib/utils";
@@ -14,9 +14,17 @@ const champCls =
 const inputType = (t: AccountField["type"]) =>
   t === "date" ? "date" : t === "nombre" ? "number" : t === "email" ? "email" : t === "telephone" ? "tel" : "text";
 
-export default function NouvelleFiche({ onClose }: { onClose: () => void }) {
-  const { accountFields, addAccount } = useAdminData();
-  const [valeurs, setValeurs] = useState<Record<string, string>>({});
+export default function FicheClient({ fiche, onClose }: { fiche?: Account; onClose: () => void }) {
+  const { accountFields, addAccount, saveAccount } = useAdminData();
+  const [valeurs, setValeurs] = useState<Record<string, string>>(() => {
+    if (!fiche) return {};
+    return {
+      etablissement: fiche.name,
+      date_client: fiche.signedOn ?? "",
+      secteur: fiche.sector ?? "",
+      ...fiche.data,
+    };
+  });
 
   const lire = (key: string) => valeurs[key] ?? "";
   const ecrire = (key: string, v: string) => setValeurs((prev) => ({ ...prev, [key]: v }));
@@ -30,12 +38,14 @@ export default function NouvelleFiche({ onClose }: { onClose: () => void }) {
       const v = lire(f.key).trim();
       if (v) data[f.key] = v;
     }
-    addAccount({
+    const valeursFiche = {
       name: nom,
       signedOn: lire("date_client") || null,
       sector: lire("secteur").trim() || null,
       data,
-    });
+    };
+    if (fiche) saveAccount(fiche.id, valeursFiche);
+    else addAccount(valeursFiche);
     onClose();
   };
 
@@ -43,9 +53,11 @@ export default function NouvelleFiche({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} width={520}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Nouveau client</h2>
+          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
+            {fiche ? fiche.name : "Nouveau client"}
+          </h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            Seul l’établissement est nécessaire ; le reste peut se remplir plus tard.
+            {fiche ? "Modifiez ce qu’il faut, puis enregistrez." : "Seul l’établissement est nécessaire ; le reste peut se remplir plus tard."}
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
