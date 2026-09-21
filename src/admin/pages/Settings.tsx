@@ -15,7 +15,7 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader title="Réglages" subtitle="Administration de l'application" />
+      <PageHeader title="Réglages" subtitle="Réglages du Hub AvisDoc" />
 
       <Card className="max-w-[560px] p-6">
         <h2 className="font-display text-lg font-semibold text-avisdoc-ink">

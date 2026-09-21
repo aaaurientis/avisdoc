@@ -18,6 +18,7 @@ import type { AdminUser } from "../types";
 import { ADMIN_AUTH, ALLOWED_DOMAIN, isAllowedEmail } from "../lib/config";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { logAudit } from "../lib/audit";
+import { MODULES_DEFAUT, type Module } from "../lib/modules";
 
 type Status = "loading" | "authenticated" | "unauthenticated";
 
@@ -27,6 +28,10 @@ interface AuthValue {
   error: string | null;
   /** true si le compte connecté peut consulter le journal d'audit. */
   isSuperAdmin: boolean;
+  /** Modules de 1er niveau autorisés (admin_droits ; défaut si non listé). */
+  modules: Module[];
+  /** L'utilisateur a-t-il accès à ce module ? (super-admin : toujours oui.) */
+  peut: (m: Module) => boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -53,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [modules, setModules] = useState<Module[]>(MODULES_DEFAUT);
 
   // Hydratation initiale.
   useEffect(() => {
@@ -123,6 +129,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then(({ data }) => {
           if (active) setIsSuperAdmin(!!data);
         });
+      // Modules autorisés (admin_droits) — défaut si l'utilisateur n'est pas
+      // listé, ou si la migration 0021 n'est pas encore appliquée.
+      supabaseAdmin
+        .from("admin_droits")
+        .select("modules")
+        .eq("email", email)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active && data?.modules) setModules(data.modules as Module[]);
+        })
+        .catch(() => { /* table absente → défauts */ });
     };
 
     supabaseAdmin.auth.getSession().then(({ data }) => void applySession(data.session, false));
@@ -173,8 +190,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const value = useMemo<AuthValue>(
-    () => ({ status, user, error, isSuperAdmin, signIn, signOut }),
-    [status, user, error, isSuperAdmin, signIn, signOut],
+    () => ({
+      status, user, error, isSuperAdmin, modules,
+      peut: (m: Module) => isSuperAdmin || modules.includes(m),
+      signIn, signOut,
+    }),
+    [status, user, error, isSuperAdmin, modules, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
