@@ -15,6 +15,14 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   note: NotebookPen,
 };
 
+/** Une couleur par sorte : on reconnaît un appel d'un rendez-vous sans lire. */
+const TEINTES: Record<GenreEchange, string> = {
+  appel: "bg-avisdoc-teal text-white",
+  rdv: "bg-avisdoc-coral text-white",
+  email: "bg-violet-500 text-white",
+  note: "bg-slate-500 text-white",
+};
+
 const NOMS: Record<GenreEchange, string> = {
   appel: "appel",
   email: "e-mail",
@@ -36,7 +44,17 @@ export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
   const urgent = prevu.prochain ? new Date(prevu.prochain).getTime() <= Date.now() + 86_400_000 : false;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1">
+    <div className="mt-2 flex items-center justify-end gap-1.5">
+      {prevu.prochain && (
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px] font-bold",
+            urgent ? "bg-avisdoc-coral/15 text-avisdoc-coral" : "bg-muted text-avisdoc-ink",
+          )}
+        >
+          {leJour(prevu.prochain)}
+        </span>
+      )}
       {genres.map(([genre, n]) => {
         const Icone = ICONES[genre];
         return (
@@ -44,20 +62,15 @@ export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
             key={genre}
             title={`${n} ${NOMS[genre]}${n > 1 ? "s" : ""} à venir${prevu.prochain ? ` — le ${leJour(prevu.prochain)}` : ""}`}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold",
-              urgent ? "bg-avisdoc-coral/15 text-avisdoc-coral" : "bg-muted text-muted-foreground",
+              "inline-flex size-[22px] items-center justify-center rounded-full shadow-sm",
+              TEINTES[genre],
+              urgent && "ring-2 ring-avisdoc-coral/30",
             )}
           >
-            <Icone className="size-3" />
-            {n > 1 ? n : ""}
+            {n > 1 ? <span className="text-[11px] font-bold">{n}</span> : <Icone className="size-3.5" strokeWidth={2.4} />}
           </span>
         );
       })}
-      {prevu.prochain && (
-        <span className={cn("text-[10.5px] font-semibold", urgent ? "text-avisdoc-coral" : "text-muted-foreground")}>
-          {leJour(prevu.prochain)}
-        </span>
-      )}
     </div>
   );
 }

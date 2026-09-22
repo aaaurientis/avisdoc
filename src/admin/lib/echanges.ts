@@ -89,3 +89,29 @@ export async function supprimerEchange(id: string): Promise<void> {
   const { error } = await supabaseAdmin.from("admin_echanges").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+/** Déplacer ou corriger une action déjà notée : on décale un appel, on précise un objet. */
+export async function modifierEchange(
+  id: string,
+  saisie: { titre: string; detail: string; au: string },
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("admin_echanges")
+    .update({ titre: saisie.titre.trim(), detail: saisie.detail.trim() || null, au: saisie.au })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Les actions À VENIR d'une fiche : ce qui reste à faire, et qu'on peut encore déplacer. */
+export async function actionsAVenir(cles: ClesFiche): Promise<Echange[]> {
+  const ou = filtre(cles);
+  if (!ou) return [];
+  const { data, error } = await supabaseAdmin
+    .from("admin_echanges")
+    .select("id, kind, titre, detail, au, par")
+    .or(ou)
+    .gte("au", new Date().toISOString())
+    .order("au", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Echange[];
+}
