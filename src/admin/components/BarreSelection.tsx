@@ -8,19 +8,24 @@ import { Mail, Trash2, X } from "lucide-react";
 
 export default function BarreSelection({
   nombre,
+  total,
   avecEmail,
   libelleSuppression,
   onEmail,
   onSupprimer,
+  onTout,
   onEffacer,
 }: {
   nombre: number;
+  /** Combien de fiches sont affichées à l'écran : « tout cocher » n'en prend pas d'autres. */
+  total: number;
   /** Combien, parmi les fiches cochées, ont une adresse e-mail. */
   avecEmail: number;
   /** « Supprimer » ou « Écarter » selon l'écran : on ne détruit pas un prospect. */
   libelleSuppression: string;
   onEmail: () => void;
   onSupprimer: () => void;
+  onTout: () => void;
   onEffacer: () => void;
 }) {
   if (nombre === 0) return null;
@@ -31,6 +36,16 @@ export default function BarreSelection({
         <span className="px-2 text-[13px] font-bold text-avisdoc-ink">
           {nombre} fiche{nombre > 1 ? "s" : ""}
         </span>
+
+        {nombre < total && (
+          <button
+            type="button"
+            onClick={onTout}
+            className="rounded-full px-3 py-1.5 text-[12.5px] font-bold text-avisdoc-teal underline-offset-2 hover:underline"
+          >
+            Tout cocher ({total})
+          </button>
+        )}
 
         <button
           type="button"
@@ -53,10 +68,9 @@ export default function BarreSelection({
         <button
           type="button"
           onClick={onEffacer}
-          aria-label="Tout décocher"
-          className="rounded-full p-1.5 text-muted-foreground transition-colors hover:text-avisdoc-ink"
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:text-avisdoc-ink"
         >
-          <X className="size-4" />
+          <X className="size-3.5" /> Tout décocher
         </button>
       </div>
     </div>

@@ -112,6 +112,8 @@ export interface Client {
   ville?: string;
   effectif: string;
   stage: Stage;
+  /** La fiche du fichier client a déjà été créée : ne pas la recréer. */
+  ficheClientCreee?: boolean;
   jours: number;
   tarif: number;
   depistes: number;

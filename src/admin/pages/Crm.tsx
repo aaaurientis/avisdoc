@@ -5,6 +5,7 @@ import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
+import { toast } from "sonner";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
   departementDe,
@@ -79,8 +80,16 @@ export default function Crm() {
     const n = selectionnees.length;
     if (n === 0) return;
     if (!window.confirm(`Supprimer ${n} affaire${n > 1 ? "s" : ""} du Pipeline ? Cette suppression ne se défait pas.`)) return;
-    for (const c of selectionnees) await deleteClient(c.id);
+    let echecs = 0;
+    for (const c of selectionnees) {
+      try {
+        await deleteClient(c.id);
+      } catch {
+        echecs += 1;
+      }
+    }
     setCoches(new Set());
+    if (echecs > 0) toast.error(`${echecs} affaire${echecs > 1 ? "s n’ont" : " n’a"} pas pu être supprimée${echecs > 1 ? "s" : ""}.`);
   };
 
   /** Les départements réellement présents dans les affaires. */
@@ -144,12 +153,15 @@ export default function Crm() {
           origines={origines}
           coches={coches}
           onCocher={cocher}
+          onChangerCoches={setCoches}
         />
       )}
 
       {!selected && (
         <BarreSelection
           nombre={selectionnees.length}
+          total={visibles.length}
+          onTout={() => setCoches(new Set(visibles.map((c) => c.id)))}
           avecEmail={adresses.length}
           libelleSuppression="Supprimer"
           onEmail={ecrireAuxCoches}

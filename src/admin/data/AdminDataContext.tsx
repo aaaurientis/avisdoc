@@ -680,23 +680,30 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * Signé vaut client : toute affaire arrivée à l'étape qui signe a sa fiche au
-   * fichier client. On le vérifie à chaque chargement, et pas seulement au moment du
-   * clic — une étape changée ailleurs, ou avant que la règle existe, est rattrapée.
+   * Signer fait entrer l'affaire au fichier client — une fois, et une seule.
+   *
+   * La fiche créée est notée sur l'affaire (`ficheClientCreee`). Sans cette marque, on
+   * recréait la fiche à chaque chargement : la supprimer ne servait à rien, et trois
+   * affaires homonymes en fabriquaient trois d'un coup.
    */
   useEffect(() => {
     const signe = etapeQuiSigne(stages);
     if (!signe || clients.length === 0) return;
-    // Une fiche importée d'Excel n'est reliée à aucune affaire : on la reconnaît à son
-    // nom, sinon la signature en créerait un double.
+
     const nom = (t: string) => t.trim().toLowerCase();
-    const manquantes = clients.filter(
-      (c) =>
-        c.stage === signe &&
-        !accounts.some((a) => a.clientId === c.id || nom(a.name) === nom(c.company)),
-    );
-    if (manquantes.length === 0) return;
-    for (const c of manquantes) {
+    // Les noms déjà pris — par une fiche existante, ou par une affaire traitée juste avant
+    // dans cette même passe : deux affaires du même nom ne font pas deux fiches.
+    const pris = new Set(accounts.map((a) => nom(a.name)));
+
+    for (const c of clients) {
+      if (c.stage !== signe || c.ficheClientCreee) continue;
+      if (accounts.some((a) => a.clientId === c.id) || pris.has(nom(c.company))) {
+        // Rien à créer, mais l'affaire est en règle : on la marque pour ne plus y revenir.
+        updateClientFields(c.id, { ficheClientCreee: true });
+        continue;
+      }
+      pris.add(nom(c.company));
+      updateClientFields(c.id, { ficheClientCreee: true });
       void repo
         .secteurDuProspect(c.id)
         .catch(() => null)
@@ -710,7 +717,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           }),
         );
     }
-  }, [accounts, addAccount, clients, repo, stages]);
+  }, [accounts, addAccount, clients, repo, stages, updateClientFields]);
 
   const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
     (fiches) => {

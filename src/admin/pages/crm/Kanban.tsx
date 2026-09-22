@@ -4,7 +4,7 @@ import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
 import { Badge } from "../../components/ui";
-import CaseFiche from "../../components/CaseFiche";
+import CaseFiche, { CaseColonne } from "../../components/CaseFiche";
 import { tonNote } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ export default function Kanban({
   origines,
   coches,
   onCocher,
+  onChangerCoches,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -32,6 +33,8 @@ export default function Kanban({
   /** Fiches cochées, pour les actions groupées. */
   coches?: Set<string>;
   onCocher?: (id: string) => void;
+  /** Remplace la sélection entière : sert à cocher ou décocher une colonne d'un coup. */
+  onChangerCoches?: (suivant: Set<string>) => void;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -74,9 +77,17 @@ export default function Kanban({
               cible && "bg-avisdoc-teal/10 ring-2 ring-avisdoc-teal/40",
             )}
           >
-            <div className="mb-2.5 flex items-center justify-between">
-              <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                {stage.label}
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {onChangerCoches && coches && (
+                  <CaseColonne
+                    liste={list.map((c) => c.id)}
+                    coches={coches}
+                    onChanger={onChangerCoches}
+                    libelle={stage.label}
+                  />
+                )}
+                <div className="truncate text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">{stage.label}</div>
               </div>
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${ton.dot}`}>
                 {list.length}

@@ -151,6 +151,7 @@ export class SupabaseRepo implements AdminRepo {
       ville: r.ville ?? "",
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
+      ficheClientCreee: r.fiche_client_creee ?? false,
       jours: r.jours ?? 1,
       tarif: r.tarif ?? 0,
       depistes: r.depistes ?? 0,
@@ -240,7 +241,7 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateClientFields(id: string, fields: Partial<Client>): Promise<void> {
     const row: Record<string, unknown> = {};
-    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal" };
+    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee" };
     for (const [k, v] of Object.entries(fields)) {
       if (["contacts", "docs", "suivis"].includes(k)) continue;
       row[map[k] ?? k] = v;

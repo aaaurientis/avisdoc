@@ -12,7 +12,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import FiltresClients, { FILTRES_COMPTE_VIDES, retenueCompte, type FiltresCompte } from "./clients/FiltresClients";
 import ApercuImport from "./clients/ApercuImport";
 import BarreSelection from "../components/BarreSelection";
-import CaseFiche from "../components/CaseFiche";
+import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { proposer, type Correspondance } from "../lib/import-colonnes";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
@@ -476,8 +476,9 @@ export default function FichierClient() {
             return (
               <div key={secteur} className={COLONNE_KANBAN}>
                 <div className="mb-2.5 flex items-center justify-between gap-2">
-                  <div className="truncate text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                    {secteur}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <CaseColonne liste={liste.map((a) => a.id)} coches={coches} onChanger={setCoches} libelle={secteur} />
+                    <div className="truncate text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">{secteur}</div>
                   </div>
                   <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
                     {liste.length}
@@ -644,6 +645,8 @@ export default function FichierClient() {
 
       <BarreSelection
         nombre={selectionnees.length}
+        total={visibles.length}
+        onTout={() => setCoches(new Set(visibles.map((a) => a.id)))}
         avecEmail={adresses.length}
         libelleSuppression="Supprimer"
         onEmail={ecrireAuxCoches}

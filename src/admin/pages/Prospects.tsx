@@ -10,7 +10,7 @@ import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
-import CaseFiche from "../components/CaseFiche";
+import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
@@ -382,6 +382,8 @@ export default function Prospects() {
 
       <BarreSelection
         nombre={selectionnees.length}
+        total={visibles.length}
+        onTout={() => setCoches(new Set(visibles.map((p) => p.id)))}
         avecEmail={adresses.length}
         libelleSuppression={voirEcartees ? "Restaurer" : "Supprimer"}
         onEmail={ecrireAuxCoches}
