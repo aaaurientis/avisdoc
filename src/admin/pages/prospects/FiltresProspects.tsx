@@ -29,6 +29,7 @@ const ARRIVEE: { valeur: string; label: string; jours: number }[] = [
   { valeur: "1", label: "Aujourd’hui", jours: 1 },
   { valeur: "7", label: "7 derniers jours", jours: 7 },
   { valeur: "30", label: "30 derniers jours", jours: 30 },
+  { valeur: "90", label: "3 derniers mois", jours: 90 },
 ];
 
 /** Applique les filtres et la recherche à une fiche. */

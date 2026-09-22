@@ -313,9 +313,6 @@ export default function ProspectFiche({
             {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
           </button>
-          <span className="text-[12.5px] text-muted-foreground">
-            {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} : environ {euroDollar(couts.approfondissement.montant)} par approfondissement.
-          </span>
           <button
             type="button"
             onClick={() => void lancer("email")}
@@ -326,9 +323,6 @@ export default function ProspectFiche({
             {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
             Écrire un e-mail personnalisé
           </button>
-          <span className="text-[12.5px] text-muted-foreground">
-            {p.contact_email ? `Environ ${euroDollar(couts.email.montant)}.` : `Pas d’adresse sur la fiche : vous la saisirez dans l’e-mail. Environ ${euroDollar(couts.email.montant)}.`}
-          </span>
           <button
             type="button"
             onClick={() => void lancer("ecarter")}
@@ -339,6 +333,11 @@ export default function ProspectFiche({
             Écarter
           </button>
         </div>
+
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
+          {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
+        </p>
       </div>
     </div>
   );

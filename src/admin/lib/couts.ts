@@ -43,12 +43,11 @@ export function coutDe(usage: Consommation | null | undefined, modele = MODELE_P
   return { entree, sortie, recherches, total: entree + sortie + recherches };
 }
 
-/** Un montant en dollars, lisible même quand il est minuscule. */
+/** Un montant en dollars, à la française, lisible même quand il est minuscule. */
 export function euroDollar(montant: number): string {
   if (montant === 0) return "0 $";
-  if (montant < 0.01) return `${montant.toFixed(4)} $`;
-  if (montant < 1) return `${montant.toFixed(3)} $`;
-  return `${montant.toFixed(2)} $`;
+  const decimales = montant < 0.01 ? 3 : 2;
+  return `${montant.toLocaleString("fr-FR", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })} $`;
 }
 
 /**

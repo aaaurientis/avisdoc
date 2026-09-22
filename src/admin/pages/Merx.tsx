@@ -141,9 +141,9 @@ export default function Merx() {
         }
       />
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_440px]">
         {/* ── La conversation ── */}
-        <Card className="flex h-[calc(100vh-14rem)] min-h-[420px] flex-col">
+        <Card className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto p-6">
             {messages.length === 0 && (
               <div className="mx-auto max-w-lg rounded-2xl bg-muted/60 p-6 text-center">
@@ -213,13 +213,13 @@ export default function Merx() {
         </Card>
 
         {/* ── Pistes et historique ── */}
-        <div className="flex flex-col gap-3">
-          <Card className="p-4">
+        <div className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col gap-3">
+          <Card className="flex min-h-0 flex-col p-4">
             <SectionLabel>Pistes à explorer</SectionLabel>
             <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
-              Des croisements que personne n’a encore demandés. Modifiez le texte avant de lancer.
+              Des croisements que personne n’a encore demandés — modifiez le texte avant de lancer.
             </p>
-            <div className="mt-3 space-y-2">
+            <div className="mt-2.5 min-h-0 space-y-2 overflow-y-auto">
               {propositions.length === 0 && (
                 <p className="text-[12.5px] text-muted-foreground">Tous les croisements ont été explorés — écrivez votre propre demande.</p>
               )}
@@ -229,7 +229,7 @@ export default function Merx() {
             </div>
           </Card>
 
-          <Card className="flex min-h-0 flex-1 flex-col p-4">
+          <Card className="flex min-h-[124px] flex-1 flex-col overflow-hidden p-4">
             <SectionLabel>Vos conversations</SectionLabel>
             <div className="mt-2 flex-1 space-y-1 overflow-y-auto">
               {historique.length === 0 && (
@@ -276,19 +276,19 @@ function PisteModifiable({
 }) {
   const [texte, setTexte] = useState(piste);
   return (
-    <div className="rounded-xl border border-border p-2">
+    <div className="flex items-center gap-2 rounded-xl border border-border p-2">
       <textarea
         value={texte}
         onChange={(e) => setTexte(e.target.value)}
         rows={2}
         aria-label={`Piste ${index + 1}`}
-        className="w-full resize-none rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] leading-snug text-avisdoc-ink outline-none"
+        className="min-w-0 flex-1 resize-none rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] leading-snug text-avisdoc-ink outline-none"
       />
       <button
         type="button"
         onClick={() => onLancer(texte)}
         disabled={occupe || !texte.trim()}
-        className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-bold text-avisdoc-ink transition-colors hover:bg-avisdoc-teal hover:text-white disabled:opacity-50"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-bold text-avisdoc-ink transition-colors hover:bg-avisdoc-teal hover:text-white disabled:opacity-50"
       >
         <Play className="size-3.5" /> Lancer
       </button>
