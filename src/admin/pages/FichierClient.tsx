@@ -10,6 +10,8 @@ import type { Account, AccountField, FieldType } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import FiltresClients, { FILTRES_COMPTE_VIDES, retenueCompte, type FiltresCompte } from "./clients/FiltresClients";
+import ApercuImport from "./clients/ApercuImport";
+import { proposer, type Correspondance } from "../lib/import-colonnes";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
 import { tonNote } from "../lib/merx";
@@ -38,6 +40,10 @@ function affiche(a: Account, f: AccountField): string {
 
 const SANS_VALEUR = "Non renseigné";
 
+/** Une cellule Excel peut être une date, un nombre ou du texte : on la lit toujours en texte. */
+const texteCellule = (v: unknown) =>
+  v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim();
+
 /** Regrouper par mois plutôt que par date : une colonne par jour n’aurait aucun sens. */
 const MOIS_ENTREE = "__mois";
 
@@ -52,6 +58,11 @@ export default function FichierClient() {
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
   const [groupePar, setGroupePar] = useState("secteur");
   const [importOuvert, setImportOuvert] = useState(false);
+  const [aImporter, setAImporter] = useState<{
+    nom: string;
+    lignes: Record<string, unknown>[];
+    correspondances: Correspondance[];
+  } | null>(null);
   const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
     new Map(),
   );
@@ -180,14 +191,10 @@ export default function FichierClient() {
   };
 
   /**
-   * Import : on prend le fichier tel qu'il est. Les colonnes déjà connues sont
-   * reconnues par leur libellé ; les autres sont CRÉÉES, avec le type deviné d'après
-   * leurs valeurs. Rien n'est jeté faute d'en-tête attendu.
-   *
-   * La colonne qui porte le nom de l'établissement est cherchée parmi les intitulés
-   * usuels ; à défaut, c'est la première colonne du fichier.
+   * Lire le fichier et proposer une destination par colonne. Rien n'entre encore :
+   * l'aperçu montre où va quoi, et se corrige.
    */
-  const importer = async (file: File) => {
+  const lireLeFichier = async (file: File) => {
     setMessage(null);
     try {
       const XLSX = await import("xlsx");
@@ -198,76 +205,61 @@ export default function FichierClient() {
         setMessage("Le fichier ne contient aucune ligne.");
         return;
       }
-
       const entetes = Object.keys(lignes[0]).filter((e) => e.trim());
-      const nu = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      const NOMS = ["etablissement", "nom", "raison sociale", "societe", "entreprise", "client"];
-      const enteteNom = entetes.find((e) => NOMS.includes(nu(e))) ?? entetes[0];
-
-      const texte = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim());
-
-      /** Le type d'une colonne se devine sur ses valeurs : on ne le demande pas. */
-      const typeDe = (entete: string): FieldType => {
-        const vues = lignes.map((l) => l[entete]).filter((v) => texte(v));
-        if (vues.length === 0) return "texte";
-        if (vues.every((v) => v instanceof Date)) return "date";
-        const t = vues.map(texte);
-        if (t.every((v) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v))) return "email";
-        if (t.every((v) => /^https?:\/\//i.test(v))) return "lien";
-        if (t.every((v) => /^[+\d][\d .()-]{7,}$/.test(v))) return "telephone";
-        if (t.every((v) => /^-?\d+([.,]\d+)?$/.test(v))) return "nombre";
-        if (t.some((v) => v.length > 60)) return "multiligne";
-        return "texte";
-      };
-
-      const parLabel = new Map(accountFields.map((f) => [nu(f.label), f]));
-      // Les colonnes absentes du fichier client sont créées avec le type deviné.
-      const aCreer = entetes
-        .filter((e) => e !== enteteNom && !parLabel.has(nu(e)))
-        .map((e) => ({ label: e.trim(), type: typeDe(e) }));
-      const nouvelles = aCreer.length > 0 ? addFields(aCreer) : new Map<string, string>();
-
-      const fiches = lignes.map((ligne) => {
-        const data: Record<string, string> = {};
-        let name = "";
-        let signedOn: string | null = null;
-        let sector: string | null = null;
-        for (const [entete, brut] of Object.entries(ligne)) {
-          const v = texte(brut);
-          if (entete === enteteNom) {
-            name = v;
-            continue;
-          }
-          const champ = parLabel.get(nu(entete));
-          if (champ) {
-            if (champ.key === "etablissement") name = name || v;
-            else if (champ.key === "date_client") signedOn = v || null;
-            else if (champ.key === "secteur") sector = v || null;
-            else if (v) data[champ.key] = v;
-            continue;
-          }
-          const cle = nouvelles.get(entete.trim());
-          if (cle && v) data[cle] = v;
-        }
-        return { name, signedOn, sector, data };
-      });
-
-      const retenues = fiches.filter((f) => f.name);
-      addManyAccounts(retenues);
-      const ignorees = fiches.length - retenues.length;
-      setMessage(
-        [
-          `${retenues.length} fiche${retenues.length > 1 ? "s ajoutées" : " ajoutée"}`,
-          `nom repris de la colonne « ${enteteNom.trim()} »`,
-          aCreer.length > 0 && `${aCreer.length} colonne${aCreer.length > 1 ? "s créées" : " créée"} : ${aCreer.map((c) => c.label).join(", ")}`,
-          ignorees > 0 && `${ignorees} ligne${ignorees > 1 ? "s" : ""} sans nom ignorée${ignorees > 1 ? "s" : ""}`,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      );
+      const valeursPar = (entete: string) => lignes.map((l) => texteCellule(l[entete]));
+      setAImporter({ nom: file.name, lignes, correspondances: proposer(entetes, valeursPar, accountFields) });
     } catch (e) {
       setMessage(`Le fichier n’a pas pu être lu : ${e instanceof Error ? e.message : "format inattendu"}`);
     }
+  };
+
+  /** L'aperçu a été validé : on crée les colonnes retenues, puis les fiches. */
+  const importer = (choisies: Correspondance[]) => {
+    if (!aImporter) return;
+    const { lignes } = aImporter;
+
+    const aCreer = choisies
+      .filter((c) => c.destination.sorte === "nouvelle")
+      .map((c) => ({ label: c.entete.trim(), type: (c.destination as { type: FieldType }).type }));
+    const nouvelles = aCreer.length > 0 ? addFields(aCreer) : new Map<string, string>();
+
+    const enteteNom = choisies.find((c) => c.destination.sorte === "nom")?.entete ?? "";
+
+    const fiches = lignes.map((ligne) => {
+      const data: Record<string, string> = {};
+      let name = "";
+      let signedOn: string | null = null;
+      let sector: string | null = null;
+      for (const c of choisies) {
+        const v = texteCellule(ligne[c.entete]);
+        if (c.entete === enteteNom) {
+          name = v;
+          continue;
+        }
+        if (c.destination.sorte === "ignorer" || !v) continue;
+        const cle =
+          c.destination.sorte === "existante" ? c.destination.champ.key : nouvelles.get(c.entete.trim());
+        if (!cle) continue;
+        if (cle === "date_client") signedOn = v;
+        else if (cle === "secteur") sector = v;
+        else data[cle] = v;
+      }
+      return { name, signedOn, sector, data };
+    });
+
+    const retenues = fiches.filter((f) => f.name);
+    addManyAccounts(retenues);
+    const ignorees = fiches.length - retenues.length;
+    setAImporter(null);
+    setMessage(
+      [
+        `${retenues.length} fiche${retenues.length > 1 ? "s ajoutées" : " ajoutée"}`,
+        aCreer.length > 0 && `${aCreer.length} colonne${aCreer.length > 1 ? "s créées" : " créée"} : ${aCreer.map((c) => c.label).join(", ")}`,
+        ignorees > 0 && `${ignorees} ligne${ignorees > 1 ? "s" : ""} sans nom ignorée${ignorees > 1 ? "s" : ""}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
   };
 
   const boutonSecondaire =
@@ -307,7 +299,7 @@ export default function FichierClient() {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) void importer(f);
+          if (f) void lireLeFichier(f);
           e.target.value = "";
         }}
       />
@@ -598,6 +590,17 @@ export default function FichierClient() {
             Le modèle sert si vous partez de zéro : c’est un fichier vide aux colonnes d’aujourd’hui.
           </p>
         </Modal>
+      )}
+
+      {aImporter && (
+        <ApercuImport
+          fichier={aImporter.nom}
+          lignes={aImporter.lignes.length}
+          correspondances={aImporter.correspondances}
+          champs={accountFields}
+          onAnnuler={() => setAImporter(null)}
+          onValider={importer}
+        />
       )}
 
       {colonnes && <ColonnesClient onClose={() => setColonnes(false)} />}
