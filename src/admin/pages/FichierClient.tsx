@@ -15,6 +15,8 @@ import BarreSelection from "../components/BarreSelection";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { proposer, type Correspondance } from "../lib/import-colonnes";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
+import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
+import PastillesPrevues from "../components/PastillesPrevues";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
 import { tonNote } from "../lib/merx";
@@ -62,6 +64,16 @@ export default function FichierClient() {
   const [groupePar, setGroupePar] = useState("secteur");
   const [importOuvert, setImportOuvert] = useState(false);
   const [coches, setCoches] = useState<Set<string>>(new Set());
+  const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
+
+  /** Ce qui attend sur chaque fiche : une action notée doit se voir depuis le tableau. */
+  useEffect(() => {
+    let vivant = true;
+    void actionsPrevues().then((m) => vivant && setPrevues(m));
+    return () => {
+      vivant = false;
+    };
+  }, [accounts]);
 
   const cocher = (id: string) =>
     setCoches((prev) => {
@@ -548,6 +560,8 @@ export default function FichierClient() {
                             {origineDe(a)!.rationale}
                           </p>
                         )}
+                        <PastillesPrevues prevu={prevues.get(a.id)} />
+
                         {infos.map((f) => (
                           <div key={f.id} className="mt-1 truncate text-[11.5px] text-muted-foreground">
                             <span className="text-muted-foreground/70">{f.label} · </span>
