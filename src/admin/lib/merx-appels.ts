@@ -23,6 +23,20 @@ export async function approfondirProspect(prospectId: string): Promise<void> {
   await appeler({ action: "approfondir", prospectId });
 }
 
+/**
+ * Demande un brouillon pour quelqu'un qui est DÉJÀ client : Merx s'appuie sur la campagne
+ * menée et sur tout ce qui a été noté avec eux. RIEN N'EST ENVOYÉ.
+ */
+export async function redigerEmailClient(accountId: string, intention: string, signature: string): Promise<BrouillonRendu> {
+  const r = await appeler<{ objet?: string; corps?: string; destinataire?: string | null }>({
+    action: "email_client",
+    accountId,
+    intention,
+    signature,
+  });
+  return { objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null };
+}
+
 /** Demande un brouillon de premier contact. RIEN N'EST ENVOYÉ. */
 export async function redigerEmailProspect(prospectId: string, signature: string): Promise<BrouillonRendu> {
   const r = await appeler<{ objet?: string; corps?: string; destinataire?: string | null }>({

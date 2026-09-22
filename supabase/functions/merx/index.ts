@@ -18,7 +18,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
 import { complete, converse, model, type LlmUsage } from "./llm.ts";
-import { CHAT_SYSTEM, EMAIL_SCHEMA, EMAIL_SYSTEM, emailPrompt, type EmailOut } from "./prompts.ts";
+import {
+  CHAT_SYSTEM,
+  EMAIL_CLIENT_SYSTEM,
+  EMAIL_SCHEMA,
+  EMAIL_SYSTEM,
+  emailClientPrompt,
+  emailPrompt,
+  type EmailOut,
+} from "./prompts.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +127,100 @@ Deno.serve(async (req: Request) => {
             .eq("id", demande.id);
         }
         return json({ objet: out.objet, corps: out.corps, destinataire: p.contact_email ?? null });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ error: "Le brouillon n'a pas pu être écrit. Vous pouvez réessayer." }, 500);
+      }
+    }
+
+    // ── Écrire à un client ───────────────────────────────────────────────
+    if (body.action === "email_client") {
+      if (!body.accountId) return json({ error: "Fiche non précisée." }, 400);
+      const intention = String(body.intention ?? "").trim();
+      if (!intention) return json({ error: "Dites d'abord ce que vous voulez leur écrire." }, 400);
+
+      const { data: a } = await sb
+        .from("admin_accounts")
+        .select("id, name, sector, signed_on, client_id")
+        .eq("id", body.accountId)
+        .maybeSingle();
+      if (!a) return json({ error: "Fiche introuvable." }, 404);
+
+      // L'affaire du Pipeline porte le chiffre et les interlocuteurs ; le fichier client, le nom.
+      const { data: affaire } = a.client_id
+        ? await sb.from("admin_clients").select("ville, jours, depistes, orientes").eq("id", a.client_id).maybeSingle()
+        : { data: null };
+      const { data: contact } = a.client_id
+        ? await sb
+            .from("admin_client_contacts")
+            .select("prenom, nom, role, email")
+            .eq("client_id", a.client_id)
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
+
+      // Tout ce qu'on a noté avec eux, d'un côté comme de l'autre du passage au fichier client.
+      const ou = [`account_id.eq.${a.id}`, a.client_id ? `client_id.eq.${a.client_id}` : ""].filter(Boolean).join(",");
+      const { data: fil } = await sb
+        .from("admin_echanges")
+        .select("kind, titre, detail, au")
+        .or(ou)
+        .order("au", { ascending: false })
+        .limit(12);
+
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "email", request: `${a.name} — ${intention}`, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      try {
+        const signature = String(body.signature ?? "").trim() || email;
+        const out = await complete<EmailOut>(
+          emailClientPrompt(
+            {
+              nom: a.name,
+              secteur: a.sector,
+              clientDepuis: a.signed_on,
+              journees: affaire?.jours ?? null,
+              depistes: affaire?.depistes ?? null,
+              orientes: affaire?.orientes ?? null,
+              ville: affaire?.ville ?? null,
+              contact: contact ? { nom: [contact.prenom, contact.nom].filter(Boolean).join(" "), role: contact.role ?? null } : null,
+            },
+            intention,
+            (fil ?? []).map((e) => ({
+              quand: new Date(e.au as string).toLocaleDateString("fr-FR"),
+              genre: String(e.kind),
+              titre: String(e.titre ?? ""),
+              detail: (e.detail as string | null) ?? null,
+            })),
+            signature,
+          ),
+          EMAIL_SCHEMA as unknown as Record<string, unknown>,
+          { system: EMAIL_CLIENT_SYSTEM, usage: "email", timeoutMs: 40_000, onUsage: (u) => (usage = u) },
+        );
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({
+              status: "terminee",
+              usage,
+              model: model("email"),
+              finished_at: new Date().toISOString(),
+              objet: out.objet,
+              corps: out.corps,
+            })
+            .eq("id", demande.id);
+        }
+        return json({ objet: out.objet, corps: out.corps, destinataire: contact?.email ?? null });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (demande) {
