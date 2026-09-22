@@ -6,9 +6,16 @@
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import type { GenreEchange } from "./echanges";
 
+/** Une action à venir : sa sorte et son heure. Chacune a la sienne. */
+export interface ActionPrevue {
+  kind: GenreEchange;
+  au: string;
+  titre: string;
+}
+
 export interface Prevu {
-  /** Combien de chaque sorte, à venir. */
-  parGenre: Partial<Record<GenreEchange, number>>;
+  /** Les actions à venir, de la plus proche à la plus lointaine. */
+  actions: ActionPrevue[];
   /** La plus proche échéance : c'est elle qui presse. */
   prochain: string | null;
 }
@@ -20,16 +27,19 @@ export interface Prevu {
 export async function actionsPrevues(): Promise<Map<string, Prevu>> {
   const { data } = await supabaseAdmin
     .from("admin_echanges")
-    .select("client_id, prospect_id, account_id, kind, au")
+    .select("client_id, prospect_id, account_id, kind, au, titre")
     .gte("au", new Date().toISOString())
     .order("au", { ascending: true });
 
   const par = new Map<string, Prevu>();
-  for (const e of (data ?? []) as { client_id: string | null; prospect_id: string | null; account_id: string | null; kind: GenreEchange; au: string }[]) {
+  for (const e of (data ?? []) as {
+    client_id: string | null; prospect_id: string | null; account_id: string | null;
+    kind: GenreEchange; au: string; titre: string;
+  }[]) {
     const cle = e.client_id ?? e.prospect_id ?? e.account_id;
     if (!cle) continue;
-    const vu = par.get(cle) ?? { parGenre: {}, prochain: null };
-    vu.parGenre[e.kind] = (vu.parGenre[e.kind] ?? 0) + 1;
+    const vu = par.get(cle) ?? { actions: [], prochain: null };
+    vu.actions.push({ kind: e.kind, au: e.au, titre: e.titre });
     // Les lignes arrivent triées : la première vue est la plus proche.
     if (!vu.prochain) vu.prochain = e.au;
     par.set(cle, vu);
