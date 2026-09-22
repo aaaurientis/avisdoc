@@ -518,14 +518,54 @@ export default function FichierClient() {
       {importOuvert && (
         <Modal onClose={() => setImportOuvert(false)} width={520}>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Importer un fichier Excel</h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            Prenez votre fichier tel qu’il est. La première ligne doit porter les noms des colonnes ; chaque ligne
-            suivante est un client. Les colonnes que le fichier client ne connaît pas encore seront créées.
-          </p>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            Une seule chose compte : une colonne doit porter le nom de l’établissement — intitulée
-            « Établissement », « Nom », « Raison sociale », « Société », « Entreprise » ou « Client ». À défaut, la
-            première colonne sera prise pour le nom.
+          <p className="mt-2 text-[13.5px] text-muted-foreground">Votre fichier doit ressembler à ceci :</p>
+
+          {/* Montrer vaut mieux qu’expliquer : l’exemple dit la règle à lui seul. */}
+          <div className="mt-2 overflow-hidden rounded-xl border border-border">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  {["Nom", "Ville", "Téléphone"].map((e) => (
+                    <th key={e} className="px-3 py-2 text-[12px] font-bold text-avisdoc-ink">
+                      {e}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Clinique des Cèdres", "Toulouse", "05 61 22 30 40"],
+                  ["Hôpital Saint-Joseph", "Marseille", "04 91 80 65 00"],
+                ].map((ligne) => (
+                  <tr key={ligne[0]} className="border-b border-border last:border-0">
+                    {ligne.map((v) => (
+                      <td key={v} className="px-3 py-2 text-[12.5px] text-muted-foreground">
+                        {v}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <ul className="mt-3 space-y-1.5">
+            {[
+              "La première ligne donne le nom des colonnes.",
+              "Ensuite, une ligne par client.",
+              "Mettez toutes vos colonnes : celles qui n’existent pas ici seront ajoutées.",
+            ].map((t) => (
+              <li key={t} className="flex gap-2 text-[13px] leading-snug text-muted-foreground">
+                <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-avisdoc-teal" />
+                {t}
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+            Une seule colonne est indispensable : celle du <span className="font-semibold text-avisdoc-ink">nom de
+            l’entreprise</span>. Si elle ne s’appelle pas « Nom », « Établissement » ou « Raison sociale », c’est la
+            première colonne qui sera prise.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
@@ -555,8 +595,7 @@ export default function FichierClient() {
             </button>
           </div>
           <p className="mt-3 text-[12px] text-muted-foreground">
-            Le modèle reprend les colonnes de votre fichier du moment, avec une ligne d’exemple. Il n’est pas
-            obligatoire : il sert si vous partez de zéro.
+            Le modèle sert si vous partez de zéro : c’est un fichier vide aux colonnes d’aujourd’hui.
           </p>
         </Modal>
       )}
