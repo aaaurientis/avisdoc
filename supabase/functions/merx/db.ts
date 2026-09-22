@@ -81,14 +81,52 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
 export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
   if (!prospects.length) return 0;
 
-  const clef = (nom: string, ville: string | null) => `${nom.trim().toLowerCase()}|${(ville ?? "").trim().toLowerCase()}`;
-  const { data: connus } = await sb.from("admin_prospects").select("name, city");
-  const dejaLa = new Set((connus ?? []).map((r: { name: string; city: string | null }) => clef(r.name, r.city)));
+  // On compare sur un nom RÉDUIT : sans accents, sans ponctuation, sans forme juridique.
+  // « Jardin Eau Bois », « JARDIN-EAU-BOIS » et « Jardin Eau Bois SARL » sont la même maison.
+  const nu = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\b(sarl|sas|sasu|eurl|sa|sci|scop|snc|earl|gaec|ets|etablissements?)\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const chiffres = (t: string | null) => (t ?? "").replace(/\D/g, "");
+
+  // Une entreprise déjà connue peut l'être N'IMPORTE OÙ : en prospection, au Pipeline ou
+  // au fichier client. La chercher dans les seuls prospects laissait passer les doublons.
+  const [enProspection, auPipeline, auFichier] = await Promise.all([
+    sb.from("admin_prospects").select("name, city, siren"),
+    sb.from("admin_clients").select("company, ville, siren"),
+    sb.from("admin_accounts").select("name"),
+  ]);
+
+  const connus: { nom: string; ville: string; siren: string }[] = [
+    ...(enProspection.data ?? []).map((r) => ({ nom: nu(r.name as string), ville: nu((r.city as string) ?? ""), siren: chiffres(r.siren as string) })),
+    ...(auPipeline.data ?? []).map((r) => ({ nom: nu(r.company as string), ville: nu((r.ville as string) ?? ""), siren: chiffres(r.siren as string) })),
+    ...(auFichier.data ?? []).map((r) => ({ nom: nu(r.name as string), ville: "", siren: "" })),
+  ];
+
+  /**
+   * Même nom : c'est la même entreprise, SAUF si les deux villes sont connues et
+   * différentes. Une ville manquante d'un côté ne suffit pas à en faire deux maisons —
+   * c'est précisément ce qui avait laissé passer un doublon d'ONETIP.
+   */
+  const dejaConnue = (nom: string, ville: string | null, siren: string | null) => {
+    const n = nu(nom);
+    const v = nu(ville ?? "");
+    const s = chiffres(siren);
+    return connus.some((c) => {
+      if (s && c.siren && s === c.siren) return true;
+      if (c.nom !== n) return false;
+      return !(v && c.ville && v !== c.ville);
+    });
+  };
 
   let ajoutes = 0;
   for (const p of prospects) {
-    if (dejaLa.has(clef(p.name, p.city))) continue;
-    dejaLa.add(clef(p.name, p.city));
+    if (dejaConnue(p.name, p.city, null)) continue;
+    connus.push({ nom: nu(p.name), ville: nu(p.city ?? ""), siren: "" });
     const { error } = await sb.from("admin_prospects").insert({
       found_by: demandeId,
       owner_email: owner,
