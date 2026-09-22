@@ -387,3 +387,131 @@ export function emailClientPrompt(
     .filter(Boolean)
     .join("\n");
 }
+
+// ── Le débrief : ce que le commercial raconte en sortant ─────────────────
+
+export const DEBRIEF_SYSTEM = `${AVISDOC}
+
+Un commercial d'AvisDoc vient de raconter sa journée, ou sa sortie de rendez-vous. Le texte
+t'arrive tel qu'il a parlé : phrases coupées, noms approximatifs, ordre décousu. Ton travail
+est d'en tirer ce qui se range, entreprise par entreprise.
+
+CE QUE TU NE FAIS JAMAIS
+- Tu n'inventes rien. Ce qui n'est pas dit n'existe pas. Un doute laisse le champ vide.
+- Tu ne reformules pas une objection ni un argument : tu les rends AVEC LES MOTS DITS. C'est
+  leur valeur — « on a déjà la médecine du travail » vaut mieux que « objection organisationnelle ».
+- Tu ne décides rien. Tout ce que tu rends sera relu et validé à l'écran avant d'être écrit.
+
+RECONNAÎTRE LES ENTREPRISES
+La liste des fiches du commercial t'est donnée, avec leur identifiant. Rattache chaque
+entreprise citée à SA fiche quand tu la reconnais, même si le nom est déformé à l'oral
+(« jardin d'eau et bois » = « JARDIN EAU BOIS »). Si tu hésites entre deux fiches, ou si
+tu n'en trouves aucune, laisse l'identifiant vide et donne le nom tel qu'il a été dit : le
+commercial fera le lien lui-même.
+
+CE QUE TU RANGES, POUR CHAQUE ENTREPRISE CITÉE
+- resume : une phrase qui dit ce qui s'est passé avec eux. Elle ira dans l'historique.
+- objections : ce qui a bloqué, avec les mots dits, et la famille qui les range
+  (« médecine du travail », « prix », « déjà fait », « pas le temps », « effectif trop faible »…).
+  Tu ranges dans une famille existante quand elle convient ; tu en crées une, courte et
+  générale, seulement si rien ne va. Si le commercial a dit ce qu'il a répondu, note-le.
+- mouches : ce qui a fait mouche — l'argument, la phrase, le moment où le ton a changé —
+  avec les mots dits et la famille (« réseau d'aval », « examen sur site », « délai de 4 jours »…).
+- actions : ce qu'il faut faire ensuite. Genre : « appel », « email », « rdv » ou « note ».
+  Si une date est dite (« jeudi », « la semaine prochaine »), rends-la en AAAA-MM-JJ à partir
+  de la date d'aujourd'hui qui t'est donnée. Sinon, laisse la date vide.
+- etape : l'étape du Pipeline si le commercial dit que cela a bougé (par exemple « ils veulent
+  une proposition » → « Proposition », « c'est signé » → « Signé »). Les étapes possibles te
+  sont données. Sinon, vide.
+
+${POLITESSE}
+${NEVER}`;
+
+export const DEBRIEF_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["entreprises", "non_rattachees"],
+  properties: {
+    entreprises: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["entreprise", "fiche_type", "fiche_id", "resume", "objections", "mouches", "actions", "etape"],
+        properties: {
+          entreprise: { type: "string" },
+          /** « prospect », « affaire », « client » — ou vide si le rattachement est incertain. */
+          fiche_type: { type: "string" },
+          fiche_id: { type: "string" },
+          resume: { type: "string" },
+          objections: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["verbatim", "famille", "reponse"],
+              properties: { verbatim: { type: "string" }, famille: { type: "string" }, reponse: { type: "string" } },
+            },
+          },
+          mouches: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["verbatim", "famille"],
+              properties: { verbatim: { type: "string" }, famille: { type: "string" } },
+            },
+          },
+          actions: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["genre", "quoi", "quand"],
+              properties: { genre: { type: "string" }, quoi: { type: "string" }, quand: { type: "string" } },
+            },
+          },
+          etape: { type: "string" },
+        },
+      },
+    },
+    /** Ce qui a été dit sans qu'on sache à qui le rattacher : on le montre plutôt que de le perdre. */
+    non_rattachees: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+export interface DebriefOut {
+  entreprises: {
+    entreprise: string;
+    fiche_type: string;
+    fiche_id: string;
+    resume: string;
+    objections: { verbatim: string; famille: string; reponse: string }[];
+    mouches: { verbatim: string; famille: string }[];
+    actions: { genre: string; quoi: string; quand: string }[];
+    etape: string;
+  }[];
+  non_rattachees: string[];
+}
+
+export function debriefPrompt(
+  texte: string,
+  fiches: { type: string; id: string; nom: string; ville: string | null }[],
+  etapes: string[],
+  familles: { objection: string[]; mouche: string[] },
+  aujourdhui: string,
+): string {
+  const liste = fiches.map((f) => `- [${f.type}:${f.id}] ${f.nom}${f.ville ? ` (${f.ville})` : ""}`).join("\n");
+  return [
+    `Aujourd'hui : ${aujourdhui}.`,
+    `Étapes du Pipeline : ${etapes.join(", ")}.`,
+    familles.objection.length ? `Familles d'objections déjà connues : ${familles.objection.join(", ")}.` : "",
+    familles.mouche.length ? `Familles d'arguments qui ont déjà porté : ${familles.mouche.join(", ")}.` : "",
+    "",
+    `LES FICHES DU COMMERCIAL :\n${liste || "(aucune fiche)"}`,
+    "",
+    `CE QU'IL RACONTE :\n${texte}`,
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
+}
