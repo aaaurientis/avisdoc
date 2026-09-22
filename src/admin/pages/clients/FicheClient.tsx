@@ -21,7 +21,7 @@ const champCls =
 const ONGLETS: Onglet[] = [
   { cle: "identite", label: "Identité" },
   { cle: "approche", label: "Approche" },
-  { cle: "suivi", label: "Suivi" },
+  { cle: "suivi", label: "Historique" },
 ];
 
 const inputType = (t: AccountField["type"]) =>

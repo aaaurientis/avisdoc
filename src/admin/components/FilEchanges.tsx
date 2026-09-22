@@ -1,4 +1,4 @@
-// L'onglet « Suivi » des fiches : ce qu'on a fait, et ce qui s'est fait tout seul.
+// L'onglet « Historique » des fiches : ce qu'on a fait, et ce qui s'est fait tout seul.
 //
 // En haut, quatre boutons pour noter un appel, un e-mail, un rendez-vous ou une note.
 // En dessous, un seul fil daté qui mélange ces échanges et les jalons de la fiche
@@ -68,7 +68,8 @@ export default function FilEchanges({
       setErreur(
         /Could not find the table .* in the schema cache/i.test(message)
           ? "L’historique attend sa migration (0028) : collez-la dans le SQL Editor."
-          : message,
+          : // Une erreur technique reste lisible : on dit d’abord ce qui n’a pas marché.
+            `L’historique n’a pas pu être chargé. ${message}`,
       );
     } finally {
       setChargement(false);

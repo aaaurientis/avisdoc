@@ -72,7 +72,7 @@ export default function ProspectFiche({
   const onglets: Onglet[] = [
     { cle: "identite", label: "Identité" },
     { cle: "approche", label: "Approche", compte: brouillons.length },
-    { cle: "suivi", label: "Suivi", compte: nbEchanges },
+    { cle: "suivi", label: "Historique", compte: nbEchanges },
   ];
   const p = prospect;
   const siege = p.head_office;

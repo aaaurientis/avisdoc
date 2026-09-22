@@ -78,12 +78,7 @@ export default function Crm() {
       )}
 
       {selected ? (
-        <ProjectView
-          client={selected}
-          allClients={clients}
-          onSelect={(id) => navigate(`/crm/${id}`)}
-          onClose={() => navigate("/crm")}
-        />
+        <ProjectView client={selected} onClose={() => navigate("/crm")} />
       ) : (
         <Kanban
           clients={visibles}

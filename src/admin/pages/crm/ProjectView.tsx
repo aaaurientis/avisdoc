@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, Lock, Minus, Pencil, Plus, UserPlus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, PenLine, Plus, Search, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -12,6 +12,14 @@ import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
 import ParcoursBanner from "../../espace/ParcoursBanner";
+import { useAuth } from "../../auth/AuthContext";
+import { supabaseAdmin } from "../../data/supabaseAdmin";
+import NoteDetaillee from "../prospects/NoteDetaillee";
+import BrouillonEmail from "../prospects/BrouillonEmail";
+import FilEchanges from "../../components/FilEchanges";
+import type { Jalon } from "../../lib/echanges";
+import type { Prospect } from "../../lib/merx";
+import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -81,13 +89,9 @@ function Section({
 
 export default function ProjectView({
   client,
-  allClients,
-  onSelect,
   onClose,
 }: {
   client: Client;
-  allClients: Client[];
-  onSelect: (id: string) => void;
   onClose: () => void;
 }) {
   const {
@@ -104,6 +108,7 @@ export default function ProjectView({
     addAccount,
     setClientStage,
   } = useAdminData();
+  const { user } = useAuth();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "" });
@@ -126,8 +131,17 @@ export default function ProjectView({
   };
   const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
 
+  const [origine, setOrigine] = useState<Prospect | null>(null);
+  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
+  const compter = useCallback((n: number) => setNbEchanges(n), []);
+  const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
+  const [merxErreur, setMerxErreur] = useState<string | null>(null);
+  const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
+
   // Onglets des fonctions, dans l'ordre du parcours.
   const TABS: { key: string; label: string; min: Stage; compte?: number }[] = [
+    { key: "approche", label: "Approche", min: "Nouveau" },
+    { key: "suivi", label: "Historique", min: "Nouveau", compte: nbEchanges ?? undefined },
     { key: "contacts", label: "Contacts", min: "Nouveau", compte: client.contacts.length },
     { key: "suivis", label: "Suivis", min: "Nouveau", compte: client.suivis.length },
     { key: "journal", label: "Journal", min: "Nouveau" },
@@ -137,7 +151,45 @@ export default function ProjectView({
     { key: "espace", label: "Espace client", min: "Signé" },
     { key: "rdv", label: "Rendez-vous", min: "Signé" },
   ];
-  const [tab, setTab] = useState("contacts");
+  const [tab, setTab] = useState("approche");
+
+  /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
+  const chargerOrigine = useCallback(async () => {
+    const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("converted_client_id", client.id).maybeSingle();
+    setOrigine((data as Prospect) ?? null);
+  }, [client.id]);
+
+  useEffect(() => {
+    void chargerOrigine();
+  }, [chargerOrigine]);
+
+  const jalons = useMemo<Jalon[]>(
+    () =>
+      ([
+        origine ? { libelle: "Trouvée par Merx", au: origine.created_at } : null,
+        origine?.enriched_at ? { libelle: "Fiche approfondie", au: origine.enriched_at } : null,
+        origine?.converted_at ? { libelle: "Passée au Pipeline", au: origine.converted_at } : null,
+      ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
+    [origine],
+  );
+
+  const demanderAMerx = async (quoi: "approfondir" | "email") => {
+    if (!origine || merxEnCours) return;
+    setMerxEnCours(quoi);
+    setMerxErreur(null);
+    try {
+      if (quoi === "approfondir") {
+        await approfondirProspect(origine.id);
+        await chargerOrigine();
+      } else {
+        setBrouillon(await redigerEmailProspect(origine.id, user?.name ?? user?.email ?? ""));
+      }
+    } catch (e) {
+      setMerxErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
+    } finally {
+      setMerxEnCours(null);
+    }
+  };
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
   const activeLocked = verrou(activeTab.min);
 
@@ -180,35 +232,7 @@ export default function ProjectView({
   const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
   return (
-    <div className="ad-crm-grid grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
-      {/* Liste des clients */}
-      <Card className="overflow-hidden">
-        {allClients.map((c) => {
-          const active = c.id === client.id;
-          const sm = stageMeta(c.stage, stages);
-          return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onSelect(c.id)}
-              className={cn(
-                "ad-row block w-full border-b border-border/60 border-l-[3px] px-4.5 py-3 text-left transition-colors last:border-b-0",
-                active ? "border-l-avisdoc-teal bg-sky-50/70" : "border-l-transparent",
-              )}
-              style={{ paddingLeft: 18, paddingRight: 18 }}
-            >
-              <div className="text-[13.5px] font-semibold text-avisdoc-ink">{c.company}</div>
-              <div className="mt-0.5 flex justify-between">
-                <span className="text-[11.5px] text-muted-foreground">{c.contacts[0]?.name ?? "—"}</span>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wide", sm.text)}>{c.stage}</span>
-              </div>
-            </button>
-          );
-        })}
-      </Card>
-
-      {/* Détail projet — accordéon pleine largeur */}
-      <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
         {/* 1. Nom de la société et infos */}
         <Section
           titre={client.company}
@@ -395,6 +419,10 @@ export default function ProjectView({
               </div>
             ) : (
               <>
+                {tab === "approche" && ApprocheTab()}
+                {tab === "suivi" && (
+                  <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} />
+                )}
                 {tab === "contacts" && ContactsTab()}
                 {tab === "suivis" && SuivisTab()}
                 {tab === "journal" && <JournalCard clientId={client.id} />}
@@ -408,9 +436,80 @@ export default function ProjectView({
           </div>
         </Card>
 
-      </div>
+      {brouillon && (
+        <BrouillonEmail
+          nom={client.company}
+          objet={brouillon.objet}
+          corps={brouillon.corps}
+          destinataire={brouillon.destinataire}
+          onClose={() => setBrouillon(null)}
+        />
+      )}
     </div>
   );
+
+  /** Ce que Merx avait trouvé, et ce qu’on peut encore lui demander. */
+  function ApprocheTab() {
+    if (!origine) {
+      return (
+        <p className="py-6 text-[13px] text-muted-foreground">
+          Cette affaire n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
+          prospection gardent ici ce que Merx avait trouvé.
+        </p>
+      );
+    }
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void demanderAMerx("approfondir")}
+            disabled={merxEnCours !== null}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {merxEnCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+            {origine.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void demanderAMerx("email")}
+            disabled={merxEnCours !== null}
+            title="Merx rédige un brouillon à partir de la fiche. Rien n’est envoyé."
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {merxEnCours === "email" ? <Loader2 className="size-3.5 animate-spin" /> : <PenLine className="size-3.5" />}
+            Écrire un e-mail personnalisé
+          </button>
+        </div>
+
+        {merxErreur && (
+          <p className="mb-4 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
+        )}
+
+        {origine.rationale && (
+          <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+              Pourquoi c’était un bon prospect
+            </div>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
+            {origine.approach && (
+              <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                <span className="font-semibold">Angle d’approche : </span>
+                {origine.approach}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          La note, critère par critère
+        </div>
+        <div className="mt-2">
+          <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
+        </div>
+      </div>
+    );
+  }
 
   // ---- Contenus d'onglets (fermetures sur l'état du composant) ----
 
