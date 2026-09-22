@@ -4,15 +4,25 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
+  BookUser,
   Building2,
   ChevronDown,
+  Coins,
   FileText,
+  KeyRound,
   LayoutDashboard,
+  LayoutGrid,
   Megaphone,
+  Mic,
   Moon,
   Power,
+  Receipt,
+  ScrollText,
   Settings,
+  SlidersHorizontal,
+  Sparkles,
   Sun,
+  Target,
   Users,
   Wallet,
   type LucideIcon,
@@ -28,6 +38,8 @@ import { Avatar } from "./ui";
 interface Enfant {
   to: string;
   label: string;
+  /** Pictogramme de la page, en trait fin — mêmes choix que le hub Onetip. */
+  icon: LucideIcon;
   /** Réservé aux super-admins (ex. journal d'audit). */
   superadmin?: boolean;
   /** Module propre à cette page, quand il diffère de celui du groupe (ex. Merx). */
@@ -49,23 +61,23 @@ interface Entree {
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
-    { to: "/merx", label: "Merx", module: "merx" },
-    { to: "/prospects", label: "Prospection", module: "merx" },
-    { to: "/crm", label: "Pipeline" },
-    { to: "/fichier-client", label: "Clients", module: "merx" },
-    { to: "/notes-dictees", label: "Notes dictées", module: "merx" },
-    { to: "/couts", label: "Coûts", module: "merx" },
+    { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
+    { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
+    { to: "/crm", label: "Pipeline", icon: LayoutGrid },
+    { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
+    { to: "/notes-dictees", label: "Notes dictées", icon: Mic, module: "merx" },
+    { to: "/couts", label: "Coûts", icon: Coins, module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
-    { to: "/clients", label: "Facturation" },
+    { to: "/clients", label: "Facturation", icon: Receipt },
   ] },
   { module: "documents", label: "Documents", icon: FileText, to: "/documents" },
   { module: "admin", label: "Admin", icon: Settings, enfants: [
-    { to: "/settings", label: "Réglages" },
-    { to: "/droits", label: "Droits d'accès", superadmin: true },
-    { to: "/audit", label: "Auditabilité", superadmin: true },
+    { to: "/settings", label: "Réglages", icon: SlidersHorizontal },
+    { to: "/droits", label: "Droits d'accès", icon: KeyRound, superadmin: true },
+    { to: "/audit", label: "Auditabilité", icon: ScrollText, superadmin: true },
   ] },
 ];
 
@@ -95,22 +107,26 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
       </button>
       {(ouvert || enfantActif) && (
         <div className="ml-[26px] flex flex-col gap-0.5 border-l border-border pl-2.5 pt-0.5">
-          {enfants.map((e) => (
-            <NavLink
-              key={e.to}
-              to={e.to}
-              className={({ isActive }) =>
-                cn(
-                  "rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
-                  isActive
-                    ? "bg-avisdoc-ink text-white"
-                    : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
-                )
-              }
-            >
-              {e.label}
-            </NavLink>
-          ))}
+          {enfants.map((e) => {
+            const IconeEnfant = e.icon;
+            return (
+              <NavLink
+                key={e.to}
+                to={e.to}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                    isActive
+                      ? "bg-avisdoc-ink text-white"
+                      : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
+                  )
+                }
+              >
+                <IconeEnfant className="size-[15px] shrink-0" strokeWidth={1.9} />
+                <span className="min-w-0 truncate">{e.label}</span>
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </div>
