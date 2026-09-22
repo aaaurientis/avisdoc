@@ -6,6 +6,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
 import { toast } from "sonner";
+import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
   departementDe,
@@ -20,7 +21,7 @@ import ColonnesModal from "./crm/ColonnesModal";
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients, stages, setClientStage, deleteClient } = useAdminData();
+  const { clients, stages, setClientStage, rafraichir } = useAdminData();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
@@ -79,17 +80,15 @@ export default function Crm() {
   const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Supprimer ${n} affaire${n > 1 ? "s" : ""} du Pipeline ? Cette suppression ne se défait pas.`)) return;
-    let echecs = 0;
-    for (const c of selectionnees) {
-      try {
-        await deleteClient(c.id);
-      } catch {
-        echecs += 1;
-      }
+    if (!window.confirm(`Supprimer ${n} affaire${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
+      return;
+    try {
+      await jeter("affaire", selectionnees.map((c) => c.id));
+      setCoches(new Set());
+      await rafraichir();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "La suppression a échoué.");
     }
-    setCoches(new Set());
-    if (echecs > 0) toast.error(`${echecs} affaire${echecs > 1 ? "s n’ont" : " n’a"} pas pu être supprimée${echecs > 1 ? "s" : ""}.`);
   };
 
   /** Les départements réellement présents dans les affaires. */

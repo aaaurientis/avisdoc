@@ -14,6 +14,7 @@ import ApercuImport from "./clients/ApercuImport";
 import BarreSelection from "../components/BarreSelection";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { proposer, type Correspondance } from "../lib/import-colonnes";
+import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
 import { tonNote } from "../lib/merx";
@@ -55,7 +56,7 @@ const moisDe = (iso: string | null) =>
     : SANS_VALEUR;
 
 export default function FichierClient() {
-  const { accounts, accountFields, addManyAccounts, addFields, deleteAccount } = useAdminData();
+  const { accounts, accountFields, addManyAccounts, addFields, rafraichir } = useAdminData();
   const [recherche, setRecherche] = useState("");
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
   const [groupePar, setGroupePar] = useState("secteur");
@@ -133,9 +134,14 @@ export default function FichierClient() {
   const supprimerLesCoches = () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} du fichier client ? Cette suppression ne se défait pas.`)) return;
-    for (const a of selectionnees) deleteAccount(a.id);
-    setCoches(new Set());
+    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
+      return;
+    void jeter("client", selectionnees.map((a) => a.id))
+      .then(() => {
+        setCoches(new Set());
+        return rafraichir();
+      })
+      .catch((e) => setMessage(e instanceof Error ? e.message : "La suppression a échoué."));
   };
 
   /** Tous les secteurs du fichier, pour le filtre — pas seulement ceux qui restent affichés. */
@@ -671,14 +677,16 @@ export default function FichierClient() {
         <Modal onClose={() => setASupprimer(null)} width={440}>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Supprimer ce client ?</h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            <span className="font-semibold text-avisdoc-ink">{aSupprimer.name}</span> et toutes ses informations
-            seront retirés du fichier. Cette suppression ne se défait pas.
+            <span className="font-semibold text-avisdoc-ink">{aSupprimer.name}</span> quitte le fichier client. Vous la
+            retrouverez {JOURS_DE_GARDE} jours dans la corbeille avant qu’elle ne soit vidée.
           </p>
           <div className="mt-5 flex gap-2">
             <button
               type="button"
               onClick={() => {
-                deleteAccount(aSupprimer.id);
+                void jeter("client", [aSupprimer.id])
+                  .then(rafraichir)
+                  .catch((e) => setMessage(e instanceof Error ? e.message : "La suppression a échoué."));
                 setASupprimer(null);
               }}
               className="inline-flex items-center gap-1.5 rounded-full bg-avisdoc-coral px-5 py-2.5 text-sm font-bold text-white"

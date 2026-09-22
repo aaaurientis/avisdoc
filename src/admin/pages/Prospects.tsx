@@ -17,6 +17,7 @@ import BrouillonEmail from "./prospects/BrouillonEmail";
 import NouveauProspect from "./prospects/NouveauProspect";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
+import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
 import { clientDepuisProspect, contactDepuisProspect } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
 
@@ -95,7 +96,6 @@ export default function Prospects() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
-  const [voirEcartees, setVoirEcartees] = useState(false);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
@@ -128,21 +128,15 @@ export default function Prospects() {
   const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    const versCorbeille = !voirEcartees;
-    const question = versCorbeille
-      ? `Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez dans la corbeille.`
-      : `Restaurer ${n} fiche${n > 1 ? "s" : ""} dans la prospection ?`;
-    if (!window.confirm(question)) return;
-    const { error } = await supabaseAdmin
-      .from("admin_prospects")
-      .update({ status: versCorbeille ? "ecarte" : "a_verifier" })
-      .in("id", [...coches]);
-    if (error) {
-      setErreur(error.message);
+    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
       return;
+    try {
+      await jeter("prospect", [...coches]);
+      setCoches(new Set());
+      await charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
     }
-    setCoches(new Set());
-    await charger();
   };
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [brouillon, setBrouillon] = useState<{
@@ -167,6 +161,7 @@ export default function Prospects() {
     const { data, error } = await supabaseAdmin
       .from("admin_prospects")
       .select("*")
+      .is("deleted_at", null)
       .order("score_total", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) setErreur(messageErreur(error.message));
@@ -185,8 +180,8 @@ export default function Prospects() {
 
   /** Les fiches de l’onglet courant, avant que les filtres ne s’en mêlent. */
   const duVivier = useMemo(
-    () => prospects.filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte" && !p.converted_client_id)),
-    [prospects, voirEcartees],
+    () => prospects.filter((p) => !p.converted_client_id),
+    [prospects],
   );
 
   const visibles = useMemo(
@@ -195,10 +190,7 @@ export default function Prospects() {
   );
 
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
-  const nouvelles = useMemo(
-    () => prospects.filter((p) => p.status !== "ecarte" && !p.converted_client_id && !p.opened_at).length,
-    [prospects],
-  );
+  const nouvelles = useMemo(() => prospects.filter((p) => !p.converted_client_id && !p.opened_at).length, [prospects]);
 
   /** Les départements réellement présents : on ne propose pas un filtre qui ne rendrait rien. */
   const departements = useMemo(
@@ -216,11 +208,9 @@ export default function Prospects() {
     },
     [],
   );
-  const corbeille = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
-
   /** Parties au Pipeline : on dit où elles sont allées plutôt que de les laisser disparaître sans un mot. */
   const auPipeline = useMemo(
-    () => prospects.filter((p) => p.status !== "ecarte" && p.converted_client_id).length,
+    () => prospects.filter((p) => p.converted_client_id).length,
     [prospects],
   );
   const fiche = useMemo(() => prospects.find((p) => p.id === ouverte) ?? null, [prospects, ouverte]);
@@ -273,8 +263,10 @@ export default function Prospects() {
 
   const ecarter = useCallback(
     async (p: Prospect) => {
-      const vers = p.status === "ecarte" ? "a_verifier" : "ecarte";
-      const { error } = await supabaseAdmin.from("admin_prospects").update({ status: vers }).eq("id", p.id);
+      const { error } = await supabaseAdmin
+        .from("admin_prospects")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", p.id);
       if (error) throw new Error(error.message);
       setOuverte(null);
       await charger();
@@ -299,10 +291,10 @@ export default function Prospects() {
           chargement
             ? "Chargement…"
             : [
-                `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " dans la corbeille" : ""}`,
-                !voirEcartees && nouvelles > 0 ? `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}` : "",
+                `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}`,
+                nouvelles > 0 ? `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}` : "",
                 "trouvées par Merx",
-                !voirEcartees && auPipeline > 0 ? `${auPipeline} passée${auPipeline > 1 ? "s" : ""} au Pipeline` : "",
+                auPipeline > 0 ? `${auPipeline} passée${auPipeline > 1 ? "s" : ""} au Pipeline` : "",
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -330,11 +322,9 @@ export default function Prospects() {
         </div>
       ) : duVivier.length === 0 ? (
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
-          <SectionLabel>{voirEcartees ? "Corbeille vide" : "Aucune fiche pour l’instant"}</SectionLabel>
+          <SectionLabel>Aucune fiche pour l’instant</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-            {voirEcartees
-              ? "Les fiches que vous supprimez restent ici : rien n’est perdu, tout se restaure."
-              : "Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, rangées par secteur."}
+            Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, rangées par secteur.
           </p>
         </div>
       ) : (
@@ -370,22 +360,12 @@ export default function Prospects() {
         </div>
       )}
 
-      {(corbeille > 0 || voirEcartees) && (
-        <button
-          type="button"
-          onClick={() => setVoirEcartees((v) => !v)}
-          className="mt-4 text-[13px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
-        >
-          {voirEcartees ? "Revenir aux fiches actives" : `Corbeille (${corbeille})`}
-        </button>
-      )}
-
       <BarreSelection
         nombre={selectionnees.length}
         total={visibles.length}
         onTout={() => setCoches(new Set(visibles.map((p) => p.id)))}
         avecEmail={adresses.length}
-        libelleSuppression={voirEcartees ? "Restaurer" : "Supprimer"}
+        libelleSuppression="Supprimer"
         onEmail={ecrireAuxCoches}
         onSupprimer={() => void supprimerLesCoches()}
         onEffacer={() => setCoches(new Set())}

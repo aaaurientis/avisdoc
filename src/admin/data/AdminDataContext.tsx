@@ -75,6 +75,8 @@ interface DataValue {
   setContactGeo: (id: string, lat: number, lng: number) => void;
 
   addClient: (client: Client) => Promise<boolean>;
+  /** Relit tout depuis la base : après une mise à la corbeille, par exemple. */
+  rafraichir: () => Promise<void>;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
   /** Change l'étape d'une affaire. Entrer dans la dernière colonne vaut signature. */
   setClientStage: (id: string, stage: Stage) => void;
@@ -911,6 +913,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
+      rafraichir: reload,
       addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
@@ -934,6 +937,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
+      reload,
       addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
