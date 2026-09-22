@@ -165,6 +165,7 @@ export default function Crm() {
           onCocher={cocher}
           onChangerCoches={setCoches}
           onSupprimer={(c) => void supprimerUne(c)}
+          onModifier={(c) => navigate(`/crm/${c.id}?modifier=1`)}
         />
       )}
 

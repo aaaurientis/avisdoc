@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, PenLine, Plus, Search, UserPlus, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, Plus, Search, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -17,6 +18,7 @@ import { supabaseAdmin } from "../../data/supabaseAdmin";
 import NoteDetaillee from "../prospects/NoteDetaillee";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import FilEchanges from "../../components/FilEchanges";
+import ActionsFiche from "../../components/ActionsFiche";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
@@ -139,7 +141,9 @@ export default function ProjectView({
   } = useAdminData();
   const { user } = useAuth();
 
-  const [editing, setEditing] = useState(false);
+  // « ?modifier=1 » : le crayon d'une carte ouvre la fiche prête à être corrigée.
+  const [chercheur] = useSearchParams();
+  const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "" });
   const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
@@ -165,6 +169,8 @@ export default function ProjectView({
   const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
   const [merxErreur, setMerxErreur] = useState<string | null>(null);
   const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
+  /** Change de valeur après une action : l'historique se relit. */
+  const [relire, setRelire] = useState(0);
 
   // Onglets des fonctions, dans l'ordre du parcours.
   // Quatre onglets, les mêmes que sur les autres fiches : ce qui est vrai, ce qu'on
@@ -254,6 +260,13 @@ export default function ProjectView({
       setMerxEnCours(null);
     }
   };
+
+  // Arriver par le crayon d'une carte ouvre le formulaire : il doit être rempli.
+  useEffect(() => {
+    if (chercheur.get("modifier") === "1") startEdit();
+    // Une seule fois, à l'ouverture de la fiche.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id]);
 
   const startEdit = () => {
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
@@ -425,6 +438,16 @@ export default function ProjectView({
 
             {tab === "action" && (
               <>
+                <Bloc titre="Agir maintenant">
+                  <ActionsFiche
+                    cles={{ clientId: client.id }}
+                    onFait={() => setRelire((n) => n + 1)}
+                    onEcrireAvecMerx={origine ? () => void demanderAMerx("email") : undefined}
+                  />
+                </Bloc>
+
+                <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
+
                 {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
                 {verrou("Proposition") ? (
                   <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
@@ -454,11 +477,10 @@ export default function ProjectView({
 
             {tab === "historique" && (
               <>
-                <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} />
-                <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
-                <Bloc>
-                  <JournalCard clientId={client.id} />
-                </Bloc>
+                <p className="mb-3 text-[12.5px] text-muted-foreground">
+                  Ce qui s’est passé, dans l’ordre. Rien ne s’y modifie : les actions se prennent dans l’onglet Action.
+                </p>
+                <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} rafraichir={relire} />
               </>
             )}
           </div>
@@ -515,16 +537,6 @@ export default function ProjectView({
           >
             {merxEnCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
             {origine.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void demanderAMerx("email")}
-            disabled={merxEnCours !== null}
-            title="Merx rédige un brouillon à partir de la fiche. Rien n’est envoyé."
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
-          >
-            {merxEnCours === "email" ? <Loader2 className="size-3.5 animate-spin" /> : <PenLine className="size-3.5" />}
-            Écrire un e-mail personnalisé
           </button>
         </div>
 

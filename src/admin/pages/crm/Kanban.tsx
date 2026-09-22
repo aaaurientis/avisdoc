@@ -22,6 +22,7 @@ export default function Kanban({
   onCocher,
   onChangerCoches,
   onSupprimer,
+  onModifier,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -38,6 +39,8 @@ export default function Kanban({
   onChangerCoches?: (suivant: Set<string>) => void;
   /** Met une affaire à la corbeille, depuis sa carte. */
   onSupprimer?: (c: Client) => void;
+  /** Ouvre la fiche directement en modification. */
+  onModifier?: (c: Client) => void;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -174,9 +177,9 @@ export default function Kanban({
                     >
                       <button
                         type="button"
-                        onClick={() => onSelect(c.id)}
-                        aria-label={`Ouvrir ${c.company}`}
-                        title="Ouvrir la fiche"
+                        onClick={() => (onModifier ? onModifier(c) : onSelect(c.id))}
+                        aria-label={`Modifier ${c.company}`}
+                        title="Modifier la fiche"
                         className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
                       >
                         <Pencil className="size-3.5" />
