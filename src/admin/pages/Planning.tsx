@@ -11,6 +11,7 @@ import { PageHeader, SectionLabel } from "../components/ui";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/planning";
 import type { GenreEchange } from "../lib/echanges";
+import ModifierAction from "../components/ModifierAction";
 import { cn } from "@/lib/utils";
 
 const ICONES: Record<GenreEchange, typeof Phone> = {
@@ -19,6 +20,15 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   rdv: CalendarClock,
   note: NotebookPen,
 };
+
+const TEINTES: Record<GenreEchange, string> = {
+  appel: "bg-avisdoc-teal text-white",
+  rdv: "bg-avisdoc-coral text-white",
+  email: "bg-violet-500 text-white",
+  note: "bg-slate-500 text-white",
+};
+
+const NOMS: Record<GenreEchange, string> = { appel: "appel", rdv: "rendez-vous", email: "e-mail", note: "note" };
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -40,6 +50,7 @@ export default function Planning() {
   const [lignes, setLignes] = useState<Rendezvous[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [aModifier, setAModifier] = useState<Rendezvous | null>(null);
 
   // La lecture s'arrête au vendredi soir : ce qui tombe le week-end n'est pas montré,
   // et ne doit donc pas être compté.
@@ -173,19 +184,43 @@ export default function Planning() {
                         <button
                           key={a.id}
                           type="button"
-                          onClick={() => navigate(chemin[a.origine](a.ficheId))}
+                          onClick={() => setAModifier(a)}
                           className="flex w-full items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-avisdoc-teal"
                         >
-                          <span className="mt-0.5 shrink-0 font-mono text-[12px] font-bold text-avisdoc-ink">{heure(a.au)}</span>
-                          <Icone className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                          <span className={cn("mt-0.5 inline-flex size-[26px] shrink-0 items-center justify-center rounded-full", TEINTES[a.kind])}>
+                            <Icone className="size-3.5" strokeWidth={2.4} />
+                          </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">{a.titre}</span>
-                            <span className="block truncate text-[11.5px] text-muted-foreground">
-                              {a.fiche} · {LIBELLE[a.origine]}
+                            <span className="flex items-baseline gap-1.5">
+                              <span className="font-mono text-[12.5px] font-bold text-avisdoc-ink">{heure(a.au)}</span>
+                              <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                                {NOMS[a.kind]}
+                              </span>
                             </span>
+                            <span className="mt-0.5 block text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.titre}</span>
+                            <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-avisdoc-teal">{a.fiche}</span>
                             {a.detail && (
-                              <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
+                              <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
                             )}
+                            <span className="mt-1 flex items-center gap-2 text-[11px]">
+                              <span className="text-muted-foreground">Cliquez pour déplacer</span>
+                              <span
+                                role="link"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(chemin[a.origine](a.ficheId));
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key !== "Enter") return;
+                                  e.stopPropagation();
+                                  navigate(chemin[a.origine](a.ficheId));
+                                }}
+                                className="cursor-pointer font-semibold text-avisdoc-teal underline-offset-2 hover:underline"
+                              >
+                                ouvrir la fiche
+                              </span>
+                            </span>
                           </span>
                         </button>
                       );
@@ -206,6 +241,20 @@ export default function Planning() {
             jour et à l’heure prévus.
           </p>
         </div>
+      )}
+      {aModifier && (
+        <ModifierAction
+          action={{
+            id: aModifier.id,
+            kind: aModifier.kind,
+            titre: aModifier.titre,
+            detail: aModifier.detail,
+            au: aModifier.au,
+            par: aModifier.par,
+          }}
+          onClose={() => setAModifier(null)}
+          onFait={charger}
+        />
       )}
     </div>
   );

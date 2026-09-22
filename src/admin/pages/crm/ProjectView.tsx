@@ -466,6 +466,7 @@ export default function ProjectView({
                   <ActionsFiche
                     cles={{ clientId: client.id }}
                     onFait={() => setRelire((n) => n + 1)}
+                    relire={relire}
                     onEcrireAvecMerx={origine ? () => void demanderAMerx("email") : undefined}
                   />
                 </Bloc>

@@ -6,12 +6,15 @@
 //
 // Ce qui est fait part dans l'historique, qui ne se modifie pas.
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, Loader2, Mail, NotebookPen, PenLine, Phone } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { SectionLabel } from "./ui";
-import { ajouterEchange, libelleGenre, type ClesFiche, type GenreEchange } from "../lib/echanges";
+import { actionsAVenir, ajouterEchange, libelleGenre, type ClesFiche, type Echange, type GenreEchange } from "../lib/echanges";
+import ModifierAction from "./ModifierAction";
 import { cn } from "@/lib/utils";
+
+const ICONES: Record<GenreEchange, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
 
 const GENRES: { valeur: GenreEchange; label: string; icone: typeof Phone; quand: boolean; aide: string }[] = [
   { valeur: "appel", label: "Appel", icone: Phone, quand: true, aide: "Quand appelez-vous, et pourquoi ?" },
@@ -24,6 +27,12 @@ const champCls =
   "ad-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
+
+/** « mar. 29 sept. à 19:00 » : assez pour se situer, assez court pour une ligne. */
+const quandCourt = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+};
 /** L'heure ronde qui vient : on propose, on ne fait pas saisir. */
 const prochaineHeure = () => {
   const d = new Date();
@@ -36,12 +45,15 @@ export default function ActionsFiche({
   cles,
   onFait,
   onEcrireAvecMerx,
+  relire,
 }: {
   cles: ClesFiche;
   /** Rappelé après l'enregistrement : l'historique se recharge. */
   onFait: () => Promise<void> | void;
   /** Présent quand Merx peut rédiger pour cette fiche. */
   onEcrireAvecMerx?: () => void;
+  /** Change de valeur pour relire ce qui est prévu. */
+  relire?: number;
 }) {
   const { user } = useAuth();
   const [genre, setGenre] = useState<GenreEchange | null>(null);
@@ -51,6 +63,21 @@ export default function ActionsFiche({
   const [heure, setHeure] = useState(prochaineHeure);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [prevues, setPrevues] = useState<Echange[]>([]);
+  const [aModifier, setAModifier] = useState<Echange | null>(null);
+
+  /** Ce qui est déjà programmé sur cette fiche : on doit le voir, et pouvoir le déplacer. */
+  const relireLesPrevues = useCallback(async () => {
+    try {
+      setPrevues(await actionsAVenir(cles));
+    } catch {
+      setPrevues([]);
+    }
+  }, [cles]);
+
+  useEffect(() => {
+    void relireLesPrevues();
+  }, [relireLesPrevues, relire]);
 
   const choisi = GENRES.find((g) => g.valeur === genre);
 
@@ -73,6 +100,7 @@ export default function ActionsFiche({
       const au = choisi?.quand ? new Date(`${jour}T${heure}:00`) : new Date();
       await ajouterEchange(cles, { kind: genre, titre, detail, au: au.toISOString(), par: user?.email ?? "" });
       setGenre(null);
+      await relireLesPrevues();
       await onFait();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L’enregistrement a échoué.");
@@ -83,6 +111,38 @@ export default function ActionsFiche({
 
   return (
     <div>
+      {prevues.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-coral p-4">
+          <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-avisdoc-coral">
+            {prevues.length === 1 ? "Prévu" : `${prevues.length} actions prévues`}
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {prevues.map((a) => {
+              const Icone = ICONES[a.kind];
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAModifier(a)}
+                  title="Modifier, décaler ou supprimer"
+                  className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-avisdoc-teal"
+                >
+                  <Icone className="size-4 shrink-0 text-avisdoc-coral" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">{a.titre}</span>
+                    {a.detail && <span className="block truncate text-[11.5px] text-muted-foreground">{a.detail}</span>}
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-[12px] font-bold text-avisdoc-ink">{quandCourt(a.au)}</span>
+                    <span className="block text-[11px] text-muted-foreground">modifier</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {GENRES.map((g) => {
           const Icone = g.icone;
@@ -175,6 +235,16 @@ export default function ActionsFiche({
             </button>
           </div>
         </div>
+      )}
+      {aModifier && (
+        <ModifierAction
+          action={aModifier}
+          onClose={() => setAModifier(null)}
+          onFait={async () => {
+            await relireLesPrevues();
+            await onFait();
+          }}
+        />
       )}
     </div>
   );
