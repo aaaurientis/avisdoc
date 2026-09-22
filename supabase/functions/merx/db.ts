@@ -194,8 +194,41 @@ export interface Enrichment {
 
 /** Un approfondissement n'efface jamais une donnée déjà là : chaque champ vide laisse l'ancien en place. */
 export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichment): Promise<void> {
-  const { data: before } = await sb.from("admin_prospects").select("sources").eq("id", id).maybeSingle();
+  const { data: before } = await sb.from("admin_prospects").select("sources, score, dossier").eq("id", id).maybeSingle();
   const sources = [...new Set([...((before?.sources as string[]) ?? []), ...e.sources])];
+
+  // ── Ce qui a été trouvé une fois ne se reperd pas ────────────────────────
+  //
+  // Un second approfondissement peut tomber sur moins de choses que le premier :
+  // un site en panne, une page retirée, une recherche moins chanceuse. Il ne doit
+  // pas pour autant effacer ce qu'on savait.
+
+  /** Un dossier sans rien dedans n'est pas un dossier : il ne remplace pas le précédent. */
+  const dossierUtile = (d: unknown): boolean => {
+    if (!d || typeof d !== "object") return false;
+    const o = d as Record<string, unknown>;
+    const texte = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+    const liste = (v: unknown) => Array.isArray(v) && v.length > 0;
+    return texte(o.accroche) || texte(o.qui_aborder) || texte(o.offre) || liste(o.a_retenir) || liste(o.arguments) || liste(o.objections);
+  };
+  const dossier = dossierUtile(e.dossier) ? e.dossier : dossierUtile(before?.dossier) ? (before?.dossier as unknown) : null;
+
+  // La note se fusionne critère par critère : un critère qu'on n'a pas su juger
+  // cette fois garde son jugement d'avant, et le total suit.
+  const ancienScore = (before?.score ?? {}) as Record<string, { points: number | null; justification?: string }>;
+  const nouveauScore = e.score as unknown as Record<string, { points: number | null; justification?: string }>;
+  const scoreFusionne: Record<string, unknown> = { ...ancienScore };
+  for (const [critere, valeur] of Object.entries(nouveauScore)) {
+    const avant = ancienScore[critere];
+    const vaut = valeur && (valeur.points !== null || (valeur.justification ?? "").trim().length > 0);
+    const valaitAvant = avant && (avant.points !== null || (avant.justification ?? "").trim().length > 0);
+    // On ne remplace un jugement établi que par un autre jugement établi.
+    if (vaut || !valaitAvant) scoreFusionne[critere] = valeur;
+  }
+  const totalFusionne = Object.values(scoreFusionne).reduce(
+    (somme: number, c) => somme + ((c as { points: number | null } | undefined)?.points ?? 0),
+    0,
+  );
   const patch: Record<string, unknown> = {
     siren: e.siren,
     legal_name: e.legalName,
@@ -212,10 +245,10 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     contact_source: e.contactSource,
     site_contacts: e.siteContacts,
     approach: e.approach,
-    dossier: e.dossier,
+    dossier,
     sources,
-    score: e.score,
-    score_total: e.scoreTotal,
+    score: scoreFusionne,
+    score_total: totalFusionne,
     enriched_at: new Date().toISOString(),
   };
   for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
