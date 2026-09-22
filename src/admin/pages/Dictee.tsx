@@ -11,8 +11,10 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { garder, listerEnAttente, oublier, type NoteEnAttente } from "./dictee/store";
 import { cn } from "@/lib/utils";
 
-const DUREE_MAX_S = 180; // 3 minutes (décision d’Olivier sur la vitrine)
-const ALERTE_S = 150; // on prévient 30 secondes avant
+// 10 minutes : un débrief de fin de journée couvre quatre ou cinq entreprises, et
+// découper l'enregistrement ferait perdre le fil. (3 min à l'origine, porté à 10 le 22/09.)
+const DUREE_MAX_S = 600;
+const ALERTE_S = DUREE_MAX_S - 30; // on prévient trente secondes avant l'arrêt
 
 const chrono = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
