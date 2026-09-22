@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, Phone, Search } from "lucide-react";
+import { Loader2, Mail, Phone, Plus, Search } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -11,6 +11,7 @@ import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
+import NouveauProspect from "./prospects/NouveauProspect";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
 import { clientDepuisProspect, contactDepuisProspect } from "../lib/conversion";
@@ -76,6 +77,7 @@ export default function Prospects() {
   const [voirEcartees, setVoirEcartees] = useState(false);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
+  const [ajout, setAjout] = useState(false);
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [brouillon, setBrouillon] = useState<{
     prospect: Prospect;
@@ -216,6 +218,15 @@ export default function Prospects() {
   return (
     <div>
       <PageHeader
+        action={
+          <button
+            type="button"
+            onClick={() => setAjout(true)}
+            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+          >
+            <Plus className="size-4" /> Ajouter un prospect
+          </button>
+        }
         title="Prospection"
         subtitle={
           chargement
@@ -294,6 +305,8 @@ export default function Prospects() {
           {voirEcartees ? "Revenir aux fiches actives" : `Voir les fiches écartées (${ecartees})`}
         </button>
       )}
+
+      {ajout && <NouveauProspect onClose={() => setAjout(false)} onCree={charger} />}
 
       {brouillon && (
         <BrouillonEmail
