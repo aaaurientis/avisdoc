@@ -233,7 +233,7 @@ export default function ProspectFiche({
                 className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground hover:border-rose-300 hover:text-rose-700 disabled:opacity-60"
               >
                 {enCours === "ecarter" ? <Loader2 className="size-4 animate-spin" /> : null}
-                Écarter
+                {p.status === "ecarte" ? "Restaurer" : "Supprimer"}
               </button>
         </>
       }

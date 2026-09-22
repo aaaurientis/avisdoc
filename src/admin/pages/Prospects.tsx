@@ -1,5 +1,5 @@
 // Prospects — ce que Merx a trouvé, rangé par secteur.
-// Les fiches sont communes à l’équipe (comme le fichier CRM) ; une fiche écartée sort du tableau
+// Les fiches sont communes à l’équipe (comme le fichier CRM) ; une fiche supprimée part à la corbeille
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -122,17 +122,20 @@ export default function Prospects() {
   };
 
   /**
-   * Écarter, pas supprimer : une fiche écartée reste consultable. C'est ce que fait
-   * déjà la corbeille de cet écran, et on ne perd jamais le travail de Merx.
+   * Supprimer met à la corbeille : la fiche sort du tableau mais se retrouve et se
+   * restaure. Une recherche a coûté quelque chose — on ne détruit pas ce travail d'un clic.
    */
-  const ecarterLesCoches = async () => {
+  const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Écarter ${n} fiche${n > 1 ? "s" : ""} ? Elles restent consultables dans « Voir les fiches écartées ».`))
-      return;
+    const versCorbeille = !voirEcartees;
+    const question = versCorbeille
+      ? `Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez dans la corbeille.`
+      : `Restaurer ${n} fiche${n > 1 ? "s" : ""} dans la prospection ?`;
+    if (!window.confirm(question)) return;
     const { error } = await supabaseAdmin
       .from("admin_prospects")
-      .update({ status: "ecarte" })
+      .update({ status: versCorbeille ? "ecarte" : "a_verifier" })
       .in("id", [...coches]);
     if (error) {
       setErreur(error.message);
@@ -213,7 +216,7 @@ export default function Prospects() {
     },
     [],
   );
-  const ecartees = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
+  const corbeille = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
 
   /** Parties au Pipeline : on dit où elles sont allées plutôt que de les laisser disparaître sans un mot. */
   const auPipeline = useMemo(
@@ -270,7 +273,8 @@ export default function Prospects() {
 
   const ecarter = useCallback(
     async (p: Prospect) => {
-      const { error } = await supabaseAdmin.from("admin_prospects").update({ status: "ecarte" }).eq("id", p.id);
+      const vers = p.status === "ecarte" ? "a_verifier" : "ecarte";
+      const { error } = await supabaseAdmin.from("admin_prospects").update({ status: vers }).eq("id", p.id);
       if (error) throw new Error(error.message);
       setOuverte(null);
       await charger();
@@ -295,7 +299,7 @@ export default function Prospects() {
           chargement
             ? "Chargement…"
             : [
-                `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " écartée" + (visibles.length > 1 ? "s" : "") : ""}`,
+                `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " dans la corbeille" : ""}`,
                 !voirEcartees && nouvelles > 0 ? `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}` : "",
                 "trouvées par Merx",
                 !voirEcartees && auPipeline > 0 ? `${auPipeline} passée${auPipeline > 1 ? "s" : ""} au Pipeline` : "",
@@ -326,10 +330,10 @@ export default function Prospects() {
         </div>
       ) : duVivier.length === 0 ? (
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
-          <SectionLabel>{voirEcartees ? "Aucune fiche écartée" : "Aucune fiche pour l’instant"}</SectionLabel>
+          <SectionLabel>{voirEcartees ? "Corbeille vide" : "Aucune fiche pour l’instant"}</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             {voirEcartees
-              ? "Les fiches que vous écartez restent ici, elles ne sont jamais supprimées."
+              ? "Les fiches que vous supprimez restent ici : rien n’est perdu, tout se restaure."
               : "Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, rangées par secteur."}
           </p>
         </div>
@@ -366,22 +370,22 @@ export default function Prospects() {
         </div>
       )}
 
-      {(ecartees > 0 || voirEcartees) && (
+      {(corbeille > 0 || voirEcartees) && (
         <button
           type="button"
           onClick={() => setVoirEcartees((v) => !v)}
           className="mt-4 text-[13px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
         >
-          {voirEcartees ? "Revenir aux fiches actives" : `Voir les fiches écartées (${ecartees})`}
+          {voirEcartees ? "Revenir aux fiches actives" : `Corbeille (${corbeille})`}
         </button>
       )}
 
       <BarreSelection
         nombre={selectionnees.length}
         avecEmail={adresses.length}
-        libelleSuppression="Écarter"
+        libelleSuppression={voirEcartees ? "Restaurer" : "Supprimer"}
         onEmail={ecrireAuxCoches}
-        onSupprimer={() => void ecarterLesCoches()}
+        onSupprimer={() => void supprimerLesCoches()}
         onEffacer={() => setCoches(new Set())}
       />
 
