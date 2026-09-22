@@ -25,7 +25,8 @@ const quand = (iso: string) =>
 
 /** Une table absente veut dire « migration pas encore appliquée » : on le dit en français. */
 function messageErreur(brut: string): string {
-  return /Could not find the table|does not exist/i.test(brut)
+  // Uniquement la table absente : une colonne manquante est un vrai défaut, qu'il faut voir.
+  return /Could not find the table .* in the schema cache/i.test(brut)
     ? "Cet écran attend sa migration : le SQL n’a pas encore été exécuté sur la base."
     : brut;
 }
