@@ -6,8 +6,10 @@ import type {
   ContactStatut,
   ContactType,
   DocExt,
+  PipelineStage,
   PropoStatut,
   Stage,
+  StageTone,
 } from "../types";
 
 /** Rôles d'un contact : liste `types` si présente, sinon le rôle historique. */
@@ -36,22 +38,53 @@ export const STATUT_BADGE: Record<ContactStatut, string> = {
   Refusé: "bg-rose-100 text-rose-700",
 };
 
-/** Métadonnées des étapes du pipeline CRM. */
-export const STAGES: {
-  name: Stage;
-  dot: string; // fond du point / badge compteur (plein)
-  text: string; // couleur de texte
-  soft: string; // fond doux
-}[] = [
-  { name: "Nouveau", dot: "bg-slate-400", text: "text-slate-500", soft: "bg-slate-100" },
-  { name: "Qualifié", dot: "bg-avisdoc-teal", text: "text-avisdoc-teal", soft: "bg-sky-100" },
-  { name: "Proposition", dot: "bg-avisdoc-coral", text: "text-avisdoc-coral", soft: "bg-amber-100" },
-  { name: "Signé", dot: "bg-emerald-500", text: "text-emerald-600", soft: "bg-emerald-100" },
+/** Teintes possibles d'une colonne du pipeline (choisies dans « Colonnes »). */
+export const TONES: Record<StageTone, { dot: string; text: string; soft: string; label: string }> = {
+  slate: { dot: "bg-slate-400", text: "text-slate-500", soft: "bg-slate-100", label: "Gris" },
+  teal: { dot: "bg-avisdoc-teal", text: "text-avisdoc-teal", soft: "bg-sky-100", label: "Bleu" },
+  coral: { dot: "bg-avisdoc-coral", text: "text-avisdoc-coral", soft: "bg-amber-100", label: "Orange" },
+  emerald: { dot: "bg-emerald-500", text: "text-emerald-600", soft: "bg-emerald-100", label: "Vert" },
+  violet: { dot: "bg-violet-500", text: "text-violet-600", soft: "bg-violet-100", label: "Violet" },
+  rose: { dot: "bg-rose-500", text: "text-rose-600", soft: "bg-rose-100", label: "Rose" },
+};
+
+/**
+ * Le dessin d'une colonne de tableau. Le Pipeline et la Prospection s'en servent tous
+ * les deux : on ne doit rien avoir à réapprendre en passant d'un écran à l'autre.
+ * La hauteur est commune pour que les colonnes s'alignent d'un écran à l'autre.
+ */
+export const COLONNE_KANBAN = "flex h-full min-h-[400px] flex-col rounded-xl bg-muted/60 p-3";
+
+/**
+ * L'étape qui fait d'une affaire un client.
+ *
+ * Ce n'est PAS la dernière colonne : un pipeline finit souvent par « Perdu », et une
+ * affaire perdue ne devient pas cliente. On cherche la colonne qui le dit — signé,
+ * gagné — et si aucune ne le dit, on ne crée rien plutôt que de se tromper.
+ */
+export function etapeQuiSigne(stages: PipelineStage[]): string | null {
+  const nu = (t: string) =>
+    t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return stages.find((s) => /^(signe|gagne|client)/.test(nu(s.label)))?.label ?? null;
+}
+
+/** Colonnes de départ — servent au mode démonstration et de repli si la table est vide. */
+export const STAGES_DEFAUT: PipelineStage[] = [
+  { id: "s1", label: "Nouveau", position: 1, tone: "slate" },
+  { id: "s2", label: "Qualifié", position: 2, tone: "teal" },
+  { id: "s3", label: "Proposition", position: 3, tone: "coral" },
+  { id: "s4", label: "Signé", position: 4, tone: "emerald" },
 ];
 
-export function stageMeta(name: Stage) {
-  return STAGES.find((s) => s.name === name) ?? STAGES[0];
+/** Teintes d'une étape, à partir des colonnes de l'équipe. Une étape inconnue reste neutre. */
+export function stageMeta(name: Stage, stages: PipelineStage[] = STAGES_DEFAUT) {
+  const tone = stages.find((s) => s.label === name)?.tone ?? "slate";
+  return { name, ...TONES[tone] };
 }
+
+/** Rang d'une étape dans le parcours ; -1 si la colonne n'existe plus. */
+export const stageRank = (name: Stage, stages: PipelineStage[] = STAGES_DEFAUT) =>
+  stages.findIndex((s) => s.label === name);
 
 /** Couleur pastille d'extension de fichier. */
 export const DOC_EXT: Record<DocExt, string> = {

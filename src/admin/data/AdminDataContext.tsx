@@ -16,17 +16,23 @@ import {
 import { toast } from "sonner";
 import { espaceRepo } from "../espace/espaceRepo";
 import type {
+  Account,
+  AccountField,
   ActiviteContact,
   ActivityItem,
   Client,
   ContactType,
   DocItem,
+  FieldType,
   NetworkContact,
+  PipelineStage,
   Stage,
+  StageTone,
   Suivi,
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
+import { etapeQuiSigne, STAGES_DEFAUT } from "../lib/ui-tokens";
 import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
@@ -68,8 +74,12 @@ interface DataValue {
   /** Mémorise les coordonnées géocodées d'un contact (cache carte). */
   setContactGeo: (id: string, lat: number, lng: number) => void;
 
-  addClient: (client: Client) => void;
+  addClient: (client: Client) => Promise<boolean>;
+  /** Relit tout depuis la base : après une mise à la corbeille, par exemple. */
+  rafraichir: () => Promise<void>;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
+  /** Change l'étape d'une affaire. Entrer dans la dernière colonne vaut signature. */
+  setClientStage: (id: string, stage: Stage) => void;
   deleteClient: (id: string) => Promise<void>;
   addProjectContact: (clientId: string, input: { prenom: string; nom: string; role: string; email: string }) => void;
   removeProjectContact: (clientId: string, contactId: string) => void;
@@ -89,6 +99,32 @@ interface DataValue {
 
   addDocType: (name: string) => void;
   removeDocType: (name: string) => void;
+
+  // Colonnes du pipeline (migration 0023)
+  stages: PipelineStage[];
+  addStage: (label: string, tone: StageTone) => void;
+  renameStage: (id: string, nouveau: string) => void;
+  setStageTone: (id: string, tone: StageTone) => void;
+  /** Supprime une colonne ; ses fiches partent vers `versLabel` (obligatoire si elle n'est pas vide). */
+  deleteStage: (id: string, versLabel: string | null) => void;
+  moveStage: (id: string, sens: -1 | 1) => void;
+
+  // Fichier client (migration 0024)
+  accounts: Account[];
+  accountFields: AccountField[];
+  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null }) => void;
+  /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
+  setAccountCell: (id: string, key: string, value: string) => void;
+  /** Enregistre une fiche entière (formulaire de modification), en une seule écriture. */
+  saveAccount: (id: string, valeurs: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }) => void;
+  deleteAccount: (id: string) => void;
+  addManyAccounts: (fiches: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }[]) => void;
+  addField: (label: string, type: FieldType) => void;
+  /** Crée les colonnes manquantes ; rend la clé de chaque libellé demandé. */
+  addFields: (demandes: { label: string; type: FieldType }[]) => Map<string, string>;
+  renameField: (id: string, label: string) => void;
+  moveField: (id: string, sens: -1 | 1) => void;
+  deleteField: (id: string) => void;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -104,6 +140,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountFields, setAccountFields] = useState<AccountField[]>([]);
 
   const applySnapshot = useCallback((snap: AdminSnapshot) => {
     setContacts(snap.contacts);
@@ -111,6 +150,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setDocs(snap.docs);
     setDocTypes(snap.docTypes);
     setActivity(snap.activity);
+    setStages(snap.stages);
+    setAccounts(snap.accounts);
+    setAccountFields(snap.accountFields);
   }, []);
 
   // Recharge silencieuse (utilisée par le temps réel).
@@ -177,8 +219,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   }, [status, reload]);
 
   // Persistance best-effort : notifie en cas d'échec, sans rollback (optimiste).
-  const persist = useCallback((op: () => Promise<void>) => {
-    op().catch((e) => {
+  const persist = useCallback((op: () => Promise<void>): Promise<boolean> => {
+    return op().then(() => true).catch((e) => {
       console.error(e);
       toast.error("La modification n'a pas pu être enregistrée.");
       void logAudit({
@@ -188,6 +230,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         success: false,
         detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
       });
+      return false;
     });
   }, [user]);
 
@@ -246,10 +289,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   );
 
   // --- Projets CRM ---
+  /**
+   * Ajouter une affaire. Rend `false` si l'écriture en base a échoué : celui qui
+   * doit enchaîner — poser converted_client_id sur le prospect, rattacher un
+   * contact — attend la réponse, sinon la clé étrangère pointe dans le vide.
+   */
   const addClient: DataValue["addClient"] = useCallback(
     (client) => {
       setClients((prev) => [...prev, client]);
-      persist(() => repo.createClient(client));
+      return persist(() => repo.createClient(client));
     },
     [persist, repo],
   );
@@ -512,6 +560,342 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+
+  // ── Colonnes du pipeline ────────────────────────────────────────────────
+  // L'état applicatif change tout de suite (mutation optimiste), le repository suit.
+
+  const addStage: DataValue["addStage"] = useCallback(
+    (label, tone) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setStages((prev) => {
+        if (prev.some((s) => s.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        const stage: PipelineStage = {
+          id: crypto.randomUUID(),
+          label: propre,
+          position: (prev.at(-1)?.position ?? 0) + 1,
+          tone,
+        };
+        persist(() => repo.createStage(stage));
+        return [...prev, stage];
+      });
+    },
+    [persist, repo],
+  );
+
+  const renameStage: DataValue["renameStage"] = useCallback(
+    (id, nouveau) => {
+      const propre = nouveau.trim();
+      if (!propre) return;
+      setStages((prev) => {
+        const stage = prev.find((s) => s.id === id);
+        if (!stage || stage.label === propre) return prev;
+        if (prev.some((s) => s.id !== id && s.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        const ancien = stage.label;
+        // Les fiches suivent le renommage, sinon elles n'auraient plus de colonne.
+        setClients((cs) => cs.map((c) => (c.stage === ancien ? { ...c, stage: propre } : c)));
+        persist(() => repo.renameStage(id, ancien, propre));
+        return prev.map((s) => (s.id === id ? { ...s, label: propre } : s));
+      });
+    },
+    [persist, repo],
+  );
+
+  const setStageTone: DataValue["setStageTone"] = useCallback(
+    (id, tone) => {
+      setStages((prev) => prev.map((s) => (s.id === id ? { ...s, tone } : s)));
+      persist(() => repo.setStageTone(id, tone));
+    },
+    [persist, repo],
+  );
+
+  const deleteStage: DataValue["deleteStage"] = useCallback(
+    (id, versLabel) => {
+      setStages((prev) => {
+        const stage = prev.find((s) => s.id === id);
+        if (!stage) return prev;
+        if (prev.length <= 1) {
+          toast.error("Le pipeline garde au moins une colonne.");
+          return prev;
+        }
+        setClients((cs) => (versLabel ? cs.map((c) => (c.stage === stage.label ? { ...c, stage: versLabel } : c)) : cs));
+        persist(() => repo.deleteStage(id, stage.label, versLabel));
+        return prev.filter((s) => s.id !== id);
+      });
+    },
+    [persist, repo],
+  );
+
+  const moveStage: DataValue["moveStage"] = useCallback(
+    (id, sens) => {
+      setStages((prev) => {
+        const i = prev.findIndex((s) => s.id === id);
+        const j = i + sens;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const suite = [...prev];
+        [suite[i], suite[j]] = [suite[j], suite[i]];
+        const ordonne = suite.map((s, k) => ({ ...s, position: k + 1 }));
+        persist(() => repo.reorderStages(ordonne.map((s) => ({ id: s.id, position: s.position }))));
+        return ordonne;
+      });
+    },
+    [persist, repo],
+  );
+
+
+  // ── Fichier client ──────────────────────────────────────────────────────
+
+  const addAccount: DataValue["addAccount"] = useCallback(
+    (saisie) => {
+      const propre = saisie.name.trim();
+      if (!propre) return;
+      const fiche: Account = {
+        id: crypto.randomUUID(),
+        name: propre,
+        signedOn: saisie.signedOn,
+        sector: saisie.sector,
+        data: saisie.data,
+        clientId: saisie.clientId ?? null,
+      };
+      setAccounts((prev) => [...prev, fiche]);
+      persist(() => repo.createAccount(fiche));
+    },
+    [persist, repo],
+  );
+
+  /**
+   * Changer d'étape. Le changement est immédiat — il n'y a rien à enregistrer — mais
+   * il se voyait à peine : on le dit. La fiche client suit toute seule (règle plus bas).
+   */
+  const setClientStage: DataValue["setClientStage"] = useCallback(
+    (id, stage) => {
+      updateClientFields(id, { stage });
+      toast.success(`Étape : ${stage}`);
+    },
+    [updateClientFields],
+  );
+
+  /**
+   * Signer fait entrer l'affaire au fichier client — une fois, et une seule.
+   *
+   * La fiche créée est notée sur l'affaire (`ficheClientCreee`). Sans cette marque, on
+   * recréait la fiche à chaque chargement : la supprimer ne servait à rien, et trois
+   * affaires homonymes en fabriquaient trois d'un coup.
+   */
+  useEffect(() => {
+    const signe = etapeQuiSigne(stages);
+    if (!signe || clients.length === 0) return;
+
+    const nom = (t: string) => t.trim().toLowerCase();
+    // Les noms déjà pris — par une fiche existante, ou par une affaire traitée juste avant
+    // dans cette même passe : deux affaires du même nom ne font pas deux fiches.
+    const pris = new Set(accounts.map((a) => nom(a.name)));
+
+    for (const c of clients) {
+      if (c.stage !== signe || c.ficheClientCreee) continue;
+      if (accounts.some((a) => a.clientId === c.id) || pris.has(nom(c.company))) {
+        // Rien à créer, mais l'affaire est en règle : on la marque pour ne plus y revenir.
+        updateClientFields(c.id, { ficheClientCreee: true });
+        continue;
+      }
+      pris.add(nom(c.company));
+      updateClientFields(c.id, { ficheClientCreee: true });
+      void repo
+        .secteurDuProspect(c.id)
+        .catch(() => null)
+        .then((secteur) =>
+          addAccount({
+            name: c.company,
+            signedOn: new Date().toISOString().slice(0, 10),
+            sector: secteur,
+            data: {},
+            clientId: c.id,
+          }),
+        );
+    }
+  }, [accounts, addAccount, clients, repo, stages, updateClientFields]);
+
+  const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
+    (fiches) => {
+      const nouvelles: Account[] = fiches
+        .filter((f) => f.name.trim())
+        .map((f) => ({ id: crypto.randomUUID(), name: f.name.trim(), signedOn: f.signedOn, sector: f.sector, data: f.data, clientId: null }));
+      if (!nouvelles.length) return;
+      setAccounts((prev) => [...prev, ...nouvelles]);
+      persist(async () => {
+        for (const f of nouvelles) await repo.createAccount(f);
+      });
+    },
+    [persist, repo],
+  );
+
+  const setAccountCell: DataValue["setAccountCell"] = useCallback(
+    (id, key, value) => {
+      setAccounts((prev) => {
+        const fiche = prev.find((a) => a.id === id);
+        if (!fiche) return prev;
+        // Les trois colonnes du socle ont leur champ ; les autres vivent dans `data`.
+        const maj: Account =
+          key === "etablissement"
+            ? { ...fiche, name: value }
+            : key === "date_client"
+              ? { ...fiche, signedOn: value || null }
+              : key === "secteur"
+                ? { ...fiche, sector: value || null }
+                : { ...fiche, data: { ...fiche.data, [key]: value } };
+        persist(() => repo.updateAccount(maj));
+        return prev.map((a) => (a.id === id ? maj : a));
+      });
+    },
+    [persist, repo],
+  );
+
+  const saveAccount: DataValue["saveAccount"] = useCallback(
+    (id, valeurs) => {
+      const propre = valeurs.name.trim();
+      if (!propre) return;
+      setAccounts((prev) => {
+        const fiche = prev.find((a) => a.id === id);
+        if (!fiche) return prev;
+        const maj: Account = { ...fiche, name: propre, signedOn: valeurs.signedOn, sector: valeurs.sector, data: valeurs.data };
+        persist(() => repo.updateAccount(maj));
+        return prev.map((a) => (a.id === id ? maj : a));
+      });
+    },
+    [persist, repo],
+  );
+
+  const deleteAccount: DataValue["deleteAccount"] = useCallback(
+    (id) => {
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      persist(() => repo.deleteAccount(id));
+    },
+    [persist, repo],
+  );
+
+  /**
+   * Crée d'un coup les colonnes manquantes et rend, pour chaque libellé demandé, la clé
+   * où ranger la valeur. Sert à l'import : un fichier peut apporter ses propres colonnes.
+   */
+  const addFields: DataValue["addFields"] = useCallback(
+    (demandes) => {
+      const cles = new Map<string, string>();
+      setAccountFields((prev) => {
+        const champs = [...prev];
+        for (const d of demandes) {
+          const propre = d.label.trim();
+          if (!propre) continue;
+          const connue = champs.find((f) => f.label.toLowerCase() === propre.toLowerCase());
+          if (connue) {
+            cles.set(d.label, connue.key);
+            continue;
+          }
+          const base =
+            propre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") ||
+            "colonne";
+          let key = base;
+          let n = 2;
+          while (champs.some((f) => f.key === key)) key = `${base}_${n++}`;
+          const champ: AccountField = {
+            id: crypto.randomUUID(),
+            key,
+            label: propre,
+            type: d.type,
+            position: (champs.at(-1)?.position ?? 0) + 1,
+            protege: false,
+          };
+          champs.push(champ);
+          cles.set(d.label, key);
+          persist(() => repo.createField(champ));
+        }
+        return champs;
+      });
+      return cles;
+    },
+    [persist, repo],
+  );
+
+  const addField: DataValue["addField"] = useCallback(
+    (label, type) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setAccountFields((prev) => {
+        if (prev.some((f) => f.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        // Clé technique dérivée du nom : stable même si la colonne est renommée ensuite.
+        const base = propre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "colonne";
+        let key = base;
+        let n = 2;
+        while (prev.some((f) => f.key === key)) key = `${base}_${n++}`;
+        const champ: AccountField = { id: crypto.randomUUID(), key, label: propre, type, position: (prev.at(-1)?.position ?? 0) + 1, protege: false };
+        persist(() => repo.createField(champ));
+        return [...prev, champ];
+      });
+    },
+    [persist, repo],
+  );
+
+  const renameField: DataValue["renameField"] = useCallback(
+    (id, label) => {
+      const propre = label.trim();
+      if (!propre) return;
+      setAccountFields((prev) => {
+        if (prev.some((f) => f.id !== id && f.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom.");
+          return prev;
+        }
+        persist(() => repo.renameField(id, propre));
+        return prev.map((f) => (f.id === id ? { ...f, label: propre } : f));
+      });
+    },
+    [persist, repo],
+  );
+
+  const moveField: DataValue["moveField"] = useCallback(
+    (id, sens) => {
+      setAccountFields((prev) => {
+        const i = prev.findIndex((f) => f.id === id);
+        const j = i + sens;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const suite = [...prev];
+        [suite[i], suite[j]] = [suite[j], suite[i]];
+        const ordonne = suite.map((f, k) => ({ ...f, position: k + 1 }));
+        persist(() => repo.moveField(ordonne.map((f) => ({ id: f.id, position: f.position }))));
+        return ordonne;
+      });
+    },
+    [persist, repo],
+  );
+
+  const deleteField: DataValue["deleteField"] = useCallback(
+    (id) => {
+      setAccountFields((prev) => {
+        const champ = prev.find((f) => f.id === id);
+        if (!champ || champ.protege) return prev;
+        // Les valeurs de la colonne disparaissent avec elle, sinon elles resteraient invisibles.
+        setAccounts((as) =>
+          as.map((a) => {
+            if (!(champ.key in a.data)) return a;
+            const data = { ...a.data };
+            delete data[champ.key];
+            return { ...a, data };
+          }),
+        );
+        persist(() => repo.deleteField(id, champ.key));
+        return prev.filter((f) => f.id !== id);
+      });
+    },
+    [persist, repo],
+  );
+
   const value = useMemo<DataValue>(
     () => ({
       loading,
@@ -527,6 +911,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setContactGeo,
       addClient,
       updateClientFields,
+      stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
+      rafraichir: reload,
+      addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
       removeProjectContact,
@@ -547,6 +935,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
+      stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
+      reload,
+      addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addDocType, removeDocType,

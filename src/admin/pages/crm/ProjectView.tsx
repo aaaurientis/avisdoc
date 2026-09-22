@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, Lock, Minus, Pencil, Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, PenLine, Plus, Search, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
-import { DOC_EXT, PROPO_STATUTS, STAGES, stageMeta } from "../../lib/ui-tokens";
+import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
@@ -12,13 +12,47 @@ import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
 import ParcoursBanner from "../../espace/ParcoursBanner";
+import { useAuth } from "../../auth/AuthContext";
+import { supabaseAdmin } from "../../data/supabaseAdmin";
+import NoteDetaillee from "../prospects/NoteDetaillee";
+import BrouillonEmail from "../prospects/BrouillonEmail";
+import FilEchanges from "../../components/FilEchanges";
+import type { Jalon } from "../../lib/echanges";
+import type { Prospect } from "../../lib/merx";
+import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
+import Onglets from "../../components/Onglets";
 import { cn } from "@/lib/utils";
-
-// Rang d'une étape dans le flux (Nouveau < Qualifié < Proposition < Signé).
-const stageRank = (s: Stage) => STAGES.findIndex((x) => x.name === s);
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+
+/** Ce qu'une étape retient encore, dit une seule fois. */
+function Verrouille({ etape, fonctions }: { etape: string; fonctions: string }) {
+  return (
+    <section className="mt-5 flex items-center gap-2.5 rounded-2xl border border-border px-4 py-3.5 first:mt-0">
+      <Lock className="size-4 shrink-0 text-muted-foreground/60" />
+      <p className="text-[13px] text-muted-foreground">
+        {fonctions} se débloquent à l’étape <span className="font-semibold text-avisdoc-ink">{etape}</span>.
+      </p>
+    </section>
+  );
+}
+
+/** Un bloc à l'intérieur d'un onglet : plusieurs fonctions tiennent dans le même. */
+function Bloc({ titre, verrou, children }: { titre?: string; verrou?: string | null; children: ReactNode }) {
+  return (
+    <section className="mt-5 first:mt-0">
+      {titre && <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">{titre}</div>}
+      {verrou ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-border px-4 py-3 text-[13px] text-muted-foreground">
+          <Lock className="size-4 shrink-0 text-muted-foreground/60" /> {verrou}
+        </div>
+      ) : (
+        children
+      )}
+    </section>
+  );
+}
 
 // Section repliable pleine largeur (accordéon de la fiche projet).
 // `locked` : étape non atteinte → en-tête grisé, cadenas, contenu masqué.
@@ -84,13 +118,9 @@ function Section({
 
 export default function ProjectView({
   client,
-  allClients,
-  onSelect,
   onClose,
 }: {
   client: Client;
-  allClients: Client[];
-  onSelect: (id: string) => void;
   onClose: () => void;
 }) {
   const {
@@ -102,7 +132,12 @@ export default function ProjectView({
     addSuivi,
     toggleSuivi,
     removeSuivi,
+    stages,
+    accounts,
+    addAccount,
+    setClientStage,
   } = useAdminData();
+  const { user } = useAuth();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "" });
@@ -115,24 +150,110 @@ export default function ProjectView({
 
   // Déblocage par étape : une fonction verrouillée tant que l'étape minimale
   // requise n'est pas atteinte.
-  const cur = stageRank(client.stage);
-  const verrou = (min: Stage) => cur < stageRank(min);
-  const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
+  // Rang d'une étape dans le parcours, d'après les colonnes de l'équipe.
+  // Une colonne supprimée ou renommée rend -1 : on ne verrouille alors rien.
+  const ficheClient = accounts.find((a) => a.clientId === client.id);
+  const cur = stageRank(client.stage, stages);
+  const verrou = (min: Stage) => {
+    const rang = stageRank(min, stages);
+    return rang >= 0 && cur >= 0 && cur < rang;
+  };
+
+  const [origine, setOrigine] = useState<Prospect | null>(null);
+  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
+  const compter = useCallback((n: number) => setNbEchanges(n), []);
+  const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
+  const [merxErreur, setMerxErreur] = useState<string | null>(null);
+  const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
 
   // Onglets des fonctions, dans l'ordre du parcours.
-  const TABS: { key: string; label: string; min: Stage; compte?: number }[] = [
-    { key: "contacts", label: "Contacts", min: "Nouveau", compte: client.contacts.length },
-    { key: "suivis", label: "Suivis", min: "Nouveau", compte: client.suivis.length },
-    { key: "journal", label: "Journal", min: "Nouveau" },
-    { key: "documents", label: "Documents", min: "Nouveau", compte: client.docs.length },
-    { key: "proposition", label: "Proposition", min: "Proposition" },
-    { key: "qonto", label: "Devis Qonto", min: "Proposition" },
-    { key: "espace", label: "Espace client", min: "Signé" },
-    { key: "rdv", label: "Rendez-vous", min: "Signé" },
+  // Quatre onglets, les mêmes que sur les autres fiches : ce qui est vrai, ce qu'on
+  // pense, ce qu'on fait, ce qui s'est passé. Leurs fonctions se rangent dedans.
+  const TABS: { key: string; label: string; compte?: number }[] = [
+    { key: "identite", label: "Identité", compte: client.contacts.length + client.docs.length },
+    { key: "approche", label: "Approche" },
+    { key: "action", label: "Action" },
+    { key: "historique", label: "Historique", compte: (nbEchanges ?? 0) + client.suivis.length },
   ];
-  const [tab, setTab] = useState("contacts");
-  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
-  const activeLocked = verrou(activeTab.min);
+
+  const [tab, setTab] = useState("identite");
+
+  /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
+  const chargerOrigine = useCallback(async () => {
+    const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("converted_client_id", client.id).maybeSingle();
+    setOrigine((data as Prospect) ?? null);
+  }, [client.id]);
+
+  useEffect(() => {
+    void chargerOrigine();
+  }, [chargerOrigine]);
+
+  const jalons = useMemo<Jalon[]>(
+    () =>
+      ([
+        origine ? { libelle: "Trouvée par Merx", au: origine.created_at } : null,
+        origine?.enriched_at ? { libelle: "Fiche approfondie", au: origine.enriched_at } : null,
+        origine?.converted_at ? { libelle: "Passée au Pipeline", au: origine.converted_at } : null,
+      ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
+    [origine],
+  );
+
+  /**
+   * Une affaire saisie à la main n'a pas de fiche chez Merx : on lui en ouvre une,
+   * rattachée à l'affaire, puis on lance l'approfondissement. Merx travaille alors
+   * dessus comme sur n'importe quelle entreprise qu'il aurait trouvée lui-même.
+   */
+  const confierAMerx = async () => {
+    if (merxEnCours) return;
+    setMerxEnCours("approfondir");
+    setMerxErreur(null);
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("admin_prospects")
+        .insert({
+          owner_email: user?.email ?? "",
+          name: client.company,
+          city: client.ville || null,
+          department: (client.codePostal ?? "").slice(0, 2) || null,
+          siren: client.siren || null,
+          converted_client_id: client.id,
+          converted_at: new Date().toISOString(),
+          status: "a_contacter",
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      await approfondirProspect(data.id as string);
+      await chargerOrigine();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "Merx n’a pas répondu.";
+      setMerxErreur(
+        /duplicate key|unique/i.test(m)
+          ? "Merx connaît déjà une entreprise de ce nom dans cette ville : retrouvez-la dans Prospection."
+          : m,
+      );
+    } finally {
+      setMerxEnCours(null);
+    }
+  };
+
+  const demanderAMerx = async (quoi: "approfondir" | "email") => {
+    if (!origine || merxEnCours) return;
+    setMerxEnCours(quoi);
+    setMerxErreur(null);
+    try {
+      if (quoi === "approfondir") {
+        await approfondirProspect(origine.id);
+        await chargerOrigine();
+      } else {
+        setBrouillon(await redigerEmailProspect(origine.id, user?.name ?? user?.email ?? ""));
+      }
+    } catch (e) {
+      setMerxErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
+    } finally {
+      setMerxEnCours(null);
+    }
+  };
 
   const startEdit = () => {
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
@@ -173,35 +294,11 @@ export default function ProjectView({
   const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
   return (
-    <div className="ad-crm-grid grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
-      {/* Liste des clients */}
-      <Card className="overflow-hidden">
-        {allClients.map((c) => {
-          const active = c.id === client.id;
-          const sm = stageMeta(c.stage);
-          return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onSelect(c.id)}
-              className={cn(
-                "ad-row block w-full border-b border-border/60 border-l-[3px] px-4.5 py-3 text-left transition-colors last:border-b-0",
-                active ? "border-l-avisdoc-teal bg-sky-50/70" : "border-l-transparent",
-              )}
-              style={{ paddingLeft: 18, paddingRight: 18 }}
-            >
-              <div className="text-[13.5px] font-semibold text-avisdoc-ink">{c.company}</div>
-              <div className="mt-0.5 flex justify-between">
-                <span className="text-[11.5px] text-muted-foreground">{c.contacts[0]?.name ?? "—"}</span>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wide", sm.text)}>{c.stage}</span>
-              </div>
-            </button>
-          );
-        })}
-      </Card>
-
-      {/* Détail projet — accordéon pleine largeur */}
-      <div className="flex min-w-0 flex-col gap-3">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-6">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex w-full max-w-5xl min-w-0 flex-col gap-3 rounded-3xl bg-card p-5 shadow-floating sm:p-6"
+      >
         {/* 1. Nom de la société et infos */}
         <Section
           titre={client.company}
@@ -298,87 +395,167 @@ export default function ProjectView({
             </div>
           )}
 
-          {/* Pastilles d'étape */}
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {STAGES.map((s) => {
-              const active = client.stage === s.name;
-              return (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => updateClientFields(client.id, { stage: s.name as Stage })}
-                  className={cn(
-                    "rounded-full border px-4 py-1.5 text-xs font-bold transition-colors",
-                    active
-                      ? cn(s.dot, "border-transparent text-white")
-                      : "border-border bg-card text-muted-foreground hover:border-avisdoc-ink",
-                  )}
-                >
-                  {s.name}
-                </button>
-              );
-            })}
-          </div>
         </Section>
 
         {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
-        <ParcoursBanner clientId={client.id} currentStage={client.stage} />
+        <ParcoursBanner
+          clientId={client.id}
+          currentStage={client.stage}
+          // Comme en prospection : la fiche se referme et on voit la carte arriver
+          // dans sa nouvelle colonne.
+          onEtape={(s) => {
+            setClientStage(client.id, s);
+            onClose();
+          }}
+        />
 
         {/* Onglets des fonctions (sous le bandeau) */}
         <Card className="overflow-hidden">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 pt-2">
-            {TABS.map((t) => {
-              const locked = verrou(t.min);
-              const active = t.key === tab;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3.5 py-2.5 text-[12.5px] font-bold transition-colors",
-                    active
-                      ? "border-avisdoc-teal text-avisdoc-ink"
-                      : "border-transparent text-muted-foreground hover:text-avisdoc-ink",
-                    locked && "opacity-50",
-                  )}
-                >
-                  {locked && <Lock className="size-3" />}
-                  {t.label}
-                  {t.compte != null && !locked && (
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                      {t.compte}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <Onglets onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))} actif={tab} onChange={setTab} />
 
           <div className="px-5 pb-5 pt-4">
-            {activeLocked ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Lock className="size-6 text-muted-foreground/50" />
-                <p className="text-[13px] text-muted-foreground">{indice(activeTab.min)}</p>
-              </div>
-            ) : (
+            {tab === "identite" && (
               <>
-                {tab === "contacts" && ContactsTab()}
-                {tab === "suivis" && SuivisTab()}
-                {tab === "journal" && <JournalCard clientId={client.id} />}
-                {tab === "documents" && DocumentsTab()}
-                {tab === "proposition" && PropositionTab()}
-                {tab === "qonto" && <DevisQonto clientId={client.id} />}
-                {tab === "espace" && <EspaceClientCard bare clientId={client.id} clientName={client.company} />}
-                {tab === "rdv" && <RendezVousCard bare clientId={client.id} />}
+                <Bloc titre="Interlocuteurs">{ContactsTab()}</Bloc>
+                <Bloc titre="Documents">{DocumentsTab()}</Bloc>
+              </>
+            )}
+
+            {tab === "approche" && ApprocheTab()}
+
+            {tab === "action" && (
+              <>
+                {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
+                {verrou("Proposition") ? (
+                  <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
+                ) : (
+                  <>
+                    <Bloc titre="Proposition">{PropositionTab()}</Bloc>
+                    <Bloc>
+                      <DevisQonto clientId={client.id} />
+                    </Bloc>
+                  </>
+                )}
+
+                {verrou("Signé") ? (
+                  <Verrouille etape="Signé" fonctions="L’espace client et les rendez-vous" />
+                ) : (
+                  <>
+                    <Bloc>
+                      <EspaceClientCard bare clientId={client.id} clientName={client.company} />
+                    </Bloc>
+                    <Bloc>
+                      <RendezVousCard bare clientId={client.id} />
+                    </Bloc>
+                  </>
+                )}
+              </>
+            )}
+
+            {tab === "historique" && (
+              <>
+                <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} />
+                <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
+                <Bloc>
+                  <JournalCard clientId={client.id} />
+                </Bloc>
               </>
             )}
           </div>
         </Card>
-
       </div>
+
+      {brouillon && (
+        <BrouillonEmail
+          nom={client.company}
+          objet={brouillon.objet}
+          corps={brouillon.corps}
+          destinataire={brouillon.destinataire}
+          onClose={() => setBrouillon(null)}
+        />
+      )}
     </div>
   );
+
+  /** Ce que Merx avait trouvé, et ce qu’on peut encore lui demander. */
+  function ApprocheTab() {
+    if (!origine) {
+      return (
+        <div className="py-2">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            Cette affaire n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Vous pouvez la lui confier
+            — il ira chercher le registre officiel, les coordonnées publiées, et dira comment aborder l’entreprise.
+          </p>
+          <button
+            type="button"
+            onClick={() => void confierAMerx()}
+            disabled={merxEnCours !== null}
+            className="ad-btn-accent mt-3 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          >
+            {merxEnCours ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+            Confier cette fiche à Merx
+          </button>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Cela prend une trentaine de secondes. Les sources consultées sont gratuites.
+          </p>
+          {merxErreur && (
+            <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void demanderAMerx("approfondir")}
+            disabled={merxEnCours !== null}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {merxEnCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+            {origine.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void demanderAMerx("email")}
+            disabled={merxEnCours !== null}
+            title="Merx rédige un brouillon à partir de la fiche. Rien n’est envoyé."
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {merxEnCours === "email" ? <Loader2 className="size-3.5 animate-spin" /> : <PenLine className="size-3.5" />}
+            Écrire un e-mail personnalisé
+          </button>
+        </div>
+
+        {merxErreur && (
+          <p className="mb-4 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
+        )}
+
+        {origine.rationale && (
+          <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+              Pourquoi c’était un bon prospect
+            </div>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
+            {origine.approach && (
+              <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                <span className="font-semibold">Angle d’approche : </span>
+                {origine.approach}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          La note, critère par critère
+        </div>
+        <div className="mt-2">
+          <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
+        </div>
+      </div>
+    );
+  }
 
   // ---- Contenus d'onglets (fermetures sur l'état du composant) ----
 
@@ -597,6 +774,19 @@ export default function ProjectView({
                 );
               })}
             </div>
+
+            {(client.tarif > 0 || client.statutPropo !== "Brouillon") && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("Retirer la proposition ? Les journées et le tarif repartent à zéro.")) return;
+                  updateClientFields(client.id, { jours: 1, tarif: 0, statutPropo: "Brouillon" });
+                }}
+                className="mt-3 text-[11.5px] font-semibold text-white/60 underline-offset-2 hover:text-white hover:underline"
+              >
+                Retirer la proposition
+              </button>
+            )}
           </div>
 
           {/* Résultat de campagne */}

@@ -6,6 +6,13 @@ import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Crm from "./pages/Crm";
+import Merx from "./pages/Merx";
+import Prospects from "./pages/Prospects";
+import FichierClient from "./pages/FichierClient";
+import NotesDictees from "./pages/NotesDictees";
+import Dictee from "./pages/Dictee";
+import Couts from "./pages/Couts";
+import Corbeille from "./pages/Corbeille";
 import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
 import Documents from "./pages/Documents";
@@ -43,7 +50,14 @@ function Gate() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/crm" element={<Garde module="crm"><Crm /></Garde>} />
           <Route path="/crm/:clientId" element={<Garde module="crm"><Crm /></Garde>} />
+          <Route path="/merx" element={<Garde module="merx"><Merx /></Garde>} />
+          <Route path="/prospects" element={<Garde module="merx"><Prospects /></Garde>} />
           <Route path="/clients" element={<Garde module="finance"><Clients /></Garde>} />
+          <Route path="/fichier-client" element={<Garde module="merx"><FichierClient /></Garde>} />
+          <Route path="/notes-dictees" element={<Garde module="merx"><NotesDictees /></Garde>} />
+          <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
+          <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
+          <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
           <Route path="/contacts" element={<Garde module="contacts"><Contacts /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />

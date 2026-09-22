@@ -1,18 +1,29 @@
 // Barre latérale du Hub — menu à 2 niveaux, filtré par les modules autorisés
 // (admin_droits ; un super-admin voit tout). Les groupes se déplient et
 // s'ouvrent automatiquement quand une de leurs pages est active.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
+  BookUser,
   Building2,
   ChevronDown,
+  Coins,
+  Trash2,
   FileText,
+  KeyRound,
   LayoutDashboard,
+  LayoutGrid,
   Megaphone,
+  Mic,
   Moon,
   Power,
+  Receipt,
+  ScrollText,
   Settings,
+  SlidersHorizontal,
+  Sparkles,
   Sun,
+  Target,
   Users,
   Wallet,
   type LucideIcon,
@@ -28,8 +39,12 @@ import { Avatar } from "./ui";
 interface Enfant {
   to: string;
   label: string;
+  /** Pictogramme de la page, en trait fin — mêmes choix que le hub Onetip. */
+  icon: LucideIcon;
   /** Réservé aux super-admins (ex. journal d'audit). */
   superadmin?: boolean;
+  /** Module propre à cette page, quand il diffère de celui du groupe (ex. Merx). */
+  module?: Module;
 }
 interface Entree {
   /** Module de droits ; null = visible par tous (tableau de bord). */
@@ -47,18 +62,24 @@ interface Entree {
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
-    { to: "/crm", label: "CRM" },
+    { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
+    { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
+    { to: "/crm", label: "Pipeline", icon: LayoutGrid },
+    { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
+    { to: "/notes-dictees", label: "Notes dictées", icon: Mic, module: "merx" },
+    { to: "/couts", label: "Coûts", icon: Coins, module: "merx" },
+    { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
-    { to: "/clients", label: "Facturation" },
+    { to: "/clients", label: "Facturation", icon: Receipt },
   ] },
   { module: "documents", label: "Documents", icon: FileText, to: "/documents" },
   { module: "admin", label: "Admin", icon: Settings, enfants: [
-    { to: "/settings", label: "Réglages" },
-    { to: "/droits", label: "Droits d'accès", superadmin: true },
-    { to: "/audit", label: "Auditabilité", superadmin: true },
+    { to: "/settings", label: "Réglages", icon: SlidersHorizontal },
+    { to: "/droits", label: "Droits d'accès", icon: KeyRound, superadmin: true },
+    { to: "/audit", label: "Auditabilité", icon: ScrollText, superadmin: true },
   ] },
 ];
 
@@ -68,42 +89,52 @@ const lienCls = (actif: boolean) =>
     actif ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
   );
 
-function Groupe({ entree, isSuperAdmin }: { entree: Entree; isSuperAdmin: boolean }) {
+function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: boolean; peut: (m: Module) => boolean }) {
   const { pathname } = useLocation();
-  const enfants = (entree.enfants ?? []).filter((e) => !e.superadmin || isSuperAdmin);
+  const enfants = (entree.enfants ?? []).filter((e) => (!e.superadmin || isSuperAdmin) && (!e.module || peut(e.module)));
   const enfantActif = enfants.some((e) => pathname.startsWith(e.to));
   const [ouvert, setOuvert] = useState(enfantActif);
   const Icon = entree.icon;
+
+  // Le groupe suit la navigation : il s'ouvre sur ses écrans, se referme dès qu'on le
+  // quitte. Sans cela, « enfantActif » forçait l'ouverture et le chevron ne servait à rien.
+  useEffect(() => {
+    setOuvert(enfantActif);
+  }, [enfantActif]);
 
   return (
     <div>
       <button
         type="button"
         onClick={() => setOuvert((o) => !o)}
-        className={cn(lienCls(false), "w-full", enfantActif && "text-avisdoc-ink")}
+        className={cn(lienCls(false), "w-full", enfantActif && "bg-accent font-bold text-avisdoc-ink")}
       >
         <Icon className="size-[18px]" strokeWidth={2.2} />
         <span className="min-w-0 flex-1 truncate text-left">{entree.label}</span>
-        <ChevronDown className={cn("size-4 shrink-0 transition-transform", (ouvert || enfantActif) && "rotate-180")} />
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", ouvert && "rotate-180")} />
       </button>
-      {(ouvert || enfantActif) && (
+      {ouvert && (
         <div className="ml-[26px] flex flex-col gap-0.5 border-l border-border pl-2.5 pt-0.5">
-          {enfants.map((e) => (
-            <NavLink
-              key={e.to}
-              to={e.to}
-              className={({ isActive }) =>
-                cn(
-                  "rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
-                  isActive
-                    ? "bg-avisdoc-ink text-white"
-                    : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
-                )
-              }
-            >
-              {e.label}
-            </NavLink>
-          ))}
+          {enfants.map((e) => {
+            const IconeEnfant = e.icon;
+            return (
+              <NavLink
+                key={e.to}
+                to={e.to}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                    isActive
+                      ? "bg-avisdoc-ink text-white"
+                      : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
+                  )
+                }
+              >
+                <IconeEnfant className="size-[15px] shrink-0" strokeWidth={1.9} />
+                <span className="min-w-0 truncate">{e.label}</span>
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </div>
@@ -144,7 +175,7 @@ export default function Sidebar() {
               </div>
             );
           }
-          if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} />;
+          if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} peut={peut} />;
           return (
             <NavLink key={m.to} to={m.to!} className={({ isActive }) => lienCls(isActive)}>
               <Icon className="size-[18px]" strokeWidth={2.2} />

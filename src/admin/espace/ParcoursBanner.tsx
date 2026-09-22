@@ -3,7 +3,8 @@
 import { Fragment, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import type { Stage } from "../types";
-import { STAGES } from "../lib/ui-tokens";
+import { TONES } from "../lib/ui-tokens";
+import { useAdminData } from "../data/AdminDataContext";
 import { stageRepo, type StageEvent } from "./stageRepo";
 import { Card } from "../components/ui";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,17 @@ function duree(ms: number): string {
   return `${a} an${a > 1 ? "s" : ""}`;
 }
 
-export default function ParcoursBanner({ clientId, currentStage }: { clientId: string; currentStage: Stage }) {
+export default function ParcoursBanner({
+  clientId,
+  currentStage,
+  onEtape,
+}: {
+  clientId: string;
+  currentStage: Stage;
+  /** Si fourni, cliquer une étape y fait passer l'affaire. */
+  onEtape?: (stage: Stage) => void;
+}) {
+  const { stages } = useAdminData();
   const [hist, setHist] = useState<StageEvent[]>([]);
 
   useEffect(() => {
@@ -45,8 +56,8 @@ export default function ParcoursBanner({ clientId, currentStage }: { clientId: s
   // Étape courante non encore historisée (course avec le trigger) → « maintenant ».
   if (!reachedAt.has(currentStage)) reachedAt.set(currentStage, new Date().toISOString());
 
-  const curRank = STAGES.findIndex((s) => s.name === currentStage);
-  const firstIso = reachedAt.get(STAGES[0].name);
+  const curRank = stages.findIndex((s) => s.label === currentStage);
+  const firstIso = reachedAt.get(stages[0]?.label ?? "");
   const curIso = reachedAt.get(currentStage);
   const totalMs = firstIso && curIso ? new Date(curIso).getTime() - new Date(firstIso).getTime() : 0;
 
@@ -61,20 +72,20 @@ export default function ParcoursBanner({ clientId, currentStage }: { clientId: s
         )}
       </div>
 
-      <div className="flex items-start overflow-x-auto pb-1">
-        {STAGES.map((s, i) => {
+      <div className="flex items-start overflow-x-auto overscroll-x-contain pb-1">
+        {stages.map((s, i) => {
           const reached = i <= curRank;
           const active = i === curRank;
-          const iso = reachedAt.get(s.name);
+          const iso = reachedAt.get(s.label);
           // Durée depuis l'étape précédente atteinte.
-          const prevIso = i > 0 ? reachedAt.get(STAGES[i - 1].name) : undefined;
+          const prevIso = i > 0 ? reachedAt.get(stages[i - 1].label) : undefined;
           const segMs = reached && prevIso && iso ? new Date(iso).getTime() - new Date(prevIso).getTime() : null;
 
           return (
-            <Fragment key={s.name}>
+            <Fragment key={s.id}>
               {i > 0 && (
                 <div className="flex min-w-[44px] flex-1 flex-col items-center pt-2.5">
-                  <div className={cn("h-[2px] w-full", reached ? s.dot : "bg-border")} />
+                  <div className={cn("h-[2px] w-full", reached ? TONES[s.tone].dot : "bg-border")} />
                   {segMs != null && (
                     <span className="mt-1 whitespace-nowrap text-[10.5px] font-medium text-muted-foreground">
                       {duree(segMs)}
@@ -82,26 +93,35 @@ export default function ParcoursBanner({ clientId, currentStage }: { clientId: s
                   )}
                 </div>
               )}
-              <div className="flex min-w-[74px] shrink-0 flex-col items-center text-center">
+              <button
+                type="button"
+                disabled={!onEtape}
+                onClick={() => onEtape?.(s.label)}
+                title={onEtape ? `Passer à l’étape ${s.label}` : undefined}
+                className={cn(
+                  "flex min-w-[74px] shrink-0 flex-col items-center text-center",
+                  onEtape && "cursor-pointer rounded-lg py-1 transition-colors hover:bg-muted",
+                )}
+              >
                 <div
                   className={cn(
                     "flex size-7 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors",
                     active
-                      ? cn(s.dot, "border-transparent text-white")
+                      ? cn(TONES[s.tone].dot, "border-transparent text-white")
                       : reached
-                        ? cn(s.dot, "border-transparent text-white")
+                        ? cn(TONES[s.tone].dot, "border-transparent text-white")
                         : "border-border bg-card text-muted-foreground",
                   )}
                 >
                   {reached && !active ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
                 </div>
                 <span className={cn("mt-1.5 text-[12px] font-semibold", reached ? "text-avisdoc-ink" : "text-muted-foreground")}>
-                  {s.name}
+                  {s.label}
                 </span>
                 <span className="mt-0.5 text-[10.5px] text-muted-foreground/80">
                   {reached ? dateFr(iso) : "—"}
                 </span>
-              </div>
+              </button>
             </Fragment>
           );
         })}

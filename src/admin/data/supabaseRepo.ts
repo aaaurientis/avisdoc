@@ -3,16 +3,21 @@
 // supabase/migrations/0001_admin_schema.sql et docs/admin-app.md.
 
 import type {
+  Account,
+  AccountField,
   ActivityItem,
   Client,
   DocItem,
   NetworkContact,
+  PipelineStage,
   ProjectContact,
   ProjectDoc,
   Stage,
   Suivi,
 } from "../types";
 import { supabaseAdmin as sb } from "./supabaseAdmin";
+import { STAGES_DEFAUT } from "../lib/ui-tokens";
+import { SECTEURS } from "../lib/merx";
 import type { AdminRepo, AdminSnapshot } from "./repo";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -102,16 +107,19 @@ const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
-    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes] =
+    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
-        sb.from("admin_clients").select("*").order("created_at", { ascending: true }),
+        sb.from("admin_clients").select("*").is("deleted_at", null).order("created_at", { ascending: true }),
         sb.from("admin_client_contacts").select("*"),
         sb.from("admin_client_docs").select("*"),
         sb.from("admin_suivis").select("*"),
         sb.from("admin_documents").select("*").order("created_at", { ascending: false }),
         sb.from("admin_doc_types").select("*").order("name", { ascending: true }),
         sb.from("admin_activity").select("*").order("created_at", { ascending: false }).limit(20),
+        sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
+        sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
+        sb.from("admin_accounts").select("*").is("deleted_at", null).order("name", { ascending: true }),
       ]);
 
     const firstError =
@@ -143,6 +151,7 @@ export class SupabaseRepo implements AdminRepo {
       ville: r.ville ?? "",
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
+      ficheClientCreee: r.fiche_client_creee ?? false,
       jours: r.jours ?? 1,
       tarif: r.tarif ?? 0,
       depistes: r.depistes ?? 0,
@@ -162,6 +171,21 @@ export class SupabaseRepo implements AdminRepo {
       activity: (actRes.data ?? []).map(
         (r: any): ActivityItem => ({ id: r.id, dot: r.dot, text: r.text, when: r.when_label ?? "" }),
       ),
+      // Tant que la migration 0023 n'est pas appliquée, on affiche les colonnes de départ.
+      stages: stagesRes.error || !stagesRes.data?.length
+        ? structuredClone(STAGES_DEFAUT)
+        : stagesRes.data.map((r: any): PipelineStage => ({ id: r.id, label: r.label, position: r.position, tone: r.tone })),
+      // La migration 0024 peut ne pas être appliquée : le fichier client est alors vide.
+      accountFields: fieldsRes.error
+        ? []
+        : (fieldsRes.data ?? []).map((r: any): AccountField => ({
+            id: r.id, key: r.key, label: r.label, type: r.type, position: r.position, protege: r.protege,
+          })),
+      accounts: accountsRes.error
+        ? []
+        : (accountsRes.data ?? []).map((r: any): Account => ({
+            id: r.id, name: r.name, signedOn: r.signed_on, sector: r.sector, data: r.data ?? {}, clientId: r.client_id,
+          })),
     };
   }
 
@@ -217,7 +241,7 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateClientFields(id: string, fields: Partial<Client>): Promise<void> {
     const row: Record<string, unknown> = {};
-    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal" };
+    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee" };
     for (const [k, v] of Object.entries(fields)) {
       if (["contacts", "docs", "suivis"].includes(k)) continue;
       row[map[k] ?? k] = v;
@@ -332,6 +356,110 @@ export class SupabaseRepo implements AdminRepo {
     }
     const { error } = await sb.from("admin_documents").delete().eq("id", id);
     this.assert(error);
+  }
+
+  // ── Fichier client (migration 0024) ──────────────────────────────────
+  async secteurDuProspect(clientId: string): Promise<string | null> {
+    const { data } = await sb
+      .from("admin_prospects")
+      .select("sector, activity")
+      .eq("converted_client_id", clientId)
+      .maybeSingle();
+    if (!data) return null;
+    // Le libellé du secteur se lit ; à défaut, l'activité trouvée par Merx.
+    const connu = SECTEURS.find((x) => x.id === data.sector);
+    return connu && connu.id !== "autre" ? connu.label : (data.activity ?? null);
+  }
+
+  async createAccount(a: Account): Promise<void> {
+    const { error } = await sb.from("admin_accounts").insert({
+      id: a.id, name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data, client_id: a.clientId,
+    });
+    this.assert(error);
+  }
+
+  async updateAccount(a: Account): Promise<void> {
+    const { error } = await sb
+      .from("admin_accounts")
+      .update({ name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data })
+      .eq("id", a.id);
+    this.assert(error);
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    const { error } = await sb.from("admin_accounts").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  async createField(f: AccountField): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").insert({
+      id: f.id, key: f.key, label: f.label, type: f.type, position: f.position, protege: f.protege,
+    });
+    this.assert(error);
+  }
+
+  async renameField(id: string, label: string): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").update({ label }).eq("id", id);
+    this.assert(error);
+  }
+
+  async moveField(ordre: { id: string; position: number }[]): Promise<void> {
+    for (const { id, position } of ordre) {
+      const { error } = await sb.from("admin_account_fields").update({ position }).eq("id", id);
+      this.assert(error);
+    }
+  }
+
+  /** La colonne part avec ses valeurs : sinon elles resteraient invisibles dans `data`. */
+  async deleteField(id: string, key: string): Promise<void> {
+    const { error } = await sb.from("admin_account_fields").delete().eq("id", id);
+    this.assert(error);
+    const { data } = await sb.from("admin_accounts").select("id, data");
+    for (const row of data ?? []) {
+      const d = { ...((row as any).data ?? {}) };
+      if (key in d) {
+        delete d[key];
+        await sb.from("admin_accounts").update({ data: d }).eq("id", (row as any).id);
+      }
+    }
+  }
+
+  // ── Colonnes du pipeline (migration 0023) ────────────────────────────
+  async createStage(stage: PipelineStage): Promise<void> {
+    const { error } = await sb
+      .from("admin_pipeline_stages")
+      .insert({ id: stage.id, label: stage.label, position: stage.position, tone: stage.tone });
+    this.assert(error);
+  }
+
+  /** Renommer une colonne renomme aussi l'étape des fiches qui la citent. */
+  async renameStage(id: string, ancien: string, nouveau: string): Promise<void> {
+    const { error } = await sb.from("admin_pipeline_stages").update({ label: nouveau }).eq("id", id);
+    this.assert(error);
+    const { error: e2 } = await sb.from("admin_clients").update({ stage: nouveau }).eq("stage", ancien);
+    this.assert(e2);
+  }
+
+  async setStageTone(id: string, tone: PipelineStage["tone"]): Promise<void> {
+    const { error } = await sb.from("admin_pipeline_stages").update({ tone }).eq("id", id);
+    this.assert(error);
+  }
+
+  /** Les fiches sont déplacées AVANT la suppression : aucune ne reste sans colonne. */
+  async deleteStage(id: string, label: string, versLabel: string | null): Promise<void> {
+    if (versLabel) {
+      const { error } = await sb.from("admin_clients").update({ stage: versLabel }).eq("stage", label);
+      this.assert(error);
+    }
+    const { error } = await sb.from("admin_pipeline_stages").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  async reorderStages(ordre: { id: string; position: number }[]): Promise<void> {
+    for (const { id, position } of ordre) {
+      const { error } = await sb.from("admin_pipeline_stages").update({ position }).eq("id", id);
+      this.assert(error);
+    }
   }
 
   async addDocType(name: string): Promise<void> {
