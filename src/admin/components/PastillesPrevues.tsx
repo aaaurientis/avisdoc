@@ -44,17 +44,8 @@ export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
   const urgent = prevu.prochain ? new Date(prevu.prochain).getTime() <= Date.now() + 86_400_000 : false;
 
   return (
-    <div className="mt-2 flex items-center justify-end gap-1.5">
-      {prevu.prochain && (
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[11px] font-bold",
-            urgent ? "bg-avisdoc-coral/15 text-avisdoc-coral" : "bg-muted text-avisdoc-ink",
-          )}
-        >
-          {leJour(prevu.prochain)}
-        </span>
-      )}
+    // Le pictogramme d'abord, la date ensuite : on voit qu'il y a un appel, puis quand.
+    <div className="mt-2 flex items-center gap-1.5">
       {genres.map(([genre, n]) => {
         const Icone = ICONES[genre];
         return (
@@ -71,6 +62,11 @@ export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
           </span>
         );
       })}
+      {prevu.prochain && (
+        <span className={cn("text-[12px] font-bold", urgent ? "text-avisdoc-coral" : "text-avisdoc-ink")}>
+          {leJour(prevu.prochain)}
+        </span>
+      )}
     </div>
   );
 }

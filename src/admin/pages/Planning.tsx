@@ -6,12 +6,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarClock, ChevronLeft, ChevronRight, Loader2, Mail, NotebookPen, Phone } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Mail, NotebookPen, Pencil, Phone, Trash2 } from "lucide-react";
 import { PageHeader, SectionLabel } from "../components/ui";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/planning";
 import type { GenreEchange } from "../lib/echanges";
 import ModifierAction from "../components/ModifierAction";
+import ApercuFiche from "../components/ApercuFiche";
+import { supprimerEchange } from "../lib/echanges";
 import { cn } from "@/lib/utils";
 
 const ICONES: Record<GenreEchange, typeof Phone> = {
@@ -51,6 +53,17 @@ export default function Planning() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [aModifier, setAModifier] = useState<Rendezvous | null>(null);
+  const [aVoir, setAVoir] = useState<Rendezvous | null>(null);
+
+  const supprimer = async (a: Rendezvous) => {
+    if (!window.confirm(`Supprimer « ${a.titre} » ?`)) return;
+    try {
+      await supprimerEchange(a.id);
+      await charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
+    }
+  };
 
   // La lecture s'arrête au vendredi soir : ce qui tombe le week-end n'est pas montré,
   // et ne doit donc pas être compté.
@@ -181,11 +194,13 @@ export default function Planning() {
                     {actions.map((a) => {
                       const Icone = ICONES[a.kind];
                       return (
-                        <button
+                        <div
                           key={a.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => setAModifier(a)}
-                          className="flex w-full items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-avisdoc-teal"
+                          onKeyDown={(e) => e.key === "Enter" && setAModifier(a)}
+                          className="group flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-avisdoc-teal"
                         >
                           <span className={cn("mt-0.5 inline-flex size-[26px] shrink-0 items-center justify-center rounded-full", TEINTES[a.kind])}>
                             <Icone className="size-3.5" strokeWidth={2.4} />
@@ -202,27 +217,42 @@ export default function Planning() {
                             {a.detail && (
                               <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
                             )}
-                            <span className="mt-1 flex items-center gap-2 text-[11px]">
-                              <span className="text-muted-foreground">Cliquez pour déplacer</span>
-                              <span
-                                role="link"
-                                tabIndex={0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(chemin[a.origine](a.ficheId));
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key !== "Enter") return;
-                                  e.stopPropagation();
-                                  navigate(chemin[a.origine](a.ficheId));
-                                }}
-                                className="cursor-pointer font-semibold text-avisdoc-teal underline-offset-2 hover:underline"
-                              >
-                                ouvrir la fiche
-                              </span>
-                            </span>
+
                           </span>
-                        </button>
+
+                          <span
+                            className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setAVoir(a)}
+                              aria-label={`Voir la fiche ${a.fiche}`}
+                              title="Voir la fiche"
+                              className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+                            >
+                              <Eye className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAModifier(a)}
+                              aria-label={`Modifier ${a.titre}`}
+                              title="Modifier ou déplacer"
+                              className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void supprimer(a)}
+                              aria-label={`Supprimer ${a.titre}`}
+                              title="Supprimer"
+                              className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </span>
+                        </div>
                       );
                     })}
                   </div>
@@ -242,6 +272,16 @@ export default function Planning() {
           </p>
         </div>
       )}
+      {aVoir && (
+        <ApercuFiche
+          origine={aVoir.origine}
+          id={aVoir.ficheId}
+          nom={aVoir.fiche}
+          onClose={() => setAVoir(null)}
+          onOuvrirVraiment={() => navigate(chemin[aVoir.origine](aVoir.ficheId))}
+        />
+      )}
+
       {aModifier && (
         <ModifierAction
           action={{
