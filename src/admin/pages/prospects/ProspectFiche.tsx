@@ -5,9 +5,9 @@ import { useCallback, useMemo, useState } from "react";
 import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
-import { uid } from "../../lib/format";
 import { Badge, Card, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
+import { clientDepuisProspect, contactDepuisProspect } from "../../lib/conversion";
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
 import FicheEntreprise from "../../components/FicheEntreprise";
@@ -85,39 +85,11 @@ export default function ProspectFiche({
     setEnCours("pipeline");
     setChoixEtape(false);
     try {
-      const id = uid();
-      const client: Client = {
-        id,
-        company: p.legal_name || p.name,
-        siren: p.siren ?? "",
-        siret: "",
-        naf: "",
-        adresse: p.head_office?.address ?? "",
-        codePostal: "",
-        ville: p.head_office?.city ?? p.city ?? "",
-        effectif: effectifLabel(p.headcount_band) ?? "",
-        stage: etape,
-        jours: 1,
-        tarif: 0,
-        depistes: 0,
-        orientes: 0,
-        resultat: null,
-        statutPropo: "Brouillon",
-        contacts: [],
-        docs: [],
-        suivis: [],
-      };
+      const client = clientDepuisProspect(p, etape);
+      const id = client.id;
       addClient(client);
-      // L'interlocuteur trouvé par Merx suit l'affaire.
-      if (p.contact_name) {
-        const [prenom, ...reste] = p.contact_name.trim().split(" ");
-        addProjectContact(id, {
-          prenom,
-          nom: reste.join(" "),
-          role: p.contact_role ?? "",
-          email: p.contact_email ?? "",
-        });
-      }
+      const contact = contactDepuisProspect(p);
+      if (contact) addProjectContact(id, contact);
       await onMettreAuPipeline(p, id);
     } finally {
       setEnCours(null);

@@ -4,12 +4,15 @@
 // Les trois colonnes du socle (Établissement, Date, Secteur) ont leur champ propre en base ;
 // toutes les autres vivent dans `data`, sous la clé de leur colonne.
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Columns3, Download, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import type { Account, AccountField } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
+import { supabaseAdmin } from "../data/supabaseAdmin";
+import FiltresClients, { FILTRES_COMPTE_VIDES, retenueCompte, type FiltresCompte } from "./clients/FiltresClients";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
-import { Modal, PageHeader, SectionLabel } from "../components/ui";
+import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
+import { tonNote } from "../lib/merx";
 import ColonnesClient from "./clients/ColonnesClient";
 import FicheClient from "./clients/FicheClient";
 import { cn } from "@/lib/utils";
@@ -38,20 +41,53 @@ const SANS_SECTEUR = "Sans secteur";
 export default function FichierClient() {
   const { accounts, accountFields, addManyAccounts, deleteAccount } = useAdminData();
   const [recherche, setRecherche] = useState("");
-  const [vue, setVue] = useState<"liste" | "kanban">("liste");
+  const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
+  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
+    new Map(),
+  );
+
+  /** Ce que Merx avait trouvé pour ces clients : la carte dit la même chose qu’ailleurs. */
+  useEffect(() => {
+    let vivant = true;
+    void supabaseAdmin
+      .from("admin_prospects")
+      .select("converted_client_id, score_total, activity, rationale")
+      .not("converted_client_id", "is", null)
+      .then(({ data }) => {
+        if (!vivant || !data) return;
+        setOrigines(
+          new Map(
+            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null }[]).map(
+              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale }],
+            ),
+          ),
+        );
+      });
+    return () => {
+      vivant = false;
+    };
+  }, []);
+
+  /** Ce que Merx sait d’une fiche, par le lien de conversion. */
+  const origineDe = useCallback((a: Account) => (a.clientId ? origines.get(a.clientId) : undefined), [origines]);
+  // Le tableau d’abord : c’est la vue commune à la prospection et au Pipeline.
+  const [vue, setVue] = useState<"liste" | "kanban">("kanban");
   const [colonnes, setColonnes] = useState(false);
   const [fiche, setFiche] = useState<{ compte?: Account; mode: "lecture" | "edition" } | null>(null);
   const [aSupprimer, setASupprimer] = useState<Account | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fichierRef = useRef<HTMLInputElement>(null);
 
-  const visibles = useMemo(() => {
-    const q = recherche.trim().toLowerCase();
-    if (!q) return accounts;
-    return accounts.filter((a) =>
-      [a.name, a.sector ?? "", ...Object.values(a.data)].some((v) => v.toLowerCase().includes(q)),
-    );
-  }, [accounts, recherche]);
+  const visibles = useMemo(
+    () => accounts.filter((a) => retenueCompte(a, filtres, recherche, Boolean(origineDe(a)))),
+    [accounts, filtres, origineDe, recherche],
+  );
+
+  /** Tous les secteurs du fichier, pour le filtre — pas seulement ceux qui restent affichés. */
+  const tousSecteurs = useMemo(
+    () => [...new Set(accounts.map((a) => (a.sector ?? "").trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")),
+    [accounts],
+  );
 
   /** Colonnes du kanban : les secteurs réellement utilisés, puis les fiches sans secteur. */
   const secteurs = useMemo(() => {
@@ -177,6 +213,7 @@ export default function FichierClient() {
             className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           />
         </div>
+        <FiltresClients filtres={filtres} onChange={setFiltres} secteurs={tousSecteurs} />
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           {([
             { id: "liste", label: "Liste", Icone: List },
@@ -292,7 +329,7 @@ export default function FichierClient() {
                     // Sur la carte : les premières colonnes renseignées, hors établissement et secteur.
                     const infos = accountFields
                       .filter((f) => f.key !== "etablissement" && f.key !== "secteur" && affiche(a, f))
-                      .slice(0, 3);
+                      .slice(0, 4);
                     return (
                       <div
                         key={a.id}
@@ -301,6 +338,11 @@ export default function FichierClient() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
+                          {origineDe(a) && (
+                            <Badge className={`${tonNote(origineDe(a)!.score_total)} shrink-0`}>
+                              {origineDe(a)!.score_total ?? "—"}
+                            </Badge>
+                          )}
                           <div
                             className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
                             onClick={(e) => e.stopPropagation()}
@@ -323,6 +365,14 @@ export default function FichierClient() {
                             </button>
                           </div>
                         </div>
+                        <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                          {[origineDe(a)?.activity, a.sector].filter(Boolean).join(" · ") || "—"}
+                        </div>
+                        {origineDe(a)?.rationale && (
+                          <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
+                            {origineDe(a)!.rationale}
+                          </p>
+                        )}
                         {infos.map((f) => (
                           <div key={f.id} className="mt-1 truncate text-[11.5px] text-muted-foreground">
                             <span className="text-muted-foreground/70">{f.label} · </span>

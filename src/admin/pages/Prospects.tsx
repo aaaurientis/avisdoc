@@ -13,6 +13,8 @@ import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
+import { clientDepuisProspect, contactDepuisProspect } from "../lib/conversion";
+import { useAdminData } from "../data/AdminDataContext";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -66,6 +68,7 @@ function messageErreur(brut: string): string {
 export default function Prospects() {
   const { user } = useAuth();
   const nomDuCommercial = user?.name ?? user?.email ?? "";
+  const { stages, addClient, addProjectContact } = useAdminData();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -74,7 +77,12 @@ export default function Prospects() {
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
   const [demandes, setDemandes] = useState<Demande[]>([]);
-  const [brouillon, setBrouillon] = useState<{ nom: string; objet: string; corps: string; destinataire: string | null } | null>(null);
+  const [brouillon, setBrouillon] = useState<{
+    prospect: Prospect;
+    objet: string;
+    corps: string;
+    destinataire: string | null;
+  } | null>(null);
 
   /** Les brouillons d’e-mail déjà écrits pour la fiche ouverte, du plus récent au plus ancien. */
   const brouillonsDeLaFiche = useMemo(
@@ -165,7 +173,7 @@ export default function Prospects() {
       if (error) throw new Error(error.message);
       const r = data as { objet?: string; corps?: string; destinataire?: string | null; error?: string };
       if (r.error) throw new Error(r.error);
-      setBrouillon({ nom: p.name, objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null });
+      setBrouillon({ prospect: p, objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null });
       await charger();
     },
     [charger, nomDuCommercial],
@@ -296,7 +304,28 @@ export default function Prospects() {
         </button>
       )}
 
-      {brouillon && <BrouillonEmail {...brouillon} onClose={() => setBrouillon(null)} />}
+      {brouillon && (
+        <BrouillonEmail
+          nom={brouillon.prospect.name}
+          objet={brouillon.objet}
+          corps={brouillon.corps}
+          destinataire={brouillon.destinataire}
+          onClose={() => setBrouillon(null)}
+          // Une fiche déjà partie au Pipeline ne se repropose pas.
+          stages={brouillon.prospect.converted_client_id ? undefined : stages}
+          onMettreAuPipeline={
+            brouillon.prospect.converted_client_id
+              ? undefined
+              : async (etape) => {
+                  const client = clientDepuisProspect(brouillon.prospect, etape);
+                  addClient(client);
+                  const contact = contactDepuisProspect(brouillon.prospect);
+                  if (contact) addProjectContact(client.id, contact);
+                  await mettreAuPipeline(brouillon.prospect, client.id);
+                }
+          }
+        />
+      )}
 
       {fiche && (
         <ProspectFiche
@@ -310,7 +339,7 @@ export default function Prospects() {
           demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
           brouillons={brouillonsDeLaFiche}
           onRouvrirBrouillon={(b) =>
-            setBrouillon({ nom: fiche.name, objet: b.objet, corps: b.corps, destinataire: fiche.contact_email ?? null })
+            setBrouillon({ prospect: fiche, objet: b.objet, corps: b.corps, destinataire: fiche.contact_email ?? null })
           }
         />
       )}

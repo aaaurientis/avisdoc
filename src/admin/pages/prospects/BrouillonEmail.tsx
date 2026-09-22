@@ -2,7 +2,8 @@
 // RIEN N'EST ENVOYÉ PAR LE HUB : on relit, on corrige, puis on ouvre sa propre messagerie.
 
 import { useState } from "react";
-import { Check, Copy, Mail, X } from "lucide-react";
+import { ArrowRightCircle, Check, Copy, Loader2, Mail, X } from "lucide-react";
+import type { PipelineStage } from "../../types";
 import { Modal, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
@@ -15,16 +16,24 @@ export default function BrouillonEmail({
   corps: corpsInitial,
   destinataire,
   onClose,
+  stages,
+  onMettreAuPipeline,
 }: {
   nom: string;
   objet: string;
   corps: string;
   destinataire: string | null;
   onClose: () => void;
+  /** Les colonnes du Pipeline, pour choisir où l'affaire entre. */
+  stages?: PipelineStage[];
+  /** Absent quand l'affaire est déjà au Pipeline : on ne repropose rien. */
+  onMettreAuPipeline?: (etape: string) => Promise<void>;
 }) {
   const [objet, setObjet] = useState(objetInitial);
   const [corps, setCorps] = useState(corpsInitial);
   const [copie, setCopie] = useState(false);
+  const [proposer, setProposer] = useState(false);
+  const [envoiPipeline, setEnvoiPipeline] = useState(false);
 
   const copier = async () => {
     await navigator.clipboard.writeText(`${objet}\n\n${corps}`);
@@ -35,6 +44,19 @@ export default function BrouillonEmail({
   const ouvrirMessagerie = () => {
     const lien = `mailto:${destinataire ?? ""}?subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(corps)}`;
     window.location.href = lien;
+    // Écrire n'est pas contacter ; envoyer, si. C'est le moment de demander.
+    if (onMettreAuPipeline) setProposer(true);
+  };
+
+  const versLePipeline = async (etape: string) => {
+    if (!onMettreAuPipeline || envoiPipeline) return;
+    setEnvoiPipeline(true);
+    try {
+      await onMettreAuPipeline(etape);
+      onClose();
+    } finally {
+      setEnvoiPipeline(false);
+    }
   };
 
   return (
@@ -72,6 +94,42 @@ export default function BrouillonEmail({
           className={cn(champCls, "mt-1 resize-none leading-relaxed")}
         />
       </label>
+
+      {proposer && (
+        <div className="mt-5 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+          <div className="flex items-start gap-2">
+            <ArrowRightCircle className="mt-0.5 size-4 shrink-0 text-avisdoc-teal" />
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-semibold text-avisdoc-ink">Mettre le prospect dans le Pipeline ?</p>
+              <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                Vous venez de le contacter : l’affaire se suit désormais dans le Pipeline, et la fiche quitte la
+                prospection.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {(stages ?? []).map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => void versLePipeline(st.label)}
+                disabled={envoiPipeline}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
+              >
+                {envoiPipeline && <Loader2 className="size-3.5 animate-spin" />}
+                {st.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setProposer(false)}
+              className="text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
+            >
+              Pas maintenant
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
         <button
