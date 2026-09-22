@@ -50,3 +50,26 @@ export function euroDollar(montant: number): string {
   if (montant < 1) return `${montant.toFixed(3)} $`;
   return `${montant.toFixed(2)} $`;
 }
+
+/**
+ * Ordres de grandeur affichés AVANT la première mesure, pour que le commercial sache
+ * ce qu'il engage en cliquant. Repris des essais réels menés sur la vitrine AvisDoc
+ * (approfondissement mesuré entre 0,06 $ et 0,075 $) ; la rédaction d'un e-mail ne fait
+ * qu'un appel court, sans recherche web. Dès la première demande enregistrée, c'est la
+ * moyenne réellement observée qui s'affiche à la place.
+ */
+export const ESTIMATIONS: Record<string, number> = {
+  approfondissement: 0.07,
+  email: 0.005,
+};
+
+/** Moyenne observée pour une sorte de demande ; à défaut, l'ordre de grandeur ci-dessus. */
+export function coutMoyen(
+  demandes: { kind: string; usage: Consommation | null }[],
+  kind: string,
+): { montant: number; mesure: boolean } {
+  const siennes = demandes.filter((d) => d.kind === kind);
+  if (!siennes.length) return { montant: ESTIMATIONS[kind] ?? 0, mesure: false };
+  const total = siennes.reduce((s, d) => s + coutDe(d.usage).total, 0);
+  return { montant: total / siennes.length, mesure: true };
+}

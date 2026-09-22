@@ -2,12 +2,13 @@
 // et les pages réellement consultées. « Approfondir » va chercher le registre officiel et le site.
 
 import { useState } from "react";
-import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, Phone, Search, X } from "lucide-react";
+import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { uid } from "../../lib/format";
 import { Badge, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
+import { euroDollar } from "../../lib/couts";
 import { cn } from "@/lib/utils";
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
@@ -25,6 +26,8 @@ export default function ProspectFiche({
   onApprofondir,
   onEcarter,
   onMettreAuPipeline,
+  onRedigerEmail,
+  couts,
 }: {
   prospect: Prospect;
   onClose: () => void;
@@ -32,9 +35,13 @@ export default function ProspectFiche({
   onEcarter: (p: Prospect) => Promise<void>;
   /** Crée l'affaire dans le Pipeline et garde le lien sur la fiche. */
   onMettreAuPipeline: (p: Prospect, clientId: string) => Promise<void>;
+  /** Demande à Merx un brouillon de premier contact. */
+  onRedigerEmail: (p: Prospect) => Promise<void>;
+  /** Ce que coûte chaque bouton, mesuré ou estimé tant qu'aucune demande n'a eu lieu. */
+  couts: { approfondissement: { montant: number; mesure: boolean }; email: { montant: number; mesure: boolean } };
 }) {
   const { stages, addClient, addProjectContact } = useAdminData();
-  const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | null>(null);
+  const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
   const [choixEtape, setChoixEtape] = useState(false);
   const p = prospect;
   const siege = p.head_office;
@@ -85,15 +92,20 @@ export default function ProspectFiche({
     }
   };
 
-  const lancer = async (quoi: "approfondir" | "ecarter") => {
+  const lancer = async (quoi: "approfondir" | "ecarter" | "email") => {
     if (enCours) return;
     setEnCours(quoi);
     try {
-      await (quoi === "approfondir" ? onApprofondir(p) : onEcarter(p));
+      if (quoi === "approfondir") await onApprofondir(p);
+      else if (quoi === "ecarter") await onEcarter(p);
+      else await onRedigerEmail(p);
     } finally {
       setEnCours(null);
     }
   };
+
+  /** Le prix est annoncé sur le bouton : on sait ce qu'on engage avant de cliquer. */
+  const prix = (c: { montant: number; mesure: boolean }) => `${c.mesure ? "" : "~"}${euroDollar(c.montant)}`;
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-8">
@@ -295,6 +307,18 @@ export default function ProspectFiche({
           >
             {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
+            <span className="font-mono text-[11.5px] font-normal text-muted-foreground">{prix(couts.approfondissement)}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void lancer("email")}
+            disabled={enCours !== null}
+            title="Merx rédige un brouillon à partir de cette fiche. Rien n'est envoyé."
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
+            Rédiger un mail
+            <span className="font-mono text-[11.5px] font-normal text-muted-foreground">{prix(couts.email)}</span>
           </button>
           <button
             type="button"

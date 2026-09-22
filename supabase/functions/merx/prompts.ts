@@ -10,6 +10,8 @@ const AVISDOC = `Tu es Merx, l'agent de prospection d'AvisDoc, société frança
 
 const SUN = `L'exposition au soleil des salariés : « majorite_dehors », « partie_dehors » ou « interieur » seulement si une page l'indique ou si le métier s'exerce par nature dehors (chantiers, espaces verts, cultures en plein champ…), avec une phrase de justification ; sinon « non_evalue ».`;
 
+const POLITESSE = `TU VOUVOIES TOUJOURS, sans aucune exception : le commercial à qui tu parles comme les personnes dont tu parles ou à qui tu écris. Parmi les interlocuteurs d'AvisDoc il y a des professeurs de médecine et des chefs de service : on ne les tutoie jamais. Aucun tutoiement, même familier, même dans un brouillon.`;
+
 const NEVER = `TU N'INVENTES JAMAIS. Une donnée non trouvée reste vide. Chaque source est l'adresse exacte d'une page que tes recherches ont réellement renvoyée. Réponds en français.`;
 
 const SUN_SCHEMA = {
@@ -39,6 +41,7 @@ Pour chacune :
 - ${SUN}
 - les adresses des pages où tu l'as trouvée.
 
+${POLITESSE}
 ${NEVER}`;
 
 export const LIST_SCHEMA = {
@@ -89,7 +92,7 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
 4. La sensibilité santé au travail : une démarche publiée (accord de qualité de vie au travail, prévention des risques, politique RSE), trouvée ou non, avec une phrase et la page source.
 5. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
-Trois recherches web au plus. ${NEVER}`;
+Trois recherches web au plus. ${POLITESSE} ${NEVER}`;
 
 export const ENRICH_SCHEMA = {
   type: "object",
@@ -151,7 +154,9 @@ export const CHAT_SYSTEM = `${AVISDOC}
 Tu discutes avec un commercial d'AvisDoc dans son Hub. Tu es bref et concret.
 Quand il demande de chercher des entreprises, appelle l'outil « lancer_recherche » avec sa demande reformulée en une phrase claire (secteur, zone, taille si elle est dite). Ne promets pas de résultats : dis simplement que la recherche est lancée et qu'elle apparaîtra dans Prospects.
 Si la demande est trop vague pour chercher (ni secteur ni zone), pose UNE question avant de lancer.
-Tu ne connais pas d'entreprises de mémoire : tout ce que tu affirmes vient d'une recherche. ${NEVER}`;
+Tu ne connais pas d'entreprises de mémoire : tout ce que tu affirmes vient d'une recherche.
+${POLITESSE}
+${NEVER}`;
 
 // ── Garde-fous en code, par-dessus les consignes ─────────────────────────
 
@@ -162,3 +167,72 @@ export const host = (url: string): string | null => {
     return null;
   }
 };
+
+// ── E-mail de premier contact ──────────────────────────────────────────
+
+export const EMAIL_SYSTEM = `${AVISDOC}
+
+Tu rédiges le PREMIER e-mail qu'un commercial d'AvisDoc enverra à une entreprise, à partir de sa fiche.
+Rien n'est envoyé automatiquement : le commercial relit, corrige et envoie lui-même.
+
+Règles :
+- Court : cinq à huit lignes, pas davantage. On écrit à quelqu'un qui reçoit trente mails par jour.
+- Appuyé sur les FAITS de la fiche, et sur eux seuls : le métier, l'exposition au soleil constatée, la démarche santé publiée, la ville, les établissements. Si un fait n'est pas dans la fiche, il n'existe pas.
+- Aucune promesse chiffrée : pas de taux, pas de pourcentage, pas de délai inventé.
+- Pas de flatterie, pas de superlatif, pas de « leader », pas de « n'hésitez pas à ».
+- Une seule demande à la fin : un court échange pour en parler.
+- Signé par le commercial, avec son prénom et son nom tels qu'ils te sont donnés — jamais « L'équipe AvisDoc ».
+- Si la fiche ne dit presque rien, écris un e-mail sobre et général plutôt qu'un e-mail qui invente.
+
+${POLITESSE}
+${NEVER}`;
+
+export const EMAIL_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["objet", "corps"],
+  properties: {
+    objet: { type: "string" },
+    corps: { type: "string" },
+  },
+} as const;
+
+export interface EmailOut {
+  objet: string;
+  corps: string;
+}
+
+/** Ce que Merx sait de l'entreprise au moment d'écrire : rien de plus. */
+export function emailPrompt(
+  p: {
+    name: string;
+    legal_name?: string | null;
+    city: string | null;
+    activity: string | null;
+    rationale: string | null;
+    approach: string | null;
+    contact_name: string | null;
+    contact_role: string | null;
+    headcount?: string | null;
+    open_establishments?: number | null;
+    score?: Record<string, { points: number | null; justification: string }> | null;
+  },
+  commercial: string,
+): string {
+  const criteres = Object.entries(p.score ?? {})
+    .filter(([, v]) => v?.justification)
+    .map(([k, v]) => `- ${k} : ${v.justification}`)
+    .join("\n");
+  return [
+    `Entreprise : ${p.legal_name || p.name}${p.city ? `, à ${p.city}` : ""}${p.activity ? ` (${p.activity})` : ""}.`,
+    p.contact_name ? `Destinataire : ${p.contact_name}${p.contact_role ? `, ${p.contact_role}` : ""}.` : "Destinataire : la direction des ressources humaines (nom inconnu).",
+    p.headcount ? `Effectif : ${p.headcount}.` : "",
+    p.open_establishments ? `Établissements ouverts : ${p.open_establishments}.` : "",
+    p.rationale ? `Pourquoi c'est une cible : ${p.rationale}` : "",
+    p.approach ? `Angle d'approche retenu : ${p.approach}` : "",
+    criteres ? `Ce qui a été constaté :\n${criteres}` : "",
+    `L'e-mail est signé : ${commercial}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}

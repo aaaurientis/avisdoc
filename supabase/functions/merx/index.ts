@@ -8,6 +8,7 @@
 //                                                    créée et son identifiant est rendu.
 //   { action: "traiter", demandeId? }             → exécute la demande (recherche ou approfondissement).
 //   { action: "approfondir", prospectId }         → crée la demande d'approfondissement et l'exécute.
+//   { action: "email", prospectId }               → rédige le brouillon de premier contact (rien n'est envoyé).
 //
 // Déploiement :
 //   supabase functions deploy merx
@@ -16,8 +17,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
-import { converse, model } from "./llm.ts";
-import { CHAT_SYSTEM } from "./prompts.ts";
+import { complete, converse, model, type LlmUsage } from "./llm.ts";
+import { CHAT_SYSTEM, EMAIL_SCHEMA, EMAIL_SYSTEM, emailPrompt, type EmailOut } from "./prompts.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +77,50 @@ Deno.serve(async (req: Request) => {
       if (error) return json({ error: error.message }, 500);
       await runAgentTick(sb, demande.id);
       return json({ demandeId: demande.id });
+    }
+
+    // ── Rédiger l'e-mail de premier contact ──────────────────────────────
+    // Merx écrit un brouillon à partir de la seule fiche ; le commercial l'envoie lui-même.
+    if (body.action === "email") {
+      if (!body.prospectId) return json({ error: "Fiche non précisée." }, 400);
+      const { data: p } = await sb
+        .from("admin_prospects")
+        .select("id, name, legal_name, city, activity, rationale, approach, contact_name, contact_role, contact_email, headcount_band, open_establishments, score")
+        .eq("id", body.prospectId)
+        .maybeSingle();
+      if (!p) return json({ error: "Fiche introuvable." }, 404);
+
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "email", request: p.name, prospect_id: p.id, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      try {
+        const signature = String(body.signature ?? "").trim() || email;
+        const out = await complete<EmailOut>(
+          emailPrompt(p as never, signature),
+          EMAIL_SCHEMA as unknown as Record<string, unknown>,
+          { system: EMAIL_SYSTEM, timeoutMs: 40_000, onUsage: (u) => (usage = u) },
+        );
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "terminee", usage, finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ objet: out.objet, corps: out.corps, destinataire: p.contact_email ?? null });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "echec", message, usage, finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ error: "Le brouillon n'a pas pu être écrit. Vous pouvez réessayer." }, 500);
+      }
     }
 
     // ── Chat ─────────────────────────────────────────────────────────────

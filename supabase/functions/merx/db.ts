@@ -71,27 +71,43 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
   };
 }
 
-/** Enregistre les fiches trouvées ; celles déjà connues ne sont pas recréées. Rend le nombre ajouté. */
+/**
+ * Enregistre les fiches trouvées ; celles déjà connues ne sont pas recréées. Rend le nombre ajouté.
+ *
+ * L'unicité est posée sur `lower(name)` et `lower(city)` (migration 0022) : c'est un index d'EXPRESSION,
+ * que `on conflict (colonnes)` ne sait pas viser. On écarte donc les doublons avant d'écrire, puis on
+ * insère fiche par fiche — le volume est faible (dix au plus) et une fiche refusée n'emporte pas les autres.
+ */
 export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
   if (!prospects.length) return 0;
-  const rows = prospects.map((p) => ({
-    found_by: demandeId,
-    owner_email: owner,
-    name: p.name,
-    city: p.city,
-    department: p.department,
-    activity: p.activity,
-    sector: p.sector,
-    website: p.website,
-    rationale: p.rationale,
-    sources: p.sources,
-    score: p.score,
-    score_total: p.scoreTotal,
-  }));
-  // `ignoreDuplicates` : l'index unique (nom, ville) empêche qu'une seconde recherche recrée les mêmes fiches.
-  const { data, error } = await sb.from("admin_prospects").upsert(rows, { onConflict: "name,city", ignoreDuplicates: true }).select("id");
-  if (error) throw new Error(error.message);
-  return data?.length ?? 0;
+
+  const clef = (nom: string, ville: string | null) => `${nom.trim().toLowerCase()}|${(ville ?? "").trim().toLowerCase()}`;
+  const { data: connus } = await sb.from("admin_prospects").select("name, city");
+  const dejaLa = new Set((connus ?? []).map((r: { name: string; city: string | null }) => clef(r.name, r.city)));
+
+  let ajoutes = 0;
+  for (const p of prospects) {
+    if (dejaLa.has(clef(p.name, p.city))) continue;
+    dejaLa.add(clef(p.name, p.city));
+    const { error } = await sb.from("admin_prospects").insert({
+      found_by: demandeId,
+      owner_email: owner,
+      name: p.name,
+      city: p.city,
+      department: p.department,
+      activity: p.activity,
+      sector: p.sector,
+      website: p.website,
+      rationale: p.rationale,
+      sources: p.sources,
+      score: p.score,
+      score_total: p.scoreTotal,
+    });
+    // Une fiche créée entre-temps par une autre recherche : ce n'est pas une erreur.
+    if (error && !/duplicate key|unique constraint/i.test(error.message)) throw new Error(error.message);
+    if (!error) ajoutes++;
+  }
+  return ajoutes;
 }
 
 export async function listFoundNames(sb: SupabaseClient, demandeId: string): Promise<string[]> {

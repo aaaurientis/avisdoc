@@ -32,6 +32,19 @@ import {
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
+/** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
+function enClair(message: string): string {
+  if (/duplicate key|unique constraint/i.test(message)) return "ces entreprises sont déjà dans vos fiches.";
+  if (/rate.?limit|429|overloaded/i.test(message)) return "le service est momentanément saturé, réessayez dans un instant.";
+  if (/pas de réponse en/i.test(message)) return message.toLowerCase();
+  if (/ANTHROPIC_API_KEY/i.test(message)) return "la clé du modèle n'est pas configurée sur le projet.";
+  // Une erreur inattendue reste consignée telle quelle dans la demande (écran Coûts) ; ici, on reste lisible.
+  if (/[a-z]{4,}\s+[a-z]{4,}\s+[a-z]{4,}/i.test(message) && !/[éèàçùê]/i.test(message)) {
+    return "une erreur technique est survenue ; elle est consignée dans la demande.";
+  }
+  return message;
+}
+
 const BUDGET_MS = 120_000; // sous la coupure de l'hébergeur
 const LIST_WEB_SEARCHES = 2; // deux recherches suffisent pour une liste
 const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le temps d'une recherche
@@ -205,7 +218,7 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",
-        content: `La recherche « ${req.request} » n'a pas abouti : ${message} Vous pouvez la relancer.`,
+        content: `La recherche « ${req.request} » n'a pas abouti : ${enClair(message)} Vous pouvez la relancer.`,
       });
     }
   }

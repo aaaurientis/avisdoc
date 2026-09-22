@@ -5,9 +5,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Mail, Phone, RefreshCw } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
 import ProspectFiche from "./prospects/ProspectFiche";
+import BrouillonEmail from "./prospects/BrouillonEmail";
+import { coutMoyen, type Consommation } from "../lib/couts";
 
 function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
   return (
@@ -44,11 +47,15 @@ function messageErreur(brut: string): string {
 }
 
 export default function Prospects() {
+  const { user } = useAuth();
+  const nomDuCommercial = user?.name ?? user?.email ?? "";
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [voirEcartees, setVoirEcartees] = useState(false);
+  const [demandes, setDemandes] = useState<{ kind: string; usage: Consommation | null }[]>([]);
+  const [brouillon, setBrouillon] = useState<{ nom: string; objet: string; corps: string; destinataire: string | null } | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -59,6 +66,8 @@ export default function Prospects() {
       .order("created_at", { ascending: false });
     if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
+    const { data: passees } = await supabaseAdmin.from("admin_merx_demandes").select("kind, usage").eq("status", "terminee");
+    setDemandes((passees ?? []) as { kind: string; usage: Consommation | null }[]);
     setChargement(false);
   }, []);
 
@@ -72,6 +81,28 @@ export default function Prospects() {
   );
   const ecartees = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
   const fiche = useMemo(() => prospects.find((p) => p.id === ouverte) ?? null, [prospects, ouverte]);
+
+  const couts = useMemo(
+    () => ({
+      approfondissement: coutMoyen(demandes, "approfondissement"),
+      email: coutMoyen(demandes, "email"),
+    }),
+    [demandes],
+  );
+
+  const redigerEmail = useCallback(
+    async (p: Prospect) => {
+      const { data, error } = await supabaseAdmin.functions.invoke("merx", {
+        body: { action: "email", prospectId: p.id, signature: nomDuCommercial },
+      });
+      if (error) throw new Error(error.message);
+      const r = data as { objet?: string; corps?: string; destinataire?: string | null; error?: string };
+      if (r.error) throw new Error(r.error);
+      setBrouillon({ nom: p.name, objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null });
+      await charger();
+    },
+    [charger, nomDuCommercial],
+  );
 
   const approfondir = useCallback(
     async (p: Prospect) => {
@@ -174,6 +205,8 @@ export default function Prospects() {
         </button>
       )}
 
+      {brouillon && <BrouillonEmail {...brouillon} onClose={() => setBrouillon(null)} />}
+
       {fiche && (
         <ProspectFiche
           prospect={fiche}
@@ -181,6 +214,8 @@ export default function Prospects() {
           onApprofondir={approfondir}
           onEcarter={ecarter}
           onMettreAuPipeline={mettreAuPipeline}
+          onRedigerEmail={redigerEmail}
+          couts={couts}
         />
       )}
     </div>
