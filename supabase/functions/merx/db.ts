@@ -147,6 +147,8 @@ export interface Enrichment {
   contactSource: string | null;
   siteContacts: SiteContacts | null;
   approach: string | null;
+  /** Le dossier commercial : ce qu'il faut pour décrocher son téléphone. */
+  dossier: unknown;
   sources: string[];
   score: Score;
   scoreTotal: number;
@@ -172,6 +174,7 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     contact_source: e.contactSource,
     site_contacts: e.siteContacts,
     approach: e.approach,
+    dossier: e.dossier,
     sources,
     score: e.score,
     score_total: e.scoreTotal,

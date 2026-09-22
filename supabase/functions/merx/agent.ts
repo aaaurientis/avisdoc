@@ -199,6 +199,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     contactSource: named?.source ?? (site && (email || phone) ? site.readOn : null),
     siteContacts: site,
     approach: out.angle_approche.trim() || null,
+    dossier: out.dossier ?? null,
     sources: out.sources.filter(allowed),
     score,
     scoreTotal: total(score),

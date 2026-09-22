@@ -96,7 +96,16 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
 4. La sensibilité santé au travail : une démarche publiée (accord de qualité de vie au travail, prévention des risques, politique RSE), trouvée ou non, avec une phrase et la page source.
 5. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
-Trois recherches web au plus. ${POLITESSE} ${NEVER}`;
+6. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
+   • a_retenir : trois à six faits CONCRETS sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
+   • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
+   • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
+   • arguments : trois à cinq arguments de vente, chacun avec le fait qui le fonde. Un argument sans fait n'a aucune valeur : écris ce que tu as lu.
+   • objections : deux ou trois objections que CETTE entreprise-là opposera, et ce qu'on répond. Pense à sa taille, à son secteur, à ce que tu as appris.
+   • offre : ce qui lui conviendrait — une journée d'essai, plusieurs journées, un rendez-vous régulier — au vu de son effectif et de ses implantations. Dis le raisonnement, jamais un prix.
+   • a_verifier : ce que tu n'as PAS pu établir et qu'il faudra demander. C'est une qualité, pas un aveu.
+
+Six recherches web au plus. ${POLITESSE} ${NEVER}`;
 
 export const ENRICH_SCHEMA = {
   type: "object",
@@ -119,6 +128,38 @@ export const ENRICH_SCHEMA = {
       properties: { trouve: { type: "boolean" }, justification: { type: "string" }, source: { type: "string" } },
     },
     angle_approche: { type: "string" },
+    dossier: {
+      type: "object",
+      additionalProperties: false,
+      required: ["a_retenir", "qui_aborder", "accroche", "arguments", "objections", "offre", "a_verifier"],
+      properties: {
+        /** Ce qu'on a appris d'elle et qu'aucun registre ne dit. */
+        a_retenir: { type: "array", items: { type: "string" } },
+        qui_aborder: { type: "string" },
+        /** La première phrase, celle qu'on dit au téléphone. */
+        accroche: { type: "string" },
+        arguments: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["argument", "parce_que"],
+            properties: { argument: { type: "string" }, parce_que: { type: "string" } },
+          },
+        },
+        objections: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["objection", "reponse"],
+            properties: { objection: { type: "string" }, reponse: { type: "string" } },
+          },
+        },
+        offre: { type: "string" },
+        a_verifier: { type: "array", items: { type: "string" } },
+      },
+    },
     sources: { type: "array", items: { type: "string" } },
   },
 } as const;
@@ -130,6 +171,15 @@ export interface EnrichOut {
   exposition_soleil: SunOut;
   sante_travail: { trouve: boolean; justification: string; source: string };
   angle_approche: string;
+  dossier?: {
+    a_retenir: string[];
+    qui_aborder: string;
+    accroche: string;
+    arguments: { argument: string; parce_que: string }[];
+    objections: { objection: string; reponse: string }[];
+    offre: string;
+    a_verifier: string[];
+  };
   sources: string[];
 }
 
