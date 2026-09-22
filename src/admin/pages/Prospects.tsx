@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { LayoutGrid, List, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -134,6 +134,8 @@ export default function Prospects() {
   const [ajout, setAjout] = useState(false);
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
+  // Le tableau d'abord, comme dans le Pipeline ; la liste pour qui la préfère.
+  const [vue, setVue] = useState<"kanban" | "liste">("kanban");
 
   /** Ce qui attend sur chaque fiche : une action notée doit se voir depuis le tableau. */
   useEffect(() => {
@@ -369,6 +371,24 @@ export default function Prospects() {
           />
         </div>
         <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
+        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+          {([
+            { id: "liste", label: "Liste", Icone: List },
+            { id: "kanban", label: "Kanban", Icone: LayoutGrid },
+          ] as const).map(({ id, label, Icone }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setVue(id)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors",
+                vue === id ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
+              )}
+            >
+              <Icone className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {chargement ? (
@@ -381,6 +401,75 @@ export default function Prospects() {
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, rangées par secteur.
           </p>
+        </div>
+      ) : vue === "liste" ? (
+        /* ── Liste : toutes les fiches d'un coup, triées par note ── */
+        <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
+          <table className="w-full min-w-[720px] border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="w-10 px-3" />
+                {["Entreprise", "Activité", "Ville", "Interlocuteur", "Note", "Prévu"].map((t) => (
+                  <th
+                    key={t}
+                    className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
+                  >
+                    {t}
+                  </th>
+                ))}
+                <th className="w-20" />
+              </tr>
+            </thead>
+            <tbody>
+              {visibles.map((p) => (
+                <tr
+                  key={p.id}
+                  onClick={() => void ouvrir(p)}
+                  className={cn(
+                    "group cursor-pointer border-b border-border last:border-0 hover:bg-muted/30",
+                    coches.has(p.id) && "bg-avisdoc-teal/5",
+                  )}
+                >
+                  <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                    <CaseFiche cochee={coches.has(p.id)} onBascule={() => cocher(p.id)} libelle={p.name} visible={coches.size > 0} />
+                  </td>
+                  <td className="px-4 py-2.5 text-[13px] font-semibold text-avisdoc-ink">
+                    {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}
+                    {p.name}
+                  </td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.activity || "—"}</td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.city || "—"}</td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.contact_name || p.contact_email || "—"}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <PastillesPrevues prevu={prevues.get(p.id)} />
+                  </td>
+                  <td className="whitespace-nowrap px-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setAModifier(p)}
+                      aria-label={`Modifier ${p.name}`}
+                      title="Modifier"
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-avisdoc-teal"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void supprimerUne(p)}
+                      aria-label={`Supprimer ${p.name}`}
+                      title="Supprimer"
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-rose-700"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div
