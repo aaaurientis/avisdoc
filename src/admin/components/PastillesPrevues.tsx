@@ -35,37 +35,37 @@ const leJour = (iso: string) =>
   " à " +
   new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
-  if (!prevu) return null;
-  const genres = Object.entries(prevu.parGenre) as [GenreEchange, number][];
-  if (genres.length === 0) return null;
+/** Au plus trois lignes sur une carte : au-delà, on renvoie à la fiche. */
+const LIGNES_MAX = 3;
 
-  // Aujourd'hui ou avant : c'est maintenant que ça se joue.
-  const urgent = prevu.prochain ? new Date(prevu.prochain).getTime() <= Date.now() + 86_400_000 : false;
+export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
+  if (!prevu || prevu.actions.length === 0) return null;
+
+  const visibles = prevu.actions.slice(0, LIGNES_MAX);
+  const reste = prevu.actions.length - visibles.length;
 
   return (
-    // Le pictogramme d'abord, la date ensuite : on voit qu'il y a un appel, puis quand.
-    <div className="mt-2 flex items-center gap-1.5">
-      {genres.map(([genre, n]) => {
-        const Icone = ICONES[genre];
+    // Une ligne par action : le pictogramme, puis SA date. Deux actions n'ont pas
+    // la même échéance, et les confondre revient à n'en montrer aucune.
+    <div className="mt-2 space-y-1">
+      {visibles.map((a) => {
+        const Icone = ICONES[a.kind];
+        const urgent = new Date(a.au).getTime() <= Date.now() + 86_400_000;
         return (
-          <span
-            key={genre}
-            title={`${n} ${NOMS[genre]}${n > 1 ? "s" : ""} à venir${prevu.prochain ? ` — le ${leJour(prevu.prochain)}` : ""}`}
-            className={cn(
-              "inline-flex size-[22px] items-center justify-center rounded-full shadow-sm",
-              TEINTES[genre],
-              urgent && "ring-2 ring-avisdoc-coral/30",
-            )}
-          >
-            {n > 1 ? <span className="text-[11px] font-bold">{n}</span> : <Icone className="size-3.5" strokeWidth={2.4} />}
-          </span>
+          <div key={`${a.kind}-${a.au}`} className="flex items-center gap-2" title={`${NOMS[a.kind]} — ${a.titre}`}>
+            <span className={cn("inline-flex size-[22px] shrink-0 items-center justify-center rounded-full shadow-sm", TEINTES[a.kind])}>
+              <Icone className="size-3.5" strokeWidth={2.4} />
+            </span>
+            <span className={cn("truncate text-[12px] font-bold", urgent ? "text-avisdoc-coral" : "text-avisdoc-ink")}>
+              {leJour(a.au)}
+            </span>
+          </div>
         );
       })}
-      {prevu.prochain && (
-        <span className={cn("text-[12px] font-bold", urgent ? "text-avisdoc-coral" : "text-avisdoc-ink")}>
-          {leJour(prevu.prochain)}
-        </span>
+      {reste > 0 && (
+        <div className="pl-[30px] text-[11px] font-semibold text-muted-foreground">
+          + {reste} autre{reste > 1 ? "s" : ""}
+        </div>
       )}
     </div>
   );
