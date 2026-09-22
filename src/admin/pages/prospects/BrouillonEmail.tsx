@@ -34,6 +34,7 @@ export default function BrouillonEmail({
   const [copie, setCopie] = useState(false);
   const [proposer, setProposer] = useState(false);
   const [envoiPipeline, setEnvoiPipeline] = useState(false);
+  const [erreurPipeline, setErreurPipeline] = useState<string | null>(null);
 
   const copier = async () => {
     await navigator.clipboard.writeText(`${objet}\n\n${corps}`);
@@ -51,9 +52,12 @@ export default function BrouillonEmail({
   const versLePipeline = async (etape: string) => {
     if (!onMettreAuPipeline || envoiPipeline) return;
     setEnvoiPipeline(true);
+    setErreurPipeline(null);
     try {
       await onMettreAuPipeline(etape);
       onClose();
+    } catch (e) {
+      setErreurPipeline(e instanceof Error ? e.message : "Le passage au Pipeline a échoué.");
     } finally {
       setEnvoiPipeline(false);
     }
@@ -128,6 +132,9 @@ export default function BrouillonEmail({
               Pas maintenant
             </button>
           </div>
+          {erreurPipeline && (
+            <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreurPipeline}</p>
+          )}
         </div>
       )}
 

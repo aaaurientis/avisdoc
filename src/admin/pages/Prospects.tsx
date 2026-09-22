@@ -318,7 +318,7 @@ export default function Prospects() {
               ? undefined
               : async (etape) => {
                   const client = clientDepuisProspect(brouillon.prospect, etape);
-                  addClient(client);
+                  if (!(await addClient(client))) throw new Error("L’affaire n’a pas pu être créée dans le Pipeline.");
                   const contact = contactDepuisProspect(brouillon.prospect);
                   if (contact) addProjectContact(client.id, contact);
                   await mettreAuPipeline(brouillon.prospect, client.id);

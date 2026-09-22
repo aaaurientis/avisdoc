@@ -129,7 +129,8 @@ export default function NewClientModal({
       };
     }
     if (!client) return;
-    addClient(client);
+    // On attend l'écriture : le devis Qonto et la navigation pointent sur cette affaire.
+    if (!(await addClient(client))) return;
     if (qontoPick) await devisRepo.lierQonto(id, qontoPick.id);
     onCreated(id);
   };

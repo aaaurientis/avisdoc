@@ -74,7 +74,7 @@ interface DataValue {
   /** Mémorise les coordonnées géocodées d'un contact (cache carte). */
   setContactGeo: (id: string, lat: number, lng: number) => void;
 
-  addClient: (client: Client) => void;
+  addClient: (client: Client) => Promise<boolean>;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
   /** Change l'étape d'une affaire. Entrer dans la dernière colonne vaut signature. */
   setClientStage: (id: string, stage: Stage) => void;
@@ -215,8 +215,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   }, [status, reload]);
 
   // Persistance best-effort : notifie en cas d'échec, sans rollback (optimiste).
-  const persist = useCallback((op: () => Promise<void>) => {
-    op().catch((e) => {
+  const persist = useCallback((op: () => Promise<void>): Promise<boolean> => {
+    return op().then(() => true).catch((e) => {
       console.error(e);
       toast.error("La modification n'a pas pu être enregistrée.");
       void logAudit({
@@ -226,6 +226,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         success: false,
         detail: { message: String((e as Error)?.message ?? e).slice(0, 300) },
       });
+      return false;
     });
   }, [user]);
 
@@ -284,10 +285,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   );
 
   // --- Projets CRM ---
+  /**
+   * Ajouter une affaire. Rend `false` si l'écriture en base a échoué : celui qui
+   * doit enchaîner — poser converted_client_id sur le prospect, rattacher un
+   * contact — attend la réponse, sinon la clé étrangère pointe dans le vide.
+   */
   const addClient: DataValue["addClient"] = useCallback(
     (client) => {
       setClients((prev) => [...prev, client]);
-      persist(() => repo.createClient(client));
+      return persist(() => repo.createClient(client));
     },
     [persist, repo],
   );

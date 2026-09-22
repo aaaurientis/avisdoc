@@ -87,10 +87,13 @@ export default function ProspectFiche({
     try {
       const client = clientDepuisProspect(p, etape);
       const id = client.id;
-      addClient(client);
+      // On attend que l'affaire existe vraiment : le prospect va pointer dessus.
+      if (!(await addClient(client))) throw new Error("L’affaire n’a pas pu être créée dans le Pipeline.");
       const contact = contactDepuisProspect(p);
       if (contact) addProjectContact(id, contact);
       await onMettreAuPipeline(p, id);
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Le passage au Pipeline a échoué.");
     } finally {
       setEnCours(null);
     }
