@@ -10,7 +10,8 @@ import { Badge, Card, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
-import ParcoursProspect, { type EtapeParcours } from "./ParcoursProspect";
+import FicheEntreprise from "../../components/FicheEntreprise";
+import type { EtapeParcours } from "../../components/ParcoursFiche";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import type { Jalon } from "../../lib/echanges";
@@ -171,42 +172,28 @@ export default function ProspectFiche({
 
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-8">
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl rounded-3xl bg-card p-5 shadow-floating sm:p-6"
-      >
-        {/* En-tête : qui c’est, et ce qu’on peut en faire. */}
-        <div>
-          <div className="flex items-start gap-4 border-b border-border pb-4">
-            <div className="min-w-0 flex-1">
-              <h2 className="font-display text-2xl font-semibold text-avisdoc-ink">{p.name}</h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
-              </p>
+    <FicheEntreprise
+      titre={p.name}
+      sousTitre={[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
+      badge={<Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"} / 100</Badge>}
+      identite={
+        <>
+          {p.siren && (
+            <div className="text-[12.5px] text-muted-foreground">
+              SIREN {p.siren}
+              {p.legal_name ? ` · ${p.legal_name}` : ""} —{" "}
+              <span className="font-bold text-avisdoc-teal">annuaire des entreprises ✓</span>
             </div>
-            <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"} / 100</Badge>
-            <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
-              <X className="size-5" />
-            </button>
-          </div>
-
-          <div className="pt-4">
-            {p.siren && (
-              <div className="text-[12.5px] text-muted-foreground">
-                SIREN {p.siren}
-                {p.legal_name ? ` · ${p.legal_name}` : ""} —{" "}
-                <span className="font-bold text-avisdoc-teal">annuaire des entreprises ✓</span>
-              </div>
-            )}
-            {siege && (siege.address || siege.city) && (
-              <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                {[siege.address, siege.city].filter(Boolean).join(", ")}
-              </div>
-            )}
-
-            {/* Ce qu’on peut faire de cette fiche. */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+          )}
+          {siege && (siege.address || siege.city) && (
+            <div className="mt-0.5 text-[12.5px] text-muted-foreground">
+              {[siege.address, siege.city].filter(Boolean).join(", ")}
+            </div>
+          )}
+        </>
+      }
+      actions={
+        <>
               {p.converted_client_id ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2.5 text-sm font-bold text-emerald-700">
                   <Check className="size-4" /> Dans le Pipeline
@@ -273,27 +260,25 @@ export default function ProspectFiche({
                 {enCours === "ecarter" ? <Loader2 className="size-4 animate-spin" /> : null}
                 Écarter
               </button>
-            </div>
-
-            {erreur ? (
-              <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>
-            ) : (
-              <p className="mt-2 text-[12px] text-muted-foreground">
-                {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
-                {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <ParcoursProspect etapes={parcours} />
-        </div>
-
-        <div className="mt-3 overflow-hidden rounded-2xl border border-border">
-        <Onglets onglets={onglets} actif={onglet} onChange={setOnglet} />
-
-        <div className="px-4 pb-4 pt-4">
+        </>
+      }
+      message={
+        erreur ? (
+          <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>
+        ) : (
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
+            {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
+          </p>
+        )
+      }
+      parcours={parcours}
+      onglets={onglets}
+      actif={onglet}
+      onOnglet={setOnglet}
+      onClose={onClose}
+    >
+      <div>
           {onglet === "identite" && (
             <>
             {/* Ce que l’approfondissement a trouvé */}
@@ -460,9 +445,7 @@ export default function ProspectFiche({
               onCompte={compter}
             />
           )}
-        </div>
-        </div>
       </div>
-    </div>
+    </FicheEntreprise>
   );
 }

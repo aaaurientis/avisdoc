@@ -1,11 +1,12 @@
-// Le parcours d'un prospect, dans le bandeau d'avancement du Pipeline.
+// Le parcours d'une fiche, dans le dessin du bandeau d'avancement du Pipeline.
 //
-// Les quatre étapes ne sont pas des colonnes : ce sont les dates que la fiche porte
-// déjà. Une étape sans date n'est pas atteinte, et affiche « — » comme chez eux.
+// Une étape sans date n'est pas atteinte, et affiche « — ». Quand l'écran le permet,
+// les étapes se cliquent pour changer d'étape : c'est alors le seul endroit qui le
+// fait, et aucune rangée de pastilles n'a besoin de le répéter.
 
 import { Fragment } from "react";
-import { TONES } from "../../lib/ui-tokens";
-import type { StageTone } from "../../types";
+import { TONES } from "../lib/ui-tokens";
+import type { StageTone } from "../types";
 import { cn } from "@/lib/utils";
 
 export interface EtapeParcours {
@@ -28,7 +29,14 @@ function duree(ms: number): string {
   return mois <= 1 ? "1 mois" : `${mois} mois`;
 }
 
-export default function ParcoursProspect({ etapes }: { etapes: EtapeParcours[] }) {
+export default function ParcoursFiche({
+  etapes,
+  surEtape,
+}: {
+  etapes: EtapeParcours[];
+  /** Si fourni, chaque étape devient un bouton qui y fait passer la fiche. */
+  surEtape?: (label: string) => void;
+}) {
   const dernierAtteint = etapes.reduce((acc, e, i) => (e.au ? i : acc), -1);
 
   return (
@@ -55,7 +63,15 @@ export default function ParcoursProspect({ etapes }: { etapes: EtapeParcours[] }
                 </div>
               )}
 
-              <div className="flex min-w-[84px] shrink-0 flex-col items-center text-center">
+              <button
+                type="button"
+                disabled={!surEtape}
+                onClick={() => surEtape?.(e.label)}
+                className={cn(
+                  "flex min-w-[84px] shrink-0 flex-col items-center text-center",
+                  surEtape && "cursor-pointer rounded-lg py-1 transition-colors hover:bg-muted",
+                )}
+              >
                 <div
                   className={cn(
                     "flex size-7 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors",
@@ -77,7 +93,7 @@ export default function ParcoursProspect({ etapes }: { etapes: EtapeParcours[] }
                 <span className="mt-0.5 whitespace-nowrap text-[10.5px] text-muted-foreground">
                   {e.au ? leJour(e.au) : "—"}
                 </span>
-              </div>
+              </button>
             </Fragment>
           );
         })}

@@ -329,56 +329,10 @@ export default function ProjectView({
             </div>
           )}
 
-          {/* Le fichier client : une affaire gagnée y entre une fois, sur décision. */}
-          <div className="mt-4">
-            {ficheClient ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-bold text-emerald-700">
-                <Check className="size-3.5" /> Dans le fichier client
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  addAccount({
-                    name: client.company,
-                    signedOn: new Date().toISOString().slice(0, 10),
-                    sector: null,
-                    data: {},
-                    clientId: client.id,
-                  })
-                }
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-xs font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-              >
-                <UserPlus className="size-3.5" /> Créer la fiche client
-              </button>
-            )}
-          </div>
-
-          {/* Pastilles d'étape */}
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {stages.map((s) => {
-              const active = client.stage === s.label;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setClientStage(client.id, s.label)}
-                  className={cn(
-                    "rounded-full border px-4 py-1.5 text-xs font-bold transition-colors",
-                    active
-                      ? cn(TONES[s.tone].dot, "border-transparent text-white")
-                      : "border-border bg-card text-muted-foreground hover:border-avisdoc-ink",
-                  )}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
         </Section>
 
         {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
-        <ParcoursBanner clientId={client.id} currentStage={client.stage} />
+        <ParcoursBanner clientId={client.id} currentStage={client.stage} onEtape={(s) => setClientStage(client.id, s)} />
 
         {/* Onglets des fonctions (sous le bandeau) */}
         <Card className="overflow-hidden">

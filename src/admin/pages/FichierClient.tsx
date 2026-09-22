@@ -8,6 +8,7 @@ import { useMemo, useRef, useState } from "react";
 import { Columns3, Download, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import type { Account, AccountField } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
+import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Modal, PageHeader, SectionLabel } from "../components/ui";
 import ColonnesClient from "./clients/ColonnesClient";
 import FicheClient from "./clients/FicheClient";
@@ -270,14 +271,14 @@ export default function FichierClient() {
         /* ── Kanban par secteur ── */
         <div
           className="ad-kanban grid gap-3 overflow-x-auto pb-1"
-          style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(210px, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(300px, 380px))` }}
         >
           {secteurs.map((secteur) => {
             const liste = visibles.filter((a) =>
               secteur === SANS_SECTEUR ? !(a.sector ?? "").trim() : (a.sector ?? "").trim() === secteur,
             );
             return (
-              <div key={secteur} className="min-h-[260px] rounded-xl bg-muted/60 p-3">
+              <div key={secteur} className={COLONNE_KANBAN}>
                 <div className="mb-2.5 flex items-center justify-between gap-2">
                   <div className="truncate text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">
                     {secteur}
@@ -286,7 +287,7 @@ export default function FichierClient() {
                     {liste.length}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-1 flex-col gap-2">
                   {liste.map((a) => {
                     // Sur la carte : les premières colonnes renseignées, hors établissement et secteur.
                     const infos = accountFields

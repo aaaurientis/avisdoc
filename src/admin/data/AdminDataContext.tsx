@@ -659,34 +659,46 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
-  /**
-   * Changer d'étape. La dernière colonne du pipeline est l'affaire gagnée : la fiche
-   * entre alors dans le fichier client, une seule fois, sans qu'on ait à y penser.
-   */
+  /** Changer d'étape. La fiche client suit toute seule (voir la règle plus bas). */
   const setClientStage: DataValue["setClientStage"] = useCallback(
     (id, stage) => {
       updateClientFields(id, { stage });
-      const derniere = stages[stages.length - 1]?.label;
-      if (!derniere || stage !== derniere) return;
-      const client = clients.find((c) => c.id === id);
-      if (!client || accounts.some((a) => a.clientId === id)) return;
-      // Le secteur vient du prospect d'origine : sans lui, le tableau des clients
-      // n'aurait qu'une colonne « Sans secteur ».
+    },
+    [updateClientFields],
+  );
+
+  /**
+   * Signé vaut client : toute affaire arrivée dans la dernière colonne a sa fiche au
+   * fichier client. On le vérifie à chaque chargement, et pas seulement au moment du
+   * clic — une étape changée ailleurs, ou avant que la règle existe, est rattrapée.
+   */
+  useEffect(() => {
+    const derniere = stages[stages.length - 1]?.label;
+    if (!derniere || clients.length === 0) return;
+    // Une fiche importée d'Excel n'est reliée à aucune affaire : on la reconnaît à son
+    // nom, sinon la signature en créerait un double.
+    const nom = (t: string) => t.trim().toLowerCase();
+    const manquantes = clients.filter(
+      (c) =>
+        c.stage === derniere &&
+        !accounts.some((a) => a.clientId === c.id || nom(a.name) === nom(c.company)),
+    );
+    if (manquantes.length === 0) return;
+    for (const c of manquantes) {
       void repo
-        .secteurDuProspect(id)
+        .secteurDuProspect(c.id)
         .catch(() => null)
         .then((secteur) =>
           addAccount({
-            name: client.company,
+            name: c.company,
             signedOn: new Date().toISOString().slice(0, 10),
             sector: secteur,
             data: {},
-            clientId: id,
+            clientId: c.id,
           }),
         );
-    },
-    [accounts, addAccount, clients, repo, stages, updateClientFields],
-  );
+    }
+  }, [accounts, addAccount, clients, repo, stages]);
 
   const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
     (fiches) => {

@@ -31,7 +31,16 @@ function duree(ms: number): string {
   return `${a} an${a > 1 ? "s" : ""}`;
 }
 
-export default function ParcoursBanner({ clientId, currentStage }: { clientId: string; currentStage: Stage }) {
+export default function ParcoursBanner({
+  clientId,
+  currentStage,
+  onEtape,
+}: {
+  clientId: string;
+  currentStage: Stage;
+  /** Si fourni, cliquer une étape y fait passer l'affaire. */
+  onEtape?: (stage: Stage) => void;
+}) {
   const { stages } = useAdminData();
   const [hist, setHist] = useState<StageEvent[]>([]);
 
@@ -84,7 +93,16 @@ export default function ParcoursBanner({ clientId, currentStage }: { clientId: s
                   )}
                 </div>
               )}
-              <div className="flex min-w-[74px] shrink-0 flex-col items-center text-center">
+              <button
+                type="button"
+                disabled={!onEtape}
+                onClick={() => onEtape?.(s.label)}
+                title={onEtape ? `Passer à l’étape ${s.label}` : undefined}
+                className={cn(
+                  "flex min-w-[74px] shrink-0 flex-col items-center text-center",
+                  onEtape && "cursor-pointer rounded-lg py-1 transition-colors hover:bg-muted",
+                )}
+              >
                 <div
                   className={cn(
                     "flex size-7 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors",
@@ -103,7 +121,7 @@ export default function ParcoursBanner({ clientId, currentStage }: { clientId: s
                 <span className="mt-0.5 text-[10.5px] text-muted-foreground/80">
                   {reached ? dateFr(iso) : "—"}
                 </span>
-              </div>
+              </button>
             </Fragment>
           );
         })}

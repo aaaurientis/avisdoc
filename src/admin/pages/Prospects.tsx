@@ -263,7 +263,7 @@ export default function Prospects() {
       ) : (
         <div
           className="ad-kanban grid gap-3 overflow-x-auto pb-1"
-          style={{ gridTemplateColumns: `repeat(${SECTEURS.length}, minmax(300px, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${SECTEURS.length}, minmax(300px, 380px))` }}
         >
           {SECTEURS.map((s) => {
             const liste = visibles.filter((p) => secteurDe(p) === s.id);
