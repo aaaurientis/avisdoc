@@ -10,12 +10,14 @@ import { coutDe, euroDollar, MODELE_PAR_DEFAUT, TARIFS_MODELE, TARIF_RECHERCHE_W
 
 interface Demande {
   id: string;
-  kind: "recherche" | "approfondissement";
+  kind: "recherche" | "approfondissement" | "email";
   request: string;
   requested_by: string;
   status: string;
   found_count: number | null;
   usage: Consommation | null;
+  /** Le modèle qui a travaillé ; absent pour les demandes d'avant le 22/09/2026. */
+  model: string | null;
   created_at: string;
   finished_at: string | null;
 }
@@ -55,7 +57,7 @@ export default function Couts() {
     setErreur(null);
     const { data, error } = await supabaseAdmin
       .from("admin_merx_demandes")
-      .select("id, kind, request, requested_by, status, found_count, usage, created_at, finished_at")
+      .select("id, kind, request, requested_by, status, found_count, usage, model, created_at, finished_at")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) setErreur(messageErreur(error.message));
@@ -81,7 +83,7 @@ export default function Couts() {
     let fiches = 0;
 
     for (const d of demandes) {
-      const c = coutDe(d.usage).total;
+      const c = coutDe(d.usage, d.model ?? undefined).total;
       total += c;
       if (new Date(d.created_at) >= debutDuMois) mois += c;
       if (d.kind === "recherche") {
@@ -188,7 +190,7 @@ export default function Couts() {
                 </thead>
                 <tbody>
                   {demandes.map((d) => {
-                    const c = coutDe(d.usage);
+                    const c = coutDe(d.usage, d.model ?? undefined);
                     return (
                       <tr key={d.id} className="border-b border-border text-[13px] last:border-0 hover:bg-muted/30">
                         <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{quand(d.created_at)}</td>

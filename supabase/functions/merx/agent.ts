@@ -18,7 +18,7 @@ import {
   type Demande,
   type LightProspect,
 } from "./db.ts";
-import { complete, type LlmUsage } from "./llm.ts";
+import { complete, model, type LlmUsage, type Usage } from "./llm.ts";
 import {
   ENRICH_SCHEMA,
   ENRICH_SYSTEM,
@@ -46,9 +46,16 @@ function enClair(message: string): string {
 }
 
 const BUDGET_MS = 120_000; // sous la coupure de l'hébergeur
-const LIST_WEB_SEARCHES = 2; // deux recherches suffisent pour une liste
+
+/** Quel modèle sert à quelle sorte de demande : sert à enregistrer le bon tarif. */
+const modeleDe = (kind: string): Usage => (kind === "approfondissement" ? "approfondissement" : "recherche");
+// Sonnet cherche vraiment : on lui en laisse les moyens. Deux recherches donnaient
+// « trois noms à la ramasse » ; six permettent de croiser annuaires, presse locale et
+// fédérations professionnelles.
+const LIST_WEB_SEARCHES = 6;
 const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le temps d'une recherche
-const ENRICH_WEB_SEARCHES = 3;
+// Approfondir, c'est le travail d'Opus : site, mentions légales, presse, réseaux.
+const ENRICH_WEB_SEARCHES = 6;
 
 // Plateformes prises à tort pour un site officiel (annuaires, recrutement, réseaux).
 const PLATFORMS = ["linkedin.com", "facebook.com", "werecruit.io", "societe.com", "pappers.fr", "verif.com", "manageo.fr", "infonet.fr", "kompass.com", "pagesjaunes.fr", "usinenouvelle.com"];
@@ -65,6 +72,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
   const spent: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   const ask = (prompt: string) =>
     complete<ListOut>(prompt, LIST_SCHEMA as unknown as Record<string, unknown>, {
+      usage: "recherche",
       system: LIST_SYSTEM,
       webSearch: { maxUses: LIST_WEB_SEARCHES },
       onSources: (u) => (urls = u),
@@ -137,6 +145,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   let urls: string[] = [];
 
   const out = await complete<EnrichOut>(enrichPrompt(p, candidates, site), ENRICH_SCHEMA as unknown as Record<string, unknown>, {
+    usage: "approfondissement",
     system: ENRICH_SYSTEM,
     webSearch: { maxUses: ENRICH_WEB_SEARCHES },
     onSources: (u) => (urls = u),
@@ -205,7 +214,7 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
   const onUsage = (u: LlmUsage) => (usage = u);
   try {
     const result = req.kind === "recherche" ? await runSearch(sb, req, onUsage) : await runEnrichment(sb, req, onUsage);
-    await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage });
+    await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage, model: model(modeleDe(req.kind)) });
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",
@@ -214,7 +223,7 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await failRequest(sb, req.id, message, usage);
+    await failRequest(sb, req.id, message, usage, model(modeleDe(req.kind)));
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",

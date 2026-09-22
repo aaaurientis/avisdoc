@@ -182,15 +182,29 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   if (error) throw new Error(error.message);
 }
 
-export async function finishRequest(sb: SupabaseClient, id: string, r: { foundCount: number; message: string | null; usage: unknown }): Promise<void> {
+export async function finishRequest(
+  sb: SupabaseClient,
+  id: string,
+  r: { foundCount: number; message: string | null; usage: unknown; model?: string },
+): Promise<void> {
   await sb
     .from("admin_merx_demandes")
-    .update({ status: "terminee", found_count: r.foundCount, message: r.message, usage: r.usage, finished_at: new Date().toISOString() })
+    .update({
+      status: "terminee",
+      found_count: r.foundCount,
+      message: r.message,
+      usage: r.usage,
+      model: r.model ?? null,
+      finished_at: new Date().toISOString(),
+    })
     .eq("id", id);
 }
 
-export async function failRequest(sb: SupabaseClient, id: string, message: string, usage: unknown): Promise<void> {
-  await sb.from("admin_merx_demandes").update({ status: "echec", message, usage, finished_at: new Date().toISOString() }).eq("id", id);
+export async function failRequest(sb: SupabaseClient, id: string, message: string, usage: unknown, mdl?: string): Promise<void> {
+  await sb
+    .from("admin_merx_demandes")
+    .update({ status: "echec", message, usage, model: mdl ?? null, finished_at: new Date().toISOString() })
+    .eq("id", id);
 }
 
 /** Ajoute un message à une conversation (ce que Merx écrit à la fin d'une recherche). */

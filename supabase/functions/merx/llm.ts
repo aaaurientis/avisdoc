@@ -1,8 +1,13 @@
 // Appel au modèle de langage — SDK officiel Anthropic.
-// Le modèle vient de MERX_MODEL (Haiku 4.5, choix d'Olivier du 12/09/2026 pour le coût) : passer à une
-// version plus récente se fait en changeant la variable, sans toucher au code.
-// Recherche web : variante de base `web_search_20250305`. La variante à filtrage dynamique exige Sonnet
-// ou Opus — avec Haiku, l'API répond « does not support programmatic tool calling ».
+//
+// Le modèle dépend de ce qu'on demande (décision d'Olivier du 22/09/2026) :
+//   • prospecter — Sonnet : il faut chercher pour de bon, pas glaner trois noms ;
+//   • approfondir une fiche — Opus : c'est là qu'on veut le meilleur jugement ;
+//   • converser, rédiger — Sonnet : comprendre une demande et écrire juste.
+// Chacun se règle par une variable d'environnement, sans toucher au code.
+//
+// Recherche web : variante de base `web_search_20250305`. La variante à filtrage dynamique
+// exige Sonnet ou Opus — elle devient donc accessible, Haiku ne le permettait pas.
 
 import Anthropic, { APIConnectionTimeoutError } from "npm:@anthropic-ai/sdk@0.125.0";
 
@@ -15,6 +20,8 @@ export interface LlmUsage {
 export interface LlmOptions {
   system?: string;
   model?: string;
+  /** À défaut de modèle explicite, celui de cet usage. */
+  usage?: Usage;
   /** Recherche web faite par le modèle lui-même, bornée à `maxUses` recherches. */
   webSearch?: { maxUses: number };
   /** Reçoit les adresses des pages réellement consultées (garde-fou des sources). */
@@ -38,7 +45,26 @@ export interface ChatTool {
 
 const MAX_TOOL_ROUNDS = 3; // conversation : allers-retours d'outil au plus, par message
 
-export const model = () => Deno.env.get("MERX_MODEL") ?? "claude-haiku-4-5";
+/** Ce pour quoi on appelle le modèle : chaque usage a le sien. */
+export type Usage = "recherche" | "approfondissement" | "chat" | "email";
+
+const DEFAUTS: Record<Usage, string> = {
+  recherche: "claude-sonnet-5",
+  approfondissement: "claude-opus-5",
+  chat: "claude-sonnet-5",
+  email: "claude-sonnet-5",
+};
+
+const VARIABLES: Record<Usage, string> = {
+  recherche: "MERX_MODEL_RECHERCHE",
+  approfondissement: "MERX_MODEL_APPROFONDISSEMENT",
+  chat: "MERX_MODEL_CHAT",
+  email: "MERX_MODEL_EMAIL",
+};
+
+/** Le modèle d'un usage : sa variable, sinon MERX_MODEL pour tout régler d'un coup, sinon le défaut. */
+export const model = (usage: Usage = "chat") =>
+  Deno.env.get(VARIABLES[usage]) ?? Deno.env.get("MERX_MODEL") ?? DEFAUTS[usage];
 
 let client: Anthropic | undefined;
 const api = () => (client ??= new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") ?? "" }));
@@ -73,7 +99,7 @@ export async function complete<T>(prompt: string, schema: Record<string, unknown
   const response = await api()
     .messages.create(
       {
-        model: options?.model ?? model(),
+        model: options?.model ?? model(options?.usage),
         max_tokens: 16000,
         ...(options?.system && { system: options.system }),
         messages: [{ role: "user", content: prompt }],
@@ -110,7 +136,7 @@ export async function converse(
     for (let round = 0; ; round++) {
       const response = await api()
         .messages.create(
-          { model: options.model ?? model(), max_tokens: 1500, ...(options.system && { system: options.system }), tools, messages: history } as any,
+          { model: options.model ?? model(options.usage), max_tokens: 1500, ...(options.system && { system: options.system }), tools, messages: history } as any,
           requestOptions(options),
         )
         .catch((e: unknown) => {

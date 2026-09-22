@@ -11,8 +11,18 @@ export const TARIFS_MODELE: Record<string, { entree: number; sortie: number }> =
   "claude-opus-5": { entree: 5, sortie: 25 },
 };
 
-/** Modèle utilisé par Merx (variable MERX_MODEL de la fonction). */
+/**
+ * Modèle retenu quand la demande ne dit pas lequel a servi — les demandes d'avant le
+ * 22/09/2026, faites du temps où Merx n'en utilisait qu'un.
+ */
 export const MODELE_PAR_DEFAUT = "claude-haiku-4-5";
+
+/** Ce que Merx appelle aujourd'hui, par sorte de demande. Affiché dans l'écran des coûts. */
+export const MODELES_ACTUELS: Record<string, string> = {
+  recherche: "claude-sonnet-5",
+  approfondissement: "claude-opus-5",
+  email: "claude-sonnet-5",
+};
 
 /**
  * Recherche web : 10 $ pour 1 000 recherches, en plus des jetons.

@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
         const out = await complete<EmailOut>(
           emailPrompt(p as never, signature),
           EMAIL_SCHEMA as unknown as Record<string, unknown>,
-          { system: EMAIL_SYSTEM, timeoutMs: 40_000, onUsage: (u) => (usage = u) },
+          { system: EMAIL_SYSTEM, usage: "email", timeoutMs: 40_000, onUsage: (u) => (usage = u) },
         );
         if (demande) {
           await sb
@@ -110,6 +110,7 @@ Deno.serve(async (req: Request) => {
             .update({
               status: "terminee",
               usage,
+              model: model("email"),
               finished_at: new Date().toISOString(),
               // Le brouillon se garde : la fiche doit pouvoir le rouvrir.
               objet: out.objet,
@@ -123,7 +124,7 @@ Deno.serve(async (req: Request) => {
         if (demande) {
           await sb
             .from("admin_merx_demandes")
-            .update({ status: "echec", message, usage, finished_at: new Date().toISOString() })
+            .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
         return json({ error: "Le brouillon n'a pas pu être écrit. Vous pouvez réessayer." }, 500);
@@ -160,7 +161,7 @@ Deno.serve(async (req: Request) => {
       let demandeId: string | null = null;
       const reply = await converse([...history, { role: "user", content: message }], {
         system: CHAT_SYSTEM,
-        model: model(),
+        model: model("chat"),
         timeoutMs: CHAT_TIMEOUT_MS,
         tools: [
           {

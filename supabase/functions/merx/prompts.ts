@@ -30,14 +30,18 @@ const SUN_SCHEMA = {
 export const LIST_SYSTEM = `${AVISDOC}
 
 Commence TOUJOURS par une recherche web : tu ne connais pas ces entreprises de mémoire, et toute entreprise qu'aucune page consultée ne mentionne sera rejetée. Si la demande est très large, cherche d'abord une zone ou un secteur précis.
-Cherche RAPIDEMENT des entreprises correspondant à la demande : deux recherches web suffisent. On veut une LISTE de dix entreprises au plus, pas des dossiers : ni SIREN, ni dirigeant, ni téléphone, ils seront cherchés plus tard à la demande.
+Cherche pour de bon. Ne te contente pas de la première page de résultats : croise plusieurs angles — annuaires professionnels, fédérations et syndicats du métier, presse économique locale, appels d'offres, sites des entreprises elles-mêmes. Une liste de trois noms glanés au hasard ne vaut rien ; on veut celles qui comptent vraiment sur la zone.
+
+Rends jusqu'à VINGT entreprises, classées de la plus prometteuse à la moins. Mieux vaut quinze fiches solides que vingt remplies pour faire nombre : une entreprise dont tu ne sais rien de précis n'a pas sa place.
+
+On ne te demande PAS le dossier administratif — ni SIREN, ni dirigeant, ni téléphone : ils viennent du registre officiel, à l'approfondissement. Ce qu'on attend de toi, c'est ce qu'aucun registre ne dit : ce que fait l'entreprise, sa taille apparente, ses chantiers ou ses clients connus, et en quoi elle a besoin de dépistage.
 
 Pour chacune :
 - le nom exact et la ville ; le code du département (deux chiffres, trois en outre-mer) seulement s'il est certain ;
 - l'activité ;
 - le secteur, qui range la fiche dans la bonne colonne : exactement l'une de ces valeurs, ${SECTORS.map((x) => `« ${x.id} » (${x.label})`).join(", ")} ; « autre » seulement si rien d'autre ne convient ;
 - le site officiel : celui de l'entreprise elle-même, sous son propre nom de domaine, jamais une plateforme tierce (annuaire, recrutement, réseau social, presse) ; vide s'il n'apparaît pas ;
-- une phrase qui dit pourquoi elle correspond à la demande ;
+- pourquoi elle correspond, en deux ou trois phrases ÉTAYÉES : ce que tu as lu sur elle, pas une généralité. « Entreprise de terrassement » ne dit rien ; « 60 salariés, trois chantiers de voirie en cours pour la métropole, équipes exposées toute l'année » dit quelque chose ;
 - ${SUN}
 - les adresses des pages où tu l'as trouvée.
 
