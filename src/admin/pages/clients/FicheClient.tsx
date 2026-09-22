@@ -11,6 +11,10 @@ import { Modal, SectionLabel } from "../../components/ui";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
+import BrouillonEmail from "../prospects/BrouillonEmail";
+import { redigerEmailClient } from "../../lib/merx-appels";
+import { useAuth } from "../../auth/AuthContext";
+import type { GenreEchange } from "../../lib/echanges";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
 import NoteDetaillee from "../prospects/NoteDetaillee";
@@ -23,13 +27,13 @@ const champCls =
  * Ce qu'on peut proposer à quelqu'un qui est DÉJÀ client — et qu'on n'a pas à retrouver
  * de mémoire à chaque fois. Un clic remplit l'intitulé, qui reste modifiable.
  */
-const SUGGESTIONS = [
-  "Proposer une nouvelle campagne",
-  "Relancer sur une journée supplémentaire",
-  "Prendre des nouvelles après la campagne",
-  "Envoyer le bilan de la dernière campagne",
-  "Proposer une session sur un autre site",
-  "Présenter le volet prévention solaire",
+const SUGGESTIONS: { titre: string; genre: GenreEchange }[] = [
+  { titre: "Proposer une nouvelle campagne", genre: "email" },
+  { titre: "Relancer sur une journée supplémentaire", genre: "appel" },
+  { titre: "Prendre des nouvelles après la campagne", genre: "appel" },
+  { titre: "Envoyer le bilan de la dernière campagne", genre: "email" },
+  { titre: "Proposer une session sur un autre site", genre: "email" },
+  { titre: "Présenter le volet prévention solaire", genre: "email" },
 ];
 
 const inputType = (t: AccountField["type"]) =>
@@ -51,7 +55,23 @@ export default function FicheClient({
   const [origine, setOrigine] = useState<Prospect | null>(null);
   const [nbEchanges, setNbEchanges] = useState<number | null>(null);
   const [relire, setRelire] = useState(0);
+  const [brouillon, setBrouillon] = useState<{ objet: string; corps: string; destinataire: string | null } | null>(null);
   const compter = useCallback((n: number) => setNbEchanges(n), []);
+  const { user } = useAuth();
+
+  /**
+   * Merx écrit à un client qu'on connaît : il relit ce qui s'est passé avec eux et
+   * part de l'intention dite dans l'intitulé. Sans intitulé, il n'a pas de sujet.
+   */
+  const ecrireAvecMerx = async (intention: string) => {
+    if (!fiche) return;
+    if (!intention) {
+      toast.error("Écrivez d’abord ce que vous voulez leur dire, ou choisissez une proposition.");
+      return;
+    }
+    const r = await redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? "");
+    setBrouillon(r);
+  };
 
   /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
   const affaire = fiche?.clientId ? getClient(fiche.clientId) : undefined;
@@ -128,6 +148,7 @@ export default function FicheClient({
   };
 
   return (
+    <>
     <Modal onClose={onClose} width={mode === "lecture" ? 820 : 520}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
@@ -232,6 +253,7 @@ export default function FicheClient({
             <ActionsFiche
               cles={{ accountId: fiche?.id ?? null }}
               suggestions={SUGGESTIONS}
+              onEcrireAvecMerx={fiche ? (i) => void ecrireAvecMerx(i) : undefined}
               onFait={() => setRelire((n) => n + 1)}
               relire={relire}
             />
@@ -344,5 +366,16 @@ export default function FicheClient({
         )}
       </div>
     </Modal>
+    {/* Après la fiche dans la page : à niveau égal, c'est le dernier rendu qui passe devant. */}
+    {brouillon && fiche && (
+      <BrouillonEmail
+        nom={fiche.name}
+        objet={brouillon.objet}
+        corps={brouillon.corps}
+        destinataire={brouillon.destinataire}
+        onClose={() => setBrouillon(null)}
+      />
+    )}
+    </>
   );
 }

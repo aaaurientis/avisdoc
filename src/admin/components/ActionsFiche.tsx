@@ -51,12 +51,12 @@ export default function ActionsFiche({
   cles: ClesFiche;
   /** Rappelé après l'enregistrement : l'historique se recharge. */
   onFait: () => Promise<void> | void;
-  /** Présent quand Merx peut rédiger pour cette fiche. */
-  onEcrireAvecMerx?: () => void;
+  /** Présent quand Merx peut rédiger pour cette fiche ; reçoit l'intitulé, qui dit l'intention. */
+  onEcrireAvecMerx?: (intention: string) => void;
   /** Change de valeur pour relire ce qui est prévu. */
   relire?: number;
-  /** Intitulés proposés d'un clic : ce qu'on fait couramment sur ce genre de fiche. */
-  suggestions?: string[];
+  /** Ce qu'on fait couramment sur ce genre de fiche : un clic ouvre le bon formulaire, intitulé compris. */
+  suggestions?: { titre: string; genre: GenreEchange }[];
 }) {
   const { user } = useAuth();
   const [genre, setGenre] = useState<GenreEchange | null>(null);
@@ -84,9 +84,9 @@ export default function ActionsFiche({
 
   const choisi = GENRES.find((g) => g.valeur === genre);
 
-  const ouvrir = (g: GenreEchange) => {
+  const ouvrir = (g: GenreEchange, intitule = "") => {
     setGenre(g);
-    setTitre("");
+    setTitre(intitule);
     setDetail("");
     setJour(aujourdhui());
     setHeure(prochaineHeure());
@@ -146,6 +146,28 @@ export default function ActionsFiche({
         </div>
       )}
 
+      {suggestions && suggestions.length > 0 && !choisi && (
+        <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+          <SectionLabel>Ce que vous pouvez leur proposer</SectionLabel>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">Un clic ouvre l’action, l’intitulé déjà écrit.</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {suggestions.map((s) => {
+              const Icone = ICONES[s.genre];
+              return (
+                <button
+                  key={s.titre}
+                  type="button"
+                  onClick={() => ouvrir(s.genre, s.titre)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-[12.5px] font-semibold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                >
+                  <Icone className="size-3.5 text-avisdoc-teal" /> {s.titre}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {GENRES.map((g) => {
           const Icone = g.icone;
@@ -175,26 +197,11 @@ export default function ActionsFiche({
           {choisi.valeur === "email" && onEcrireAvecMerx && (
             <button
               type="button"
-              onClick={onEcrireAvecMerx}
+              onClick={() => onEcrireAvecMerx(titre.trim())}
               className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
             >
               <PenLine className="size-3.5" /> Écrire un e-mail personnalisé avec Merx
             </button>
-          )}
-
-          {suggestions && suggestions.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setTitre(s)}
-                  className="rounded-full border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
           )}
 
           <input

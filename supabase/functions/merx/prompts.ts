@@ -321,3 +321,61 @@ export function emailPrompt(
     .filter(Boolean)
     .join("\n");
 }
+
+// ── Écrire à quelqu'un qui est DÉJÀ client ───────────────────────────────
+
+export const EMAIL_CLIENT_SYSTEM = `${AVISDOC}
+
+Tu rédiges un e-mail à une entreprise qui est DÉJÀ CLIENTE d'AvisDoc. Ce n'est pas un premier
+contact : on a déjà travaillé ensemble, et cela doit s'entendre dès la première ligne.
+Rien n'est envoyé automatiquement : le commercial relit, corrige et envoie lui-même.
+
+Règles :
+- Court : cinq à huit lignes, pas davantage.
+- On se connaît : jamais « je me permets de vous contacter », jamais de présentation d'AvisDoc.
+  On reprend le fil là où on l'a laissé.
+- Appuyé sur ce qui s'est RÉELLEMENT passé avec eux — la campagne menée, ce qui s'est dit au
+  dernier échange, ce qu'ils avaient demandé. Ces éléments te sont donnés ; s'ils manquent,
+  écris sobrement plutôt que d'inventer un passé commun.
+- L'intention du commercial t'est donnée : c'est le sujet de l'e-mail, et il n'y en a qu'un.
+- Aucune promesse chiffrée, aucun prix, aucun taux.
+- Pas de flatterie, pas de « n'hésitez pas à ».
+- Une seule demande à la fin, simple.
+- Signé par le commercial, avec son prénom et son nom tels qu'ils te sont donnés.
+
+${POLITESSE}
+${NEVER}`;
+
+export function emailClientPrompt(
+  c: {
+    nom: string;
+    secteur: string | null;
+    clientDepuis: string | null;
+    journees: number | null;
+    depistes: number | null;
+    orientes: number | null;
+    ville: string | null;
+    contact: { nom: string; role: string | null } | null;
+  },
+  intention: string,
+  historique: { quand: string; genre: string; titre: string; detail: string | null }[],
+  commercial: string,
+): string {
+  const fil = historique
+    .slice(0, 12)
+    .map((e) => `- ${e.quand} · ${e.genre} : ${e.titre}${e.detail ? ` — ${e.detail}` : ""}`)
+    .join("\n");
+  return [
+    `Client : ${c.nom}${c.ville ? `, à ${c.ville}` : ""}${c.secteur ? ` (${c.secteur})` : ""}.`,
+    c.clientDepuis ? `Client depuis le ${c.clientDepuis}.` : "",
+    c.journees ? `Journées réalisées ou vendues : ${c.journees}.` : "",
+    c.depistes ? `Personnes dépistées : ${c.depistes}.` : "",
+    c.orientes ? `Personnes orientées vers un dermatologue : ${c.orientes}.` : "",
+    c.contact ? `Destinataire : ${c.contact.nom}${c.contact.role ? `, ${c.contact.role}` : ""}.` : "Destinataire : leur interlocuteur habituel (nom inconnu).",
+    fil ? `Ce qui s'est passé avec eux, du plus récent au plus ancien :\n${fil}` : "Aucun échange n'a encore été noté avec eux.",
+    `CE QUE LE COMMERCIAL VEUT LEUR DIRE : ${intention}`,
+    `L'e-mail est signé : ${commercial}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
