@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, Phone, Plus, Search } from "lucide-react";
+import { Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -18,7 +18,7 @@ import NouveauProspect from "./prospects/NouveauProspect";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
-import { clientDepuisProspect, contactDepuisProspect } from "../lib/conversion";
+import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
@@ -36,12 +36,16 @@ interface Demande {
 function Carte({
   p,
   onOuvrir,
+  onModifier,
+  onSupprimer,
   cochee,
   onCocher,
   selectionEnCours,
 }: {
   p: Prospect;
   onOuvrir: () => void;
+  onModifier: () => void;
+  onSupprimer: () => void;
   cochee: boolean;
   onCocher: () => void;
   selectionEnCours: boolean;
@@ -64,6 +68,29 @@ function Carte({
         <CaseFiche cochee={cochee} onBascule={onCocher} libelle={p.name} visible={selectionEnCours} />
         <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">{p.name}</div>
         <Badge className={`${tonNote(p.score_total)} shrink-0`}>{p.score_total ?? "—"}</Badge>
+        <div
+          className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={onModifier}
+            aria-label={`Modifier ${p.name}`}
+            title="Modifier"
+            className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onSupprimer}
+            aria-label={`Supprimer ${p.name}`}
+            title="Supprimer"
+            className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
       </div>
       <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
         {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
@@ -91,7 +118,7 @@ function messageErreur(brut: string): string {
 export default function Prospects() {
   const { user } = useAuth();
   const nomDuCommercial = user?.name ?? user?.email ?? "";
-  const { stages, addClient, addProjectContact } = useAdminData();
+  const { stages, clients, addClient, addProjectContact } = useAdminData();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -99,6 +126,7 @@ export default function Prospects() {
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
+  const [aModifier, setAModifier] = useState<Prospect | null>(null);
   const [coches, setCoches] = useState<Set<string>>(new Set());
 
   const cocher = (id: string) =>
@@ -119,6 +147,17 @@ export default function Prospects() {
   const ecrireAuxCoches = () => {
     if (adresses.length === 0) return;
     window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
+  };
+
+  /** Supprimer une fiche depuis sa carte, sans passer par la sélection. */
+  const supprimerUne = async (p: Prospect) => {
+    if (!window.confirm(`Supprimer ${p.name} ? Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`)) return;
+    try {
+      await jeter("prospect", [p.id]);
+      await charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
+    }
   };
 
   /**
@@ -348,6 +387,8 @@ export default function Prospects() {
                       key={p.id}
                       p={p}
                       onOuvrir={() => void ouvrir(p)}
+                      onModifier={() => setAModifier(p)}
+                      onSupprimer={() => void supprimerUne(p)}
                       cochee={coches.has(p.id)}
                       onCocher={() => cocher(p.id)}
                       selectionEnCours={coches.size > 0}
@@ -371,7 +412,16 @@ export default function Prospects() {
         onEffacer={() => setCoches(new Set())}
       />
 
-      {ajout && <NouveauProspect onClose={() => setAjout(false)} onCree={charger} />}
+      {(ajout || aModifier) && (
+        <NouveauProspect
+          fiche={aModifier ?? undefined}
+          onClose={() => {
+            setAjout(false);
+            setAModifier(null);
+          }}
+          onCree={charger}
+        />
+      )}
 
       {brouillon && (
         <BrouillonEmail
@@ -386,6 +436,8 @@ export default function Prospects() {
             brouillon.prospect.converted_client_id
               ? undefined
               : async (etape) => {
+                  const existante = dejaAuPipeline(brouillon.prospect, clients);
+                  if (existante) throw new Error(`${existante.company} est déjà dans le Pipeline, à l’étape « ${existante.stage} ».`);
                   const client = clientDepuisProspect(brouillon.prospect, etape);
                   if (!(await addClient(client))) throw new Error("L’affaire n’a pas pu être créée dans le Pipeline.");
                   const contact = contactDepuisProspect(brouillon.prospect);

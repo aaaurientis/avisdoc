@@ -7,7 +7,7 @@ import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Card, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
-import { clientDepuisProspect, contactDepuisProspect } from "../../lib/conversion";
+import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../../lib/conversion";
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
 import FicheEntreprise from "../../components/FicheEntreprise";
@@ -61,7 +61,7 @@ export default function ProspectFiche({
   brouillons: Brouillon[];
   onRouvrirBrouillon: (b: Brouillon) => void;
 }) {
-  const { stages, addClient, addProjectContact } = useAdminData();
+  const { stages, clients, addClient, addProjectContact } = useAdminData();
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
   const [choixEtape, setChoixEtape] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -85,6 +85,8 @@ export default function ProspectFiche({
     setEnCours("pipeline");
     setChoixEtape(false);
     try {
+      const existante = dejaAuPipeline(p, clients);
+      if (existante) throw new Error(`${existante.company} est déjà dans le Pipeline, à l’étape « ${existante.stage} ».`);
       const client = clientDepuisProspect(p, etape);
       const id = client.id;
       // On attend que l'affaire existe vraiment : le prospect va pointer dessus.

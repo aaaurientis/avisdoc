@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GripVertical, Mail } from "lucide-react";
+import { GripVertical, Mail, Pencil, Trash2 } from "lucide-react";
 import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
@@ -21,6 +21,7 @@ export default function Kanban({
   coches,
   onCocher,
   onChangerCoches,
+  onSupprimer,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -35,6 +36,8 @@ export default function Kanban({
   onCocher?: (id: string) => void;
   /** Remplace la sélection entière : sert à cocher ou décocher une colonne d'un coup. */
   onChangerCoches?: (suivant: Set<string>) => void;
+  /** Met une affaire à la corbeille, depuis sa carte. */
+  onSupprimer?: (c: Client) => void;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -163,6 +166,32 @@ export default function Kanban({
                       </div>
                     )}
                   </button>
+
+                  {onSupprimer && (
+                    <div
+                      className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onSelect(c.id)}
+                        aria-label={`Ouvrir ${c.company}`}
+                        title="Ouvrir la fiche"
+                        className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSupprimer(c)}
+                        aria-label={`Supprimer ${c.company}`}
+                        title="Supprimer"
+                        className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

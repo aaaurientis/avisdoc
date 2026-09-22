@@ -10,23 +10,32 @@ import { Loader2, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal, SectionLabel } from "../../components/ui";
-import { SECTEURS } from "../../lib/merx";
+import { SECTEURS, type Prospect } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
-export default function NouveauProspect({ onClose, onCree }: { onClose: () => void; onCree: () => Promise<void> }) {
+export default function NouveauProspect({
+  fiche,
+  onClose,
+  onCree,
+}: {
+  /** Présente quand on modifie une fiche existante ; absente à la création. */
+  fiche?: Prospect;
+  onClose: () => void;
+  onCree: () => Promise<void>;
+}) {
   const { user } = useAuth();
-  const [nom, setNom] = useState("");
-  const [ville, setVille] = useState("");
-  const [activite, setActivite] = useState("");
-  const [site, setSite] = useState("");
-  const [secteur, setSecteur] = useState("");
-  const [pourquoi, setPourquoi] = useState("");
-  const [contact, setContact] = useState("");
-  const [email, setEmail] = useState("");
-  const [telephone, setTelephone] = useState("");
+  const [nom, setNom] = useState(fiche?.name ?? "");
+  const [ville, setVille] = useState(fiche?.city ?? "");
+  const [activite, setActivite] = useState(fiche?.activity ?? "");
+  const [site, setSite] = useState(fiche?.website ?? "");
+  const [secteur, setSecteur] = useState(fiche?.sector ?? "");
+  const [pourquoi, setPourquoi] = useState(fiche?.rationale ?? "");
+  const [contact, setContact] = useState(fiche?.contact_name ?? "");
+  const [email, setEmail] = useState(fiche?.contact_email ?? "");
+  const [telephone, setTelephone] = useState(fiche?.contact_phone ?? "");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -35,8 +44,7 @@ export default function NouveauProspect({ onClose, onCree }: { onClose: () => vo
     setEnvoi(true);
     setErreur(null);
     try {
-      const { error } = await supabaseAdmin.from("admin_prospects").insert({
-        owner_email: user?.email ?? "",
+      const valeurs = {
         name: nom.trim(),
         city: ville.trim() || null,
         activity: activite.trim() || null,
@@ -47,7 +55,10 @@ export default function NouveauProspect({ onClose, onCree }: { onClose: () => vo
         contact_email: email.trim() || null,
         contact_phone: telephone.trim() || null,
         contact_source: contact.trim() || email.trim() || telephone.trim() ? "saisi à la main" : null,
-      });
+      };
+      const { error } = fiche
+        ? await supabaseAdmin.from("admin_prospects").update(valeurs).eq("id", fiche.id)
+        : await supabaseAdmin.from("admin_prospects").insert({ ...valeurs, owner_email: user?.email ?? "" });
       if (error) throw new Error(error.message);
       await onCree();
       onClose();
@@ -67,9 +78,13 @@ export default function NouveauProspect({ onClose, onCree }: { onClose: () => vo
     <Modal onClose={onClose} width={560}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Ajouter un prospect</h2>
+          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
+            {fiche ? `Modifier ${fiche.name}` : "Ajouter un prospect"}
+          </h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            Seul le nom est nécessaire. Merx complétera le reste depuis la fiche, avec « Approfondir ».
+            {fiche
+              ? "Ce que vous corrigez ici prime sur ce que Merx avait trouvé."
+              : "Seul le nom est nécessaire. Merx complétera le reste depuis la fiche, avec « Approfondir »."}
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
@@ -153,7 +168,7 @@ export default function NouveauProspect({ onClose, onCree }: { onClose: () => vo
           disabled={!nom.trim() || envoi}
           className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
-          {envoi && <Loader2 className="size-4 animate-spin" />} Ajouter le prospect
+          {envoi && <Loader2 className="size-4 animate-spin" />} {fiche ? "Enregistrer" : "Ajouter le prospect"}
         </button>
         <button
           type="button"

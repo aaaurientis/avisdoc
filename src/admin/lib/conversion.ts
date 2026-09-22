@@ -5,6 +5,19 @@ import type { Client } from "../types";
 import { uid } from "./format";
 import { effectifLabel, type Prospect } from "./merx";
 
+/**
+ * Une entreprise déjà présente dans le Pipeline, s'il y en a une.
+ *
+ * Une même entreprise ne doit exister qu'à un seul endroit à la fois. Sans ce
+ * garde-fou, un double clic ou un second essai après une erreur créait une seconde
+ * affaire du même nom — c'est arrivé, quatre fois pour la même société.
+ */
+export function dejaAuPipeline(p: Prospect, clients: Client[]): Client | undefined {
+  const nu = (t: string) => t.trim().toLowerCase();
+  const noms = [nu(p.legal_name || p.name), nu(p.name)];
+  return clients.find((c) => noms.includes(nu(c.company)) || (p.siren && c.siren && c.siren === p.siren));
+}
+
 /** L'affaire telle qu'elle entre dans le Pipeline, avec ce que Merx a trouvé. */
 export function clientDepuisProspect(p: Prospect, etape: string): Client {
   return {

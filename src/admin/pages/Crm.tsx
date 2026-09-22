@@ -77,6 +77,17 @@ export default function Crm() {
     window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
   };
 
+  /** Supprimer une affaire depuis sa carte, sans passer par la sélection. */
+  const supprimerUne = async (c: (typeof clients)[number]) => {
+    if (!window.confirm(`Supprimer ${c.company} ? Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`)) return;
+    try {
+      await jeter("affaire", [c.id]);
+      await rafraichir();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "La suppression a échoué.");
+    }
+  };
+
   const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
@@ -153,6 +164,7 @@ export default function Crm() {
           coches={coches}
           onCocher={cocher}
           onChangerCoches={setCoches}
+          onSupprimer={(c) => void supprimerUne(c)}
         />
       )}
 
