@@ -359,7 +359,16 @@ export default function ProjectView({
         </Section>
 
         {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
-        <ParcoursBanner clientId={client.id} currentStage={client.stage} onEtape={(s) => setClientStage(client.id, s)} />
+        <ParcoursBanner
+          clientId={client.id}
+          currentStage={client.stage}
+          // Comme en prospection : la fiche se referme et on voit la carte arriver
+          // dans sa nouvelle colonne.
+          onEtape={(s) => {
+            setClientStage(client.id, s);
+            onClose();
+          }}
+        />
 
         {/* Onglets des fonctions (sous le bandeau) */}
         <Card className="overflow-hidden">
