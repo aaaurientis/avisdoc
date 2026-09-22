@@ -4,7 +4,6 @@
 // déjà. Une étape sans date n'est pas atteinte, et affiche « — » comme chez eux.
 
 import { Fragment } from "react";
-import { Card } from "../../components/ui";
 import { TONES } from "../../lib/ui-tokens";
 import type { StageTone } from "../../types";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,7 @@ export default function ParcoursProspect({ etapes }: { etapes: EtapeParcours[] }
   const dernierAtteint = etapes.reduce((acc, e, i) => (e.au ? i : acc), -1);
 
   return (
-    <Card className="p-4">
+    <div className="rounded-2xl border border-border p-4">
       <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Avancement</div>
 
       <div className="flex items-start overflow-x-auto pb-1">
@@ -83,6 +82,6 @@ export default function ParcoursProspect({ etapes }: { etapes: EtapeParcours[] }
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }

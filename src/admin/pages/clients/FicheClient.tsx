@@ -106,7 +106,7 @@ export default function FicheClient({
   };
 
   return (
-    <Modal onClose={onClose} width={mode === "lecture" ? 660 : 520}>
+    <Modal onClose={onClose} width={mode === "lecture" ? 820 : 520}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
@@ -129,12 +129,12 @@ export default function FicheClient({
 
       {mode === "lecture" ? (
         /* ── Consultation : trois onglets, aucun champ de saisie ── */
-        <>
+        <div className="overflow-hidden rounded-2xl border border-border">
         <Onglets onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
 
-        <div className="mt-4">
+        <div className="p-4">
         {onglet === "identite" && (
-        <div className="max-h-[52vh] divide-y divide-border overflow-y-auto rounded-2xl border border-border">
+        <div className="max-h-[52vh] divide-y divide-border overflow-y-auto">
           {accountFields.map((f) => {
             const v = lire(f.key).trim();
             const affichee =
@@ -166,7 +166,7 @@ export default function FicheClient({
             {origine ? (
               <>
                 {origine.rationale && (
-                  <div className="mb-4 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
+                  <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
                     <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>
                     <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
                     {origine.approach && (
@@ -197,7 +197,7 @@ export default function FicheClient({
           </div>
         )}
         </div>
-        </>
+        </div>
       ) : (
         <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
         {accountFields.map((f) => (

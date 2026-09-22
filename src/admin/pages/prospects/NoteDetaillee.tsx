@@ -33,7 +33,7 @@ export default function NoteDetaillee({
           return (
             <div key={cat.id} className="rounded-2xl border border-border">
               {/* En-tête : ce que la catégorie a rapporté sur ce qu’elle pouvait rapporter. */}
-              <div className="rounded-t-2xl bg-muted/60 px-3.5 py-2.5">
+              <div className="rounded-t-2xl border-b border-border px-3.5 py-2.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[13px] font-semibold text-avisdoc-ink">{cat.label}</span>
                   <span className="font-mono text-[13px] font-bold text-avisdoc-ink">

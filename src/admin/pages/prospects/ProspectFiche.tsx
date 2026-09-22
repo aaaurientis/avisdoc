@@ -170,10 +170,13 @@ export default function ProspectFiche({
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-8">
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl space-y-3">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl rounded-3xl bg-card p-5 shadow-floating sm:p-6"
+      >
         {/* En-tête : qui c’est, et ce qu’on peut en faire. */}
-        <Card className="overflow-hidden">
-          <div className="flex items-start gap-4 border-b border-border px-5 py-4">
+        <div>
+          <div className="flex items-start gap-4 border-b border-border pb-4">
             <div className="min-w-0 flex-1">
               <h2 className="font-display text-2xl font-semibold text-avisdoc-ink">{p.name}</h2>
               <p className="mt-1 text-[13px] text-muted-foreground">
@@ -186,7 +189,7 @@ export default function ProspectFiche({
             </button>
           </div>
 
-          <div className="px-5 py-4">
+          <div className="pt-4">
             {p.siren && (
               <div className="text-[12.5px] text-muted-foreground">
                 SIREN {p.siren}
@@ -207,7 +210,7 @@ export default function ProspectFiche({
                   <Check className="size-4" /> Dans le Pipeline
                 </span>
               ) : choixEtape ? (
-                <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-muted/60 p-2.5">
+                <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border p-2.5">
                   <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
                   {stages.map((s) => (
                     <button
@@ -279,14 +282,16 @@ export default function ProspectFiche({
               </p>
             )}
           </div>
-        </Card>
+        </div>
 
-        <ParcoursProspect etapes={parcours} />
+        <div className="mt-4">
+          <ParcoursProspect etapes={parcours} />
+        </div>
 
-        <Card className="overflow-hidden">
+        <div className="mt-3 overflow-hidden rounded-2xl border border-border">
         <Onglets onglets={onglets} actif={onglet} onChange={setOnglet} />
 
-        <div className="px-5 pb-5 pt-4">
+        <div className="px-4 pb-4 pt-4">
           {onglet === "identite" && (
             <>
             {/* Ce que l’approfondissement a trouvé */}
@@ -390,7 +395,7 @@ export default function ProspectFiche({
             <>
             {/* Pourquoi c’est une cible : la phrase, les faits constatés, puis l’angle d’approche. */}
             {(p.rationale || constats.length > 0 || p.approach) && (
-              <div className="mb-5 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
+              <div className="mb-5 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
                 <SectionLabel>Pourquoi c’est un bon prospect</SectionLabel>
                 {p.rationale && <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{p.rationale}</p>}
                 {constats.length > 0 && (
@@ -454,7 +459,7 @@ export default function ProspectFiche({
             />
           )}
         </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
