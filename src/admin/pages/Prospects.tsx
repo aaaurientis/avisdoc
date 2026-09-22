@@ -157,7 +157,7 @@ export default function Prospects() {
     async (p: Prospect, clientId: string) => {
       const { error } = await supabaseAdmin
         .from("admin_prospects")
-        .update({ converted_client_id: clientId, status: "a_contacter" })
+        .update({ converted_client_id: clientId, converted_at: new Date().toISOString(), status: "a_contacter" })
         .eq("id", p.id);
       if (error) throw new Error(error.message);
       setOuverte(null);

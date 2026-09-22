@@ -68,6 +68,7 @@ export interface Prospect {
   found_by: string | null;
   /** L'affaire née de ce prospect (migration 0026), s'il est passé au Pipeline. */
   converted_client_id: string | null;
+  converted_at: string | null;
   status: string;
   created_at: string;
 }

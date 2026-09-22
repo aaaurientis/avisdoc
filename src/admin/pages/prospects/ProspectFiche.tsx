@@ -1,7 +1,7 @@
 // Fiche d’un prospect trouvé par Merx : pourquoi c’est une cible, la note détaillée, les coordonnées,
 // et les pages réellement consultées. « Approfondir » va chercher le registre officiel et le site.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
@@ -10,7 +10,17 @@ import { Badge, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
+import Onglets, { type Onglet } from "../../components/Onglets";
+import FilEchanges from "../../components/FilEchanges";
+import type { Jalon } from "../../lib/echanges";
 import { cn } from "@/lib/utils";
+
+/** Ce qui est vrai, ce qu’on va faire, ce qui s’est passé. */
+const ONGLETS: Onglet[] = [
+  { cle: "identite", label: "Identité" },
+  { cle: "approche", label: "Approche" },
+  { cle: "suivi", label: "Suivi" },
+];
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -48,6 +58,7 @@ export default function ProspectFiche({
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
   const [choixEtape, setChoixEtape] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [onglet, setOnglet] = useState("identite");
   const p = prospect;
   const siege = p.head_office;
   const effectif = effectifLabel(p.headcount_band);
@@ -112,6 +123,17 @@ export default function ProspectFiche({
     }
   };
 
+  /** Les jalons ne sont pas stockés : ce sont les dates que la fiche porte déjà. */
+  const jalons = useMemo<Jalon[]>(
+    () =>
+      ([
+        { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at },
+        p.enriched_at ? { libelle: "Fiche approfondie", au: p.enriched_at } : null,
+        p.converted_at ? { libelle: "Passée au Pipeline", au: p.converted_at } : null,
+      ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
+    [demandeOrigine, p.created_at, p.enriched_at, p.converted_at],
+  );
+
   // Ce qui a été constaté : les critères qui ont rapporté des points, avec leur justification.
   const constats = CATEGORIES.flatMap((cat) =>
     cat.criteres
@@ -137,139 +159,155 @@ export default function ProspectFiche({
           </button>
         </div>
 
-        {/* Pourquoi c’est une cible : la phrase, les faits constatés, puis l’angle d’approche. */}
-        {(p.rationale || constats.length > 0 || p.approach) && (
-          <div className="mb-5 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
-            <SectionLabel>Pourquoi c’est un bon prospect</SectionLabel>
-            {p.rationale && <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{p.rationale}</p>}
-            {constats.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {constats.map((c) => (
-                  <li key={c.label} className="flex gap-2 text-[13px] leading-snug text-avisdoc-ink">
-                    <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-avisdoc-teal" />
-                    <span>
-                      <span className="font-semibold">{c.label}</span> : {c.justification}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {p.approach && (
-              <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
-                <span className="font-semibold">Angle d’approche : </span>
-                {p.approach}
-              </p>
-            )}
-          </div>
-        )}
+        <Onglets onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
 
-        {/* La note, telle qu’elle a été gagnée */}
-        <div className="mb-5">
-          <SectionLabel>La note, critère par critère</SectionLabel>
-          <div className="mt-2">
-            <NoteDetaillee total={p.score_total} score={p.score ?? {}} />
-          </div>
-        </div>
-
-        {/* Ce que l’approfondissement a trouvé */}
-        <div className="mb-5 rounded-2xl border border-border">
-          <div className="border-b border-border px-4 py-2.5">
-            <SectionLabel>{p.enriched_at ? "Registre officiel et coordonnées" : "Fiche non approfondie"}</SectionLabel>
-          </div>
-          <div className="divide-y divide-border px-4 py-1">
-            {p.enriched_at ? (
-              <>
-                {p.legal_name && <Ligne label="Raison sociale">{p.legal_name}</Ligne>}
-                {p.siren && <Ligne label="SIREN">{p.siren}</Ligne>}
-                {effectif && (
-                  <Ligne label="Effectif">
-                    {effectif}
-                    {p.headcount_year ? <span className="text-muted-foreground"> (donnée {p.headcount_year})</span> : null}
-                  </Ligne>
+        <div className="mt-5">
+          {onglet === "identite" && (
+            <>
+            {/* Ce que l’approfondissement a trouvé */}
+            <div className="mb-5 rounded-2xl border border-border">
+              <div className="border-b border-border px-4 py-2.5">
+                <SectionLabel>{p.enriched_at ? "Registre officiel et coordonnées" : "Fiche non approfondie"}</SectionLabel>
+              </div>
+              <div className="divide-y divide-border px-4 py-1">
+                {p.enriched_at ? (
+                  <>
+                    {p.legal_name && <Ligne label="Raison sociale">{p.legal_name}</Ligne>}
+                    {p.siren && <Ligne label="SIREN">{p.siren}</Ligne>}
+                    {effectif && (
+                      <Ligne label="Effectif">
+                        {effectif}
+                        {p.headcount_year ? <span className="text-muted-foreground"> (donnée {p.headcount_year})</span> : null}
+                      </Ligne>
+                    )}
+                    {p.open_establishments !== null && <Ligne label="Établissements ouverts">{p.open_establishments}</Ligne>}
+                    {siege && (siege.address || siege.city) && (
+                      <Ligne label="Siège">{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
+                    )}
+                    {p.contact_name && (
+                      <Ligne label="Interlocuteur">
+                        {p.contact_name}
+                        {p.contact_role ? <span className="text-muted-foreground"> — {p.contact_role}</span> : null}
+                      </Ligne>
+                    )}
+                    {p.leaders && p.leaders.length > 0 && (
+                      <Ligne label="Dirigeants">
+                        {p.leaders.map((l) => (l.role ? `${l.name} (${l.role})` : l.name)).join(", ")}
+                      </Ligne>
+                    )}
+                    {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
+                    {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
+                  </>
+                ) : (
+                  <div className="py-3 text-[13px] text-muted-foreground">
+                    La recherche ne rend qu’une fiche légère. « Approfondir » va chercher l’identité officielle, l’effectif,
+                    les dirigeants et les coordonnées publiées — c’est gratuit, cela prend une trentaine de secondes.
+                  </div>
                 )}
-                {p.open_establishments !== null && <Ligne label="Établissements ouverts">{p.open_establishments}</Ligne>}
-                {siege && (siege.address || siege.city) && (
-                  <Ligne label="Siège">{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
+              </div>
+            </div>
+            {/* Coordonnées */}
+            {(p.contact_email || p.contact_phone || p.website) && (
+              <div className="mb-5 flex flex-wrap gap-2">
+                {p.contact_email && (
+                  <a
+                    href={`mailto:${p.contact_email}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
+                  >
+                    <Mail className="size-4" /> {p.contact_email}
+                  </a>
                 )}
-                {p.contact_name && (
-                  <Ligne label="Interlocuteur">
-                    {p.contact_name}
-                    {p.contact_role ? <span className="text-muted-foreground"> — {p.contact_role}</span> : null}
-                  </Ligne>
+                {p.contact_phone && (
+                  <a
+                    href={`tel:${p.contact_phone.replace(/\s/g, "")}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
+                  >
+                    <Phone className="size-4" /> {p.contact_phone}
+                  </a>
                 )}
-                {p.leaders && p.leaders.length > 0 && (
-                  <Ligne label="Dirigeants">
-                    {p.leaders.map((l) => (l.role ? `${l.name} (${l.role})` : l.name)).join(", ")}
-                  </Ligne>
+                {p.website && (
+                  <a
+                    href={p.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
+                  >
+                    <ExternalLink className="size-4" /> Site officiel
+                  </a>
                 )}
-                {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
-                {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
-              </>
-            ) : (
-              <div className="py-3 text-[13px] text-muted-foreground">
-                La recherche ne rend qu’une fiche légère. « Approfondir » va chercher l’identité officielle, l’effectif,
-                les dirigeants et les coordonnées publiées — c’est gratuit, cela prend une trentaine de secondes.
               </div>
             )}
-          </div>
+            {/* Pages consultées */}
+            {p.sources?.length > 0 && (
+              <div className="mb-6">
+                <SectionLabel>Pages consultées</SectionLabel>
+                <ul className="mt-1.5 space-y-1">
+                  {p.sources.slice(0, 8).map((s) => (
+                    <li key={s}>
+                      <a href={s} target="_blank" rel="noreferrer" className="text-[12.5px] text-avisdoc-teal underline-offset-2 hover:underline">
+                        {(() => {
+                          try {
+                            return new URL(s).hostname.replace(/^www\./, "");
+                          } catch {
+                            return s;
+                          }
+                        })()}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            </>
+          )}
+
+          {onglet === "approche" && (
+            <>
+            {/* Pourquoi c’est une cible : la phrase, les faits constatés, puis l’angle d’approche. */}
+            {(p.rationale || constats.length > 0 || p.approach) && (
+              <div className="mb-5 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
+                <SectionLabel>Pourquoi c’est un bon prospect</SectionLabel>
+                {p.rationale && <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{p.rationale}</p>}
+                {constats.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {constats.map((c) => (
+                      <li key={c.label} className="flex gap-2 text-[13px] leading-snug text-avisdoc-ink">
+                        <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-avisdoc-teal" />
+                        <span>
+                          <span className="font-semibold">{c.label}</span> : {c.justification}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {p.approach && (
+                  <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                    <span className="font-semibold">Angle d’approche : </span>
+                    {p.approach}
+                  </p>
+                )}
+              </div>
+            )}
+            {/* La note, telle qu’elle a été gagnée */}
+            <div className="mb-5">
+              <SectionLabel>La note, critère par critère</SectionLabel>
+              <div className="mt-2">
+                <NoteDetaillee total={p.score_total} score={p.score ?? {}} />
+              </div>
+            </div>
+            </>
+          )}
+
+          {onglet === "suivi" && (
+            <FilEchanges
+              cles={{ prospectId: p.converted_client_id ? null : p.id, clientId: p.converted_client_id }}
+              jalons={jalons}
+            />
+          )}
         </div>
 
-        {/* Coordonnées */}
-        {(p.contact_email || p.contact_phone || p.website) && (
-          <div className="mb-5 flex flex-wrap gap-2">
-            {p.contact_email && (
-              <a
-                href={`mailto:${p.contact_email}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
-              >
-                <Mail className="size-4" /> {p.contact_email}
-              </a>
-            )}
-            {p.contact_phone && (
-              <a
-                href={`tel:${p.contact_phone.replace(/\s/g, "")}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
-              >
-                <Phone className="size-4" /> {p.contact_phone}
-              </a>
-            )}
-            {p.website && (
-              <a
-                href={p.website}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal"
-              >
-                <ExternalLink className="size-4" /> Site officiel
-              </a>
-            )}
-          </div>
-        )}
-
-        {/* Pages consultées */}
-        {p.sources?.length > 0 && (
-          <div className="mb-6">
-            <SectionLabel>Pages consultées</SectionLabel>
-            <ul className="mt-1.5 space-y-1">
-              {p.sources.slice(0, 8).map((s) => (
-                <li key={s}>
-                  <a href={s} target="_blank" rel="noreferrer" className="text-[12.5px] text-avisdoc-teal underline-offset-2 hover:underline">
-                    {(() => {
-                      try {
-                        return new URL(s).hostname.replace(/^www\./, "");
-                      } catch {
-                        return s;
-                      }
-                    })()}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Actions — elles valent pour la fiche, pas pour un onglet. */}
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-5">
           {p.converted_client_id ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2.5 text-sm font-bold text-emerald-700">
               <Check className="size-4" /> Dans le Pipeline

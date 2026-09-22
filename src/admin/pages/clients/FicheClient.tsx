@@ -1,15 +1,28 @@
 // Fiche client : consultation, modification et création, bâties sur les colonnes du fichier.
 // On ne modifie jamais une information par mégarde : un clic OUVRE la fiche, le crayon la rend modifiable.
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
-import { Modal } from "../../components/ui";
+import { supabaseAdmin } from "../../data/supabaseAdmin";
+import { Modal, SectionLabel } from "../../components/ui";
+import Onglets, { type Onglet } from "../../components/Onglets";
+import FilEchanges from "../../components/FilEchanges";
+import type { Jalon } from "../../lib/echanges";
+import type { Prospect } from "../../lib/merx";
+import NoteDetaillee from "../prospects/NoteDetaillee";
 import { cn } from "@/lib/utils";
 
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+
+/** La même ossature que la fiche prospect : une affaire garde sa fiche en avançant. */
+const ONGLETS: Onglet[] = [
+  { cle: "identite", label: "Identité" },
+  { cle: "approche", label: "Approche" },
+  { cle: "suivi", label: "Suivi" },
+];
 
 const inputType = (t: AccountField["type"]) =>
   t === "date" ? "date" : t === "nombre" ? "number" : t === "email" ? "email" : t === "telephone" ? "tel" : "text";
@@ -26,6 +39,8 @@ export default function FicheClient({
 }) {
   const { accountFields, addAccount, saveAccount } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
+  const [onglet, setOnglet] = useState("identite");
+  const [origine, setOrigine] = useState<Prospect | null>(null);
   const [valeurs, setValeurs] = useState<Record<string, string>>(() => {
     if (!fiche) return {};
     return {
@@ -35,6 +50,37 @@ export default function FicheClient({
       ...fiche.data,
     };
   });
+
+  /**
+   * Le prospect dont vient cette fiche, s’il y en a un : c’est lui qui porte la note
+   * et l’angle d’approche trouvés par Merx. Une fiche saisie à la main n’en a pas.
+   */
+  useEffect(() => {
+    if (!fiche?.clientId) return;
+    let vivant = true;
+    void supabaseAdmin
+      .from("admin_prospects")
+      .select("*")
+      .eq("converted_client_id", fiche.clientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (vivant && data) setOrigine(data as Prospect);
+      });
+    return () => {
+      vivant = false;
+    };
+  }, [fiche?.clientId]);
+
+  const jalons = useMemo<Jalon[]>(
+    () =>
+      ([
+        fiche?.signedOn ? { libelle: "Entrée dans le fichier client", au: fiche.signedOn } : null,
+        origine?.converted_at ? { libelle: "Passée au Pipeline", au: origine.converted_at } : null,
+        origine?.enriched_at ? { libelle: "Fiche approfondie", au: origine.enriched_at } : null,
+        origine ? { libelle: "Trouvée par Merx", au: origine.created_at } : null,
+      ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
+    [fiche?.signedOn, origine],
+  );
 
   const lire = (key: string) => valeurs[key] ?? "";
   const ecrire = (key: string, v: string) => setValeurs((prev) => ({ ...prev, [key]: v }));
@@ -60,7 +106,7 @@ export default function FicheClient({
   };
 
   return (
-    <Modal onClose={onClose} width={520}>
+    <Modal onClose={onClose} width={mode === "lecture" ? 660 : 520}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
@@ -82,7 +128,12 @@ export default function FicheClient({
       </div>
 
       {mode === "lecture" ? (
-        /* ── Consultation : les informations, sans aucun champ de saisie ── */
+        /* ── Consultation : trois onglets, aucun champ de saisie ── */
+        <>
+        <Onglets onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
+
+        <div className="mt-4">
+        {onglet === "identite" && (
         <div className="max-h-[52vh] divide-y divide-border overflow-y-auto rounded-2xl border border-border">
           {accountFields.map((f) => {
             const v = lire(f.key).trim();
@@ -108,6 +159,45 @@ export default function FicheClient({
             );
           })}
         </div>
+        )}
+
+        {onglet === "approche" && (
+          <div className="max-h-[52vh] overflow-y-auto pr-1">
+            {origine ? (
+              <>
+                {origine.rationale && (
+                  <div className="mb-4 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
+                    <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>
+                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
+                    {origine.approach && (
+                      <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                        <span className="font-semibold">Angle d’approche : </span>
+                        {origine.approach}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <SectionLabel>La note, critère par critère</SectionLabel>
+                <div className="mt-2">
+                  <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
+                </div>
+              </>
+            ) : (
+              <p className="py-6 text-[13px] text-muted-foreground">
+                Cette fiche n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
+                prospection gardent ici ce que Merx avait trouvé.
+              </p>
+            )}
+          </div>
+        )}
+
+        {onglet === "suivi" && (
+          <div className="max-h-[52vh] overflow-y-auto pr-1">
+            <FilEchanges cles={{ accountId: fiche?.id ?? null }} jalons={jalons} />
+          </div>
+        )}
+        </div>
+        </>
       ) : (
         <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
         {accountFields.map((f) => (
