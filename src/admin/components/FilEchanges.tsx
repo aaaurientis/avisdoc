@@ -19,6 +19,7 @@ import {
   libelleGenre,
 } from "../lib/echanges";
 import { cn } from "@/lib/utils";
+import { confirmer } from "./Confirmation";
 
 const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
@@ -76,7 +77,7 @@ export default function FilEchanges({
   }, [charger, rafraichir]);
 
   const retirer = async (id: string) => {
-    if (!window.confirm("Supprimer cette ligne de l’historique ?")) return;
+    if (!(await confirmer({ titre: "Supprimer cette ligne de l’historique ?", message: "L’historique garde la trace de ce qui s’est passé : une ligne retirée ne se retrouve pas.", definitif: true }))) return;
     try {
       await supprimerEchange(id);
       await charger();

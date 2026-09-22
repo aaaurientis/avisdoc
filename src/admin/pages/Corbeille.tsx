@@ -21,6 +21,7 @@ import {
 } from "../lib/corbeille";
 import FicheJetee from "./corbeille/FicheJetee";
 import { cn } from "@/lib/utils";
+import { confirmer } from "../components/Confirmation";
 
 const leJour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
@@ -77,7 +78,7 @@ export default function Corbeille() {
   const agir = async (quoi: "restaurer" | "detruire") => {
     if (selection.length === 0 || enCours) return;
     const n = selection.length;
-    if (quoi === "detruire" && !window.confirm(`Supprimer définitivement ${n} fiche${n > 1 ? "s" : ""} ? Cette fois, rien ne se récupère.`))
+    if (quoi === "detruire" && !(await confirmer({ titre: `Supprimer définitivement ${n} fiche${n > 1 ? "s" : ""} ?`, message: "Cette fois, rien ne se récupère.", action: "Supprimer définitivement", definitif: true })))
       return;
     setEnCours(true);
     try {

@@ -11,6 +11,7 @@ import { Modal, SectionLabel } from "../../components/ui";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
+import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import { redigerEmailClient } from "../../lib/merx-appels";
 import { useAuth } from "../../auth/AuthContext";
@@ -267,6 +268,9 @@ export default function FicheClient({
           <div className="max-h-[52vh] overflow-y-auto pr-1">
             {origine ? (
               <>
+                {/* Un client reste une entreprise qu'on démarche : le dossier garde sa valeur
+                    pour proposer une nouvelle campagne. */}
+                {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
                 {origine.rationale && (
                   <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
                     <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>

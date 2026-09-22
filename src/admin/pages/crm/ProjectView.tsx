@@ -19,11 +19,13 @@ import NoteDetaillee from "../prospects/NoteDetaillee";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
+import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
 import Onglets from "../../components/Onglets";
 import { cn } from "@/lib/utils";
+import { confirmer } from "../../components/Confirmation";
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -569,6 +571,10 @@ export default function ProjectView({
           <p className="mb-4 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
         )}
 
+        {/* Le dossier d'abord : c'est avec lui qu'on décroche son téléphone, que la
+            fiche soit encore en prospection ou déjà au Pipeline. */}
+        {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
+
         {origine.rationale && (
           <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
@@ -815,8 +821,8 @@ export default function ProjectView({
             {(client.tarif > 0 || client.statutPropo !== "Brouillon") && (
               <button
                 type="button"
-                onClick={() => {
-                  if (!window.confirm("Retirer la proposition ? Les journées et le tarif repartent à zéro.")) return;
+                onClick={async () => {
+                  if (!(await confirmer({ titre: "Retirer la proposition ?", message: "Les journées et le tarif repartent à zéro.", action: "Retirer" }))) return;
                   updateClientFields(client.id, { jours: 1, tarif: 0, statutPropo: "Brouillon" });
                 }}
                 className="mt-3 text-[11.5px] font-semibold text-white/60 underline-offset-2 hover:text-white hover:underline"

@@ -18,6 +18,7 @@ import Kanban from "./crm/Kanban";
 import ProjectView from "./crm/ProjectView";
 import NewClientModal from "./crm/NewClientModal";
 import ColonnesModal from "./crm/ColonnesModal";
+import { confirmer } from "../components/Confirmation";
 
 export default function Crm() {
   const { clientId } = useParams();
@@ -90,7 +91,7 @@ export default function Crm() {
 
   /** Supprimer une affaire depuis sa carte, sans passer par la sélection. */
   const supprimerUne = async (c: (typeof clients)[number]) => {
-    if (!window.confirm(`Supprimer ${c.company} ? Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`)) return;
+    if (!(await confirmer({ titre: `Supprimer ${c.company} ?`, message: `Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` }))) return;
     try {
       await jeter("affaire", [c.id]);
       await rafraichir();
@@ -102,7 +103,7 @@ export default function Crm() {
   const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Supprimer ${n} affaire${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
+    if (!(await confirmer({ titre: `Supprimer ${n} affaire${n > 1 ? "s" : ""} ?`, message: `Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` })))
       return;
     try {
       await jeter("affaire", selectionnees.map((c) => c.id));
