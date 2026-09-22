@@ -5,7 +5,7 @@
 // toutes les autres vivent dans `data`, sous la clé de leur colonne.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Columns3, Download, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Columns3, Download, FileSpreadsheet, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import type { Account, AccountField } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
@@ -148,6 +148,38 @@ export default function FichierClient() {
     XLSX.writeFile(classeur, `clients-avisdoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  /**
+   * Le modèle d'import : les en-têtes attendus, et une ligne d'exemple pour montrer
+   * le format de chaque colonne. Comme l'import reconnaît les colonnes par leur
+   * libellé, le modèle porte exactement ceux du fichier du moment.
+   */
+  const telechargerModele = async () => {
+    const XLSX = await import("xlsx");
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const exemple = (f: AccountField) => {
+      if (f.key === "etablissement") return "Clinique du Parc";
+      if (f.type === "date") return aujourdhui;
+      if (f.type === "email") return "contact@clinique-du-parc.fr";
+      if (f.type === "telephone") return "01 23 45 67 89";
+      if (f.type === "nombre") return "3";
+      if (f.type === "lien") return "https://clinique-du-parc.fr";
+      if (f.key === "secteur") return "Clinique";
+      return "À compléter";
+    };
+    const entetes = accountFields.map((f) => f.label);
+    const feuille = XLSX.utils.json_to_sheet([Object.fromEntries(accountFields.map((f) => [f.label, exemple(f)]))], {
+      header: entetes,
+    });
+    feuille["!cols"] = entetes.map((e) => ({ wch: Math.max(14, e.length + 4) }));
+    const classeur = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(classeur, feuille, "Modèle");
+    XLSX.writeFile(classeur, "modele-import-clients-avisdoc.xlsx");
+    setMessage(
+      "Modèle téléchargé. Gardez la première ligne telle quelle : ce sont les en-têtes reconnus. " +
+        "Remplacez la ligne d’exemple par vos clients, une ligne par fiche. Seul l’établissement est obligatoire.",
+    );
+  };
+
   /** Import : les colonnes sont reconnues par leur nom ; celles qu’on ne connaît pas sont ignorées. */
   const importer = async (file: File) => {
     setMessage(null);
@@ -208,6 +240,9 @@ export default function FichierClient() {
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setColonnes(true)} className={boutonSecondaire}>
               <Columns3 className="size-4" /> Colonnes
+            </button>
+            <button type="button" onClick={() => void telechargerModele()} className={boutonSecondaire} title="Un fichier Excel aux bons en-têtes, avec une ligne d’exemple">
+              <FileSpreadsheet className="size-4" /> Modèle
             </button>
             <button type="button" onClick={() => fichierRef.current?.click()} className={boutonSecondaire}>
               <Upload className="size-4" /> Importer

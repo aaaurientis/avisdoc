@@ -128,6 +128,31 @@ export default function NewClientModal({
         ],
       };
     }
+    if (!client && query.trim()) {
+      client = {
+        id,
+        company: query.trim(),
+        siren: "",
+        siret: "",
+        naf: "",
+        adresse: "",
+        codePostal: "",
+        ville: "",
+        effectif: "—",
+        stage: "Nouveau",
+        jours: jours || 1,
+        tarif: tarif || 0,
+        depistes: 0,
+        orientes: 0,
+        resultat: null,
+        statutPropo: "Brouillon",
+        contacts: [],
+        docs: [],
+        suivis: [
+          { id: uid(), text: "Client créé à la main — fiche à compléter.", deadline: null, done: true, when: todayLabel() },
+        ],
+      };
+    }
     if (!client) return;
     // On attend l'écriture : le devis Qonto et la navigation pointent sur cette affaire.
     if (!(await addClient(client))) return;
@@ -283,13 +308,13 @@ export default function NewClientModal({
         <button
           type="button"
           onClick={create}
-          disabled={!result && !qontoPick}
+          disabled={!result && !qontoPick && !query.trim()}
           className={cn(
             "ad-btn-accent flex-1 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white transition-opacity",
-            !result && !qontoPick && "opacity-45",
+            !result && !qontoPick && !query.trim() && "opacity-45",
           )}
         >
-          Créer le client
+          {result || qontoPick ? "Créer le client" : "Créer sans fiche entreprise"}
         </button>
       </div>
     </Modal>

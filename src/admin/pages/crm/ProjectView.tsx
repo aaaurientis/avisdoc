@@ -198,6 +198,45 @@ export default function ProjectView({
     [origine],
   );
 
+  /**
+   * Une affaire saisie à la main n'a pas de fiche chez Merx : on lui en ouvre une,
+   * rattachée à l'affaire, puis on lance l'approfondissement. Merx travaille alors
+   * dessus comme sur n'importe quelle entreprise qu'il aurait trouvée lui-même.
+   */
+  const confierAMerx = async () => {
+    if (merxEnCours) return;
+    setMerxEnCours("approfondir");
+    setMerxErreur(null);
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("admin_prospects")
+        .insert({
+          owner_email: user?.email ?? "",
+          name: client.company,
+          city: client.ville || null,
+          department: (client.codePostal ?? "").slice(0, 2) || null,
+          siren: client.siren || null,
+          converted_client_id: client.id,
+          converted_at: new Date().toISOString(),
+          status: "a_contacter",
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      await approfondirProspect(data.id as string);
+      await chargerOrigine();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "Merx n’a pas répondu.";
+      setMerxErreur(
+        /duplicate key|unique/i.test(m)
+          ? "Merx connaît déjà une entreprise de ce nom dans cette ville : retrouvez-la dans Prospection."
+          : m,
+      );
+    } finally {
+      setMerxEnCours(null);
+    }
+  };
+
   const demanderAMerx = async (quoi: "approfondir" | "email") => {
     if (!origine || merxEnCours) return;
     setMerxEnCours(quoi);
@@ -442,10 +481,27 @@ export default function ProjectView({
   function ApprocheTab() {
     if (!origine) {
       return (
-        <p className="py-6 text-[13px] text-muted-foreground">
-          Cette affaire n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
-          prospection gardent ici ce que Merx avait trouvé.
-        </p>
+        <div className="py-2">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            Cette affaire n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Vous pouvez la lui confier
+            — il ira chercher le registre officiel, les coordonnées publiées, et dira comment aborder l’entreprise.
+          </p>
+          <button
+            type="button"
+            onClick={() => void confierAMerx()}
+            disabled={merxEnCours !== null}
+            className="ad-btn-accent mt-3 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          >
+            {merxEnCours ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+            Confier cette fiche à Merx
+          </button>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Cela prend une trentaine de secondes. Les sources consultées sont gratuites.
+          </p>
+          {merxErreur && (
+            <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
+          )}
+        </div>
       );
     }
     return (

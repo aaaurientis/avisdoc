@@ -2,6 +2,7 @@
 // On ne modifie jamais une information par mégarde : un clic OUVRE la fiche, le crayon la rend modifiable.
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Pencil, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
@@ -42,7 +43,7 @@ export default function FicheClient({
   const [onglet, setOnglet] = useState("identite");
   const [origine, setOrigine] = useState<Prospect | null>(null);
   const [valeurs, setValeurs] = useState<Record<string, string>>(() => {
-    if (!fiche) return {};
+    if (!fiche) return { date_client: new Date().toISOString().slice(0, 10) };
     return {
       etablissement: fiche.name,
       date_client: fiche.signedOn ?? "",
@@ -102,6 +103,7 @@ export default function FicheClient({
     };
     if (fiche) saveAccount(fiche.id, valeursFiche);
     else addAccount(valeursFiche);
+    toast.success(fiche ? "Fiche enregistrée" : `${nom} ajouté au fichier client`);
     onClose();
   };
 
