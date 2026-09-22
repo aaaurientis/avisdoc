@@ -15,6 +15,13 @@ import FilEchanges from "../../components/FilEchanges";
 import type { Jalon } from "../../lib/echanges";
 import { cn } from "@/lib/utils";
 
+export interface Brouillon {
+  id: string;
+  objet: string;
+  corps: string;
+  ecritLe: string | null;
+}
+
 /** Ce qui est vrai, ce qu’on va faire, ce qui s’est passé. */
 const ONGLETS: Onglet[] = [
   { cle: "identite", label: "Identité" },
@@ -40,6 +47,8 @@ export default function ProspectFiche({
   onRedigerEmail,
   couts,
   demandeOrigine,
+  brouillons,
+  onRouvrirBrouillon,
 }: {
   prospect: Prospect;
   onClose: () => void;
@@ -53,6 +62,9 @@ export default function ProspectFiche({
   couts: { approfondissement: { montant: number; mesure: boolean }; email: { montant: number; mesure: boolean } };
   /** La recherche qui a fait apparaître cette fiche. */
   demandeOrigine: string | null;
+  /** Les brouillons d’e-mail déjà écrits pour cette fiche, du plus récent au plus ancien. */
+  brouillons: Brouillon[];
+  onRouvrirBrouillon: (b: Brouillon) => void;
 }) {
   const { stages, addClient, addProjectContact } = useAdminData();
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
@@ -295,6 +307,29 @@ export default function ProspectFiche({
                 <NoteDetaillee total={p.score_total} score={p.score ?? {}} />
               </div>
             </div>
+              {brouillons.length > 0 && (
+                <div className="mt-5">
+                  <SectionLabel>Brouillons d’e-mail</SectionLabel>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    Écrits par Merx. Rien n’a été envoyé : l’envoi se fait depuis votre messagerie.
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {brouillons.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => onRouvrirBrouillon(b)}
+                        className="block w-full rounded-xl border border-border px-3.5 py-2.5 text-left transition-colors hover:border-avisdoc-teal"
+                      >
+                        <span className="block text-[13px] font-semibold text-avisdoc-ink">{b.objet}</span>
+                        <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+                          {b.ecritLe ? `écrit le ${new Date(b.ecritLe).toLocaleDateString("fr-FR")}` : "brouillon"} · non envoyé
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 

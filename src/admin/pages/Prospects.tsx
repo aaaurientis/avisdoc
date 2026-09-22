@@ -13,6 +13,18 @@ import BrouillonEmail from "./prospects/BrouillonEmail";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
 
+/** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
+interface Demande {
+  id: string;
+  kind: string;
+  request: string;
+  usage: Consommation | null;
+  prospect_id: string | null;
+  objet: string | null;
+  corps: string | null;
+  finished_at: string | null;
+}
+
 function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
   return (
     <button
@@ -60,8 +72,18 @@ export default function Prospects() {
   const [voirEcartees, setVoirEcartees] = useState(false);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
-  const [demandes, setDemandes] = useState<{ id: string; kind: string; request: string; usage: Consommation | null }[]>([]);
+  const [demandes, setDemandes] = useState<Demande[]>([]);
   const [brouillon, setBrouillon] = useState<{ nom: string; objet: string; corps: string; destinataire: string | null } | null>(null);
+
+  /** Les brouillons d’e-mail déjà écrits pour la fiche ouverte, du plus récent au plus ancien. */
+  const brouillonsDeLaFiche = useMemo(
+    () =>
+      demandes
+        .filter((d) => d.kind === "email" && d.prospect_id === ouverte && d.objet)
+        .sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""))
+        .map((d) => ({ id: d.id, objet: d.objet as string, corps: d.corps ?? "", ecritLe: d.finished_at })),
+    [demandes, ouverte],
+  );
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -72,8 +94,11 @@ export default function Prospects() {
       .order("created_at", { ascending: false });
     if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
-    const { data: passees } = await supabaseAdmin.from("admin_merx_demandes").select("id, kind, request, usage").eq("status", "terminee");
-    setDemandes((passees ?? []) as { id: string; kind: string; request: string; usage: Consommation | null }[]);
+    const { data: passees } = await supabaseAdmin
+      .from("admin_merx_demandes")
+      .select("id, kind, request, usage, prospect_id, objet, corps, finished_at")
+      .eq("status", "terminee");
+    setDemandes((passees ?? []) as Demande[]);
     setChargement(false);
   }, []);
 
@@ -276,6 +301,10 @@ export default function Prospects() {
           onRedigerEmail={redigerEmail}
           couts={couts}
           demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
+          brouillons={brouillonsDeLaFiche}
+          onRouvrirBrouillon={(b) =>
+            setBrouillon({ nom: fiche.name, objet: b.objet, corps: b.corps, destinataire: fiche.contact_email ?? null })
+          }
         />
       )}
     </div>

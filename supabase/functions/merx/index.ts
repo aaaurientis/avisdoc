@@ -107,7 +107,14 @@ Deno.serve(async (req: Request) => {
         if (demande) {
           await sb
             .from("admin_merx_demandes")
-            .update({ status: "terminee", usage, finished_at: new Date().toISOString() })
+            .update({
+              status: "terminee",
+              usage,
+              finished_at: new Date().toISOString(),
+              // Le brouillon se garde : la fiche doit pouvoir le rouvrir.
+              objet: out.objet,
+              corps: out.corps,
+            })
             .eq("id", demande.id);
         }
         return json({ objet: out.objet, corps: out.corps, destinataire: p.contact_email ?? null });
