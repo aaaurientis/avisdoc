@@ -121,9 +121,9 @@ export interface Champ {
 
 /** Les destinations possibles d'une restauration : on avance dans le parcours, jamais l'inverse. */
 export const DESTINATIONS: Record<Origine, { cle: Origine; label: string; ou: string }[]> = {
-  prospect: [{ cle: "prospect", label: "Prospection", ou: "Elle revient dans le tableau des prospects." }],
-  affaire: [{ cle: "affaire", label: "Pipeline", ou: "Elle revient à l’étape où elle était." }],
-  client: [{ cle: "client", label: "Clients", ou: "Elle revient dans le fichier client." }],
+  prospect: [{ cle: "prospect", label: "Prospection", ou: "Elle reprend sa place parmi les fiches trouvées par Merx." }],
+  affaire: [{ cle: "affaire", label: "Pipeline", ou: "Elle retrouve la colonne qu’elle occupait, sans rien perdre." }],
+  client: [{ cle: "client", label: "Clients", ou: "Elle reprend sa place dans le fichier commun de l’équipe." }],
 };
 
 const vide = (v: unknown) => v === null || v === undefined || String(v).trim() === "" || String(v) === "{}";
@@ -141,31 +141,55 @@ const LIBELLES: Record<string, string> = {
   enriched_at: "Approfondie le", converted_at: "Passée au Pipeline le", owner_email: "Trouvée par",
 };
 
-/** Ce que porte une fiche jetée, pour décider en connaissance de cause. */
+/** Les champs lisibles d'une ligne, dans l'ordre où ils viennent. */
+function champsDe(ligne: Record<string, unknown>, libelles: Record<string, string>): Champ[] {
+  const champs: Champ[] = [];
+  for (const [cle, brut] of Object.entries(ligne)) {
+    if (["id", "deleted_at", "updated_at", "score", "sources", "leaders", "head_office", "site_contacts", "data"].includes(cle)) continue;
+    if (vide(brut)) continue;
+    const label = libelles[cle];
+    if (!label) continue;
+    const valeur = /_at$|^signed_on$/.test(cle) ? new Date(String(brut)).toLocaleDateString("fr-FR") : String(brut);
+    champs.push({ label, valeur });
+  }
+
+  // Les colonnes libres du fichier client vivent dans `data`.
+  const libres = ligne.data as Record<string, string> | undefined;
+  if (libres && typeof libres === "object") {
+    for (const [cle, v] of Object.entries(libres)) if (!vide(v)) champs.push({ label: cle, valeur: String(v) });
+  }
+  return champs;
+}
+
+/**
+ * Ce que porte une fiche jetée, pour décider en connaissance de cause.
+ *
+ * Une fiche du fichier client ne porte souvent que son nom et sa date : tout ce qu'on
+ * sait de l'entreprise — SIREN, adresse, journées, montant — est sur l'AFFAIRE dont
+ * elle vient. On va donc la chercher, sinon on ne montre rien d'utile.
+ */
 export async function chargerDetail(origine: Origine, id: string): Promise<Champ[]> {
   const { data, error } = await supabaseAdmin.from(TABLE[origine]).select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return [];
 
   const ligne = data as Record<string, unknown>;
-  const champs: Champ[] = [];
+  const champs = champsDe(ligne, LIBELLES);
 
-  for (const [cle, brut] of Object.entries(ligne)) {
-    if (["id", "deleted_at", "updated_at", "score", "sources", "leaders", "head_office", "site_contacts", "data"].includes(cle)) continue;
-    if (vide(brut)) continue;
-    const label = LIBELLES[cle];
-    if (!label) continue;
-    const valeur = /_at$|^signed_on$/.test(cle)
-      ? new Date(String(brut)).toLocaleDateString("fr-FR")
-      : String(brut);
-    champs.push({ label, valeur });
-  }
-
-  // Les colonnes libres du fichier client vivent dans `data` : on les montre aussi.
-  const libres = ligne.data as Record<string, string> | undefined;
-  if (libres && typeof libres === "object") {
-    for (const [cle, v] of Object.entries(libres)) if (!vide(v)) champs.push({ label: cle, valeur: String(v) });
+  const affaireLiee = origine === "client" ? (ligne.client_id as string | null) : null;
+  if (affaireLiee) {
+    const { data: affaire } = await supabaseAdmin.from("admin_clients").select("*").eq("id", affaireLiee).maybeSingle();
+    if (affaire) {
+      const vus = new Set(champs.map((c) => c.label));
+      for (const c of champsDe(affaire as Record<string, unknown>, LIBELLES)) if (!vus.has(c.label)) champs.push(c);
+    }
   }
 
   return champs;
+}
+
+/** L'étape du Pipeline où une affaire retournera : on le dit avant de restaurer. */
+export async function etapeDeLAffaire(id: string): Promise<string | null> {
+  const { data } = await supabaseAdmin.from("admin_clients").select("stage").eq("id", id).maybeSingle();
+  return (data?.stage as string) ?? null;
 }
