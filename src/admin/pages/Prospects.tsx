@@ -3,13 +3,14 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, Phone, RefreshCw } from "lucide-react";
+import { Loader2, Mail, Phone, RefreshCw, Search } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
+import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
 
 function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
@@ -19,6 +20,9 @@ function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
       onClick={onOuvrir}
       className="ad-card-clickable w-full rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-avisdoc-teal"
     >
+      {!p.opened_at && (
+        <Badge className="mb-1.5 bg-amber-100 uppercase tracking-wide text-amber-800">Nouveau</Badge>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{p.name}</div>
         <Badge className={`${tonNote(p.score_total)} shrink-0`}>{p.score_total ?? "—"}</Badge>
@@ -54,6 +58,8 @@ export default function Prospects() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [voirEcartees, setVoirEcartees] = useState(false);
+  const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
+  const [recherche, setRecherche] = useState("");
   const [demandes, setDemandes] = useState<{ id: string; kind: string; request: string; usage: Consommation | null }[]>([]);
   const [brouillon, setBrouillon] = useState<{ nom: string; objet: string; corps: string; destinataire: string | null } | null>(null);
 
@@ -76,8 +82,31 @@ export default function Prospects() {
   }, [charger]);
 
   const visibles = useMemo(
-    () => prospects.filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte")),
-    [prospects, voirEcartees],
+    () =>
+      prospects
+        .filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte"))
+        .filter((p) => retenue(p, filtres, recherche)),
+    [prospects, voirEcartees, filtres, recherche],
+  );
+
+  /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
+  const nouvelles = useMemo(() => prospects.filter((p) => p.status !== "ecarte" && !p.opened_at).length, [prospects]);
+
+  /** Les départements réellement présents : on ne propose pas un filtre qui ne rendrait rien. */
+  const departements = useMemo(
+    () => [...new Set(prospects.map((p) => p.department).filter((d): d is string => Boolean(d)))].sort(),
+    [prospects],
+  );
+
+  /** Ouvrir une fiche la marque comme vue — une seule fois. */
+  const ouvrir = useCallback(
+    async (p: Prospect) => {
+      setOuverte(p.id);
+      if (p.opened_at) return;
+      await supabaseAdmin.from("admin_prospects").update({ opened_at: new Date().toISOString() }).eq("id", p.id);
+      setProspects((prev) => prev.map((x) => (x.id === p.id ? { ...x, opened_at: new Date().toISOString() } : x)));
+    },
+    [],
   );
   const ecartees = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
   const fiche = useMemo(() => prospects.find((p) => p.id === ouverte) ?? null, [prospects, ouverte]);
@@ -144,7 +173,13 @@ export default function Prospects() {
         subtitle={
           chargement
             ? "Chargement…"
-            : `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " écartée" + (visibles.length > 1 ? "s" : "") : ""} — trouvées par Merx`
+            : [
+                `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " écartée" + (visibles.length > 1 ? "s" : "") : ""}`,
+                !voirEcartees && nouvelles > 0 ? `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}` : "",
+                "trouvées par Merx",
+              ]
+                .filter(Boolean)
+                .join(" · ")
         }
         action={
           <button
@@ -158,6 +193,19 @@ export default function Prospects() {
       />
 
       {erreur && <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">{erreur}</div>}
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] max-w-sm flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher une entreprise, une ville…"
+            className="ad-input w-full rounded-full border border-border bg-card py-2 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+          />
+        </div>
+        <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
+      </div>
 
       {chargement ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -186,7 +234,7 @@ export default function Prospects() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {liste.map((p) => (
-                    <Carte key={p.id} p={p} onOuvrir={() => setOuverte(p.id)} />
+                    <Carte key={p.id} p={p} onOuvrir={() => void ouvrir(p)} />
                   ))}
                 </div>
               </div>

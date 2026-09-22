@@ -62,6 +62,8 @@ export interface Prospect {
   contact_source: string | null;
   approach: string | null;
   enriched_at: string | null;
+  /** Première ouverture de la fiche : tant qu'elle est vide, la fiche est « nouvelle ». */
+  opened_at: string | null;
   /** La demande de recherche qui a trouvé cette fiche. */
   found_by: string | null;
   /** L'affaire née de ce prospect (migration 0026), s'il est passé au Pipeline. */
