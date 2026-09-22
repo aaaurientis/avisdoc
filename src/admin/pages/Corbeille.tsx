@@ -19,6 +19,7 @@ import {
   type Jetee,
   type Origine,
 } from "../lib/corbeille";
+import FicheJetee from "./corbeille/FicheJetee";
 import { cn } from "@/lib/utils";
 
 const leJour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
@@ -30,6 +31,7 @@ export default function Corbeille() {
   const [coches, setCoches] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const [ouverte, setOuverte] = useState<Jetee | null>(null);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -85,7 +87,12 @@ export default function Corbeille() {
       }
       setCoches(new Set());
       await charger();
-      setMessage(quoi === "restaurer" ? `${n} fiche${n > 1 ? "s remises" : " remise"} à sa place.` : `${n} fiche${n > 1 ? "s supprimées" : " supprimée"} définitivement.`);
+      const ou = [...new Set(selection.map((l) => LIBELLE[l.origine]))].join(" et ");
+      setMessage(
+        quoi === "restaurer"
+          ? `${n} fiche${n > 1 ? "s sont reparties" : " est repartie"} dans ${ou}.`
+          : `${n} fiche${n > 1 ? "s supprimées" : " supprimée"} définitivement.`,
+      );
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L’opération a échoué.");
     } finally {
@@ -164,7 +171,11 @@ export default function Corbeille() {
               return (
                 <div
                   key={`${l.origine}-${l.id}`}
-                  className={cn("group flex items-center gap-3 px-4 py-3", coches.has(l.id) && "bg-avisdoc-teal/5")}
+                  className={cn(
+                    "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40",
+                    coches.has(l.id) && "bg-avisdoc-teal/5",
+                  )}
+                  onClick={() => setOuverte(l)}
                 >
                   <CaseFiche cochee={coches.has(l.id)} onBascule={() => cocher(l.id)} libelle={l.nom} visible={coches.size > 0} />
 
@@ -173,6 +184,9 @@ export default function Corbeille() {
                     <div className="truncate text-[12px] text-muted-foreground">
                       {LIBELLE[l.origine]}
                       {l.detail ? ` · ${l.detail}` : ""}
+                    </div>
+                    <div className="text-[11px] text-avisdoc-teal opacity-0 transition-opacity group-hover:opacity-100">
+                      Cliquez pour voir la fiche
                     </div>
                   </div>
 
@@ -187,6 +201,22 @@ export default function Corbeille() {
             })}
           </div>
         </>
+      )}
+      {ouverte && (
+        <FicheJetee
+          jetee={ouverte}
+          onFermer={() => setOuverte(null)}
+          onRestaurer={async () => {
+            await restaurer(ouverte.origine, [ouverte.id]);
+            await charger();
+            setMessage(`${ouverte.nom} est de retour dans ${LIBELLE[ouverte.origine]}.`);
+          }}
+          onDetruire={async () => {
+            await detruire(ouverte.origine, [ouverte.id]);
+            await charger();
+            setMessage(`${ouverte.nom} a été supprimée définitivement.`);
+          }}
+        />
       )}
     </div>
   );

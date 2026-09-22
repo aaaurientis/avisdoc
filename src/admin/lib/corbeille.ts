@@ -112,3 +112,60 @@ export async function chargerCorbeille(): Promise<Jetee[]> {
 
   return lignes.sort((x, y) => new Date(y.supprimeLe).getTime() - new Date(x.supprimeLe).getTime());
 }
+
+/** Un champ de la fiche, tel qu'on le montre avant de décider. */
+export interface Champ {
+  label: string;
+  valeur: string;
+}
+
+/** Les destinations possibles d'une restauration : on avance dans le parcours, jamais l'inverse. */
+export const DESTINATIONS: Record<Origine, { cle: Origine; label: string; ou: string }[]> = {
+  prospect: [{ cle: "prospect", label: "Prospection", ou: "Elle revient dans le tableau des prospects." }],
+  affaire: [{ cle: "affaire", label: "Pipeline", ou: "Elle revient à l’étape où elle était." }],
+  client: [{ cle: "client", label: "Clients", ou: "Elle revient dans le fichier client." }],
+};
+
+const vide = (v: unknown) => v === null || v === undefined || String(v).trim() === "" || String(v) === "{}";
+
+/** Les libellés des colonnes, pour que la fiche se lise sans connaître la base. */
+const LIBELLES: Record<string, string> = {
+  name: "Entreprise", company: "Entreprise", legal_name: "Raison sociale", siren: "SIREN", siret: "SIRET",
+  naf: "Code NAF", activity: "Activité", sector: "Secteur", city: "Ville", ville: "Ville",
+  department: "Département", code_postal: "Code postal", adresse: "Adresse", website: "Site",
+  effectif: "Effectif", headcount_band: "Tranche d’effectif", rationale: "Pourquoi c’est une cible",
+  approach: "Angle d’approche", contact_name: "Interlocuteur", contact_role: "Fonction",
+  contact_email: "E-mail", contact_phone: "Téléphone", score_total: "Note", status: "Statut",
+  stage: "Étape", jours: "Journées", tarif: "Tarif par journée", statut_propo: "Proposition",
+  depistes: "Dépistés", orientes: "Orientés", signed_on: "Client depuis", created_at: "Créée le",
+  enriched_at: "Approfondie le", converted_at: "Passée au Pipeline le", owner_email: "Trouvée par",
+};
+
+/** Ce que porte une fiche jetée, pour décider en connaissance de cause. */
+export async function chargerDetail(origine: Origine, id: string): Promise<Champ[]> {
+  const { data, error } = await supabaseAdmin.from(TABLE[origine]).select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return [];
+
+  const ligne = data as Record<string, unknown>;
+  const champs: Champ[] = [];
+
+  for (const [cle, brut] of Object.entries(ligne)) {
+    if (["id", "deleted_at", "updated_at", "score", "sources", "leaders", "head_office", "site_contacts", "data"].includes(cle)) continue;
+    if (vide(brut)) continue;
+    const label = LIBELLES[cle];
+    if (!label) continue;
+    const valeur = /_at$|^signed_on$/.test(cle)
+      ? new Date(String(brut)).toLocaleDateString("fr-FR")
+      : String(brut);
+    champs.push({ label, valeur });
+  }
+
+  // Les colonnes libres du fichier client vivent dans `data` : on les montre aussi.
+  const libres = ligne.data as Record<string, string> | undefined;
+  if (libres && typeof libres === "object") {
+    for (const [cle, v] of Object.entries(libres)) if (!vide(v)) champs.push({ label: cle, valeur: String(v) });
+  }
+
+  return champs;
+}
