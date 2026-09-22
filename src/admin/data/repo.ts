@@ -89,6 +89,12 @@ export interface AdminRepo {
   /** Supprime la colonne ET les valeurs qu'elle portait dans les fiches. */
   deleteField(id: string, key: string): Promise<void>;
 
+  /**
+   * Le secteur du prospect d'où vient cette affaire, s'il y en a un.
+   * Sert à remplir la fiche client au moment de la signature.
+   */
+  secteurDuProspect(clientId: string): Promise<string | null>;
+
   // Réglages
   addDocType(name: string): Promise<void>;
   removeDocType(name: string): Promise<void>;
@@ -125,6 +131,9 @@ export class MockRepo implements AdminRepo {
   async updateSuivi(): Promise<void> {}
   async removeSuivi(): Promise<void> {}
   async createAccount(): Promise<void> {}
+  async secteurDuProspect(): Promise<string | null> {
+    return null;
+  }
   async updateAccount(): Promise<void> {}
   async deleteAccount(): Promise<void> {}
   async createField(): Promise<void> {}

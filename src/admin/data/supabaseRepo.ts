@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { supabaseAdmin as sb } from "./supabaseAdmin";
 import { STAGES_DEFAUT } from "../lib/ui-tokens";
+import { SECTEURS } from "../lib/merx";
 import type { AdminRepo, AdminSnapshot } from "./repo";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -357,6 +358,18 @@ export class SupabaseRepo implements AdminRepo {
   }
 
   // ── Fichier client (migration 0024) ──────────────────────────────────
+  async secteurDuProspect(clientId: string): Promise<string | null> {
+    const { data } = await sb
+      .from("admin_prospects")
+      .select("sector, activity")
+      .eq("converted_client_id", clientId)
+      .maybeSingle();
+    if (!data) return null;
+    // Le libellé du secteur se lit ; à défaut, l'activité trouvée par Merx.
+    const connu = SECTEURS.find((x) => x.id === data.sector);
+    return connu && connu.id !== "autre" ? connu.label : (data.activity ?? null);
+  }
+
   async createAccount(a: Account): Promise<void> {
     const { error } = await sb.from("admin_accounts").insert({
       id: a.id, name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data, client_id: a.clientId,

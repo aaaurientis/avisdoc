@@ -670,15 +670,22 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (!derniere || stage !== derniere) return;
       const client = clients.find((c) => c.id === id);
       if (!client || accounts.some((a) => a.clientId === id)) return;
-      addAccount({
-        name: client.company,
-        signedOn: new Date().toISOString().slice(0, 10),
-        sector: null,
-        data: {},
-        clientId: id,
-      });
+      // Le secteur vient du prospect d'origine : sans lui, le tableau des clients
+      // n'aurait qu'une colonne « Sans secteur ».
+      void repo
+        .secteurDuProspect(id)
+        .catch(() => null)
+        .then((secteur) =>
+          addAccount({
+            name: client.company,
+            signedOn: new Date().toISOString().slice(0, 10),
+            sector: secteur,
+            data: {},
+            clientId: id,
+          }),
+        );
     },
-    [accounts, addAccount, clients, stages, updateClientFields],
+    [accounts, addAccount, clients, repo, stages, updateClientFields],
   );
 
   const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
