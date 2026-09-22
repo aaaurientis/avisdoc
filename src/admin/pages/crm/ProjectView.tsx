@@ -709,6 +709,19 @@ export default function ProjectView({
                 );
               })}
             </div>
+
+            {(client.tarif > 0 || client.statutPropo !== "Brouillon") && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("Retirer la proposition ? Les journées et le tarif repartent à zéro.")) return;
+                  updateClientFields(client.id, { jours: 1, tarif: 0, statutPropo: "Brouillon" });
+                }}
+                className="mt-3 text-[11.5px] font-semibold text-white/60 underline-offset-2 hover:text-white hover:underline"
+              >
+                Retirer la proposition
+              </button>
+            )}
           </div>
 
           {/* Résultat de campagne */}

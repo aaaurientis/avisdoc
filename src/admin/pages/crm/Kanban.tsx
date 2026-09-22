@@ -127,14 +127,14 @@ export default function Kanban({
                         <span className="truncate text-[11px]">{c.contacts[0].name}</span>
                       </div>
                     )}
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
-                        {joursLabel(c.jours)}
-                      </span>
-                      <span className="text-[12px] font-bold text-avisdoc-ink">
-                        {euro(c.jours * c.tarif)}
-                      </span>
-                    </div>
+                    {c.tarif > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
+                          {joursLabel(c.jours)}
+                        </span>
+                        <span className="text-[12px] font-bold text-avisdoc-ink">{euro(c.jours * c.tarif)}</span>
+                      </div>
+                    )}
                   </button>
                 </div>
               ))}
