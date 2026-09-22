@@ -13,6 +13,9 @@ import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/plan
 import type { GenreEchange } from "../lib/echanges";
 import ModifierAction from "../components/ModifierAction";
 import ApercuFiche from "../components/ApercuFiche";
+import ProjectView from "./crm/ProjectView";
+import FicheClient from "./clients/FicheClient";
+import { useAdminData } from "../data/AdminDataContext";
 import { supprimerEchange } from "../lib/echanges";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +57,11 @@ export default function Planning() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [aModifier, setAModifier] = useState<Rendezvous | null>(null);
   const [aVoir, setAVoir] = useState<Rendezvous | null>(null);
+  const { clients, accounts } = useAdminData();
+
+  // La fiche s'ouvre telle qu'elle est ailleurs — mêmes onglets, mêmes actions.
+  const affaireVue = aVoir?.origine === "affaire" ? clients.find((c) => c.id === aVoir.ficheId) : undefined;
+  const clientVu = aVoir?.origine === "client" ? accounts.find((a) => a.id === aVoir.ficheId) : undefined;
 
   const supprimer = async (a: Rendezvous) => {
     if (!window.confirm(`Supprimer « ${a.titre} » ?`)) return;
@@ -160,7 +168,7 @@ export default function Planning() {
           <Loader2 className="size-4 animate-spin" /> Chargement…
         </div>
       ) : (
-        <div className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-contain" style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(220px, 1fr))` }}>
+        <div className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-contain" style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(260px, 1fr))` }}>
           {semaine.map(({ jour, actions }) => {
             const aujourdhui = memeJour(jour, new Date());
             return (
@@ -190,7 +198,7 @@ export default function Planning() {
                 {actions.length === 0 ? (
                   <p className="text-[12.5px] text-muted-foreground">Rien de prévu.</p>
                 ) : (
-                  <div className="flex-1 space-y-1.5">
+                  <div className="flex-1 space-y-2">
                     {actions.map((a) => {
                       const Icone = ICONES[a.kind];
                       return (
@@ -200,7 +208,7 @@ export default function Planning() {
                           tabIndex={0}
                           onClick={() => setAModifier(a)}
                           onKeyDown={(e) => e.key === "Enter" && setAModifier(a)}
-                          className="group flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-avisdoc-teal"
+                          className="group flex w-full cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-avisdoc-teal"
                         >
                           <span className={cn("mt-0.5 inline-flex size-[26px] shrink-0 items-center justify-center rounded-full", TEINTES[a.kind])}>
                             <Icone className="size-3.5" strokeWidth={2.4} />
@@ -212,10 +220,14 @@ export default function Planning() {
                                 {NOMS[a.kind]}
                               </span>
                             </span>
-                            <span className="mt-0.5 block text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.titre}</span>
-                            <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-avisdoc-teal">{a.fiche}</span>
+                            <span className="mt-1 block line-clamp-2 text-[13px] font-semibold leading-snug text-avisdoc-ink">
+                              {a.titre}
+                            </span>
+                            <span className="mt-1 block line-clamp-2 text-[12px] font-semibold leading-snug text-avisdoc-teal">
+                              {a.fiche}
+                            </span>
                             {a.detail && (
-                              <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
+                              <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
                             )}
 
                           </span>
@@ -272,7 +284,13 @@ export default function Planning() {
           </p>
         </div>
       )}
-      {aVoir && (
+      {aVoir && affaireVue && (
+        <ProjectView client={affaireVue} onClose={() => setAVoir(null)} />
+      )}
+
+      {aVoir && clientVu && <FicheClient fiche={clientVu} mode="lecture" onClose={() => setAVoir(null)} />}
+
+      {aVoir && !affaireVue && !clientVu && (
         <ApercuFiche
           origine={aVoir.origine}
           id={aVoir.ficheId}
