@@ -22,6 +22,9 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
+/** La semaine de travail. Le week-end s'ajoutera le jour où on y travaillera. */
+const JOURS_OUVRES = 5;
+
 const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
 /** Où mène une action : sur la fiche qui la porte. */
@@ -38,9 +41,11 @@ export default function Planning() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
 
+  // La lecture s'arrête au vendredi soir : ce qui tombe le week-end n'est pas montré,
+  // et ne doit donc pas être compté.
   const fin = useMemo(() => {
     const f = new Date(debut);
-    f.setDate(f.getDate() + 7);
+    f.setDate(f.getDate() + JOURS_OUVRES);
     return f;
   }, [debut]);
 
@@ -67,7 +72,7 @@ export default function Planning() {
 
   const semaine = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, i) => {
+      Array.from({ length: JOURS_OUVRES }, (_, i) => {
         const jour = new Date(debut);
         jour.setDate(jour.getDate() + i);
         return { jour, actions: lignes.filter((l) => memeJour(new Date(l.au), jour)) };
@@ -131,23 +136,25 @@ export default function Planning() {
           <Loader2 className="size-4 animate-spin" /> Chargement…
         </div>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-contain" style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(220px, 1fr))` }}>
           {semaine.map(({ jour, actions }) => {
             const aujourdhui = memeJour(jour, new Date());
             return (
               <div
                 key={jour.toISOString()}
                 className={cn(
-                  "rounded-2xl border p-4",
+                  "flex min-h-[320px] flex-col rounded-2xl border p-3.5",
                   aujourdhui ? "border-avisdoc-teal bg-avisdoc-teal/5" : "border-border",
-                  actions.length === 0 && "opacity-60",
                 )}
               >
                 <div className="mb-2.5 flex items-baseline justify-between gap-2">
-                  <div className={cn("text-[13px] font-bold", aujourdhui ? "text-avisdoc-teal" : "text-avisdoc-ink")}>
-                    {JOURS[(jour.getDay() + 6) % 7]} {jour.getDate()}{" "}
-                    {jour.toLocaleDateString("fr-FR", { month: "long" })}
-                    {aujourdhui && " · aujourd’hui"}
+                  <div className={cn("min-w-0", aujourdhui ? "text-avisdoc-teal" : "text-avisdoc-ink")}>
+                    <div className="truncate text-[13px] font-bold">
+                      {JOURS[(jour.getDay() + 6) % 7]} {jour.getDate()}
+                    </div>
+                    <div className="truncate text-[11px] font-semibold text-muted-foreground">
+                      {aujourdhui ? "aujourd’hui" : jour.toLocaleDateString("fr-FR", { month: "long" })}
+                    </div>
                   </div>
                   {actions.length > 0 && (
                     <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
@@ -159,7 +166,7 @@ export default function Planning() {
                 {actions.length === 0 ? (
                   <p className="text-[12.5px] text-muted-foreground">Rien de prévu.</p>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="flex-1 space-y-1.5">
                     {actions.map((a) => {
                       const Icone = ICONES[a.kind];
                       return (
