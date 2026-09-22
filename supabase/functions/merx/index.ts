@@ -174,11 +174,21 @@ Deno.serve(async (req: Request) => {
         .order("au", { ascending: false })
         .limit(12);
 
-      const { data: demande } = await sb
+      const { data: demande, error: erreurDemande } = await sb
         .from("admin_merx_demandes")
-        .insert({ kind: "email", request: `${a.name} — ${intention}`, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .insert({
+          kind: "email",
+          request: `${a.name} — ${intention}`,
+          account_id: a.id,
+          requested_by: email,
+          status: "en_cours",
+          started_at: new Date().toISOString(),
+        })
         .select("id")
         .single();
+      // Une demande non enregistrée, c'est un coût jamais compté : on le dit plutôt
+      // que de laisser l'e-mail sortir comme si de rien n'était.
+      if (erreurDemande) console.error("email_client : demande non enregistrée —", erreurDemande.message);
 
       let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
       try {

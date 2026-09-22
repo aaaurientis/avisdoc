@@ -69,8 +69,11 @@ export default function FicheClient({
       toast.error("Écrivez d’abord ce que vous voulez leur dire, ou choisissez une proposition.");
       return;
     }
-    const r = await redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? "");
-    setBrouillon(r);
+    try {
+      setBrouillon(await redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? ""));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Merx n’a pas pu écrire ce message.");
+    }
   };
 
   /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
@@ -253,7 +256,7 @@ export default function FicheClient({
             <ActionsFiche
               cles={{ accountId: fiche?.id ?? null }}
               suggestions={SUGGESTIONS}
-              onEcrireAvecMerx={fiche ? (i) => void ecrireAvecMerx(i) : undefined}
+              onEcrireAvecMerx={fiche ? ecrireAvecMerx : undefined}
               onFait={() => setRelire((n) => n + 1)}
               relire={relire}
             />

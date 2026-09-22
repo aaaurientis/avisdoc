@@ -52,7 +52,7 @@ export default function ActionsFiche({
   /** Rappelé après l'enregistrement : l'historique se recharge. */
   onFait: () => Promise<void> | void;
   /** Présent quand Merx peut rédiger pour cette fiche ; reçoit l'intitulé, qui dit l'intention. */
-  onEcrireAvecMerx?: (intention: string) => void;
+  onEcrireAvecMerx?: (intention: string) => Promise<void> | void;
   /** Change de valeur pour relire ce qui est prévu. */
   relire?: number;
   /** Ce qu'on fait couramment sur ce genre de fiche : un clic ouvre le bon formulaire, intitulé compris. */
@@ -65,6 +65,7 @@ export default function ActionsFiche({
   const [jour, setJour] = useState(aujourdhui);
   const [heure, setHeure] = useState(prochaineHeure);
   const [envoi, setEnvoi] = useState(false);
+  const [ecriture, setEcriture] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [prevues, setPrevues] = useState<Echange[]>([]);
   const [aModifier, setAModifier] = useState<Echange | null>(null);
@@ -197,10 +198,22 @@ export default function ActionsFiche({
           {choisi.valeur === "email" && onEcrireAvecMerx && (
             <button
               type="button"
-              onClick={() => onEcrireAvecMerx(titre.trim())}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+              disabled={ecriture}
+              onClick={async () => {
+                // Un seul appel à la fois : chacun coûte, et rien ne dit à l'écran qu'il
+                // est parti tant qu'on n'a pas mis le bouton en attente.
+                if (ecriture) return;
+                setEcriture(true);
+                try {
+                  await onEcrireAvecMerx(titre.trim());
+                } finally {
+                  setEcriture(false);
+                }
+              }}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
             >
-              <PenLine className="size-3.5" /> Écrire un e-mail personnalisé avec Merx
+              {ecriture ? <Loader2 className="size-3.5 animate-spin" /> : <PenLine className="size-3.5" />}
+              {ecriture ? "Merx écrit… une trentaine de secondes" : "Écrire un e-mail personnalisé avec Merx"}
             </button>
           )}
 
