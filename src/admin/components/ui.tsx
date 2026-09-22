@@ -125,7 +125,9 @@ export function Modal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-avisdoc-ink/45 p-4"
+      // Au-dessus d'une fiche (z-50) : un brouillon ouvert depuis une fiche doit passer
+      // devant elle, pas se cacher derrière.
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-avisdoc-ink/45 p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
