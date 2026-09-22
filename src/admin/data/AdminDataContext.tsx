@@ -76,6 +76,8 @@ interface DataValue {
 
   addClient: (client: Client) => void;
   updateClientFields: (id: string, fields: Partial<Client>) => void;
+  /** Change l'étape d'une affaire. Entrer dans la dernière colonne vaut signature. */
+  setClientStage: (id: string, stage: Stage) => void;
   deleteClient: (id: string) => Promise<void>;
   addProjectContact: (clientId: string, input: { prenom: string; nom: string; role: string; email: string }) => void;
   removeProjectContact: (clientId: string, contactId: string) => void;
@@ -657,6 +659,28 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+  /**
+   * Changer d'étape. La dernière colonne du pipeline est l'affaire gagnée : la fiche
+   * entre alors dans le fichier client, une seule fois, sans qu'on ait à y penser.
+   */
+  const setClientStage: DataValue["setClientStage"] = useCallback(
+    (id, stage) => {
+      updateClientFields(id, { stage });
+      const derniere = stages[stages.length - 1]?.label;
+      if (!derniere || stage !== derniere) return;
+      const client = clients.find((c) => c.id === id);
+      if (!client || accounts.some((a) => a.clientId === id)) return;
+      addAccount({
+        name: client.company,
+        signedOn: new Date().toISOString().slice(0, 10),
+        sector: null,
+        data: {},
+        clientId: id,
+      });
+    },
+    [accounts, addAccount, clients, stages, updateClientFields],
+  );
+
   const addManyAccounts: DataValue["addManyAccounts"] = useCallback(
     (fiches) => {
       const nouvelles: Account[] = fiches
@@ -806,7 +830,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addClient,
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage,
       addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
@@ -829,7 +853,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage,
       addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,

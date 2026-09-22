@@ -47,6 +47,7 @@ export default function ProspectFiche({
   const { stages, addClient, addProjectContact } = useAdminData();
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
   const [choixEtape, setChoixEtape] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
   const p = prospect;
   const siege = p.head_office;
   const effectif = effectifLabel(p.headcount_band);
@@ -99,10 +100,13 @@ export default function ProspectFiche({
   const lancer = async (quoi: "approfondir" | "ecarter" | "email") => {
     if (enCours) return;
     setEnCours(quoi);
+    setErreur(null);
     try {
       if (quoi === "approfondir") await onApprofondir(p);
       else if (quoi === "ecarter") await onEcarter(p);
       else await onRedigerEmail(p);
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
     } finally {
       setEnCours(null);
     }
@@ -334,10 +338,14 @@ export default function ProspectFiche({
           </button>
         </div>
 
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
-          {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
-        </p>
+        {erreur ? (
+          <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>
+        ) : (
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
+            {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
+          </p>
+        )}
       </div>
     </div>
   );

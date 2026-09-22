@@ -84,13 +84,16 @@ export default function Prospects() {
   const visibles = useMemo(
     () =>
       prospects
-        .filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte"))
+        .filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte" && !p.converted_client_id))
         .filter((p) => retenue(p, filtres, recherche)),
     [prospects, voirEcartees, filtres, recherche],
   );
 
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
-  const nouvelles = useMemo(() => prospects.filter((p) => p.status !== "ecarte" && !p.opened_at).length, [prospects]);
+  const nouvelles = useMemo(
+    () => prospects.filter((p) => p.status !== "ecarte" && !p.converted_client_id && !p.opened_at).length,
+    [prospects],
+  );
 
   /** Les départements réellement présents : on ne propose pas un filtre qui ne rendrait rien. */
   const departements = useMemo(
@@ -109,6 +112,12 @@ export default function Prospects() {
     [],
   );
   const ecartees = useMemo(() => prospects.filter((p) => p.status === "ecarte").length, [prospects]);
+
+  /** Parties au Pipeline : on dit où elles sont allées plutôt que de les laisser disparaître sans un mot. */
+  const auPipeline = useMemo(
+    () => prospects.filter((p) => p.status !== "ecarte" && p.converted_client_id).length,
+    [prospects],
+  );
   const fiche = useMemo(() => prospects.find((p) => p.id === ouverte) ?? null, [prospects, ouverte]);
 
   const couts = useMemo(
@@ -151,6 +160,7 @@ export default function Prospects() {
         .update({ converted_client_id: clientId, status: "a_contacter" })
         .eq("id", p.id);
       if (error) throw new Error(error.message);
+      setOuverte(null);
       await charger();
     },
     [charger],
@@ -177,6 +187,7 @@ export default function Prospects() {
                 `${visibles.length} fiche${visibles.length > 1 ? "s" : ""}${voirEcartees ? " écartée" + (visibles.length > 1 ? "s" : "") : ""}`,
                 !voirEcartees && nouvelles > 0 ? `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}` : "",
                 "trouvées par Merx",
+                !voirEcartees && auPipeline > 0 ? `${auPipeline} passée${auPipeline > 1 ? "s" : ""} au Pipeline` : "",
               ]
                 .filter(Boolean)
                 .join(" · ")

@@ -11,7 +11,7 @@ import ColonnesModal from "./crm/ColonnesModal";
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients, stages, updateClientFields } = useAdminData();
+  const { clients, stages, setClientStage } = useAdminData();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
 
@@ -54,7 +54,7 @@ export default function Crm() {
           clients={clients}
           stages={stages}
           onSelect={(id) => navigate(`/crm/${id}`)}
-          onDeplacer={(id, stage) => updateClientFields(id, { stage })}
+          onDeplacer={(id, stage) => setClientStage(id, stage)}
         />
       )}
 

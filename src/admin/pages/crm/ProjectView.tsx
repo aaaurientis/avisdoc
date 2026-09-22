@@ -102,6 +102,7 @@ export default function ProjectView({
     stages,
     accounts,
     addAccount,
+    setClientStage,
   } = useAdminData();
 
   const [editing, setEditing] = useState(false);
@@ -337,7 +338,7 @@ export default function ProjectView({
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => updateClientFields(client.id, { stage: s.label })}
+                  onClick={() => setClientStage(client.id, s.label)}
                   className={cn(
                     "rounded-full border px-4 py-1.5 text-xs font-bold transition-colors",
                     active
