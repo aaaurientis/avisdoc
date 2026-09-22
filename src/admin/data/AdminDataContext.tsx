@@ -112,7 +112,8 @@ interface DataValue {
   // Fichier client (migration 0024)
   accounts: Account[];
   accountFields: AccountField[];
-  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null }) => void;
+  /** Rend `true` une fois la fiche réellement écrite en base — l'appelant peut en dépendre. */
+  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null }) => Promise<boolean>;
   /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
   setAccountCell: (id: string, key: string, value: string) => void;
   /** Enregistre une fiche entière (formulaire de modification), en une seule écriture. */
@@ -654,7 +655,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const addAccount: DataValue["addAccount"] = useCallback(
     (saisie) => {
       const propre = saisie.name.trim();
-      if (!propre) return;
+      if (!propre) return Promise.resolve(false);
       const fiche: Account = {
         id: crypto.randomUUID(),
         name: propre,
@@ -664,7 +665,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         clientId: saisie.clientId ?? null,
       };
       setAccounts((prev) => [...prev, fiche]);
-      persist(() => repo.createAccount(fiche));
+      return persist(() => repo.createAccount(fiche));
     },
     [persist, repo],
   );
@@ -680,6 +681,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     },
     [updateClientFields],
   );
+
+  /** Les affaires dont la fiche client est en cours d'écriture, pour ne pas la lancer deux fois. */
+  const enCreation = useRef<Set<string>>(new Set());
 
   /**
    * Signer fait entrer l'affaire au fichier client — une fois, et une seule.
@@ -704,20 +708,33 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         updateClientFields(c.id, { ficheClientCreee: true });
         continue;
       }
+      // Le verrou tient le temps de l'écriture : cet effet repasse à chaque rendu, et
+      // sans lui la même affaire partirait en création plusieurs fois de suite.
+      if (enCreation.current.has(c.id)) continue;
+      enCreation.current.add(c.id);
       pris.add(nom(c.company));
-      updateClientFields(c.id, { ficheClientCreee: true });
+
+      const affaire = c;
       void repo
-        .secteurDuProspect(c.id)
+        .secteurDuProspect(affaire.id)
         .catch(() => null)
         .then((secteur) =>
           addAccount({
-            name: c.company,
+            name: affaire.company,
             signedOn: new Date().toISOString().slice(0, 10),
             sector: secteur,
             data: {},
-            clientId: c.id,
+            clientId: affaire.id,
           }),
-        );
+        )
+        .then((ecrite) => {
+          // On ne marque QU'APRÈS l'écriture. Marquer avant, c'était perdre la fiche
+          // pour de bon au moindre incident : l'affaire se disait traitée, le fichier
+          // client restait vide, et plus rien ne repassait dessus.
+          if (ecrite) updateClientFields(affaire.id, { ficheClientCreee: true });
+          else toast.error(`La fiche client de ${affaire.company} n’a pas pu être créée. Elle sera retentée.`);
+        })
+        .finally(() => enCreation.current.delete(affaire.id));
     }
   }, [accounts, addAccount, clients, repo, stages, updateClientFields]);
 

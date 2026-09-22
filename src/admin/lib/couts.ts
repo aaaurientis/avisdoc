@@ -17,6 +17,13 @@ export const TARIFS_MODELE: Record<string, { entree: number; sortie: number }> =
  */
 export const MODELE_PAR_DEFAUT = "claude-haiku-4-5";
 
+/** Le nom des modèles en clair, pour l'écran des coûts : « claude-opus-5 » ne parle à personne. */
+export const NOM_MODELE: Record<string, string> = {
+  "claude-haiku-4-5": "Haiku 4.5",
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-5": "Opus 5",
+};
+
 /** Ce que Merx appelle aujourd'hui, par sorte de demande. Affiché dans l'écran des coûts. */
 export const MODELES_ACTUELS: Record<string, string> = {
   recherche: "claude-sonnet-5",

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
-import { coutDe, euroDollar, MODELE_PAR_DEFAUT, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
+import { coutDe, euroDollar, MODELES_ACTUELS, MODELE_PAR_DEFAUT, NOM_MODELE, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
 
 interface Demande {
   id: string;
@@ -47,6 +47,28 @@ function Chiffre({ titre, valeur, precision }: { titre: string; valeur: string; 
     </Card>
   );
 }
+
+/** Ce que Merx appelle, pourquoi, et donc ce que ça coûte. L'ordre suit celui du travail. */
+const USAGES: { cle: string; titre: string; modele: string; pourquoi: string }[] = [
+  {
+    cle: "recherche",
+    titre: "Chercher des entreprises",
+    modele: MODELES_ACTUELS.recherche,
+    pourquoi: "Ratisser un secteur et une zone, croiser les annuaires et la presse locale, rendre jusqu’à vingt fiches. Un travail large, où la rapidité compte autant que la finesse.",
+  },
+  {
+    cle: "approfondissement",
+    titre: "Approfondir une fiche",
+    modele: MODELES_ACTUELS.approfondissement,
+    pourquoi: "Le modèle le plus capable, sur une seule entreprise : l’identité légale, l’interlocuteur, et le dossier commercial — accroche, arguments, objections, offre. C’est là qu’on accepte de payer plus, parce que c’est là que se gagne le rendez-vous.",
+  },
+  {
+    cle: "email",
+    titre: "Rédiger un e-mail",
+    modele: MODELES_ACTUELS.email,
+    pourquoi: "Un premier contact court, appuyé sur les faits de la fiche. Rien n’est envoyé : le commercial relit et envoie lui-même.",
+  },
+];
 
 export default function Couts() {
   const [demandes, setDemandes] = useState<Demande[]>([]);
@@ -149,20 +171,43 @@ export default function Couts() {
             />
           </div>
 
-          {/* Les tarifs, en clair */}
+          {/* Les tarifs, en clair : deux modèles, deux usages, deux prix. */}
           <Card className="mb-4 p-4">
             <SectionLabel>Les tarifs appliqués</SectionLabel>
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-              Modèle <span className="font-semibold text-avisdoc-ink">{MODELE_PAR_DEFAUT}</span> :{" "}
-              <span className="font-semibold text-avisdoc-ink">{tarif.entree} $</span> par million de jetons lus,{" "}
-              <span className="font-semibold text-avisdoc-ink">{tarif.sortie} $</span> par million de jetons écrits.
+              Merx n’utilise pas le même modèle selon ce qu’on lui demande : chercher large et creuser une
+              entreprise ne demandent pas le même effort, et ne coûtent donc pas le même prix.
+            </p>
+
+            <div className="mt-3 space-y-2">
+              {USAGES.map((u) => {
+                const t = TARIFS_MODELE[u.modele];
+                return (
+                  <div key={u.cle} className="rounded-xl border border-border px-3.5 py-2.5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="text-[13.5px] font-semibold text-avisdoc-ink">{u.titre}</span>
+                      <span className="text-[12.5px] font-bold text-avisdoc-teal">{NOM_MODELE[u.modele] ?? u.modele}</span>
+                    </div>
+                    <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{u.pourquoi}</p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">
+                      <span className="font-semibold text-avisdoc-ink">{t.entree} $</span> par million de jetons lus,{" "}
+                      <span className="font-semibold text-avisdoc-ink">{t.sortie} $</span> par million de jetons écrits.
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
               Recherche web : <span className="font-semibold text-avisdoc-ink">{(TARIF_RECHERCHE_WEB * 1000).toFixed(0)} $ pour 1 000 recherches</span>,
               en plus des jetons — une recherche en erreur n’est pas facturée.
               L’annuaire des entreprises de l’État, lui, est gratuit : il ne coûte rien, quel que soit le nombre d’appels.
             </p>
             <p className="mt-2 text-[11.5px] text-muted-foreground/80">
-              Tarifs relevés le 22/09/2026 sur la documentation d’Anthropic. Les coûts sont recalculés à chaque
-              affichage : si un tarif change, corrigez-le dans <code className="font-mono">src/admin/lib/couts.ts</code>.
+              Tarifs relevés le 22/09/2026 sur la documentation d’Anthropic. Les demandes faites avant le 22/09/2026,
+              du temps où Merx n’utilisait que {NOM_MODELE[MODELE_PAR_DEFAUT]} ({tarif.entree} $ / {tarif.sortie} $), restent
+              comptées à ce tarif-là. Les coûts sont recalculés à chaque affichage : si un tarif change, corrigez-le
+              dans <code className="font-mono">src/admin/lib/couts.ts</code>.
             </p>
           </Card>
 
