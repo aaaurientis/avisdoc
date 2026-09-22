@@ -18,6 +18,8 @@ import NouveauProspect from "./prospects/NouveauProspect";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, type Consommation } from "../lib/couts";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
+import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
+import PastillesPrevues from "../components/PastillesPrevues";
 import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
 
@@ -41,6 +43,7 @@ function Carte({
   cochee,
   onCocher,
   selectionEnCours,
+  prevu,
 }: {
   p: Prospect;
   onOuvrir: () => void;
@@ -49,6 +52,7 @@ function Carte({
   cochee: boolean;
   onCocher: () => void;
   selectionEnCours: boolean;
+  prevu?: Prevu;
 }) {
   return (
     <div
@@ -96,6 +100,8 @@ function Carte({
         {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
       </div>
       {p.rationale && <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">{p.rationale}</p>}
+      <PastillesPrevues prevu={prevu} />
+
       {(p.contact_email || p.contact_phone) && (
         <div className="mt-2 flex items-center gap-2 text-muted-foreground">
           {p.contact_email && <Mail className="size-3.5" />}
@@ -127,6 +133,16 @@ export default function Prospects() {
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
+  const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
+
+  /** Ce qui attend sur chaque fiche : une action notée doit se voir depuis le tableau. */
+  useEffect(() => {
+    let vivant = true;
+    void actionsPrevues().then((m) => vivant && setPrevues(m));
+    return () => {
+      vivant = false;
+    };
+  }, [prospects]);
   const [coches, setCoches] = useState<Set<string>>(new Set());
 
   const cocher = (id: string) =>
@@ -392,6 +408,7 @@ export default function Prospects() {
                       cochee={coches.has(p.id)}
                       onCocher={() => cocher(p.id)}
                       selectionEnCours={coches.size > 0}
+                      prevu={prevues.get(p.id)}
                     />
                   ))}
                 </div>

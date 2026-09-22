@@ -5,6 +5,8 @@ import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
 import { Badge } from "../../components/ui";
 import CaseFiche, { CaseColonne } from "../../components/CaseFiche";
+import PastillesPrevues from "../../components/PastillesPrevues";
+import type { Prevu } from "../../lib/actions-prevues";
 import { tonNote } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,7 @@ export default function Kanban({
   onChangerCoches,
   onSupprimer,
   onModifier,
+  prevues,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -41,6 +44,8 @@ export default function Kanban({
   onSupprimer?: (c: Client) => void;
   /** Ouvre la fiche directement en modification. */
   onModifier?: (c: Client) => void;
+  /** Ce qui est prévu sur chaque affaire : appels, rendez-vous, e-mails à venir. */
+  prevues?: Map<string, Prevu>;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -160,6 +165,8 @@ export default function Kanban({
                         <span className="truncate text-[11px]">{c.contacts[0].name}</span>
                       </div>
                     )}
+                    <PastillesPrevues prevu={prevues?.get(c.id)} />
+
                     {c.tarif > 0 && (
                       <div className="mt-2 flex items-center justify-between">
                         <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">

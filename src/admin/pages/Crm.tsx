@@ -7,6 +7,7 @@ import { PageHeader } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
 import { toast } from "sonner";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
+import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
   departementDe,
@@ -27,6 +28,16 @@ export default function Crm() {
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
   const [coches, setCoches] = useState<Set<string>>(new Set());
+  const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
+
+  /** Ce qui attend sur chaque affaire : une action notée doit se voir depuis le tableau. */
+  useEffect(() => {
+    let vivant = true;
+    void actionsPrevues().then((m) => vivant && setPrevues(m));
+    return () => {
+      vivant = false;
+    };
+  }, [clients]);
 
   const cocher = (id: string) =>
     setCoches((prev) => {
@@ -166,6 +177,7 @@ export default function Crm() {
           onChangerCoches={setCoches}
           onSupprimer={(c) => void supprimerUne(c)}
           onModifier={(c) => navigate(`/crm/${c.id}?modifier=1`)}
+          prevues={prevues}
         />
       )}
 
