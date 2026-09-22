@@ -10,6 +10,7 @@ import { Modal, SectionLabel } from "../../components/ui";
 import {
   chargerDetail,
   DESTINATIONS,
+  etapeDeLAffaire,
   joursRestants,
   LIBELLE,
   type Champ,
@@ -30,6 +31,7 @@ export default function FicheJetee({
   const [champs, setChamps] = useState<Champ[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState(false);
+  const [etape, setEtape] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
 
   useEffect(() => {
@@ -37,6 +39,16 @@ export default function FicheJetee({
     chargerDetail(jetee.origine, jetee.id)
       .then((c) => vivant && setChamps(c))
       .catch((e) => vivant && setErreur(e instanceof Error ? e.message : "Lecture impossible."));
+    return () => {
+      vivant = false;
+    };
+  }, [jetee.id, jetee.origine]);
+
+  // Pour une affaire, on annonce aussi la colonne : « dans le Pipeline, colonne Qualifié ».
+  useEffect(() => {
+    if (jetee.origine !== "affaire") return;
+    let vivant = true;
+    void etapeDeLAffaire(jetee.id).then((e) => vivant && setEtape(e));
     return () => {
       vivant = false;
     };
@@ -94,11 +106,15 @@ export default function FicheJetee({
       )}
 
       {confirmation ? (
-        <div className="mt-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
-          <SectionLabel>Où voulez-vous la remettre ?</SectionLabel>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-avisdoc-ink">
-            <span className="font-semibold">{destination.label}</span> — {destination.ou}
-          </p>
+        <div className="mt-4 rounded-2xl border-2 border-avisdoc-teal bg-avisdoc-teal/5 p-4">
+          <SectionLabel>Elle retourne ici</SectionLabel>
+          <div className="mt-2 flex flex-wrap items-baseline gap-2">
+            <span className="font-display text-2xl font-semibold text-avisdoc-teal">{destination.label}</span>
+            {etape && (
+              <span className="rounded-full bg-avisdoc-teal px-3 py-1 text-[12.5px] font-bold text-white">colonne {etape}</span>
+            )}
+          </div>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-avisdoc-ink">{destination.ou}</p>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Une fiche retourne là d’où elle vient. Pour la faire avancer ensuite — au Pipeline, puis au fichier
             client — passez par son tableau, comme d’habitude.
@@ -111,7 +127,7 @@ export default function FicheJetee({
               className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-50"
             >
               {enCours ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
-              Remettre dans {destination.label}
+              Remettre dans {destination.label}{etape ? `, ${etape}` : ""}
             </button>
             <button
               type="button"
