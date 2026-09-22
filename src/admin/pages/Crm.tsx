@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Columns3, Plus, Search } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
+import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader } from "../components/ui";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
@@ -22,6 +23,31 @@ export default function Crm() {
   const [showColonnes, setShowColonnes] = useState(false);
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
+  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
+    new Map(),
+  );
+
+  /** Les fiches de Merx d’où viennent ces affaires : la carte dit la même chose qu’en prospection. */
+  useEffect(() => {
+    let vivant = true;
+    void supabaseAdmin
+      .from("admin_prospects")
+      .select("converted_client_id, score_total, activity, rationale")
+      .not("converted_client_id", "is", null)
+      .then(({ data }) => {
+        if (!vivant || !data) return;
+        setOrigines(
+          new Map(
+            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null }[]).map(
+              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale }],
+            ),
+          ),
+        );
+      });
+    return () => {
+      vivant = false;
+    };
+  }, []);
 
   const selected = clientId ? clients.find((c) => c.id === clientId) : undefined;
 
@@ -85,6 +111,7 @@ export default function Crm() {
           stages={stages}
           onSelect={(id) => navigate(`/crm/${id}`)}
           onDeplacer={(id, stage) => setClientStage(id, stage)}
+          origines={origines}
         />
       )}
 

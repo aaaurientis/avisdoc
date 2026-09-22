@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Mail } from "lucide-react";
 import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
+import { Badge } from "../../components/ui";
+import { tonNote } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
 function joursLabel(j: number) {
@@ -14,6 +16,7 @@ export default function Kanban({
   stages,
   onSelect,
   onDeplacer,
+  origines,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -21,6 +24,8 @@ export default function Kanban({
   onSelect: (id: string) => void;
   /** Changement d'étape par glisser-déposer. */
   onDeplacer?: (id: string, stage: Stage) => void;
+  /** Ce que Merx avait trouvé, par affaire : la carte dit la même chose qu’en prospection. */
+  origines?: Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -100,12 +105,28 @@ export default function Kanban({
                   )}
 
                   <button type="button" onClick={() => onSelect(c.id)} className="min-w-0 flex-1 text-left">
-                    <div className="text-[13px] font-semibold leading-snug text-avisdoc-ink">
-                      {c.company}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{c.company}</div>
+                      {origines?.get(c.id) && (
+                        <Badge className={`${tonNote(origines.get(c.id)!.score_total)} shrink-0`}>
+                          {origines.get(c.id)!.score_total ?? "—"}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-                      {c.contacts[0]?.name ?? "—"}
+                    <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                      {[origines?.get(c.id)?.activity ?? c.naf, c.ville].filter(Boolean).join(" · ") || "—"}
                     </div>
+                    {origines?.get(c.id)?.rationale && (
+                      <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
+                        {origines.get(c.id)!.rationale}
+                      </p>
+                    )}
+                    {c.contacts[0] && (
+                      <div className="mt-2 flex items-center gap-2 text-muted-foreground">
+                        {c.contacts[0].email && <Mail className="size-3.5" />}
+                        <span className="truncate text-[11px]">{c.contacts[0].name}</span>
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between">
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
                         {joursLabel(c.jours)}

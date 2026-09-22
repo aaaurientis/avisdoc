@@ -26,6 +26,18 @@ import { cn } from "@/lib/utils";
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
+/** Ce qu'une étape retient encore, dit une seule fois. */
+function Verrouille({ etape, fonctions }: { etape: string; fonctions: string }) {
+  return (
+    <section className="mt-5 flex items-center gap-2.5 rounded-2xl border border-border px-4 py-3.5 first:mt-0">
+      <Lock className="size-4 shrink-0 text-muted-foreground/60" />
+      <p className="text-[13px] text-muted-foreground">
+        {fonctions} se débloquent à l’étape <span className="font-semibold text-avisdoc-ink">{etape}</span>.
+      </p>
+    </section>
+  );
+}
+
 /** Un bloc à l'intérieur d'un onglet : plusieurs fonctions tiennent dans le même. */
 function Bloc({ titre, verrou, children }: { titre?: string; verrou?: string | null; children: ReactNode }) {
   return (
@@ -146,7 +158,6 @@ export default function ProjectView({
     const rang = stageRank(min, stages);
     return rang >= 0 && cur >= 0 && cur < rang;
   };
-  const indice = (min: Stage) => `Se débloque à l'étape « ${min} »`;
 
   const [origine, setOrigine] = useState<Prospect | null>(null);
   const [nbEchanges, setNbEchanges] = useState<number | null>(null);
@@ -366,18 +377,30 @@ export default function ProjectView({
 
             {tab === "action" && (
               <>
-                <Bloc titre="Proposition" verrou={verrou("Proposition") ? indice("Proposition") : null}>
-                  {PropositionTab()}
-                </Bloc>
-                <Bloc verrou={verrou("Proposition") ? indice("Proposition") : null}>
-                  <DevisQonto clientId={client.id} />
-                </Bloc>
-                <Bloc verrou={verrou("Signé") ? indice("Signé") : null}>
-                  <EspaceClientCard bare clientId={client.id} clientName={client.company} />
-                </Bloc>
-                <Bloc verrou={verrou("Signé") ? indice("Signé") : null}>
-                  <RendezVousCard bare clientId={client.id} />
-                </Bloc>
+                {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
+                {verrou("Proposition") ? (
+                  <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
+                ) : (
+                  <>
+                    <Bloc titre="Proposition">{PropositionTab()}</Bloc>
+                    <Bloc>
+                      <DevisQonto clientId={client.id} />
+                    </Bloc>
+                  </>
+                )}
+
+                {verrou("Signé") ? (
+                  <Verrouille etape="Signé" fonctions="L’espace client et les rendez-vous" />
+                ) : (
+                  <>
+                    <Bloc>
+                      <EspaceClientCard bare clientId={client.id} clientName={client.company} />
+                    </Bloc>
+                    <Bloc>
+                      <RendezVousCard bare clientId={client.id} />
+                    </Bloc>
+                  </>
+                )}
               </>
             )}
 
