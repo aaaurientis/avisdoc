@@ -529,6 +529,22 @@ export default function Prospects() {
         />
       )}
 
+      {fiche && (
+        <ProspectFiche
+          prospect={fiche}
+          onClose={() => setOuverte(null)}
+          onApprofondir={approfondir}
+          onEcarter={ecarter}
+          onMettreAuPipeline={mettreAuPipeline}
+          onRedigerEmail={redigerEmail}
+          couts={couts}
+          demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
+          brouillons={brouillonsDeLaFiche}
+          onRouvrirBrouillon={(b) =>
+            setBrouillon({ prospect: fiche, objet: b.objet, corps: b.corps, destinataire: fiche.contact_email ?? null })
+          }
+        />
+      )}
       {brouillon && (
         <BrouillonEmail
           nom={brouillon.prospect.name}
@@ -554,22 +570,6 @@ export default function Prospects() {
         />
       )}
 
-      {fiche && (
-        <ProspectFiche
-          prospect={fiche}
-          onClose={() => setOuverte(null)}
-          onApprofondir={approfondir}
-          onEcarter={ecarter}
-          onMettreAuPipeline={mettreAuPipeline}
-          onRedigerEmail={redigerEmail}
-          couts={couts}
-          demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
-          brouillons={brouillonsDeLaFiche}
-          onRouvrirBrouillon={(b) =>
-            setBrouillon({ prospect: fiche, objet: b.objet, corps: b.corps, destinataire: fiche.contact_email ?? null })
-          }
-        />
-      )}
     </div>
   );
 }
