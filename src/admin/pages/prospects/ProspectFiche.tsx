@@ -9,6 +9,7 @@ import { uid } from "../../lib/format";
 import { Badge, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
 import { euroDollar } from "../../lib/couts";
+import NoteDetaillee from "./NoteDetaillee";
 import { cn } from "@/lib/utils";
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default function ProspectFiche({
   onMettreAuPipeline,
   onRedigerEmail,
   couts,
+  demandeOrigine,
 }: {
   prospect: Prospect;
   onClose: () => void;
@@ -39,6 +41,8 @@ export default function ProspectFiche({
   onRedigerEmail: (p: Prospect) => Promise<void>;
   /** Ce que coûte chaque bouton, mesuré ou estimé tant qu'aucune demande n'a eu lieu. */
   couts: { approfondissement: { montant: number; mesure: boolean }; email: { montant: number; mesure: boolean } };
+  /** La recherche qui a fait apparaître cette fiche. */
+  demandeOrigine: string | null;
 }) {
   const { stages, addClient, addProjectContact } = useAdminData();
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
@@ -104,8 +108,13 @@ export default function ProspectFiche({
     }
   };
 
-  /** Le prix est annoncé sur le bouton : on sait ce qu'on engage avant de cliquer. */
-  const prix = (c: { montant: number; mesure: boolean }) => `${c.mesure ? "" : "~"}${euroDollar(c.montant)}`;
+  // Ce qui a été constaté : les critères qui ont rapporté des points, avec leur justification.
+  const constats = CATEGORIES.flatMap((cat) =>
+    cat.criteres
+      .map((id) => ({ label: CRITERES[id].label, justification: p.score?.[id]?.justification ?? "", points: p.score?.[id]?.points ?? null }))
+      .filter((c) => c.points !== null && c.justification),
+  );
+
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-8">
@@ -124,42 +133,37 @@ export default function ProspectFiche({
           </button>
         </div>
 
-        {/* Pourquoi c’est une cible */}
-        {p.rationale && (
-          <div className="mb-5 rounded-2xl bg-avisdoc-teal/10 p-4">
+        {/* Pourquoi c’est une cible : la phrase, les faits constatés, puis l’angle d’approche. */}
+        {(p.rationale || constats.length > 0 || p.approach) && (
+          <div className="mb-5 rounded-2xl border-l-4 border-avisdoc-teal bg-muted/50 p-4">
             <SectionLabel>Pourquoi c’est un bon prospect</SectionLabel>
-            <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{p.rationale}</p>
+            {p.rationale && <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{p.rationale}</p>}
+            {constats.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {constats.map((c) => (
+                  <li key={c.label} className="flex gap-2 text-[13px] leading-snug text-avisdoc-ink">
+                    <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-avisdoc-teal" />
+                    <span>
+                      <span className="font-semibold">{c.label}</span> : {c.justification}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {p.approach && (
+              <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                <span className="font-semibold">Angle d’approche : </span>
+                {p.approach}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Note détaillée */}
+        {/* La note, telle qu’elle a été gagnée */}
         <div className="mb-5">
           <SectionLabel>La note, critère par critère</SectionLabel>
-          <div className="mt-2 grid gap-4 sm:grid-cols-3">
-            {CATEGORIES.map((cat) => (
-              <div key={cat.id} className="rounded-2xl bg-muted/60 p-3">
-                <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">{cat.label}</div>
-                <div className="mt-2 space-y-2.5">
-                  {cat.criteres.map((id) => {
-                    const note = p.score?.[id];
-                    const points = note?.points ?? null;
-                    return (
-                      <div key={id}>
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[12.5px] font-semibold text-avisdoc-ink">{CRITERES[id].label}</span>
-                          <span className="shrink-0 text-[12px] font-bold text-muted-foreground">
-                            {points === null ? "non évalué" : `${points}/${CRITERES[id].max}`}
-                          </span>
-                        </div>
-                        {note?.justification && (
-                          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{note.justification}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="mt-2">
+            <NoteDetaillee total={p.score_total} score={p.score ?? {}} />
           </div>
         </div>
 
@@ -195,6 +199,7 @@ export default function ProspectFiche({
                   </Ligne>
                 )}
                 {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
+                {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
               </>
             ) : (
               <div className="py-3 text-[13px] text-muted-foreground">
@@ -307,8 +312,10 @@ export default function ProspectFiche({
           >
             {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
-            <span className="font-mono text-[11.5px] font-normal text-muted-foreground">{prix(couts.approfondissement)}</span>
           </button>
+          <span className="text-[12.5px] text-muted-foreground">
+            {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} : environ {euroDollar(couts.approfondissement.montant)} par approfondissement.
+          </span>
           <button
             type="button"
             onClick={() => void lancer("email")}
@@ -317,9 +324,11 @@ export default function ProspectFiche({
             className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
           >
             {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
-            Rédiger un mail
-            <span className="font-mono text-[11.5px] font-normal text-muted-foreground">{prix(couts.email)}</span>
+            Écrire un e-mail personnalisé
           </button>
+          <span className="text-[12.5px] text-muted-foreground">
+            {p.contact_email ? `Environ ${euroDollar(couts.email.montant)}.` : `Pas d’adresse sur la fiche : vous la saisirez dans l’e-mail. Environ ${euroDollar(couts.email.montant)}.`}
+          </span>
           <button
             type="button"
             onClick={() => void lancer("ecarter")}

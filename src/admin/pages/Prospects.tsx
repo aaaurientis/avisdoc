@@ -54,7 +54,7 @@ export default function Prospects() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [voirEcartees, setVoirEcartees] = useState(false);
-  const [demandes, setDemandes] = useState<{ kind: string; usage: Consommation | null }[]>([]);
+  const [demandes, setDemandes] = useState<{ id: string; kind: string; request: string; usage: Consommation | null }[]>([]);
   const [brouillon, setBrouillon] = useState<{ nom: string; objet: string; corps: string; destinataire: string | null } | null>(null);
 
   const charger = useCallback(async () => {
@@ -66,8 +66,8 @@ export default function Prospects() {
       .order("created_at", { ascending: false });
     if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
-    const { data: passees } = await supabaseAdmin.from("admin_merx_demandes").select("kind, usage").eq("status", "terminee");
-    setDemandes((passees ?? []) as { kind: string; usage: Consommation | null }[]);
+    const { data: passees } = await supabaseAdmin.from("admin_merx_demandes").select("id, kind, request, usage").eq("status", "terminee");
+    setDemandes((passees ?? []) as { id: string; kind: string; request: string; usage: Consommation | null }[]);
     setChargement(false);
   }, []);
 
@@ -216,6 +216,7 @@ export default function Prospects() {
           onMettreAuPipeline={mettreAuPipeline}
           onRedigerEmail={redigerEmail}
           couts={couts}
+          demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
         />
       )}
     </div>
