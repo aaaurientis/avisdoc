@@ -110,7 +110,7 @@ export class SupabaseRepo implements AdminRepo {
     const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
-        sb.from("admin_clients").select("*").order("created_at", { ascending: true }),
+        sb.from("admin_clients").select("*").is("deleted_at", null).order("created_at", { ascending: true }),
         sb.from("admin_client_contacts").select("*"),
         sb.from("admin_client_docs").select("*"),
         sb.from("admin_suivis").select("*"),
@@ -119,7 +119,7 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_activity").select("*").order("created_at", { ascending: false }).limit(20),
         sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
         sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
-        sb.from("admin_accounts").select("*").order("name", { ascending: true }),
+        sb.from("admin_accounts").select("*").is("deleted_at", null).order("name", { ascending: true }),
       ]);
 
     const firstError =
