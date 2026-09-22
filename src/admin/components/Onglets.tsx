@@ -23,7 +23,7 @@ export default function Onglets({
   onChange: (cle: string) => void;
 }) {
   return (
-    <div role="tablist" className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 pt-2">
+    <div role="tablist" className="flex items-center gap-1 overflow-x-auto overscroll-x-contain border-b border-border px-3 pt-2">
       {onglets.map((o) => {
         const ouvert = o.cle === actif;
         return (

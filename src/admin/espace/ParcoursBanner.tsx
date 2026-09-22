@@ -72,7 +72,7 @@ export default function ParcoursBanner({
         )}
       </div>
 
-      <div className="flex items-start overflow-x-auto pb-1">
+      <div className="flex items-start overflow-x-auto overscroll-x-contain pb-1">
         {stages.map((s, i) => {
           const reached = i <= curRank;
           const active = i === curRank;

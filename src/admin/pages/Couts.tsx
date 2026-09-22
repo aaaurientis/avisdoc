@@ -173,7 +173,7 @@ export default function Couts() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+            <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
               <table className="w-full min-w-[820px] border-collapse">
                 <thead>
                   <tr className="border-b border-border bg-muted/50 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">

@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, Phone, RefreshCw, Search } from "lucide-react";
+import { Loader2, Mail, Phone, Search } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -229,15 +229,6 @@ export default function Prospects() {
                 .filter(Boolean)
                 .join(" · ")
         }
-        action={
-          <button
-            type="button"
-            onClick={() => void charger()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink hover:border-avisdoc-teal"
-          >
-            <RefreshCw className="size-4" /> Actualiser
-          </button>
-        }
       />
 
       {erreur && <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">{erreur}</div>}
@@ -270,7 +261,7 @@ export default function Prospects() {
         </div>
       ) : (
         <div
-          className="ad-kanban grid gap-3 overflow-x-auto pb-1"
+          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
           style={{ gridTemplateColumns: `repeat(${SECTEURS.length}, minmax(300px, 380px))` }}
         >
           {SECTEURS.map((s) => {

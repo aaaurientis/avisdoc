@@ -36,12 +36,21 @@ function affiche(a: Account, f: AccountField): string {
   return v;
 }
 
-const SANS_SECTEUR = "Sans secteur";
+const SANS_VALEUR = "Non renseigné";
+
+/** Regrouper par mois plutôt que par date : une colonne par jour n’aurait aucun sens. */
+const MOIS_ENTREE = "__mois";
+
+const moisDe = (iso: string | null) =>
+  iso && !Number.isNaN(new Date(iso).getTime())
+    ? new Date(iso).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+    : SANS_VALEUR;
 
 export default function FichierClient() {
   const { accounts, accountFields, addManyAccounts, deleteAccount } = useAdminData();
   const [recherche, setRecherche] = useState("");
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
+  const [groupePar, setGroupePar] = useState("secteur");
   const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
     new Map(),
   );
@@ -90,13 +99,44 @@ export default function FichierClient() {
   );
 
   /** Colonnes du kanban : les secteurs réellement utilisés, puis les fiches sans secteur. */
+  /** La valeur qui range une fiche dans sa colonne, selon le regroupement choisi. */
+  const valeurGroupe = useCallback(
+    (a: Account) => {
+      if (groupePar === MOIS_ENTREE) return moisDe(a.signedOn);
+      if (groupePar === "secteur") return (a.sector ?? "").trim() || SANS_VALEUR;
+      if (groupePar === "date_client") return moisDe(a.signedOn);
+      return (a.data[groupePar] ?? "").trim() || SANS_VALEUR;
+    },
+    [groupePar],
+  );
+
+  /** Les colonnes du tableau : les valeurs réellement présentes, « Non renseigné » à la fin. */
   const secteurs = useMemo(() => {
-    const noms = [...new Set(visibles.map((a) => (a.sector ?? "").trim()).filter(Boolean))].sort((x, y) =>
-      x.localeCompare(y, "fr"),
-    );
-    const sans = visibles.some((a) => !(a.sector ?? "").trim());
-    return sans ? [...noms, SANS_SECTEUR] : noms;
-  }, [visibles]);
+    const vues = [...new Set(visibles.map(valeurGroupe))];
+    const renseignees = vues.filter((v) => v !== SANS_VALEUR);
+    // Les mois se lisent du plus récent au plus ancien ; le reste par ordre alphabétique.
+    if (groupePar === MOIS_ENTREE || groupePar === "date_client") {
+      const dateDe = (v: string) => {
+        const a = visibles.find((x) => valeurGroupe(x) === v);
+        return a?.signedOn ? new Date(a.signedOn).getTime() : 0;
+      };
+      renseignees.sort((x, y) => dateDe(y) - dateDe(x));
+    } else {
+      renseignees.sort((x, y) => x.localeCompare(y, "fr"));
+    }
+    return vues.includes(SANS_VALEUR) ? [...renseignees, SANS_VALEUR] : renseignees;
+  }, [groupePar, valeurGroupe, visibles]);
+
+  /** Ce par quoi on peut ranger : le mois d’entrée, et toute colonne du fichier sauf le nom. */
+  const regroupements = useMemo(
+    () => [
+      { cle: MOIS_ENTREE, label: "Mois d’entrée" },
+      ...accountFields
+        .filter((f) => f.key !== "etablissement" && f.key !== "date_client")
+        .map((f) => ({ cle: f.key, label: f.label })),
+    ],
+    [accountFields],
+  );
 
   /** Export de ce qui est affiché : mêmes colonnes, mêmes lignes, même ordre. */
   const exporter = async () => {
@@ -214,6 +254,20 @@ export default function FichierClient() {
           />
         </div>
         <FiltresClients filtres={filtres} onChange={setFiltres} secteurs={tousSecteurs} />
+        {vue === "kanban" && (
+          <select
+            value={groupePar}
+            onChange={(e) => setGroupePar(e.target.value)}
+            aria-label="Regrouper par"
+            className="ad-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal"
+          >
+            {regroupements.map((r) => (
+              <option key={r.cle} value={r.cle}>
+                Par {r.label.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           {([
             { id: "liste", label: "Liste", Icone: List },
@@ -245,7 +299,7 @@ export default function FichierClient() {
         </div>
       ) : vue === "liste" ? (
         /* ── Tableau, en lecture seule ── */
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[720px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
@@ -307,13 +361,11 @@ export default function FichierClient() {
       ) : (
         /* ── Kanban par secteur ── */
         <div
-          className="ad-kanban grid gap-3 overflow-x-auto pb-1"
+          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
           style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(300px, 380px))` }}
         >
           {secteurs.map((secteur) => {
-            const liste = visibles.filter((a) =>
-              secteur === SANS_SECTEUR ? !(a.sector ?? "").trim() : (a.sector ?? "").trim() === secteur,
-            );
+            const liste = visibles.filter((a) => valeurGroupe(a) === secteur);
             return (
               <div key={secteur} className={COLONNE_KANBAN}>
                 <div className="mb-2.5 flex items-center justify-between gap-2">

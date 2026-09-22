@@ -43,7 +43,7 @@ export default function ParcoursFiche({
     <div className="rounded-2xl border border-border p-4">
       <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Avancement</div>
 
-      <div className="flex items-start overflow-x-auto pb-1">
+      <div className="flex items-start overflow-x-auto overscroll-x-contain pb-1">
         {etapes.map((e, i) => {
           const atteinte = Boolean(e.au);
           const active = i === dernierAtteint;
