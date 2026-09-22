@@ -141,7 +141,7 @@ Six recherches web au plus. ${POLITESSE} ${NEVER}`;
 export const ENRICH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["siren", "site_web", "contact", "exposition_soleil", "sante_travail", "angle_approche", "sources"],
+  required: ["siren", "site_web", "contact", "exposition_soleil", "sante_travail", "angle_approche", "dossier", "sources"],
   properties: {
     siren: { type: "string" },
     site_web: { type: "string" },
@@ -202,7 +202,7 @@ export interface EnrichOut {
   exposition_soleil: SunOut;
   sante_travail: { trouve: boolean; justification: string; source: string };
   angle_approche: string;
-  dossier?: {
+  dossier: {
     a_retenir: string[];
     qui_aborder: string;
     accroche: string;
