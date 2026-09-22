@@ -46,6 +46,7 @@ export default function ActionsFiche({
   onFait,
   onEcrireAvecMerx,
   relire,
+  suggestions,
 }: {
   cles: ClesFiche;
   /** Rappelé après l'enregistrement : l'historique se recharge. */
@@ -54,6 +55,8 @@ export default function ActionsFiche({
   onEcrireAvecMerx?: () => void;
   /** Change de valeur pour relire ce qui est prévu. */
   relire?: number;
+  /** Intitulés proposés d'un clic : ce qu'on fait couramment sur ce genre de fiche. */
+  suggestions?: string[];
 }) {
   const { user } = useAuth();
   const [genre, setGenre] = useState<GenreEchange | null>(null);
@@ -177,6 +180,21 @@ export default function ActionsFiche({
             >
               <PenLine className="size-3.5" /> Écrire un e-mail personnalisé avec Merx
             </button>
+          )}
+
+          {suggestions && suggestions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setTitre(s)}
+                  className="rounded-full border border-border px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           )}
 
           <input

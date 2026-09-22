@@ -1,7 +1,7 @@
 // Fiche client : consultation, modification et création, bâties sur les colonnes du fichier.
 // On ne modifie jamais une information par mégarde : un clic OUVRE la fiche, le crayon la rend modifiable.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
@@ -10,6 +10,7 @@ import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal, SectionLabel } from "../../components/ui";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
+import ActionsFiche from "../../components/ActionsFiche";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
 import NoteDetaillee from "../prospects/NoteDetaillee";
@@ -18,11 +19,17 @@ import { cn } from "@/lib/utils";
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
-/** La même ossature que la fiche prospect : une affaire garde sa fiche en avançant. */
-const ONGLETS: Onglet[] = [
-  { cle: "identite", label: "Identité" },
-  { cle: "approche", label: "Approche" },
-  { cle: "suivi", label: "Historique" },
+/**
+ * Ce qu'on peut proposer à quelqu'un qui est DÉJÀ client — et qu'on n'a pas à retrouver
+ * de mémoire à chaque fois. Un clic remplit l'intitulé, qui reste modifiable.
+ */
+const SUGGESTIONS = [
+  "Proposer une nouvelle campagne",
+  "Relancer sur une journée supplémentaire",
+  "Prendre des nouvelles après la campagne",
+  "Envoyer le bilan de la dernière campagne",
+  "Proposer une session sur un autre site",
+  "Présenter le volet prévention solaire",
 ];
 
 const inputType = (t: AccountField["type"]) =>
@@ -38,10 +45,23 @@ export default function FicheClient({
   mode?: "lecture" | "edition";
   onClose: () => void;
 }) {
-  const { accountFields, addAccount, saveAccount } = useAdminData();
+  const { accountFields, addAccount, saveAccount, getClient } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("identite");
   const [origine, setOrigine] = useState<Prospect | null>(null);
+  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
+  const [relire, setRelire] = useState(0);
+  const compter = useCallback((n: number) => setNbEchanges(n), []);
+
+  /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
+  const affaire = fiche?.clientId ? getClient(fiche.clientId) : undefined;
+
+  const onglets: Onglet[] = [
+    { cle: "identite", label: "Identité" },
+    { cle: "approche", label: "Approche" },
+    { cle: "action", label: "Action" },
+    { cle: "suivi", label: "Historique", compte: nbEchanges },
+  ];
   const [valeurs, setValeurs] = useState<Record<string, string>>(() => {
     if (!fiche) return { date_client: new Date().toISOString().slice(0, 10) };
     return {
@@ -132,11 +152,54 @@ export default function FicheClient({
       {mode === "lecture" ? (
         /* ── Consultation : trois onglets, aucun champ de saisie ── */
         <div className="overflow-hidden rounded-2xl border border-border">
-        <Onglets onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
+        <Onglets onglets={onglets} actif={onglet} onChange={setOnglet} />
 
         <div className="p-4">
         {onglet === "identite" && (
-        <div className="max-h-[52vh] divide-y divide-border overflow-y-auto">
+        <div className="max-h-[52vh] overflow-y-auto">
+        {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
+            elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
+        {affaire && (
+          <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+            <SectionLabel>Ce qu’on sait d’eux</SectionLabel>
+            <div className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {[
+                ["SIREN", affaire.siren],
+                ["Effectif", affaire.effectif],
+                ["Adresse", [affaire.adresse, affaire.codePostal, affaire.ville].filter(Boolean).join(" ")],
+                ["Journées vendues", affaire.jours ? String(affaire.jours) : ""],
+                ["Dépistés", affaire.depistes ? String(affaire.depistes) : ""],
+                ["Orientés", affaire.orientes ? String(affaire.orientes) : ""],
+              ]
+                .filter(([, v]) => v)
+                .map(([label, v]) => (
+                  <div key={label} className="flex gap-2 text-[13px]">
+                    <span className="shrink-0 text-muted-foreground">{label}</span>
+                    <span className="min-w-0 break-words font-semibold text-avisdoc-ink">{v}</span>
+                  </div>
+                ))}
+            </div>
+            {affaire.contacts.length > 0 && (
+              <div className="mt-3 border-t border-border pt-2.5">
+                <SectionLabel>Interlocuteur{affaire.contacts.length > 1 ? "s" : ""}</SectionLabel>
+                <div className="mt-1.5 space-y-1">
+                  {affaire.contacts.map((c) => (
+                    <div key={c.id} className="text-[13px] text-avisdoc-ink">
+                      <span className="font-semibold">{[c.prenom, c.nom].filter(Boolean).join(" ")}</span>
+                      {c.role && <span className="text-muted-foreground"> · {c.role}</span>}
+                      {c.email && (
+                        <a href={`mailto:${c.email}`} className="ml-2 text-avisdoc-teal underline-offset-2 hover:underline">
+                          {c.email}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="divide-y divide-border">
           {accountFields.map((f) => {
             const v = lire(f.key).trim();
             const affichee =
@@ -161,6 +224,18 @@ export default function FicheClient({
             );
           })}
         </div>
+        </div>
+        )}
+
+        {onglet === "action" && (
+          <div className="max-h-[52vh] overflow-y-auto pr-1">
+            <ActionsFiche
+              cles={{ accountId: fiche?.id ?? null }}
+              suggestions={SUGGESTIONS}
+              onFait={() => setRelire((n) => n + 1)}
+              relire={relire}
+            />
+          </div>
         )}
 
         {onglet === "approche" && (
@@ -195,7 +270,7 @@ export default function FicheClient({
 
         {onglet === "suivi" && (
           <div className="max-h-[52vh] overflow-y-auto pr-1">
-            <FilEchanges cles={{ accountId: fiche?.id ?? null }} jalons={jalons} />
+            <FilEchanges cles={{ accountId: fiche?.id ?? null }} jalons={jalons} onCompte={compter} rafraichir={relire} />
           </div>
         )}
         </div>
