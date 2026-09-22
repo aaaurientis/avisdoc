@@ -9,6 +9,9 @@ import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
+import BarreSelection from "../components/BarreSelection";
+import CaseFiche from "../components/CaseFiche";
+import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
 import NouveauProspect from "./prospects/NouveauProspect";
@@ -29,18 +32,36 @@ interface Demande {
   finished_at: string | null;
 }
 
-function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
+function Carte({
+  p,
+  onOuvrir,
+  cochee,
+  onCocher,
+  selectionEnCours,
+}: {
+  p: Prospect;
+  onOuvrir: () => void;
+  cochee: boolean;
+  onCocher: () => void;
+  selectionEnCours: boolean;
+}) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOuvrir}
-      className="ad-card-clickable w-full rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-avisdoc-teal"
+      onKeyDown={(e) => e.key === "Enter" && onOuvrir()}
+      className={cn(
+        "ad-card-clickable group w-full cursor-pointer rounded-xl border bg-card p-3 text-left transition-colors",
+        cochee ? "border-avisdoc-teal ring-1 ring-avisdoc-teal/40" : "border-border hover:border-avisdoc-teal",
+      )}
     >
       {!p.opened_at && (
         <Badge className="mb-1.5 bg-amber-100 uppercase tracking-wide text-amber-800">Nouveau</Badge>
       )}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{p.name}</div>
+      <div className="flex items-start gap-2">
+        <CaseFiche cochee={cochee} onBascule={onCocher} libelle={p.name} visible={selectionEnCours} />
+        <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">{p.name}</div>
         <Badge className={`${tonNote(p.score_total)} shrink-0`}>{p.score_total ?? "—"}</Badge>
       </div>
       <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
@@ -54,7 +75,7 @@ function Carte({ p, onOuvrir }: { p: Prospect; onOuvrir: () => void }) {
           <span className="truncate text-[11px]">{p.contact_name ?? p.contact_email ?? p.contact_phone}</span>
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -78,6 +99,48 @@ export default function Prospects() {
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
+  const [coches, setCoches] = useState<Set<string>>(new Set());
+
+  const cocher = (id: string) =>
+    setCoches((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+
+  const selectionnees = useMemo(() => prospects.filter((p) => coches.has(p.id)), [coches, prospects]);
+  const adresses = useMemo(
+    () => [...new Set(selectionnees.map((p) => p.contact_email).filter((e): e is string => Boolean(e)))],
+    [selectionnees],
+  );
+
+  /** Un seul message à plusieurs : les destinataires sont en copie cachée. */
+  const ecrireAuxCoches = () => {
+    if (adresses.length === 0) return;
+    window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
+  };
+
+  /**
+   * Écarter, pas supprimer : une fiche écartée reste consultable. C'est ce que fait
+   * déjà la corbeille de cet écran, et on ne perd jamais le travail de Merx.
+   */
+  const ecarterLesCoches = async () => {
+    const n = selectionnees.length;
+    if (n === 0) return;
+    if (!window.confirm(`Écarter ${n} fiche${n > 1 ? "s" : ""} ? Elles restent consultables dans « Voir les fiches écartées ».`))
+      return;
+    const { error } = await supabaseAdmin
+      .from("admin_prospects")
+      .update({ status: "ecarte" })
+      .in("id", [...coches]);
+    if (error) {
+      setErreur(error.message);
+      return;
+    }
+    setCoches(new Set());
+    await charger();
+  };
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [brouillon, setBrouillon] = useState<{
     prospect: Prospect;
@@ -287,7 +350,14 @@ export default function Prospects() {
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
                   {liste.map((p) => (
-                    <Carte key={p.id} p={p} onOuvrir={() => void ouvrir(p)} />
+                    <Carte
+                      key={p.id}
+                      p={p}
+                      onOuvrir={() => void ouvrir(p)}
+                      cochee={coches.has(p.id)}
+                      onCocher={() => cocher(p.id)}
+                      selectionEnCours={coches.size > 0}
+                    />
                   ))}
                 </div>
               </div>
@@ -305,6 +375,15 @@ export default function Prospects() {
           {voirEcartees ? "Revenir aux fiches actives" : `Voir les fiches écartées (${ecartees})`}
         </button>
       )}
+
+      <BarreSelection
+        nombre={selectionnees.length}
+        avecEmail={adresses.length}
+        libelleSuppression="Écarter"
+        onEmail={ecrireAuxCoches}
+        onSupprimer={() => void ecarterLesCoches()}
+        onEffacer={() => setCoches(new Set())}
+      />
 
       {ajout && <NouveauProspect onClose={() => setAjout(false)} onCree={charger} />}
 

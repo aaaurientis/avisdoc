@@ -11,6 +11,8 @@ import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import FiltresClients, { FILTRES_COMPTE_VIDES, retenueCompte, type FiltresCompte } from "./clients/FiltresClients";
 import ApercuImport from "./clients/ApercuImport";
+import BarreSelection from "../components/BarreSelection";
+import CaseFiche from "../components/CaseFiche";
 import { proposer, type Correspondance } from "../lib/import-colonnes";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
@@ -58,6 +60,15 @@ export default function FichierClient() {
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
   const [groupePar, setGroupePar] = useState("secteur");
   const [importOuvert, setImportOuvert] = useState(false);
+  const [coches, setCoches] = useState<Set<string>>(new Set());
+
+  const cocher = (id: string) =>
+    setCoches((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
   const [aImporter, setAImporter] = useState<{
     nom: string;
     lignes: Record<string, unknown>[];
@@ -103,6 +114,29 @@ export default function FichierClient() {
     () => accounts.filter((a) => retenueCompte(a, filtres, recherche, Boolean(origineDe(a)))),
     [accounts, filtres, origineDe, recherche],
   );
+
+  const selectionnees = useMemo(() => accounts.filter((a) => coches.has(a.id)), [accounts, coches]);
+
+  /** Les adresses des fiches cochées : toute colonne de type e-mail compte. */
+  const adresses = useMemo(() => {
+    const champsMail = accountFields.filter((f) => f.type === "email");
+    const vues = selectionnees.flatMap((a) => champsMail.map((f) => (a.data[f.key] ?? "").trim()).filter(Boolean));
+    return [...new Set(vues)];
+  }, [accountFields, selectionnees]);
+
+  /** Un seul message à plusieurs : les destinataires sont en copie cachée. */
+  const ecrireAuxCoches = () => {
+    if (adresses.length === 0) return;
+    window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
+  };
+
+  const supprimerLesCoches = () => {
+    const n = selectionnees.length;
+    if (n === 0) return;
+    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} du fichier client ? Cette suppression ne se défait pas.`)) return;
+    for (const a of selectionnees) deleteAccount(a.id);
+    setCoches(new Set());
+  };
 
   /** Tous les secteurs du fichier, pour le filtre — pas seulement ceux qui restent affichés. */
   const tousSecteurs = useMemo(
@@ -369,6 +403,7 @@ export default function FichierClient() {
           <table className="w-full min-w-[720px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
+                <th className="w-10 px-3" />
                 {accountFields.map((f) => (
                   <th
                     key={f.id}
@@ -385,8 +420,14 @@ export default function FichierClient() {
                 <tr
                   key={a.id}
                   onClick={() => setFiche({ compte: a, mode: "lecture" })}
-                  className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
+                  className={cn(
+                    "group cursor-pointer border-b border-border last:border-0 hover:bg-muted/30",
+                    coches.has(a.id) && "bg-avisdoc-teal/5",
+                  )}
                 >
+                  <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                    <CaseFiche cochee={coches.has(a.id)} onBascule={() => cocher(a.id)} libelle={a.name} visible={coches.size > 0} />
+                  </td>
                   {accountFields.map((f) => (
                     <td
                       key={f.id}
@@ -452,10 +493,19 @@ export default function FichierClient() {
                       <div
                         key={a.id}
                         onClick={() => setFiche({ compte: a, mode: "lecture" })}
-                        className="group cursor-pointer rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal"
+                        className={cn(
+                          "group cursor-pointer rounded-xl border bg-card p-3 transition-colors",
+                          coches.has(a.id) ? "border-avisdoc-teal ring-1 ring-avisdoc-teal/40" : "border-border hover:border-avisdoc-teal",
+                        )}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
+                        <div className="flex items-start gap-2">
+                          <CaseFiche
+                            cochee={coches.has(a.id)}
+                            onBascule={() => cocher(a.id)}
+                            libelle={a.name}
+                            visible={coches.size > 0}
+                          />
+                          <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
                           {origineDe(a) && (
                             <Badge className={`${tonNote(origineDe(a)!.score_total)} shrink-0`}>
                               {origineDe(a)!.score_total ?? "—"}
@@ -591,6 +641,15 @@ export default function FichierClient() {
           </p>
         </Modal>
       )}
+
+      <BarreSelection
+        nombre={selectionnees.length}
+        avecEmail={adresses.length}
+        libelleSuppression="Supprimer"
+        onEmail={ecrireAuxCoches}
+        onSupprimer={supprimerLesCoches}
+        onEffacer={() => setCoches(new Set())}
+      />
 
       {aImporter && (
         <ApercuImport

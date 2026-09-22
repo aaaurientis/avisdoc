@@ -4,6 +4,7 @@ import { Columns3, Plus, Search } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader } from "../components/ui";
+import BarreSelection from "../components/BarreSelection";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
   departementDe,
@@ -18,11 +19,20 @@ import ColonnesModal from "./crm/ColonnesModal";
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients, stages, setClientStage } = useAdminData();
+  const { clients, stages, setClientStage, deleteClient } = useAdminData();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
+  const [coches, setCoches] = useState<Set<string>>(new Set());
+
+  const cocher = (id: string) =>
+    setCoches((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
   const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
     new Map(),
   );
@@ -52,6 +62,26 @@ export default function Crm() {
   const selected = clientId ? clients.find((c) => c.id === clientId) : undefined;
 
   const visibles = useMemo(() => clients.filter((c) => retenueCrm(c, filtres, recherche)), [clients, filtres, recherche]);
+
+  const selectionnees = useMemo(() => clients.filter((c) => coches.has(c.id)), [clients, coches]);
+  const adresses = useMemo(
+    () => [...new Set(selectionnees.flatMap((c) => c.contacts.map((p) => p.email)).filter(Boolean))],
+    [selectionnees],
+  );
+
+  /** Un seul message à plusieurs : les destinataires sont en copie cachée. */
+  const ecrireAuxCoches = () => {
+    if (adresses.length === 0) return;
+    window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
+  };
+
+  const supprimerLesCoches = async () => {
+    const n = selectionnees.length;
+    if (n === 0) return;
+    if (!window.confirm(`Supprimer ${n} affaire${n > 1 ? "s" : ""} du Pipeline ? Cette suppression ne se défait pas.`)) return;
+    for (const c of selectionnees) await deleteClient(c.id);
+    setCoches(new Set());
+  };
 
   /** Les départements réellement présents dans les affaires. */
   const departements = useMemo(
@@ -112,6 +142,19 @@ export default function Crm() {
           onSelect={(id) => navigate(`/crm/${id}`)}
           onDeplacer={(id, stage) => setClientStage(id, stage)}
           origines={origines}
+          coches={coches}
+          onCocher={cocher}
+        />
+      )}
+
+      {!selected && (
+        <BarreSelection
+          nombre={selectionnees.length}
+          avecEmail={adresses.length}
+          libelleSuppression="Supprimer"
+          onEmail={ecrireAuxCoches}
+          onSupprimer={() => void supprimerLesCoches()}
+          onEffacer={() => setCoches(new Set())}
         />
       )}
 

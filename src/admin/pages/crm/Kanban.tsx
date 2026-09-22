@@ -4,6 +4,7 @@ import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
 import { Badge } from "../../components/ui";
+import CaseFiche from "../../components/CaseFiche";
 import { tonNote } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,8 @@ export default function Kanban({
   onSelect,
   onDeplacer,
   origines,
+  coches,
+  onCocher,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -26,6 +29,9 @@ export default function Kanban({
   onDeplacer?: (id: string, stage: Stage) => void;
   /** Ce que Merx avait trouvé, par affaire : la carte dit la même chose qu’en prospection. */
   origines?: Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>;
+  /** Fiches cochées, pour les actions groupées. */
+  coches?: Set<string>;
+  onCocher?: (id: string) => void;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -88,7 +94,8 @@ export default function Kanban({
                     setSurvolee(null);
                   }}
                   className={cn(
-                    "ad-card-clickable group flex items-start gap-1.5 rounded-xl border border-border bg-card p-3 transition-colors hover:border-avisdoc-teal",
+                    "ad-card-clickable group flex items-start gap-1.5 rounded-xl border bg-card p-3 transition-colors",
+                    coches?.has(c.id) ? "border-avisdoc-teal ring-1 ring-avisdoc-teal/40" : "border-border hover:border-avisdoc-teal",
                     saisi === c.id && "opacity-50",
                   )}
                 >
@@ -102,6 +109,15 @@ export default function Kanban({
                     >
                       <GripVertical className="size-4" />
                     </span>
+                  )}
+
+                  {onCocher && (
+                    <CaseFiche
+                      cochee={Boolean(coches?.has(c.id))}
+                      onBascule={() => onCocher(c.id)}
+                      libelle={c.company}
+                      visible={Boolean(coches?.size)}
+                    />
                   )}
 
                   <button type="button" onClick={() => onSelect(c.id)} className="min-w-0 flex-1 text-left">
