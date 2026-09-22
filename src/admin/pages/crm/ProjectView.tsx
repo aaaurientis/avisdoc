@@ -20,10 +20,27 @@ import FilEchanges from "../../components/FilEchanges";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
+import Onglets from "../../components/Onglets";
 import { cn } from "@/lib/utils";
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+
+/** Un bloc à l'intérieur d'un onglet : plusieurs fonctions tiennent dans le même. */
+function Bloc({ titre, verrou, children }: { titre?: string; verrou?: string | null; children: ReactNode }) {
+  return (
+    <section className="mt-5 first:mt-0">
+      {titre && <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">{titre}</div>}
+      {verrou ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-border px-4 py-3 text-[13px] text-muted-foreground">
+          <Lock className="size-4 shrink-0 text-muted-foreground/60" /> {verrou}
+        </div>
+      ) : (
+        children
+      )}
+    </section>
+  );
+}
 
 // Section repliable pleine largeur (accordéon de la fiche projet).
 // `locked` : étape non atteinte → en-tête grisé, cadenas, contenu masqué.
@@ -139,19 +156,16 @@ export default function ProjectView({
   const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
 
   // Onglets des fonctions, dans l'ordre du parcours.
-  const TABS: { key: string; label: string; min: Stage; compte?: number }[] = [
-    { key: "approche", label: "Approche", min: "Nouveau" },
-    { key: "suivi", label: "Historique", min: "Nouveau", compte: nbEchanges ?? undefined },
-    { key: "contacts", label: "Contacts", min: "Nouveau", compte: client.contacts.length },
-    { key: "suivis", label: "Suivis", min: "Nouveau", compte: client.suivis.length },
-    { key: "journal", label: "Journal", min: "Nouveau" },
-    { key: "documents", label: "Documents", min: "Nouveau", compte: client.docs.length },
-    { key: "proposition", label: "Proposition", min: "Proposition" },
-    { key: "qonto", label: "Devis Qonto", min: "Proposition" },
-    { key: "espace", label: "Espace client", min: "Signé" },
-    { key: "rdv", label: "Rendez-vous", min: "Signé" },
+  // Quatre onglets, les mêmes que sur les autres fiches : ce qui est vrai, ce qu'on
+  // pense, ce qu'on fait, ce qui s'est passé. Leurs fonctions se rangent dedans.
+  const TABS: { key: string; label: string; compte?: number }[] = [
+    { key: "identite", label: "Identité", compte: client.contacts.length + client.docs.length },
+    { key: "approche", label: "Approche" },
+    { key: "action", label: "Action" },
+    { key: "historique", label: "Historique", compte: (nbEchanges ?? 0) + client.suivis.length },
   ];
-  const [tab, setTab] = useState("approche");
+
+  const [tab, setTab] = useState("identite");
 
   /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
   const chargerOrigine = useCallback(async () => {
@@ -190,8 +204,6 @@ export default function ProjectView({
       setMerxEnCours(null);
     }
   };
-  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
-  const activeLocked = verrou(activeTab.min);
 
   const startEdit = () => {
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
@@ -232,7 +244,11 @@ export default function ProjectView({
   const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-6">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex w-full max-w-5xl min-w-0 flex-col gap-3 rounded-3xl bg-card p-5 shadow-floating sm:p-6"
+      >
         {/* 1. Nom de la société et infos */}
         <Section
           titre={client.company}
@@ -336,59 +352,47 @@ export default function ProjectView({
 
         {/* Onglets des fonctions (sous le bandeau) */}
         <Card className="overflow-hidden">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 pt-2">
-            {TABS.map((t) => {
-              const locked = verrou(t.min);
-              const active = t.key === tab;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3.5 py-2.5 text-[12.5px] font-bold transition-colors",
-                    active
-                      ? "border-avisdoc-teal text-avisdoc-ink"
-                      : "border-transparent text-muted-foreground hover:text-avisdoc-ink",
-                    locked && "opacity-50",
-                  )}
-                >
-                  {locked && <Lock className="size-3" />}
-                  {t.label}
-                  {t.compte != null && !locked && (
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                      {t.compte}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <Onglets onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))} actif={tab} onChange={setTab} />
 
           <div className="px-5 pb-5 pt-4">
-            {activeLocked ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Lock className="size-6 text-muted-foreground/50" />
-                <p className="text-[13px] text-muted-foreground">{indice(activeTab.min)}</p>
-              </div>
-            ) : (
+            {tab === "identite" && (
               <>
-                {tab === "approche" && ApprocheTab()}
-                {tab === "suivi" && (
-                  <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} />
-                )}
-                {tab === "contacts" && ContactsTab()}
-                {tab === "suivis" && SuivisTab()}
-                {tab === "journal" && <JournalCard clientId={client.id} />}
-                {tab === "documents" && DocumentsTab()}
-                {tab === "proposition" && PropositionTab()}
-                {tab === "qonto" && <DevisQonto clientId={client.id} />}
-                {tab === "espace" && <EspaceClientCard bare clientId={client.id} clientName={client.company} />}
-                {tab === "rdv" && <RendezVousCard bare clientId={client.id} />}
+                <Bloc titre="Interlocuteurs">{ContactsTab()}</Bloc>
+                <Bloc titre="Documents">{DocumentsTab()}</Bloc>
+              </>
+            )}
+
+            {tab === "approche" && ApprocheTab()}
+
+            {tab === "action" && (
+              <>
+                <Bloc titre="Proposition" verrou={verrou("Proposition") ? indice("Proposition") : null}>
+                  {PropositionTab()}
+                </Bloc>
+                <Bloc verrou={verrou("Proposition") ? indice("Proposition") : null}>
+                  <DevisQonto clientId={client.id} />
+                </Bloc>
+                <Bloc verrou={verrou("Signé") ? indice("Signé") : null}>
+                  <EspaceClientCard bare clientId={client.id} clientName={client.company} />
+                </Bloc>
+                <Bloc verrou={verrou("Signé") ? indice("Signé") : null}>
+                  <RendezVousCard bare clientId={client.id} />
+                </Bloc>
+              </>
+            )}
+
+            {tab === "historique" && (
+              <>
+                <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} />
+                <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
+                <Bloc>
+                  <JournalCard clientId={client.id} />
+                </Bloc>
               </>
             )}
           </div>
         </Card>
+      </div>
 
       {brouillon && (
         <BrouillonEmail
