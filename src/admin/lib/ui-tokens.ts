@@ -48,6 +48,13 @@ export const TONES: Record<StageTone, { dot: string; text: string; soft: string;
   rose: { dot: "bg-rose-500", text: "text-rose-600", soft: "bg-rose-100", label: "Rose" },
 };
 
+/**
+ * Le dessin d'une colonne de tableau. Le Pipeline et la Prospection s'en servent tous
+ * les deux : on ne doit rien avoir à réapprendre en passant d'un écran à l'autre.
+ * La hauteur est commune pour que les colonnes s'alignent d'un écran à l'autre.
+ */
+export const COLONNE_KANBAN = "flex h-full min-h-[400px] flex-col rounded-xl bg-muted/60 p-3";
+
 /** Colonnes de départ — servent au mode démonstration et de repli si la table est vide. */
 export const STAGES_DEFAUT: PipelineStage[] = [
   { id: "s1", label: "Nouveau", position: 1, tone: "slate" },

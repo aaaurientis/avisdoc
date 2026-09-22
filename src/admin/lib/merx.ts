@@ -3,11 +3,11 @@
 // `supabase/functions/merx/scoring.ts`. On ne garde ici que les libellés et les maximums.
 
 export const SECTEURS = [
-  { id: "btp", label: "Travaux publics et BTP" },
-  { id: "espaces_verts", label: "Espaces verts" },
-  { id: "agriculture", label: "Agriculture et viticulture" },
-  { id: "collectivites", label: "Collectivités" },
-  { id: "autre", label: "Autre" },
+  { id: "btp", label: "Travaux publics et BTP", tone: "coral" },
+  { id: "espaces_verts", label: "Espaces verts", tone: "emerald" },
+  { id: "agriculture", label: "Agriculture et viticulture", tone: "teal" },
+  { id: "collectivites", label: "Collectivités", tone: "violet" },
+  { id: "autre", label: "Autre", tone: "slate" },
 ] as const;
 
 export type Secteur = (typeof SECTEURS)[number]["id"];

@@ -8,6 +8,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
+import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
@@ -106,12 +107,15 @@ export default function Prospects() {
     void charger();
   }, [charger]);
 
+  /** Les fiches de l’onglet courant, avant que les filtres ne s’en mêlent. */
+  const duVivier = useMemo(
+    () => prospects.filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte" && !p.converted_client_id)),
+    [prospects, voirEcartees],
+  );
+
   const visibles = useMemo(
-    () =>
-      prospects
-        .filter((p) => (voirEcartees ? p.status === "ecarte" : p.status !== "ecarte" && !p.converted_client_id))
-        .filter((p) => retenue(p, filtres, recherche)),
-    [prospects, voirEcartees, filtres, recherche],
+    () => duVivier.filter((p) => retenue(p, filtres, recherche)),
+    [duVivier, filtres, recherche],
   );
 
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
@@ -247,7 +251,7 @@ export default function Prospects() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Chargement des fiches…
         </div>
-      ) : visibles.length === 0 ? (
+      ) : duVivier.length === 0 ? (
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
           <SectionLabel>{voirEcartees ? "Aucune fiche écartée" : "Aucune fiche pour l’instant"}</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -264,14 +268,14 @@ export default function Prospects() {
           {SECTEURS.map((s) => {
             const liste = visibles.filter((p) => secteurDe(p) === s.id);
             return (
-              <div key={s.id} className="min-h-[260px] rounded-xl bg-muted/60 p-3">
+              <div key={s.id} className={COLONNE_KANBAN}>
                 <div className="mb-2.5 flex items-center justify-between gap-2">
                   <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">{s.label}</div>
-                  <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${TONES[s.tone].dot}`}>
                     {liste.length}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-1 flex-col gap-2">
                   {liste.map((p) => (
                     <Carte key={p.id} p={p} onOuvrir={() => void ouvrir(p)} />
                   ))}

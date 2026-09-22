@@ -2,7 +2,7 @@ import { useState } from "react";
 import { GripVertical } from "lucide-react";
 import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
-import { TONES } from "../../lib/ui-tokens";
+import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
 import { cn } from "@/lib/utils";
 
 function joursLabel(j: number) {
@@ -58,7 +58,8 @@ export default function Kanban({
               deposer(stage.label);
             }}
             className={cn(
-              "min-h-[260px] rounded-xl bg-muted/60 p-3 transition-colors",
+              COLONNE_KANBAN,
+              "transition-colors",
               cible && "bg-avisdoc-teal/10 ring-2 ring-avisdoc-teal/40",
             )}
           >
@@ -71,7 +72,7 @@ export default function Kanban({
               </span>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2">
               {list.map((c) => (
                 <div
                   key={c.id}
