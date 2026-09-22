@@ -214,30 +214,54 @@ export default function ProjectView({
     setMerxEnCours("approfondir");
     setMerxErreur(null);
     try {
-      const { data, error } = await supabaseAdmin
+      // Merx connaît peut-être déjà cette entreprise : on regarde AVANT d'insérer,
+      // plutôt que de deviner à partir d'une erreur de contrainte.
+      const { data: connue } = await supabaseAdmin
         .from("admin_prospects")
-        .insert({
-          owner_email: user?.email ?? "",
-          name: client.company,
-          city: client.ville || null,
-          department: (client.codePostal ?? "").slice(0, 2) || null,
-          siren: client.siren || null,
-          converted_client_id: client.id,
-          converted_at: new Date().toISOString(),
-          status: "a_contacter",
-        })
-        .select("id")
-        .single();
-      if (error) throw new Error(error.message);
-      await approfondirProspect(data.id as string);
+        .select("id, converted_client_id, deleted_at, city")
+        .ilike("name", client.company.trim())
+        .maybeSingle();
+
+      let prospectId: string;
+
+      if (connue) {
+        const dejaAilleurs = connue.converted_client_id && connue.converted_client_id !== client.id;
+        if (dejaAilleurs) {
+          throw new Error(
+            "Merx a déjà une fiche pour cette entreprise, rattachée à une autre affaire du Pipeline. " +
+              "Il s’agit probablement d’un doublon : gardez celle qui porte la fiche et supprimez l’autre.",
+          );
+        }
+        // Libre, ou déjà à nous : on la reprend, et on la sort de la corbeille au besoin.
+        const { error } = await supabaseAdmin
+          .from("admin_prospects")
+          .update({ converted_client_id: client.id, converted_at: new Date().toISOString(), deleted_at: null })
+          .eq("id", connue.id);
+        if (error) throw new Error(error.message);
+        prospectId = connue.id as string;
+      } else {
+        const { data, error } = await supabaseAdmin
+          .from("admin_prospects")
+          .insert({
+            owner_email: user?.email ?? "",
+            name: client.company,
+            city: client.ville || null,
+            department: (client.codePostal ?? "").slice(0, 2) || null,
+            siren: client.siren || null,
+            converted_client_id: client.id,
+            converted_at: new Date().toISOString(),
+            status: "a_contacter",
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        prospectId = data.id as string;
+      }
+
+      await approfondirProspect(prospectId);
       await chargerOrigine();
     } catch (e) {
-      const m = e instanceof Error ? e.message : "Merx n’a pas répondu.";
-      setMerxErreur(
-        /duplicate key|unique/i.test(m)
-          ? "Merx connaît déjà une entreprise de ce nom dans cette ville : retrouvez-la dans Prospection."
-          : m,
-      );
+      setMerxErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
     } finally {
       setMerxEnCours(null);
     }
