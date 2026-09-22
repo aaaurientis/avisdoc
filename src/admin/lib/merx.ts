@@ -35,6 +35,17 @@ export interface NoteCritere {
   source: string | null;
 }
 
+/** Le dossier commercial monté par Merx : de quoi décrocher son téléphone. */
+export interface Dossier {
+  a_retenir?: string[];
+  qui_aborder?: string;
+  accroche?: string;
+  arguments?: { argument: string; parce_que: string }[];
+  objections?: { objection: string; reponse: string }[];
+  offre?: string;
+  a_verifier?: string[];
+}
+
 export interface Prospect {
   id: string;
   owner_email: string;
@@ -61,6 +72,8 @@ export interface Prospect {
   contact_phone: string | null;
   contact_source: string | null;
   approach: string | null;
+  /** Le dossier commercial monté par Merx à l'approfondissement (migration 0033). */
+  dossier: Dossier | null;
   enriched_at: string | null;
   /** Première ouverture de la fiche : tant qu'elle est vide, la fiche est « nouvelle ». */
   opened_at: string | null;

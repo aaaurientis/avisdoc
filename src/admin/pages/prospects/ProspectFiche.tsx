@@ -14,6 +14,7 @@ import FicheEntreprise from "../../components/FicheEntreprise";
 import type { EtapeParcours } from "../../components/ParcoursFiche";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
+import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import type { Jalon } from "../../lib/echanges";
 import { cn } from "@/lib/utils";
 
@@ -357,6 +358,8 @@ export default function ProspectFiche({
 
           {onglet === "approche" && (
             <>
+            {/* Le dossier de Merx d’abord : c’est avec lui qu’on décroche le téléphone. */}
+            {dossierRempli(p.dossier) && <DossierCommercial dossier={p.dossier} />}
             {/* Pourquoi c’est une cible : la phrase, les faits constatés, puis l’angle d’approche. */}
             {(p.rationale || constats.length > 0 || p.approach) && (
               <div className="mb-5 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
