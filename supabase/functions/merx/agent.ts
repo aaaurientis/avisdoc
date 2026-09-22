@@ -36,7 +36,11 @@ import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, t
 function enClair(message: string): string {
   if (/duplicate key|unique constraint/i.test(message)) return "ces entreprises sont déjà dans vos fiches.";
   if (/rate.?limit|429|overloaded/i.test(message)) return "le service est momentanément saturé, réessayez dans un instant.";
-  if (/pas de réponse en/i.test(message)) return message.toLowerCase();
+  // Un dépassement, c'est presque toujours un périmètre trop vaste. Le dire, plutôt
+  // que d'annoncer un nombre de secondes qui n'apprend rien.
+  if (/pas de réponse en/i.test(message)) {
+    return "la recherche était trop large pour aboutir : reprenez-la sur un seul département, ou un seul métier.";
+  }
   if (/ANTHROPIC_API_KEY/i.test(message)) return "la clé du modèle n'est pas configurée sur le projet.";
   // Une erreur inattendue reste consignée telle quelle dans la demande (écran Coûts) ; ici, on reste lisible.
   if (/[a-z]{4,}\s+[a-z]{4,}\s+[a-z]{4,}/i.test(message) && !/[éèàçùê]/i.test(message)) {
@@ -45,7 +49,9 @@ function enClair(message: string): string {
   return message;
 }
 
-const BUDGET_MS = 120_000; // sous la coupure de l'hébergeur
+// L'hébergeur coupe à 150 s. On s'arrête à 140 pour garder de quoi écrire le résultat :
+// à 120, une recherche large partait à la poubelle après deux minutes de travail.
+const BUDGET_MS = 140_000;
 
 /** Quel modèle sert à quelle sorte de demande : sert à enregistrer le bon tarif. */
 const modeleDe = (kind: string): Usage => (kind === "approfondissement" ? "approfondissement" : "recherche");
