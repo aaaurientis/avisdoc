@@ -138,15 +138,17 @@ export default function ProspectFiche({
     }
   };
 
-  /** Le parcours de la fiche : quatre repères, quatre dates qu’elle porte déjà. */
+  /**
+   * Le parcours d’un prospect s’arrête au Pipeline : dès qu’on l’a contacté, l’affaire
+   * se suit là-bas. « Contactée » n’est donc pas une étape d’avant le Pipeline.
+   */
   const parcours = useMemo<EtapeParcours[]>(
     () => [
       { label: "Trouvée", au: p.created_at, tone: "slate" },
       { label: "Approfondie", au: p.enriched_at, tone: "teal" },
-      { label: "Contactée", au: p.last_contacted_at, tone: "coral" },
       { label: "Au Pipeline", au: p.converted_at, tone: "emerald" },
     ],
-    [p.created_at, p.enriched_at, p.last_contacted_at, p.converted_at],
+    [p.created_at, p.enriched_at, p.converted_at],
   );
 
   /** Les jalons ne sont pas stockés : ce sont les dates que la fiche porte déjà. */
