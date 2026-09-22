@@ -22,6 +22,7 @@ import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
 import PastillesPrevues from "../components/PastillesPrevues";
 import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
+import { confirmer } from "../components/Confirmation";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -169,7 +170,7 @@ export default function Prospects() {
 
   /** Supprimer une fiche depuis sa carte, sans passer par la sélection. */
   const supprimerUne = async (p: Prospect) => {
-    if (!window.confirm(`Supprimer ${p.name} ? Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`)) return;
+    if (!(await confirmer({ titre: `Supprimer ${p.name} ?`, message: `Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` }))) return;
     try {
       await jeter("prospect", [p.id]);
       await charger();
@@ -185,7 +186,7 @@ export default function Prospects() {
   const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
+    if (!(await confirmer({ titre: `Supprimer ${n} fiche${n > 1 ? "s" : ""} ?`, message: `Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` })))
       return;
     try {
       await jeter("prospect", [...coches]);
@@ -318,8 +319,11 @@ export default function Prospects() {
     [charger],
   );
 
+  // Supprimer depuis la FICHE OUVERTE. C'était le chemin oublié : la liste demandait
+  // confirmation, la fiche supprimait d'un clic.
   const ecarter = useCallback(
     async (p: Prospect) => {
+      if (!(await confirmer({ titre: `Supprimer ${p.name} ?`, message: `Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` }))) return;
       const { error } = await supabaseAdmin
         .from("admin_prospects")
         .update({ deleted_at: new Date().toISOString() })

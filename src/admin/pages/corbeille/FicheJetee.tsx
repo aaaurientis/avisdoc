@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, RotateCcw, Trash2, X } from "lucide-react";
 import { Modal, SectionLabel } from "../../components/ui";
+import { confirmer } from "../../components/Confirmation";
 import {
   chargerDetail,
   DESTINATIONS,
@@ -150,7 +151,7 @@ export default function FicheJetee({
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Supprimer définitivement ${jetee.nom} ? Cette fois, rien ne se récupère.`)) void agir("detruire");
+              void confirmer({ titre: `Supprimer définitivement ${jetee.nom} ?`, message: "Cette fois, rien ne se récupère.", action: "Supprimer définitivement", definitif: true }).then((ok) => ok && agir("detruire"));
             }}
             className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-rose-300 hover:text-rose-700"
           >

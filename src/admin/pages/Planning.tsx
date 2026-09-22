@@ -18,6 +18,7 @@ import FicheClient from "./clients/FicheClient";
 import { useAdminData } from "../data/AdminDataContext";
 import { supprimerEchange } from "../lib/echanges";
 import { cn } from "@/lib/utils";
+import { confirmer } from "../components/Confirmation";
 
 const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
@@ -64,7 +65,7 @@ export default function Planning() {
   const clientVu = aVoir?.origine === "client" ? accounts.find((a) => a.id === aVoir.ficheId) : undefined;
 
   const supprimer = async (a: Rendezvous) => {
-    if (!window.confirm(`Supprimer « ${a.titre} » ?`)) return;
+    if (!(await confirmer({ titre: `Supprimer « ${a.titre} » ?`, message: "Cette action disparaîtra du planning et de la fiche." }))) return;
     try {
       await supprimerEchange(a.id);
       await charger();

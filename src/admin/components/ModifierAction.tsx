@@ -8,6 +8,7 @@ import { Loader2, Trash2, X } from "lucide-react";
 import { Modal, SectionLabel } from "./ui";
 import { libelleGenre, modifierEchange, supprimerEchange, type Echange } from "../lib/echanges";
 import { cn } from "@/lib/utils";
+import { confirmer } from "./Confirmation";
 
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -33,7 +34,7 @@ export default function ModifierAction({
 
   const agir = async (quoi: "enregistrer" | "supprimer") => {
     if (envoi) return;
-    if (quoi === "supprimer" && !window.confirm(`Supprimer « ${action.titre} » ?`)) return;
+    if (quoi === "supprimer" && !(await confirmer({ titre: `Supprimer « ${action.titre} » ?`, message: "Cette action disparaîtra du planning et de la fiche." }))) return;
     setEnvoi(true);
     setErreur(null);
     try {

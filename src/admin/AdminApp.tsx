@@ -13,6 +13,7 @@ import NotesDictees from "./pages/NotesDictees";
 import Dictee from "./pages/Dictee";
 import Couts from "./pages/Couts";
 import Corbeille from "./pages/Corbeille";
+import Confirmation from "./components/Confirmation";
 import Debrief from "./pages/Debrief";
 import Planning from "./pages/Planning";
 import Clients from "./pages/Clients";
@@ -81,6 +82,8 @@ export default function AdminApp() {
         <Gate />
       </HashRouter>
       <Sonner />
+      {/* Une seule fenêtre de confirmation pour tout le Hub. */}
+      <Confirmation />
     </AuthProvider>
   );
 }

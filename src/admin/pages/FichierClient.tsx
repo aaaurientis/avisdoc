@@ -23,6 +23,7 @@ import { tonNote } from "../lib/merx";
 import ColonnesClient from "./clients/ColonnesClient";
 import FicheClient from "./clients/FicheClient";
 import { cn } from "@/lib/utils";
+import { confirmer } from "../components/Confirmation";
 
 /** Valeur d’une case : les trois colonnes du socle ont leur champ, les autres sont dans `data`. */
 function valeur(a: Account, f: AccountField): string {
@@ -143,10 +144,10 @@ export default function FichierClient() {
     window.location.href = `mailto:?bcc=${encodeURIComponent(adresses.join(","))}`;
   };
 
-  const supprimerLesCoches = () => {
+  const supprimerLesCoches = async () => {
     const n = selectionnees.length;
     if (n === 0) return;
-    if (!window.confirm(`Supprimer ${n} fiche${n > 1 ? "s" : ""} ? Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.`))
+    if (!(await confirmer({ titre: `Supprimer ${n} fiche${n > 1 ? "s" : ""} ?`, message: `Vous les retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` })))
       return;
     void jeter("client", selectionnees.map((a) => a.id))
       .then(() => {
