@@ -1,7 +1,7 @@
 // Barre latérale du Hub — menu à 2 niveaux, filtré par les modules autorisés
 // (admin_droits ; un super-admin voit tout). Les groupes se déplient et
 // s'ouvrent automatiquement quand une de leurs pages est active.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   BookUser,
@@ -96,18 +96,24 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
   const [ouvert, setOuvert] = useState(enfantActif);
   const Icon = entree.icon;
 
+  // Le groupe suit la navigation : il s'ouvre sur ses écrans, se referme dès qu'on le
+  // quitte. Sans cela, « enfantActif » forçait l'ouverture et le chevron ne servait à rien.
+  useEffect(() => {
+    setOuvert(enfantActif);
+  }, [enfantActif]);
+
   return (
     <div>
       <button
         type="button"
         onClick={() => setOuvert((o) => !o)}
-        className={cn(lienCls(false), "w-full", enfantActif && "text-avisdoc-ink")}
+        className={cn(lienCls(false), "w-full", enfantActif && "bg-accent font-bold text-avisdoc-ink")}
       >
         <Icon className="size-[18px]" strokeWidth={2.2} />
         <span className="min-w-0 flex-1 truncate text-left">{entree.label}</span>
-        <ChevronDown className={cn("size-4 shrink-0 transition-transform", (ouvert || enfantActif) && "rotate-180")} />
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", ouvert && "rotate-180")} />
       </button>
-      {(ouvert || enfantActif) && (
+      {ouvert && (
         <div className="ml-[26px] flex flex-col gap-0.5 border-l border-border pl-2.5 pt-0.5">
           {enfants.map((e) => {
             const IconeEnfant = e.icon;
