@@ -118,6 +118,8 @@ interface DataValue {
   deleteAccount: (id: string) => void;
   addManyAccounts: (fiches: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string> }[]) => void;
   addField: (label: string, type: FieldType) => void;
+  /** Crée les colonnes manquantes ; rend la clé de chaque libellé demandé. */
+  addFields: (demandes: { label: string; type: FieldType }[]) => Map<string, string>;
   renameField: (id: string, label: string) => void;
   moveField: (id: string, sens: -1 | 1) => void;
   deleteField: (id: string) => void;
@@ -768,6 +770,48 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+  /**
+   * Crée d'un coup les colonnes manquantes et rend, pour chaque libellé demandé, la clé
+   * où ranger la valeur. Sert à l'import : un fichier peut apporter ses propres colonnes.
+   */
+  const addFields: DataValue["addFields"] = useCallback(
+    (demandes) => {
+      const cles = new Map<string, string>();
+      setAccountFields((prev) => {
+        const champs = [...prev];
+        for (const d of demandes) {
+          const propre = d.label.trim();
+          if (!propre) continue;
+          const connue = champs.find((f) => f.label.toLowerCase() === propre.toLowerCase());
+          if (connue) {
+            cles.set(d.label, connue.key);
+            continue;
+          }
+          const base =
+            propre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") ||
+            "colonne";
+          let key = base;
+          let n = 2;
+          while (champs.some((f) => f.key === key)) key = `${base}_${n++}`;
+          const champ: AccountField = {
+            id: crypto.randomUUID(),
+            key,
+            label: propre,
+            type: d.type,
+            position: (champs.at(-1)?.position ?? 0) + 1,
+            protege: false,
+          };
+          champs.push(champ);
+          cles.set(d.label, key);
+          persist(() => repo.createField(champ));
+        }
+        return champs;
+      });
+      return cles;
+    },
+    [persist, repo],
+  );
+
   const addField: DataValue["addField"] = useCallback(
     (label, type) => {
       const propre = label.trim();
@@ -859,7 +903,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addClient,
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
       addField, renameField, moveField, deleteField,
       deleteClient,
       addProjectContact,
@@ -882,7 +926,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
-      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage,
+      accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
       addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,

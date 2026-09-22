@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Columns3, Download, FileSpreadsheet, LayoutGrid, List, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
-import type { Account, AccountField } from "../types";
+import type { Account, AccountField, FieldType } from "../types";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import FiltresClients, { FILTRES_COMPTE_VIDES, retenueCompte, type FiltresCompte } from "./clients/FiltresClients";
@@ -47,10 +47,11 @@ const moisDe = (iso: string | null) =>
     : SANS_VALEUR;
 
 export default function FichierClient() {
-  const { accounts, accountFields, addManyAccounts, deleteAccount } = useAdminData();
+  const { accounts, accountFields, addManyAccounts, addFields, deleteAccount } = useAdminData();
   const [recherche, setRecherche] = useState("");
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
   const [groupePar, setGroupePar] = useState("secteur");
+  const [importOuvert, setImportOuvert] = useState(false);
   const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
     new Map(),
   );
@@ -174,39 +175,79 @@ export default function FichierClient() {
     const classeur = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(classeur, feuille, "Modèle");
     XLSX.writeFile(classeur, "modele-import-clients-avisdoc.xlsx");
-    setMessage(
-      "Modèle téléchargé. Gardez la première ligne telle quelle : ce sont les en-têtes reconnus. " +
-        "Remplacez la ligne d’exemple par vos clients, une ligne par fiche. Seul l’établissement est obligatoire.",
-    );
+    setImportOuvert(false);
+    setMessage("Modèle téléchargé. Remplacez la ligne d’exemple par vos clients, puis importez-le.");
   };
 
-  /** Import : les colonnes sont reconnues par leur nom ; celles qu’on ne connaît pas sont ignorées. */
+  /**
+   * Import : on prend le fichier tel qu'il est. Les colonnes déjà connues sont
+   * reconnues par leur libellé ; les autres sont CRÉÉES, avec le type deviné d'après
+   * leurs valeurs. Rien n'est jeté faute d'en-tête attendu.
+   *
+   * La colonne qui porte le nom de l'établissement est cherchée parmi les intitulés
+   * usuels ; à défaut, c'est la première colonne du fichier.
+   */
   const importer = async (file: File) => {
     setMessage(null);
     try {
       const XLSX = await import("xlsx");
-      const classeur = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+      const classeur = XLSX.read(await file.arrayBuffer(), { cellDates: true, codepage: 65001 });
       const feuille = classeur.Sheets[classeur.SheetNames[0]];
       const lignes = XLSX.utils.sheet_to_json<Record<string, unknown>>(feuille, { defval: "" });
+      if (lignes.length === 0) {
+        setMessage("Le fichier ne contient aucune ligne.");
+        return;
+      }
 
-      const parLabel = new Map(accountFields.map((f) => [f.label.toLowerCase().trim(), f]));
-      const inconnues = new Set<string>();
+      const entetes = Object.keys(lignes[0]).filter((e) => e.trim());
+      const nu = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const NOMS = ["etablissement", "nom", "raison sociale", "societe", "entreprise", "client"];
+      const enteteNom = entetes.find((e) => NOMS.includes(nu(e))) ?? entetes[0];
+
+      const texte = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim());
+
+      /** Le type d'une colonne se devine sur ses valeurs : on ne le demande pas. */
+      const typeDe = (entete: string): FieldType => {
+        const vues = lignes.map((l) => l[entete]).filter((v) => texte(v));
+        if (vues.length === 0) return "texte";
+        if (vues.every((v) => v instanceof Date)) return "date";
+        const t = vues.map(texte);
+        if (t.every((v) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v))) return "email";
+        if (t.every((v) => /^https?:\/\//i.test(v))) return "lien";
+        if (t.every((v) => /^[+\d][\d .()-]{7,}$/.test(v))) return "telephone";
+        if (t.every((v) => /^-?\d+([.,]\d+)?$/.test(v))) return "nombre";
+        if (t.some((v) => v.length > 60)) return "multiligne";
+        return "texte";
+      };
+
+      const parLabel = new Map(accountFields.map((f) => [nu(f.label), f]));
+      // Les colonnes absentes du fichier client sont créées avec le type deviné.
+      const aCreer = entetes
+        .filter((e) => e !== enteteNom && !parLabel.has(nu(e)))
+        .map((e) => ({ label: e.trim(), type: typeDe(e) }));
+      const nouvelles = aCreer.length > 0 ? addFields(aCreer) : new Map<string, string>();
+
       const fiches = lignes.map((ligne) => {
         const data: Record<string, string> = {};
         let name = "";
         let signedOn: string | null = null;
         let sector: string | null = null;
         for (const [entete, brut] of Object.entries(ligne)) {
-          const champ = parLabel.get(entete.toLowerCase().trim());
-          if (!champ) {
-            if (entete.trim()) inconnues.add(entete.trim());
+          const v = texte(brut);
+          if (entete === enteteNom) {
+            name = v;
             continue;
           }
-          const v = brut instanceof Date ? brut.toISOString().slice(0, 10) : String(brut ?? "").trim();
-          if (champ.key === "etablissement") name = v;
-          else if (champ.key === "date_client") signedOn = v || null;
-          else if (champ.key === "secteur") sector = v || null;
-          else if (v) data[champ.key] = v;
+          const champ = parLabel.get(nu(entete));
+          if (champ) {
+            if (champ.key === "etablissement") name = name || v;
+            else if (champ.key === "date_client") signedOn = v || null;
+            else if (champ.key === "secteur") sector = v || null;
+            else if (v) data[champ.key] = v;
+            continue;
+          }
+          const cle = nouvelles.get(entete.trim());
+          if (cle && v) data[cle] = v;
         }
         return { name, signedOn, sector, data };
       });
@@ -217,8 +258,9 @@ export default function FichierClient() {
       setMessage(
         [
           `${retenues.length} fiche${retenues.length > 1 ? "s ajoutées" : " ajoutée"}`,
-          ignorees > 0 && `${ignorees} ligne${ignorees > 1 ? "s" : ""} sans établissement ignorée${ignorees > 1 ? "s" : ""}`,
-          inconnues.size > 0 && `colonnes non reconnues : ${[...inconnues].slice(0, 4).join(", ")}`,
+          `nom repris de la colonne « ${enteteNom.trim()} »`,
+          aCreer.length > 0 && `${aCreer.length} colonne${aCreer.length > 1 ? "s créées" : " créée"} : ${aCreer.map((c) => c.label).join(", ")}`,
+          ignorees > 0 && `${ignorees} ligne${ignorees > 1 ? "s" : ""} sans nom ignorée${ignorees > 1 ? "s" : ""}`,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -241,10 +283,7 @@ export default function FichierClient() {
             <button type="button" onClick={() => setColonnes(true)} className={boutonSecondaire}>
               <Columns3 className="size-4" /> Colonnes
             </button>
-            <button type="button" onClick={() => void telechargerModele()} className={boutonSecondaire} title="Un fichier Excel aux bons en-têtes, avec une ligne d’exemple">
-              <FileSpreadsheet className="size-4" /> Modèle
-            </button>
-            <button type="button" onClick={() => fichierRef.current?.click()} className={boutonSecondaire}>
+            <button type="button" onClick={() => setImportOuvert(true)} className={boutonSecondaire}>
               <Upload className="size-4" /> Importer
             </button>
             <button type="button" onClick={() => void exporter()} className={boutonSecondaire}>
@@ -474,6 +513,52 @@ export default function FichierClient() {
             );
           })}
         </div>
+      )}
+
+      {importOuvert && (
+        <Modal onClose={() => setImportOuvert(false)} width={520}>
+          <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Importer un fichier Excel</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+            Prenez votre fichier tel qu’il est. La première ligne doit porter les noms des colonnes ; chaque ligne
+            suivante est un client. Les colonnes que le fichier client ne connaît pas encore seront créées.
+          </p>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+            Une seule chose compte : une colonne doit porter le nom de l’établissement — intitulée
+            « Établissement », « Nom », « Raison sociale », « Société », « Entreprise » ou « Client ». À défaut, la
+            première colonne sera prise pour le nom.
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setImportOuvert(false);
+                fichierRef.current?.click();
+              }}
+              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            >
+              <Upload className="size-4" /> Choisir mon fichier
+            </button>
+            <button
+              type="button"
+              onClick={() => void telechargerModele()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+            >
+              <FileSpreadsheet className="size-4" /> Télécharger un modèle
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOuvert(false)}
+              className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink hover:text-avisdoc-ink"
+            >
+              Annuler
+            </button>
+          </div>
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            Le modèle reprend les colonnes de votre fichier du moment, avec une ligne d’exemple. Il n’est pas
+            obligatoire : il sert si vous partez de zéro.
+          </p>
+        </Modal>
       )}
 
       {colonnes && <ColonnesClient onClose={() => setColonnes(false)} />}
