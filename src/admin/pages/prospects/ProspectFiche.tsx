@@ -1,15 +1,16 @@
 // Fiche d’un prospect trouvé par Merx : pourquoi c’est une cible, la note détaillée, les coordonnées,
 // et les pages réellement consultées. « Approfondir » va chercher le registre officiel et le site.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { uid } from "../../lib/format";
-import { Badge, SectionLabel } from "../../components/ui";
+import { Badge, Card, SectionLabel } from "../../components/ui";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
+import ParcoursProspect, { type EtapeParcours } from "./ParcoursProspect";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import type { Jalon } from "../../lib/echanges";
@@ -21,13 +22,6 @@ export interface Brouillon {
   corps: string;
   ecritLe: string | null;
 }
-
-/** Ce qui est vrai, ce qu’on va faire, ce qui s’est passé. */
-const ONGLETS: Onglet[] = [
-  { cle: "identite", label: "Identité" },
-  { cle: "approche", label: "Approche" },
-  { cle: "suivi", label: "Suivi" },
-];
 
 function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -71,6 +65,15 @@ export default function ProspectFiche({
   const [choixEtape, setChoixEtape] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [onglet, setOnglet] = useState("identite");
+  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
+  const compter = useCallback((n: number) => setNbEchanges(n), []);
+
+  /** Ce qui est vrai, ce qu’on va faire, ce qui s’est passé. */
+  const onglets: Onglet[] = [
+    { cle: "identite", label: "Identité" },
+    { cle: "approche", label: "Approche", compte: brouillons.length },
+    { cle: "suivi", label: "Suivi", compte: nbEchanges },
+  ];
   const p = prospect;
   const siege = p.head_office;
   const effectif = effectifLabel(p.headcount_band);
@@ -135,6 +138,17 @@ export default function ProspectFiche({
     }
   };
 
+  /** Le parcours de la fiche : quatre repères, quatre dates qu’elle porte déjà. */
+  const parcours = useMemo<EtapeParcours[]>(
+    () => [
+      { label: "Trouvée", au: p.created_at, tone: "slate" },
+      { label: "Approfondie", au: p.enriched_at, tone: "teal" },
+      { label: "Contactée", au: p.last_contacted_at, tone: "coral" },
+      { label: "Au Pipeline", au: p.converted_at, tone: "emerald" },
+    ],
+    [p.created_at, p.enriched_at, p.last_contacted_at, p.converted_at],
+  );
+
   /** Les jalons ne sont pas stockés : ce sont les dates que la fiche porte déjà. */
   const jalons = useMemo<Jalon[]>(
     () =>
@@ -156,24 +170,123 @@ export default function ProspectFiche({
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-8">
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl rounded-3xl bg-card p-6 shadow-floating sm:p-8">
-        {/* Titre */}
-        <div className="mb-4 flex items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="font-display text-2xl font-semibold text-avisdoc-ink">{p.name}</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">
-              {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
-            </p>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl space-y-3">
+        {/* En-tête : qui c’est, et ce qu’on peut en faire. */}
+        <Card className="overflow-hidden">
+          <div className="flex items-start gap-4 border-b border-border px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-2xl font-semibold text-avisdoc-ink">{p.name}</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
+              </p>
+            </div>
+            <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"} / 100</Badge>
+            <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
+              <X className="size-5" />
+            </button>
           </div>
-          <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"} / 100</Badge>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
-            <X className="size-5" />
-          </button>
-        </div>
 
-        <Onglets onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
+          <div className="px-5 py-4">
+            {p.siren && (
+              <div className="text-[12.5px] text-muted-foreground">
+                SIREN {p.siren}
+                {p.legal_name ? ` · ${p.legal_name}` : ""} —{" "}
+                <span className="font-bold text-avisdoc-teal">annuaire des entreprises ✓</span>
+              </div>
+            )}
+            {siege && (siege.address || siege.city) && (
+              <div className="mt-0.5 text-[12.5px] text-muted-foreground">
+                {[siege.address, siege.city].filter(Boolean).join(", ")}
+              </div>
+            )}
 
-        <div className="mt-5">
+            {/* Ce qu’on peut faire de cette fiche. */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {p.converted_client_id ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2.5 text-sm font-bold text-emerald-700">
+                  <Check className="size-4" /> Dans le Pipeline
+                </span>
+              ) : choixEtape ? (
+                <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-muted/60 p-2.5">
+                  <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
+                  {stages.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => void versLePipeline(s.label)}
+                      className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setChoixEtape(false)}
+                    className="text-[12.5px] font-semibold text-muted-foreground hover:text-avisdoc-ink"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setChoixEtape(true)}
+                  disabled={enCours !== null}
+                  className={cn(
+                    "ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60",
+                  )}
+                >
+                  {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <ArrowRightCircle className="size-4" />}
+                  Mettre dans le Pipeline
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void lancer("approfondir")}
+                disabled={enCours !== null}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+              >
+                {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void lancer("email")}
+                disabled={enCours !== null}
+                title="Merx rédige un brouillon à partir de cette fiche. Rien n'est envoyé."
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+              >
+                {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
+                Écrire un e-mail personnalisé
+              </button>
+              <button
+                type="button"
+                onClick={() => void lancer("ecarter")}
+                disabled={enCours !== null}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground hover:border-rose-300 hover:text-rose-700 disabled:opacity-60"
+              >
+                {enCours === "ecarter" ? <Loader2 className="size-4 animate-spin" /> : null}
+                Écarter
+              </button>
+            </div>
+
+            {erreur ? (
+              <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>
+            ) : (
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
+                {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
+              </p>
+            )}
+          </div>
+        </Card>
+
+        <ParcoursProspect etapes={parcours} />
+
+        <Card className="overflow-hidden">
+        <Onglets onglets={onglets} actif={onglet} onChange={setOnglet} />
+
+        <div className="px-5 pb-5 pt-4">
           {onglet === "identite" && (
             <>
             {/* Ce que l’approfondissement a trouvé */}
@@ -337,88 +450,11 @@ export default function ProspectFiche({
             <FilEchanges
               cles={{ prospectId: p.converted_client_id ? null : p.id, clientId: p.converted_client_id }}
               jalons={jalons}
+              onCompte={compter}
             />
           )}
         </div>
-
-        {/* Actions — elles valent pour la fiche, pas pour un onglet. */}
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-5">
-          {p.converted_client_id ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2.5 text-sm font-bold text-emerald-700">
-              <Check className="size-4" /> Dans le Pipeline
-            </span>
-          ) : choixEtape ? (
-            <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-muted/60 p-2.5">
-              <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
-              {stages.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => void versLePipeline(s.label)}
-                  className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-                >
-                  {s.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setChoixEtape(false)}
-                className="text-[12.5px] font-semibold text-muted-foreground hover:text-avisdoc-ink"
-              >
-                Annuler
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setChoixEtape(true)}
-              disabled={enCours !== null}
-              className={cn(
-                "ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60",
-              )}
-            >
-              {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <ArrowRightCircle className="size-4" />}
-              Mettre dans le Pipeline
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void lancer("approfondir")}
-            disabled={enCours !== null}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
-          >
-            {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-            {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void lancer("email")}
-            disabled={enCours !== null}
-            title="Merx rédige un brouillon à partir de cette fiche. Rien n'est envoyé."
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
-          >
-            {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
-            Écrire un e-mail personnalisé
-          </button>
-          <button
-            type="button"
-            onClick={() => void lancer("ecarter")}
-            disabled={enCours !== null}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground hover:border-rose-300 hover:text-rose-700 disabled:opacity-60"
-          >
-            {enCours === "ecarter" ? <Loader2 className="size-4 animate-spin" /> : null}
-            Écarter
-          </button>
-        </div>
-
-        {erreur ? (
-          <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>
-        ) : (
-          <p className="mt-2 text-[12px] text-muted-foreground">
-            {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir :{" "}
-            {euroDollar(couts.approfondissement.montant)} · écrire un e-mail : {euroDollar(couts.email.montant)}.
-          </p>
-        )}
+        </Card>
       </div>
     </div>
   );

@@ -36,7 +36,16 @@ const leJour = (iso: string) =>
 /** Aujourd'hui au format attendu par un champ date. */
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
 
-export default function FilEchanges({ cles, jalons }: { cles: ClesFiche; jalons: Jalon[] }) {
+export default function FilEchanges({
+  cles,
+  jalons,
+  onCompte,
+}: {
+  cles: ClesFiche;
+  jalons: Jalon[];
+  /** Le nombre d’échanges notés, pour la pastille de l’onglet. */
+  onCompte?: (n: number) => void;
+}) {
   const { user } = useAuth();
   const [echanges, setEchanges] = useState<Echange[]>([]);
   const [chargement, setChargement] = useState(true);
@@ -50,7 +59,9 @@ export default function FilEchanges({ cles, jalons }: { cles: ClesFiche; jalons:
   const charger = useCallback(async () => {
     setChargement(true);
     try {
-      setEchanges(await chargerEchanges(cles));
+      const trouves = await chargerEchanges(cles);
+      setEchanges(trouves);
+      onCompte?.(trouves.length);
       setErreur(null);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Chargement impossible.";
@@ -62,7 +73,7 @@ export default function FilEchanges({ cles, jalons }: { cles: ClesFiche; jalons:
     } finally {
       setChargement(false);
     }
-  }, [cles]);
+  }, [cles, onCompte]);
 
   useEffect(() => {
     void charger();

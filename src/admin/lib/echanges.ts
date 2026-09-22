@@ -83,6 +83,22 @@ export async function ajouterEchange(
     par: saisie.par,
   });
   if (error) throw new Error(error.message);
+
+  // Noter un appel, un e-mail ou un rendez-vous, c’est avoir contacté : la fiche le sait.
+  // Une note ne compte pas — on peut se noter quelque chose sans avoir joint personne.
+  if (cles.prospectId && saisie.kind !== "note") {
+    await supabaseAdmin
+      .from("admin_prospects")
+      .update({ last_contacted_at: saisie.au })
+      .eq("id", cles.prospectId)
+      .lt("last_contacted_at", saisie.au);
+    // Première fois : la colonne était vide, le `lt` ne l’a pas vue.
+    await supabaseAdmin
+      .from("admin_prospects")
+      .update({ last_contacted_at: saisie.au })
+      .eq("id", cles.prospectId)
+      .is("last_contacted_at", null);
+  }
 }
 
 export async function supprimerEchange(id: string): Promise<void> {

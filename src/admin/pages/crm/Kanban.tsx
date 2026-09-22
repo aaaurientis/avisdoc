@@ -38,7 +38,7 @@ export default function Kanban({
     // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
     <div
       className="ad-kanban grid gap-3 overflow-x-auto pb-1"
-      style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(190px, 1fr))` }}
+      style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(300px, 1fr))` }}
     >
       {stages.map((stage) => {
         const list = clients.filter((c) => c.stage === stage.label);
