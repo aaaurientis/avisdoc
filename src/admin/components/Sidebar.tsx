@@ -7,6 +7,7 @@ import {
   BookUser,
   Building2,
   ChevronDown,
+  CalendarDays,
   Coins,
   Trash2,
   FileText,
@@ -63,6 +64,7 @@ const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
   { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
     { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
+    { to: "/planning", label: "Planning", icon: CalendarDays, module: "merx" },
     { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
     { to: "/crm", label: "Pipeline", icon: LayoutGrid },
     { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
