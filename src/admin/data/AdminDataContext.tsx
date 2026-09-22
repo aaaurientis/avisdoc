@@ -32,7 +32,7 @@ import type {
 } from "../types";
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
-import { STAGES_DEFAUT } from "../lib/ui-tokens";
+import { etapeQuiSigne, STAGES_DEFAUT } from "../lib/ui-tokens";
 import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
@@ -659,28 +659,32 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
-  /** Changer d'étape. La fiche client suit toute seule (voir la règle plus bas). */
+  /**
+   * Changer d'étape. Le changement est immédiat — il n'y a rien à enregistrer — mais
+   * il se voyait à peine : on le dit. La fiche client suit toute seule (règle plus bas).
+   */
   const setClientStage: DataValue["setClientStage"] = useCallback(
     (id, stage) => {
       updateClientFields(id, { stage });
+      toast.success(`Étape : ${stage}`);
     },
     [updateClientFields],
   );
 
   /**
-   * Signé vaut client : toute affaire arrivée dans la dernière colonne a sa fiche au
+   * Signé vaut client : toute affaire arrivée à l'étape qui signe a sa fiche au
    * fichier client. On le vérifie à chaque chargement, et pas seulement au moment du
    * clic — une étape changée ailleurs, ou avant que la règle existe, est rattrapée.
    */
   useEffect(() => {
-    const derniere = stages[stages.length - 1]?.label;
-    if (!derniere || clients.length === 0) return;
+    const signe = etapeQuiSigne(stages);
+    if (!signe || clients.length === 0) return;
     // Une fiche importée d'Excel n'est reliée à aucune affaire : on la reconnaît à son
     // nom, sinon la signature en créerait un double.
     const nom = (t: string) => t.trim().toLowerCase();
     const manquantes = clients.filter(
       (c) =>
-        c.stage === derniere &&
+        c.stage === signe &&
         !accounts.some((a) => a.clientId === c.id || nom(a.name) === nom(c.company)),
     );
     if (manquantes.length === 0) return;

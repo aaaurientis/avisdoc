@@ -55,6 +55,19 @@ export const TONES: Record<StageTone, { dot: string; text: string; soft: string;
  */
 export const COLONNE_KANBAN = "flex h-full min-h-[400px] flex-col rounded-xl bg-muted/60 p-3";
 
+/**
+ * L'étape qui fait d'une affaire un client.
+ *
+ * Ce n'est PAS la dernière colonne : un pipeline finit souvent par « Perdu », et une
+ * affaire perdue ne devient pas cliente. On cherche la colonne qui le dit — signé,
+ * gagné — et si aucune ne le dit, on ne crée rien plutôt que de se tromper.
+ */
+export function etapeQuiSigne(stages: PipelineStage[]): string | null {
+  const nu = (t: string) =>
+    t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return stages.find((s) => /^(signe|gagne|client)/.test(nu(s.label)))?.label ?? null;
+}
+
 /** Colonnes de départ — servent au mode démonstration et de repli si la table est vide. */
 export const STAGES_DEFAUT: PipelineStage[] = [
   { id: "s1", label: "Nouveau", position: 1, tone: "slate" },
