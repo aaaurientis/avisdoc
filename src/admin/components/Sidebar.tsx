@@ -6,15 +6,15 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   BookUser,
   Building2,
-  ChevronDown,
   CalendarDays,
+  ChevronDown,
   Coins,
-  Trash2,
   FileText,
   KeyRound,
   LayoutDashboard,
   LayoutGrid,
   Megaphone,
+  MessagesSquare,
   Mic,
   Moon,
   Power,
@@ -25,9 +25,10 @@ import {
   Sparkles,
   Sun,
   Target,
+  Trash2,
+  type LucideIcon,
   Users,
   Wallet,
-  type LucideIcon,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ const MENU: Entree[] = [
     { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
     { to: "/crm", label: "Pipeline", icon: LayoutGrid },
     { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
+    { to: "/debrief", label: "Débrief", icon: MessagesSquare, module: "merx" },
     { to: "/notes-dictees", label: "Notes dictées", icon: Mic, module: "merx" },
     { to: "/couts", label: "Coûts", icon: Coins, module: "merx" },
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },

@@ -13,6 +13,7 @@ import NotesDictees from "./pages/NotesDictees";
 import Dictee from "./pages/Dictee";
 import Couts from "./pages/Couts";
 import Corbeille from "./pages/Corbeille";
+import Debrief from "./pages/Debrief";
 import Planning from "./pages/Planning";
 import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
@@ -55,6 +56,7 @@ function Gate() {
           <Route path="/prospects" element={<Garde module="merx"><Prospects /></Garde>} />
           <Route path="/clients" element={<Garde module="finance"><Clients /></Garde>} />
           <Route path="/fichier-client" element={<Garde module="merx"><FichierClient /></Garde>} />
+          <Route path="/debrief" element={<Garde module="merx"><Debrief /></Garde>} />
           <Route path="/notes-dictees" element={<Garde module="merx"><NotesDictees /></Garde>} />
           <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
           <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />

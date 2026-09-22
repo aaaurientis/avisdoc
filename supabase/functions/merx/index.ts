@@ -20,6 +20,10 @@ import { admin } from "./db.ts";
 import { complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
   CHAT_SYSTEM,
+  DEBRIEF_SCHEMA,
+  DEBRIEF_SYSTEM,
+  debriefPrompt,
+  type DebriefOut,
   EMAIL_CLIENT_SYSTEM,
   EMAIL_SCHEMA,
   EMAIL_SYSTEM,
@@ -240,6 +244,73 @@ Deno.serve(async (req: Request) => {
             .eq("id", demande.id);
         }
         return json({ error: "Le brouillon n'a pas pu être écrit. Vous pouvez réessayer." }, 500);
+      }
+    }
+
+    // ── Débrief : ce que le commercial raconte en sortant ────────────────
+    if (body.action === "debrief") {
+      const texte = String(body.texte ?? "").trim();
+      if (texte.length < 20) return json({ error: "Racontez d'abord ce qui s'est passé." }, 400);
+
+      // Ses fiches, pour que Merx rattache ce qu'il raconte à la bonne entreprise.
+      const [prospects, affaires, comptes, stages, terrain] = await Promise.all([
+        sb.from("admin_prospects").select("id, name, city").is("deleted_at", null).limit(300),
+        sb.from("admin_clients").select("id, company, ville").is("deleted_at", null).limit(300),
+        sb.from("admin_accounts").select("id, name").is("deleted_at", null).limit(300),
+        sb.from("admin_pipeline_stages").select("label").order("position"),
+        sb.from("admin_terrain").select("nature, famille").is("deleted_at", null).not("famille", "is", null).limit(400),
+      ]);
+
+      const fiches = [
+        ...(prospects.data ?? []).map((p) => ({ type: "prospect", id: p.id as string, nom: p.name as string, ville: (p.city as string) ?? null })),
+        ...(affaires.data ?? []).map((c) => ({ type: "affaire", id: c.id as string, nom: c.company as string, ville: (c.ville as string) ?? null })),
+        ...(comptes.data ?? []).map((a) => ({ type: "client", id: a.id as string, nom: a.name as string, ville: null })),
+      ];
+
+      // Les familles déjà en usage : on range avec les mêmes mots plutôt que d'en inventer.
+      const familles = { objection: [] as string[], mouche: [] as string[] };
+      for (const t of terrain.data ?? []) {
+        const bac = t.nature === "objection" ? familles.objection : familles.mouche;
+        const f = String(t.famille);
+        if (!bac.includes(f)) bac.push(f);
+      }
+
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "recherche", request: `Débrief — ${texte.slice(0, 60)}…`, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      try {
+        const out = await complete<DebriefOut>(
+          debriefPrompt(
+            texte,
+            fiches,
+            (stages.data ?? []).map((s) => String(s.label)),
+            familles,
+            new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
+          ),
+          DEBRIEF_SCHEMA as unknown as Record<string, unknown>,
+          { system: DEBRIEF_SYSTEM, usage: "email", timeoutMs: 90_000, onUsage: (u) => (usage = u) },
+        );
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "terminee", usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        // Rien n'est écrit ici : le commercial valide à l'écran, puis l'application enregistre.
+        return json(out);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ error: "Merx n'a pas pu lire ce débrief. Vous pouvez réessayer." }, 500);
       }
     }
 
