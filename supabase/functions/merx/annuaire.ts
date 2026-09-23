@@ -104,3 +104,94 @@ export async function lookup(query: string): Promise<Company[]> {
     await new Promise((r) => setTimeout(r, 1000 * (Number(res.headers.get("retry-after")) || 1)));
   }
 }
+
+// ── Recherche de masse : le registre plutôt que le web ───────────────────────
+//
+// Chercher des noms d'entreprises sur le web avec un modèle, c'était deux minutes
+// pour en rendre sept. Le registre en rend deux cents en une seconde, exactes, avec
+// leur effectif et l'adresse de leurs établissements. Le web reste utile pour ce que
+// le registre ne dit pas — un chantier en cours, une certification — mais il ne doit
+// plus servir à établir une liste.
+
+/** Tranches INSEE, de la plus petite à la plus grande : sert à filtrer « plus de N salariés ». */
+const BANDS_ASC = ["NN", "00", "01", "02", "03", "11", "12", "21", "22", "31", "32", "41", "42", "51", "52", "53"];
+/** Le plancher de chaque tranche, pour traduire « plus de 50 salariés ». */
+const BAND_FLOOR: Record<string, number> = {
+  NN: 0, "00": 0, "01": 1, "02": 3, "03": 6, "11": 10, "12": 20,
+  "21": 50, "22": 100, "31": 200, "32": 250, "41": 500, "42": 1000,
+  "51": 2000, "52": 5000, "53": 10000,
+};
+
+/** Les tranches qui atteignent au moins cet effectif. */
+export const bandsFrom = (minimum: number): string[] =>
+  BANDS_ASC.filter((b) => BAND_FLOOR[b] >= minimum);
+
+export interface Criteria {
+  /** Section NAF (F = construction, A = agriculture…) — large. */
+  section?: string | null;
+  /** Codes NAF précis (81.30Z, 96.02B…) — étroit, prioritaire sur la section. */
+  nafCodes?: string[] | null;
+  departments: string[];
+  /** Effectif minimum de l'entreprise, en salariés. */
+  minHeadcount?: number | null;
+}
+
+/** Une entreprise trouvée par le registre, avec ses établissements dans la zone demandée. */
+export interface Found extends Company {
+  /** Les établissements qui répondent au filtre : c'est là que le commercial ira. */
+  localSites: Establishment[];
+}
+
+const PER_PAGE = 25; // maximum autorisé par l'annuaire
+
+/**
+ * Les entreprises du registre qui répondent aux critères, établissements locaux compris.
+ *
+ * On pagine jusqu'à `max` : au-delà, le commercial ne traite plus, et chaque page est
+ * un appel de plus. L'annuaire limite le débit, d'où l'attente entre deux pages.
+ */
+export async function searchByCriteria(c: Criteria, max = 100): Promise<Found[]> {
+  const found: Found[] = [];
+  const pages = Math.ceil(max / PER_PAGE);
+
+  for (let page = 1; page <= pages; page++) {
+    const params = new URLSearchParams({
+      etat_administratif: "A",
+      per_page: String(PER_PAGE),
+      page: String(page),
+    });
+    if (c.nafCodes?.length) params.set("activite_principale", c.nafCodes.join(","));
+    else if (c.section) params.set("section_activite_principale", c.section);
+    if (c.departments.length) params.set("departement", c.departments.join(","));
+    if (c.minHeadcount) {
+      const bands = bandsFrom(c.minHeadcount);
+      if (bands.length) params.set("tranche_effectif_salarie", bands.join(","));
+    }
+
+    let data: any = null;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(`${BASE}/search?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (res.status === 429 && attempt < RETRIES_429) {
+          await new Promise((r) => setTimeout(r, 1_100));
+          continue;
+        }
+        if (!res.ok) break;
+        data = await res.json();
+        break;
+      } catch {
+        break;
+      }
+    }
+    if (!data?.results?.length) break;
+
+    for (const r of data.results) {
+      const company = toCompany(r);
+      const sites = ((r.matching_etablissements ?? []) as any[]).map(toEstablishment);
+      found.push({ ...company, localSites: sites });
+      if (found.length >= max) return found;
+    }
+    if (page >= (data.total_pages ?? 1)) break;
+  }
+  return found;
+}

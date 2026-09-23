@@ -125,7 +125,6 @@ export const LIST_SCHEMA = {
           site_web: { type: "string" },
           pourquoi: { type: "string" },
           exposition_soleil: SUN_SCHEMA,
-    affinite_prevention: AFFINITE_SCHEMA,
           affinite_prevention: AFFINITE_SCHEMA,
           sources: { type: "array", items: { type: "string" } },
         },
@@ -194,6 +193,7 @@ export const ENRICH_SCHEMA = {
       properties: { nom: { type: "string" }, fonction: { type: "string" }, email: { type: "string" }, telephone: { type: "string" }, source: { type: "string" } },
     },
     exposition_soleil: SUN_SCHEMA,
+    affinite_prevention: AFFINITE_SCHEMA,
     sante_travail: {
       type: "object",
       additionalProperties: false,
@@ -274,6 +274,56 @@ export function enrichPrompt(p: { name: string; city: string | null; activity: s
     site ? `Coordonnées relevées sur le site officiel (sûres, reprends-les) :\n${JSON.stringify(site, null, 1)}` : "Aucune coordonnée n'a pu être relevée sur le site officiel.",
   ].join("\n\n");
 }
+
+// ── Lire la demande pour interroger le registre ─────────────────────────
+
+/**
+ * Traduire « les boîtes du BTP dans le 67 de plus de 50 salariés » en filtres.
+ *
+ * Aucune recherche web, aucun nom d'entreprise à trouver : le registre les a toutes.
+ * On ne demande au modèle que ce qu'il fait bien — comprendre une phrase.
+ */
+export const CRITERES_SYSTEM = `Tu traduis la demande d'un commercial en filtres pour le registre officiel des entreprises (annuaire de l'État).
+
+Tu ne cherches AUCUNE entreprise : tu rends seulement des critères.
+
+LES DÉPARTEMENTS, en code à deux chiffres (« 67 », « 33 », « 2A »). Si le commercial nomme une région ou une ville, mets les départements correspondants — « Alsace » donne 67 et 68, « Bordeaux » donne 33. S'il n'en cite aucun, rends une liste vide : sans zone, on ne cherche pas.
+
+L'ACTIVITÉ, de deux façons au choix :
+- « section » : une lettre, pour une famille large. F = construction et BTP. A = agriculture, sylviculture, pêche.
+- « codes_naf » : des codes précis, pour un métier. Ils l'emportent sur la section.
+
+Les codes utiles au métier d'AvisDoc :
+- Travaux publics et voirie : 42.11Z, 42.13A, 42.13B, 42.21Z, 42.22Z, 42.99Z
+- Terrassement, démolition, gros œuvre : 43.11Z, 43.12A, 43.12B, 43.99C
+- Couverture et étanchéité : 43.91A, 43.91B, 43.99A
+- Bâtiment, tous corps d'état : section F
+- Espaces verts et paysagistes : 81.30Z
+- Viticulture : 01.21Z — Arboriculture : 01.24Z, 01.25Z — Maraîchage : 01.13Z — Grandes cultures : 01.11Z
+- Élevage : 01.41Z, 01.42Z, 01.45Z, 01.46Z
+- Exploitation forestière : 02.20Z, 02.40Z
+- Communes et collectivités : 84.11Z
+- Instituts de beauté, esthétique : 96.02B — Coiffure : 96.02A — Spas : 96.04Z
+- Pharmacies : 47.73Z — Parapharmacie et parfumerie : 47.75Z
+- Cabinets médicaux et dermatologie : 86.21Z, 86.22C — Centres de santé : 86.90F
+- Salles de sport : 93.13Z
+- Industrie pharmaceutique et cosmétique : 21.20Z, 20.42Z
+
+L'EFFECTIF MINIMUM, en salariés, seulement s'il est dit (« plus de 50 » donne 50). Sinon 0.
+
+Si la demande ne permet ni section ni code — elle ne nomme aucun métier —, rends une section vide et une liste de codes vide.`;
+
+export const CRITERES_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["section", "codes_naf", "departements", "effectif_min"],
+  properties: {
+    section: { type: "string" },
+    codes_naf: { type: "array", items: { type: "string" } },
+    departements: { type: "array", items: { type: "string" } },
+    effectif_min: { type: "number" },
+  },
+} as const;
 
 // ── Chat : Merx répond au commercial et lance les recherches ────────────
 
