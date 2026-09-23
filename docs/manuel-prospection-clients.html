@@ -94,6 +94,16 @@ kbd{background:var(--teal);color:#fff;border-radius:10mm;padding:.4mm 2.2mm;font
   font-weight:700;font-family:inherit;white-space:nowrap}
 .onglet{border-bottom:2px solid var(--teal);font-weight:650;white-space:nowrap}
 
+.faq{margin-bottom:4mm;page-break-inside:avoid}
+.faq .q{font-weight:700;color:var(--ink);margin-bottom:.8mm;font-size:10.2pt}
+.faq .q::before{content:"▸ ";color:var(--teal);font-weight:700}
+.faq .r{margin:0;color:var(--ink-soft);padding-left:4mm}
+.faq .r strong{color:var(--ink)}
+.bloc-astuces{margin-bottom:5mm}
+.bloc-astuces h4{font-size:10.5pt;margin:0 0 2mm;color:var(--sage);
+  font-family:'Fraunces',serif;font-weight:600}
+.bloc-astuces ul{margin:0;padding-left:5mm}
+.bloc-astuces li{margin-bottom:1.8mm}
 .cloture{page-break-before:always;height:248mm;display:flex;flex-direction:column;justify-content:center}
 .fin{padding:8mm 7mm;background:var(--ink);color:#fff;border-radius:5mm}
 .fin h3{color:#fff;margin:0 0 5mm;font-size:16pt}
@@ -528,16 +538,234 @@ kbd{background:var(--teal);color:#fff;border-radius:10mm;padding:.4mm 2.2mm;font
   </p>
 </div>
 
-<h3>Les astuces qui font gagner du temps</h3>
-<table>
-  <tr><th style="width:44mm">La situation</th><th>Le réflexe</th></tr>
-  <tr><td>Préparer une tournée</td><td>Dans Prospection, filtrez sur votre département et une note minimale de 60, puis passez en vue <strong>Kanban</strong> : vos cibles du jour, rangées par métier.</td></tr>
-  <tr><td>Attaquer par les meilleures</td><td>Vue <strong>Liste</strong>, triez par note décroissante. Les dix premières d'abord.</td></tr>
-  <tr><td>Une entreprise ne vous intéresse pas</td><td><strong>Écartez-la</strong> tout de suite. Un vivier propre se travaille mieux, et elle n'est pas détruite.</td></tr>
-  <tr><td>Un client dit « rappelez-moi en janvier »</td><td>Posez l'action <strong>immédiatement</strong> depuis l'onglet Action, avec la date. Une relance notée sur un carnet est une relance perdue.</td></tr>
-  <tr><td>Vous avez supprimé par erreur</td><td><strong>Corbeille.</strong> Tout revient d'un clic pendant trente jours.</td></tr>
-  <tr><td>Vous ne savez pas faire quelque chose</td><td>Demandez-le à Merx. Il connaît les écrans.</td></tr>
-</table>
+</div>
+
+
+<!-- ═══ ASTUCES ═══ -->
+<div class="section">
+<h2>Les astuces</h2>
+<p class="chapo">
+  Tout ce qui fait gagner du temps, rangé par moment de la journée.
+</p>
+
+<div class="bloc-astuces">
+  <h4>Le matin, avant de partir</h4>
+  <ul>
+    <li><strong>Ouvrez le Planning en premier.</strong> C'est l'écran de la journée : tout ce que vous avez noté s'y trouve, au bon jour.</li>
+    <li><strong>Préparez votre tournée en deux filtres.</strong> Dans Prospection : votre département, note minimale 60, puis vue Kanban. Vos cibles du jour, rangées par métier.</li>
+    <li><strong>Relisez les fiches approfondies la veille au soir.</strong> Le matin, vous n'aurez plus qu'à appeler.</li>
+    <li><strong>Une tournée = un métier.</strong> On ne parle pas à un viticulteur comme à une mairie : enchaînez les rendez-vous du même secteur, vous garderez le bon discours.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Pour chercher, avec Merx</h4>
+  <ul>
+    <li><strong>Un métier, un département.</strong> C'est la règle d'or. « Viticulture dans l'Hérault » marche ; « agriculture en Occitanie » ne donnera rien.</li>
+    <li><strong>Élargissez ensuite, département par département.</strong> Trois recherches précises valent mieux qu'une vague.</li>
+    <li><strong>Dites la taille si elle compte.</strong> « De plus de cinquante salariés » évite de remplir votre vivier de sociétés à trois personnes.</li>
+    <li><strong>Les pistes à explorer</strong>, dans le panneau à côté de la conversation, sont des croisements que personne n'a encore demandés. Modifiez le texte avant de lancer.</li>
+    <li><strong>Relancez la même recherche plus tard</strong> : le web change, et les doublons sont écartés automatiquement.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Pour trier votre vivier</h4>
+  <ul>
+    <li><strong>Attaquez par les meilleures notes.</strong> Vue Liste, tri décroissant, les dix premières.</li>
+    <li><strong>Écartez sans hésiter.</strong> Une entreprise qui ne vous intéresse pas encombre. Écarter ne détruit rien.</li>
+    <li><strong>Ne jugez pas sur la note seule</strong> si la fiche n'est pas approfondie : la moitié des critères est encore vide.</li>
+    <li><strong>Mettez-vous en référent</strong> dès qu'une fiche vous intéresse. L'équipe voit qu'elle est prise, et personne ne double votre appel.</li>
+    <li><strong>Approfondissez par lot</strong>, dix fiches d'affilée, pendant que vous faites autre chose. Chacune prend une minute.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Avant et pendant l'appel</h4>
+  <ul>
+    <li><strong>L'onglet Approche, toujours.</strong> Accroche, bon interlocuteur, arguments, objections prévues : c'est votre fiche de préparation.</li>
+    <li><strong>Lisez « À vérifier » avant de raccrocher.</strong> Ce sont les questions à leur poser — l'occasion ne reviendra pas.</li>
+    <li><strong>Une objection en direct ?</strong> Posez-la à Merx pendant que vous êtes encore au téléphone : il cherche dans ce que l'équipe a déjà entendu.</li>
+    <li><strong>Demandez-lui le coup d'après.</strong> « Et s'ils me disent que c'est trop cher ? » — il vous donne la réponse avant que la question tombe.</li>
+    <li><strong>Notez la suite pendant l'appel</strong>, pas après. Dix secondes dans l'onglet Action, et c'est dans votre Planning.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>En sortant du rendez-vous</h4>
+  <ul>
+    <li><strong>Débriefez avant de démarrer.</strong> C'est la seule habitude qui compte vraiment. Dans deux heures, la phrase exacte du client sera perdue.</li>
+    <li><strong>Parlez comme vous parleriez à un collègue.</strong> Pas de style télégraphique : plus vous racontez, mieux c'est rangé.</li>
+    <li><strong>Citez l'objection mot pour mot.</strong> « Il m'a dit : on a déjà la médecine du travail » vaut mieux qu'« il a objecté ». C'est ce verbatim qui servira à toute l'équipe.</li>
+    <li><strong>Dites la date à voix haute</strong> — « je dois le rappeler jeudi » — et l'action sera posée au bon jour.</li>
+    <li><strong>Pas de réseau ?</strong> Dictez quand même. L'enregistrement est gardé sur le téléphone et part tout seul dès que la connexion revient.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Sur le téléphone</h4>
+  <ul>
+    <li><strong>Réglez l'ouverture sur la Dictée.</strong> Dans les paramètres, vous pouvez choisir d'arriver directement sur l'enregistreur : un geste de moins à chaque sortie de rendez-vous.</li>
+    <li><strong>Le bouton micro est partout</strong> où l'on écrit à Merx. Au volant, vous appuyez et vous parlez.</li>
+    <li><strong>Les filtres sont repliés</strong> sur petit écran : touchez « Filtres » pour les ouvrir.</li>
+    <li><strong>Dix minutes maximum</strong> par enregistrement, et l'écran vous prévient trente secondes avant la fin. Pour un long compte rendu, faites-en deux.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Le fichier Clients</h4>
+  <ul>
+    <li><strong>Créez vos colonnes.</strong> « Interlocuteur RH », « Mois de la campagne », « Nombre de sites » : le fichier s'adapte à votre façon de travailler.</li>
+    <li><strong>Regroupez par ville</strong> avant une tournée régionale, par mois d'entrée pour voir les anniversaires de contrat.</li>
+    <li><strong>Exportez avant une réunion.</strong> Le classeur Excel contient tout, colonnes libres comprises.</li>
+    <li><strong>Partez du Modèle pour importer.</strong> Un classeur aux bons en-têtes évite la moitié des erreurs de correspondance.</li>
+    <li><strong>Relancez les anciens clients.</strong> Une campagne réussie l'an dernier est la vente la plus facile de l'année.</li>
+  </ul>
+</div>
+
+<div class="bloc-astuces">
+  <h4>Pour ne jamais rien perdre</h4>
+  <ul>
+    <li><strong>Supprimez sans crainte</strong> : tout part à la Corbeille et revient d'un clic pendant trente jours.</li>
+    <li><strong>L'historique d'une fiche ne se modifie pas</strong> — c'est voulu. Ce qui est arrivé est arrivé.</li>
+    <li><strong>Une information corrigée à sa source</strong> se met à jour partout : corrigez l'affaire, la fiche client suit.</li>
+    <li><strong>Vous ne savez pas faire quelque chose ?</strong> Demandez-le à Merx. Il connaît les écrans et répond en une phrase.</li>
+  </ul>
+</div>
+</div>
+
+<!-- ═══ FAQ ═══ -->
+<div class="section">
+<h2>Questions fréquentes</h2>
+
+<h3>Merx et la recherche</h3>
+
+<div class="faq">
+  <p class="q">Combien de temps prend une recherche ?</p>
+  <p class="r">Moins d'une minute en général. Un approfondissement, un peu plus d'une minute. Vous pouvez fermer l'écran entre-temps : le travail continue et les fiches vous attendront.</p>
+</div>
+<div class="faq">
+  <p class="q">J'ai lancé une recherche et rien n'est arrivé. Pourquoi ?</p>
+  <p class="r">Presque toujours parce que la demande était trop large. Reprenez avec <strong>un seul métier et un seul département</strong>. Si le problème persiste, dites-le à Merx : il vous dira ce qu'il n'a pas pu faire.</p>
+</div>
+<div class="faq">
+  <p class="q">Est-ce que Merx invente ?</p>
+  <p class="r">Non, et c'est vérifié par le programme lui-même : une entreprise qu'aucune page réellement consultée ne mentionne est <strong>écartée automatiquement</strong>. Sur les chiffres, tarifs, délais, faits médicaux et références clients, il dit qu'il ne sait pas plutôt que de deviner.</p>
+</div>
+<div class="faq">
+  <p class="q">Est-ce que je peux lui poser des questions autres que des recherches ?</p>
+  <p class="r">C'est même son principal usage. Objections, angle d'approche, préparation d'un rendez-vous, offre à proposer — et aussi « comment je fais pour… ? », puisqu'il connaît les écrans.</p>
+</div>
+<div class="faq">
+  <p class="q">Est-ce que ça coûte quelque chose ?</p>
+  <p class="r">Chaque recherche et chaque approfondissement ont un coût, modeste mais réel. C'est pour cela qu'on ne clique pas deux fois sur « Approfondir ». L'écran <strong>CAP</strong> montre ce que chaque entreprise a coûté.</p>
+</div>
+
+<h3>Les fiches et les notes</h3>
+
+<div class="faq">
+  <p class="q">Ma fiche a une note basse. Faut-il l'abandonner ?</p>
+  <p class="r">Pas avant de l'avoir approfondie. Un critère qu'on n'a pas pu vérifier vaut zéro et s'affiche « non évalué » : la note monte souvent beaucoup une fois les informations trouvées.</p>
+</div>
+<div class="faq">
+  <p class="q">Que veut dire « approfondir » exactement ?</p>
+  <p class="r">Aller chercher l'identité officielle (SIREN, effectif, dirigeants, établissements), les coordonnées publiées sur leur site, et monter le <strong>dossier commercial</strong> : accroche, interlocuteur, arguments, objections, offre.</p>
+</div>
+<div class="faq">
+  <p class="q">Puis-je approfondir une deuxième fois ?</p>
+  <p class="r">Oui, le bouton devient « Approfondir à nouveau ». Utile si l'entreprise a changé. Un approfondissement <strong>n'efface jamais</strong> une donnée déjà présente.</p>
+</div>
+<div class="faq">
+  <p class="q">Comment je retrouve une entreprise ?</p>
+  <p class="r">La barre de recherche cherche dans le nom et la ville. Les filtres permettent de croiser note, département, effectif, adresse e-mail connue, date d'arrivée.</p>
+</div>
+
+<h3>Du prospect au client</h3>
+
+<div class="faq">
+  <p class="q">Comment un prospect devient-il une affaire ?</p>
+  <p class="r">Le bouton <strong>« Au Pipeline »</strong> sur sa fiche. Elle emporte tout ce qu'on sait d'elle, vous ne ressaisissez rien.</p>
+</div>
+<div class="faq">
+  <p class="q">Que se passe-t-il quand je mets une affaire en « Signé » ?</p>
+  <p class="r">Une fiche client se crée <strong>toute seule</strong> dans l'écran Clients, avec l'identité, les chiffres de l'affaire et l'historique complet. Vous n'avez rien à faire.</p>
+</div>
+<div class="faq">
+  <p class="q">Puis-je changer les colonnes du Pipeline ?</p>
+  <p class="r">Oui : on les renomme, on en ajoute, on les déplace, on les supprime. Ce sont les étapes de votre équipe, pas des étapes imposées.</p>
+</div>
+<div class="faq">
+  <p class="q">Une fiche client se modifie-t-elle ?</p>
+  <p class="r">Un clic l'ouvre <strong>en consultation</strong> : rien ne bouge par mégarde. Pour changer quelque chose, passez par « Modifier ».</p>
+</div>
+
+<h3>Les e-mails</h3>
+
+<div class="faq">
+  <p class="q">Merx envoie-t-il les e-mails à ma place ?</p>
+  <p class="r"><strong>Jamais.</strong> Il rédige un brouillon, vous le relisez, vous le modifiez, et vous l'envoyez vous-même depuis votre messagerie. Rien ne part sans vous.</p>
+</div>
+<div class="faq">
+  <p class="q">Peut-il écrire à un client déjà signé ?</p>
+  <p class="r">Oui, le même bouton existe sur la fiche client — mais il écrit cette fois à quelqu'un qui vous connaît, pour une relance ou une nouvelle campagne.</p>
+</div>
+
+<h3>Le débrief et la dictée</h3>
+
+<div class="faq">
+  <p class="q">Dois-je valider ce que Merx a compris ?</p>
+  <p class="r">Non. Vous parlez, c'est rangé, et l'écran vous dit où. Aucune case à cocher, aucun formulaire. Si quelque chose est mal placé, la fiche se corrige comme n'importe quelle autre.</p>
+</div>
+<div class="faq">
+  <p class="q">Et si je n'ai pas de réseau en sortant du rendez-vous ?</p>
+  <p class="r">Dictez quand même : l'enregistrement est gardé <strong>sur votre téléphone</strong> et part automatiquement dès que la connexion revient. L'écran affiche « en attente de réseau » en attendant.</p>
+</div>
+<div class="faq">
+  <p class="q">Combien de temps peut durer une dictée ?</p>
+  <p class="r">Dix minutes, et vous êtes prévenu trente secondes avant la fin. Pour plus long, faites deux enregistrements.</p>
+</div>
+<div class="faq">
+  <p class="q">Puis-je écrire au lieu de parler ?</p>
+  <p class="r">Oui, l'écran Débrief accepte les deux. Le résultat est le même.</p>
+</div>
+
+<h3>Qui voit quoi</h3>
+
+<div class="faq">
+  <p class="q">Mes collègues voient-ils mes fiches ?</p>
+  <p class="r">Oui, et c'est voulu : la Prospection, le Pipeline et le fichier Clients sont communs. Personne ne démarche deux fois la même entreprise.</p>
+</div>
+<div class="faq">
+  <p class="q">Quelqu'un peut-il écouter mes dictées ?</p>
+  <p class="r"><strong>Non.</strong> L'équipe lit le texte qui en est tiré, mais l'enregistrement n'est écouté que par vous — pas même par l'administrateur.</p>
+</div>
+<div class="faq">
+  <p class="q">Et mes conversations avec Merx ?</p>
+  <p class="r">Privées elles aussi. Personne d'autre ne les lit.</p>
+</div>
+<div class="faq">
+  <p class="q">À quoi sert le référent ?</p>
+  <p class="r">À dire qui suit le dossier. Il se choisit en haut de la fiche, s'enregistre tout seul, et <strong>suit l'entreprise</strong> du prospect jusqu'au fichier client.</p>
+</div>
+
+<h3>En cas de problème</h3>
+
+<div class="faq">
+  <p class="q">J'ai supprimé quelque chose par erreur.</p>
+  <p class="r"><strong>Écran Corbeille.</strong> Tout ce qui a été jeté y reste trente jours et se restaure d'un clic. Rien n'est détruit avant.</p>
+</div>
+<div class="faq">
+  <p class="q">Un bouton ne répond pas, ou tourne longtemps.</p>
+  <p class="r">Approfondir et écrire un e-mail prennent du temps : le bouton se met en attente, laissez-le finir. Ne cliquez pas une deuxième fois, cela relance tout depuis le début.</p>
+</div>
+<div class="faq">
+  <p class="q">Je ne vois pas les écrans Prospection ou Clients dans le menu.</p>
+  <p class="r">L'accès se donne compte par compte. Demandez-le à l'administrateur du Hub : c'est le seul à pouvoir l'ouvrir.</p>
+</div>
+<div class="faq">
+  <p class="q">Je ne sais pas faire quelque chose qui n'est pas dans ce manuel.</p>
+  <p class="r">Demandez-le à Merx. Il connaît les écrans et répond en une phrase — et s'il ne sait pas, il vous le dira plutôt que d'inventer.</p>
+</div>
 </div>
 
 <!-- ═══ CLÔTURE ═══ -->
