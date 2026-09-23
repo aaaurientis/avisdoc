@@ -540,7 +540,12 @@ export default function Prospects() {
                     {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}
                     {p.name}
                   </td>
-                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{secteurLisible(p.sector)}</td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
+                    {/* Assez large pour que « Travaux publics et BTP » ou « Services
+                        administratifs et de soutien » tiennent sur deux lignes : à trois,
+                        la rangée se creuse pour rien. */}
+                    <span className="block min-w-[10rem]">{secteurLisible(p.sector)}</span>
+                  </td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
                     {/* Deux lignes au plus : une description de cinq lignes étire la rangée
                         et l'on ne balaie plus la liste. Le texte entier reste dans la fiche,
