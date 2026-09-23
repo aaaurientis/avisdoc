@@ -18,6 +18,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
 import { transcrire } from "./transcription.ts";
+import { chercherTerrain, lireFiche } from "./consulter.ts";
 import { complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
   CHAT_SYSTEM,
@@ -283,6 +284,32 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── Transcrire une question posée de vive voix ───────────────────────
+    //
+    // Rien n'est stocké : une question dictée au volant n'a pas à être archivée.
+    // L'audio arrive encodé dans la demande, il est transcrit, et il disparaît.
+    // C'est pourquoi la durée est courte — au-delà, c'est un débrief, qui lui se garde.
+    if (body.action === "transcrire_question") {
+      const cle = Deno.env.get("OPENAI_API_KEY");
+      if (!cle) return json({ error: "La clé de transcription n'est pas configurée sur le projet." }, 500);
+      const encode = String(body.audio ?? "");
+      const type = String(body.type ?? "audio/webm");
+      if (!encode) return json({ error: "Aucun enregistrement reçu." }, 400);
+
+      try {
+        const octets = Uint8Array.from(atob(encode), (c) => c.charCodeAt(0));
+        // Une minute de parole pèse environ 1,2 Mo : au-delà de 3 Mo, ce n'est plus
+        // une question, et l'encodage alourdirait trop la demande.
+        if (octets.byteLength > 3_000_000) {
+          return json({ error: "Question trop longue. Posez-la en moins d'une minute, ou passez par le Débrief." }, 400);
+        }
+        const texte = await transcrire(new Blob([octets], { type }), cle);
+        return json({ texte });
+      } catch (e) {
+        return json({ error: e instanceof Error ? e.message : "La transcription a échoué." }, 500);
+      }
+    }
+
     // ── Débrief : ce que le commercial raconte en sortant ────────────────
     if (body.action === "debrief") {
       const texte = String(body.texte ?? "").trim();
@@ -393,18 +420,54 @@ Deno.serve(async (req: Request) => {
               properties: { demande: { type: "string", description: "La demande, en une phrase : secteur, zone, taille." } },
             },
           },
+          {
+            name: "lire_fiche",
+            description:
+              "Va chercher ce qu'on sait d'une entreprise : son identité, sa note, et le dossier commercial (accroche, arguments, objections, offre) s'il a été monté. À appeler DÈS QUE le commercial nomme une entreprise — on ne conseille pas sur une entreprise sans avoir relu sa fiche.",
+            inputSchema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["nom"],
+              properties: { nom: { type: "string", description: "Le nom de l'entreprise, même approximatif." } },
+            },
+          },
+          {
+            name: "chercher_dans_le_terrain",
+            description:
+              "Cherche dans ce que l'équipe a appris sur le terrain : les objections déjà entendues avec leurs réponses, et les arguments qui ont porté. À appeler quand le commercial parle d'une objection, demande quoi répondre, ou cherche un argument.",
+            inputSchema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["sujet"],
+              properties: { sujet: { type: "string", description: "Le sujet, en quelques mots : « médecine du travail », « trop cher », « réseau d'aval »…" } },
+            },
+          },
         ],
         runTool: async (name, input) => {
-          if (name !== "lancer_recherche") return "Outil inconnu.";
-          const demande = String((input as { demande?: string })?.demande ?? "").trim() || message;
-          const { data, error } = await sb
-            .from("admin_merx_demandes")
-            .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email })
-            .select("id")
-            .single();
-          if (error) return `La recherche n'a pas pu être enregistrée : ${error.message}`;
-          demandeId = data.id;
-          return `Recherche enregistrée : « ${demande} ». Elle est en cours ; ses résultats arriveront dans Prospects.`;
+          if (name === "lancer_recherche") {
+            const demande = String((input as { demande?: string })?.demande ?? "").trim() || message;
+            const { data, error } = await sb
+              .from("admin_merx_demandes")
+              .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email })
+              .select("id")
+              .single();
+            if (error) return `La recherche n'a pas pu être enregistrée : ${error.message}`;
+            demandeId = data.id;
+            return `Recherche enregistrée : « ${demande} ». Elle est en cours ; ses résultats arriveront dans Prospects.`;
+          }
+
+          if (name === "lire_fiche") {
+            const nom = String((input as { nom?: string })?.nom ?? "").trim();
+            if (!nom) return "Aucun nom donné.";
+            return await lireFiche(sb, nom);
+          }
+
+          if (name === "chercher_dans_le_terrain") {
+            const sujet = String((input as { sujet?: string })?.sujet ?? "").trim();
+            return await chercherTerrain(sb, sujet);
+          }
+
+          return "Outil inconnu.";
         },
       });
 

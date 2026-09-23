@@ -28,6 +28,9 @@ export interface EntrepriseVue {
   entreprise: string;
   fiche_type: string;
   fiche_id: string;
+  /** Où la créer quand elle n'existe pas encore : « prospect », « affaire », « client ». */
+  a_creer?: string;
+  ville?: string;
   resume: string;
   objections: Objection[];
   mouches: Mouche[];
@@ -42,6 +45,8 @@ export interface Extraction {
 
 /** Ce que le commercial garde, après avoir décoché ce qui ne va pas. */
 export interface Retenu {
+  /** Créer la fiche manquante : décoché, rien n'est créé et le reste se range où il peut. */
+  creer: boolean;
   resume: boolean;
   objections: boolean[];
   mouches: boolean[];
@@ -51,6 +56,7 @@ export interface Retenu {
 
 /** Tout est coché d'entrée : Merx a lu correctement dans la plupart des cas. */
 export const toutRetenir = (e: EntrepriseVue): Retenu => ({
+  creer: Boolean(!e.fiche_id && e.a_creer?.trim()),
   resume: Boolean(e.resume.trim()),
   objections: e.objections.map(() => true),
   mouches: e.mouches.map(() => true),
@@ -58,14 +64,22 @@ export const toutRetenir = (e: EntrepriseVue): Retenu => ({
   etape: Boolean(e.etape.trim()),
 });
 
-/** Ce qui est encore coché, en une ligne — pour dire ce qu'on s'apprête à enregistrer. */
-export function compte(r: Retenu): number {
+/**
+ * Ce qui sera VRAIMENT enregistré.
+ *
+ * Sans fiche — ni reconnue, ni créée —, un résumé, une action ou un changement d'étape
+ * n'ont nulle part où aller : ils ne comptent pas. Un compteur qui annonce plus que ce
+ * qu'il enregistre est pire que pas de compteur.
+ */
+export function compte(r: Retenu, e?: EntrepriseVue): number {
+  const auraUneFiche = e ? Boolean(e.fiche_id) || r.creer : true;
   return (
-    (r.resume ? 1 : 0) +
+    (r.creer ? 1 : 0) +
+    (r.resume && auraUneFiche ? 1 : 0) +
     r.objections.filter(Boolean).length +
     r.mouches.filter(Boolean).length +
-    r.actions.filter(Boolean).length +
-    (r.etape ? 1 : 0)
+    (auraUneFiche ? r.actions.filter(Boolean).length : 0) +
+    (r.etape && auraUneFiche ? 1 : 0)
   );
 }
 
@@ -94,6 +108,81 @@ export async function lireDebrief(texte: string): Promise<Extraction> {
   return { entreprises: r.entreprises ?? [], non_rattachees: r.non_rattachees ?? [] };
 }
 
+/** Sans accents ni ponctuation : la garde anti-doublon compare des noms parlés. */
+const nu = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+
+/**
+ * Crée la fiche d'une entreprise que le débrief a fait apparaître.
+ *
+ * On vérifie d'abord qu'elle n'existe vraiment nulle part : Merx ne voit que les noms
+ * qu'on lui a donnés, et une graphie inattendue lui échappe. Créer un doublon depuis un
+ * débrief serait le plus sûr moyen d'en semer partout.
+ */
+async function creerLaFiche(e: EntrepriseVue, par: string, etapeDeDepart?: string): Promise<EntrepriseVue> {
+  const nom = e.entreprise.trim();
+  if (!nom) return e;
+  const q = nu(nom);
+
+  const [prospects, affaires, comptes] = await Promise.all([
+    supabaseAdmin.from("admin_prospects").select("id, name").is("deleted_at", null).limit(500),
+    supabaseAdmin.from("admin_clients").select("id, company").is("deleted_at", null).limit(500),
+    supabaseAdmin.from("admin_accounts").select("id, name").is("deleted_at", null).limit(500),
+  ]);
+
+  const dejaProspect = (prospects.data ?? []).find((p) => nu(String(p.name)) === q);
+  if (dejaProspect) return { ...e, fiche_type: "prospect", fiche_id: dejaProspect.id as string };
+  const dejaAffaire = (affaires.data ?? []).find((c) => nu(String(c.company)) === q);
+  if (dejaAffaire) return { ...e, fiche_type: "affaire", fiche_id: dejaAffaire.id as string };
+  const dejaCompte = (comptes.data ?? []).find((a) => nu(String(a.name)) === q);
+  if (dejaCompte) return { ...e, fiche_type: "client", fiche_id: dejaCompte.id as string };
+
+  const ou = e.a_creer?.trim();
+
+  if (ou === "affaire") {
+    const { data, error } = await supabaseAdmin
+      .from("admin_clients")
+      .insert({
+        company: nom,
+        ville: e.ville?.trim() || null,
+        stage: e.etape?.trim() || etapeDeDepart || "Nouveau",
+        jours: 1,
+        tarif: 0,
+        statut_propo: "Brouillon",
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`${nom} n’a pas pu être créée au Pipeline : ${error.message}`);
+    return { ...e, fiche_type: "affaire", fiche_id: data.id as string };
+  }
+
+  if (ou === "client") {
+    const { data, error } = await supabaseAdmin
+      .from("admin_accounts")
+      .insert({ name: nom, signed_on: new Date().toISOString().slice(0, 10), data: {} })
+      .select("id")
+      .single();
+    if (error) throw new Error(`${nom} n’a pas pu être créée au fichier client : ${error.message}`);
+    return { ...e, fiche_type: "client", fiche_id: data.id as string };
+  }
+
+  // Par défaut la prospection : c'est le moins engageant, et une fiche s'avance ensuite.
+  const { data, error } = await supabaseAdmin
+    .from("admin_prospects")
+    .insert({
+      owner_email: par,
+      name: nom,
+      city: e.ville?.trim() || null,
+      rationale: e.resume?.trim() || null,
+      sources: [],
+      score: {},
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`${nom} n’a pas pu être créée en prospection : ${error.message}`);
+  return { ...e, fiche_type: "prospect", fiche_id: data.id as string };
+}
+
 /** Les clés d'échange correspondant à la fiche reconnue, s'il y en a une. */
 function clesDe(e: EntrepriseVue) {
   if (!e.fiche_id) return null;
@@ -115,17 +204,20 @@ export async function enregistrer(
   r: Retenu,
   par: string,
   noteId: string | null,
+  etapeDeDepart?: string,
 ): Promise<void> {
-  const cles = clesDe(e);
+  // Créer d'abord, s'il y a lieu : tout ce qui suit a besoin d'une fiche où se ranger.
+  const vue = r.creer && !e.fiche_id ? await creerLaFiche(e, par, etapeDeDepart) : e;
+  const cles = clesDe(vue);
   const maintenant = new Date().toISOString();
 
   // Ce qui s'est passé, dans l'historique de la fiche.
-  if (r.resume && cles && e.resume.trim()) {
-    await ajouterEchange(cles, { kind: "note", titre: e.resume.trim(), detail: "", au: maintenant, par });
+  if (r.resume && cles && vue.resume.trim()) {
+    await ajouterEchange(cles, { kind: "note", titre: vue.resume.trim(), detail: "", au: maintenant, par });
   }
 
   // Ce qu'il faut faire ensuite, dans le planning.
-  for (const [i, a] of e.actions.entries()) {
+  for (const [i, a] of vue.actions.entries()) {
     if (!r.actions[i] || !a.quoi.trim()) continue;
     if (!cles) continue;
     // Sans date dite, on pose l'action aujourd'hui : elle se voit, et se décale d'un clic.
@@ -141,10 +233,10 @@ export async function enregistrer(
 
   // La matière du terrain, qui servira sur les fiches suivantes.
   const lignes = [
-    ...e.objections
+    ...vue.objections
       .filter((_, i) => r.objections[i])
       .map((o) => ({ nature: "objection", verbatim: o.verbatim, famille: o.famille || null, reponse: o.reponse || null })),
-    ...e.mouches
+    ...vue.mouches
       .filter((_, i) => r.mouches[i])
       .map((m) => ({ nature: "mouche", verbatim: m.verbatim, famille: m.famille || null, reponse: null })),
   ].filter((l) => l.verbatim.trim());
@@ -157,10 +249,10 @@ export async function enregistrer(
         verbatim: l.verbatim.trim(),
         famille: l.famille,
         reponse: l.reponse,
-        entreprise: e.entreprise,
-        prospect_id: e.fiche_type === "prospect" ? e.fiche_id || null : null,
-        client_id: e.fiche_type === "affaire" ? e.fiche_id || null : null,
-        account_id: e.fiche_type === "client" ? e.fiche_id || null : null,
+        entreprise: vue.entreprise,
+        prospect_id: vue.fiche_type === "prospect" ? vue.fiche_id || null : null,
+        client_id: vue.fiche_type === "affaire" ? vue.fiche_id || null : null,
+        account_id: vue.fiche_type === "client" ? vue.fiche_id || null : null,
         note_id: noteId,
         au: maintenant,
       })),
@@ -169,8 +261,8 @@ export async function enregistrer(
   }
 
   // L'avancement du Pipeline, seulement pour une affaire.
-  if (r.etape && e.etape.trim() && e.fiche_type === "affaire" && e.fiche_id) {
-    const { error } = await supabaseAdmin.from("admin_clients").update({ stage: e.etape.trim() }).eq("id", e.fiche_id);
+  if (r.etape && vue.etape.trim() && vue.fiche_type === "affaire" && vue.fiche_id) {
+    const { error } = await supabaseAdmin.from("admin_clients").update({ stage: vue.etape.trim() }).eq("id", vue.fiche_id);
     if (error) throw new Error(error.message);
   }
 }
