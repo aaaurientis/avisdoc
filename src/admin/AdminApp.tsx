@@ -9,7 +9,6 @@ import Crm from "./pages/Crm";
 import Merx from "./pages/Merx";
 import Prospects from "./pages/Prospects";
 import FichierClient from "./pages/FichierClient";
-import NotesDictees from "./pages/NotesDictees";
 import Dictee from "./pages/Dictee";
 import Couts from "./pages/Couts";
 import Corbeille from "./pages/Corbeille";
@@ -58,7 +57,8 @@ function Gate() {
           <Route path="/clients" element={<Garde module="finance"><Clients /></Garde>} />
           <Route path="/fichier-client" element={<Garde module="merx"><FichierClient /></Garde>} />
           <Route path="/debrief" element={<Garde module="merx"><Debrief /></Garde>} />
-          <Route path="/notes-dictees" element={<Garde module="merx"><NotesDictees /></Garde>} />
+          {/* L'écran a fusionné avec le Débrief : un lien gardé ne tombe pas dans le vide. */}
+          <Route path="/notes-dictees" element={<Navigate to="/debrief" replace />} />
           <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
           <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
           <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
