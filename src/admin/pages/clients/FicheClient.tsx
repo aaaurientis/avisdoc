@@ -8,6 +8,7 @@ import type { Account, AccountField } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal, SectionLabel } from "../../components/ui";
+import ChoixReferent from "../../components/ChoixReferent";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
@@ -184,6 +185,11 @@ export default function FicheClient({
         <div className="max-h-[52vh] overflow-y-auto">
         {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
             elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
+        {/* Qui suit ce client. Repris de l'affaire à la signature, modifiable ensuite. */}
+        <div className="mb-3">
+          <ChoixReferent quoi="client" id={fiche.id} />
+        </div>
+
         {affaire && (
           <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
             <SectionLabel>Ce qu’on sait d’eux</SectionLabel>

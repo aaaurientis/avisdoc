@@ -25,6 +25,7 @@ import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
 import Onglets from "../../components/Onglets";
 import { cn } from "@/lib/utils";
+import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
 
 const inputCls =
@@ -447,6 +448,9 @@ export default function ProjectView({
                 <span className="font-bold text-blue-700">données Pappers ✓</span>
               </div>
               <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
+              {/* Qui suit cette affaire. Le choix descend tout seul sur la fiche
+                  client le jour où elle est signée. */}
+              <ChoixReferent quoi="affaire" id={client.id} className="mt-3" />
             </div>
           )}
 
