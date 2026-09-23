@@ -5,7 +5,7 @@
 // Budget : une edge function Supabase tient 150 s (400 s en payant) ; on se borne à 120 s pour finir proprement.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { headcountLabel, lookup, type Company } from "./annuaire.ts";
+import { headcountLabel, lookup, searchByCriteria, type Company, type Criteria, type Found } from "./annuaire.ts";
 import {
   appendConversationMessage,
   claimRequest,
@@ -32,7 +32,6 @@ import {
   type ListOut,
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
-import { headcountLabel, searchByCriteria, type Criteria, type Found } from "./annuaire.ts";
 import { metierDe } from "./metiers.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
