@@ -1,14 +1,21 @@
 // Débrief : le commercial raconte sa sortie, Merx range, le commercial valide.
 //
-// L'ordre compte. On écrit d'abord ce qu'on a vécu, sans se soucier de la forme ;
-// Merx propose ensuite un tri, entreprise par entreprise ; et rien ne part en base
-// avant qu'on ait décoché ce qui ne va pas.
+// Deux façons de raconter — à la voix ou au clavier — et une seule suite. Elles vivaient
+// dans deux rubriques séparées, « Notes dictées » et « Débrief », ce qui obligeait à
+// choisir un écran selon qu'on tape ou qu'on parle. C'est la même chose : on raconte.
+//
+// L'ordre compte. On dit d'abord ce qu'on a vécu, sans se soucier de la forme ; Merx
+// propose ensuite un tri, entreprise par entreprise ; et rien ne part en base avant
+// qu'on ait décoché ce qui ne va pas.
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Check, HandHelping, Loader2, Mail, NotebookPen, Phone, Sparkles, Target } from "lucide-react";
+import { CalendarClock, Check, HandHelping, Loader2, Mail, Mic, NotebookPen, PenLine, Phone, Play, Sparkles, Target } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Card, PageHeader, SectionLabel } from "../components/ui";
+import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
+import { supabaseAdmin } from "../data/supabaseAdmin";
+import { useActualisation } from "../lib/actualisation";
 import {
   compte,
   enregistrer,
@@ -21,6 +28,21 @@ import {
 import { cn } from "@/lib/utils";
 
 const ICONES: Record<string, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
+
+/** Un débrief déjà raconté — dicté ou écrit, c'est la même table. */
+interface Passe {
+  id: string;
+  audio_path: string | null;
+  duree_s: number | null;
+  statut: string;
+  message: string | null;
+  titre: string | null;
+  created_at: string;
+}
+
+const chrono = (s: number | null) => (s == null ? "—" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+const quandCourt = (iso: string) =>
+  new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const EXEMPLE =
   "J’ai vu la mairie de Bordeaux, très contente qu’on puisse s’occuper de ses agents des espaces verts. " +
@@ -170,10 +192,41 @@ function FicheVue({
 export default function Debrief() {
   const { user } = useAuth();
   const [texte, setTexte] = useState("");
+  /** `null` tant qu'on n'a pas choisi la voix ou le clavier. */
+  const [mode, setMode] = useState<"texte" | null>(null);
   const [lecture, setLecture] = useState(false);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [retenus, setRetenus] = useState<Retenu[]>([]);
   const [envoi, setEnvoi] = useState(false);
+  const [passes, setPasses] = useState<Passe[]>([]);
+  const [ecoute, setEcoute] = useState<string | null>(null);
+
+  /** Ce qu'on a déjà raconté : dicté comme écrit, les deux vivent dans la même table. */
+  const chargerPasses = useCallback(async () => {
+    const { data } = await supabaseAdmin
+      .from("admin_notes_dictees")
+      .select("id, audio_path, duree_s, statut, message, titre, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setPasses((data ?? []) as Passe[]);
+  }, []);
+
+  useEffect(() => {
+    void chargerPasses();
+  }, [chargerPasses]);
+
+  // Une transcription se termine au loin : l'écran suit sans qu'on clique.
+  useActualisation(chargerPasses, passes.some((n) => n.statut === "recue"));
+
+  const ecouter = async (n: Passe) => {
+    if (!n.audio_path) return;
+    const { data, error } = await supabaseAdmin.storage.from("admin-dictee").createSignedUrl(n.audio_path, 3600);
+    if (error || !data) {
+      toast.error("L’enregistrement n’a pas pu être ouvert.");
+      return;
+    }
+    setEcoute(data.signedUrl);
+  };
 
   const lire = async () => {
     if (lecture || texte.trim().length < 20) return;
@@ -217,7 +270,75 @@ export default function Debrief() {
         subtitle="Racontez votre sortie. Merx range, vous validez."
       />
 
-      {!extraction && (
+      {!extraction && mode === null && passes.length > 0 && (
+        <Card className="mb-4 p-4">
+          <SectionLabel>Ce que vous avez déjà raconté</SectionLabel>
+          <div className="mt-2 divide-y divide-border">
+            {passes.map((n) => (
+              <div key={n.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  {n.audio_path ? <Mic className="size-3.5" /> : <PenLine className="size-3.5" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">
+                    {n.titre ?? (n.audio_path ? "Débrief dicté" : "Débrief écrit")}
+                  </span>
+                  <span className="block text-[11.5px] text-muted-foreground">
+                    {quandCourt(n.created_at)}
+                    {n.duree_s != null && ` · ${chrono(n.duree_s)}`}
+                    {n.statut === "recue" && " · en attente de transcription"}
+                    {n.statut === "echec" && ` · ${n.message ?? "échec"}`}
+                  </span>
+                </span>
+                {n.audio_path && (
+                  <button
+                    type="button"
+                    onClick={() => void ecouter(n)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                  >
+                    <Play className="size-3.5" /> Réécouter
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {!extraction && mode === null && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link
+            to="/dictee"
+            className="group rounded-2xl border border-border bg-card p-6 transition-colors hover:border-avisdoc-teal"
+          >
+            <span className="flex size-11 items-center justify-center rounded-full bg-avisdoc-teal/10 text-avisdoc-teal">
+              <Mic className="size-5" />
+            </span>
+            <h2 className="mt-3 font-display text-lg font-semibold text-avisdoc-ink">À la voix</h2>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              En sortant d’un rendez-vous, ou le soir pour toute la journée. Jusqu’à dix minutes, même sans réseau —
+              la note part dès que vous en retrouvez un.
+            </p>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setMode("texte")}
+            className="group rounded-2xl border border-border bg-card p-6 text-left transition-colors hover:border-avisdoc-teal"
+          >
+            <span className="flex size-11 items-center justify-center rounded-full bg-avisdoc-coral/10 text-avisdoc-coral">
+              <PenLine className="size-5" />
+            </span>
+            <h2 className="mt-3 font-display text-lg font-semibold text-avisdoc-ink">Au clavier</h2>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Devant son écran, quand on préfère écrire. Plusieurs entreprises, dans le désordre : Merx s’occupe
+              du tri.
+            </p>
+          </button>
+        </div>
+      )}
+
+      {!extraction && mode === "texte" && (
         <Card className="p-4">
           <SectionLabel>Ce qui s’est passé</SectionLabel>
           <p className="mt-1 text-[12.5px] text-muted-foreground">
@@ -249,6 +370,13 @@ export default function Debrief() {
                 Voir un exemple
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setMode(null)}
+              className="text-[13px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
+            >
+              Retour
+            </button>
           </div>
         </Card>
       )}
@@ -316,6 +444,23 @@ export default function Debrief() {
             </div>
           )}
         </>
+      )}
+
+      {/* La lecture ne démarre jamais toute seule. */}
+      {ecoute && (
+        <Modal onClose={() => setEcoute(null)} width={420}>
+          <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Réécouter</h2>
+          <audio src={ecoute} controls className="mt-4 w-full">
+            <track kind="captions" />
+          </audio>
+          <button
+            type="button"
+            onClick={() => setEcoute(null)}
+            className="mt-4 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink hover:text-avisdoc-ink"
+          >
+            Fermer
+          </button>
+        </Modal>
       )}
     </div>
   );
