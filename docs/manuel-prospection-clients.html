@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Prospection et Clients — mode d'emploi</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:hsl(197 74% 48%);
+  --teal-soft:hsl(197 85% 94%);
+  --sage:hsl(206 55% 42%);
+  --coral:hsl(23 86% 55%);
+  --coral-soft:hsl(23 100% 94%);
+  --cream:hsl(36 52% 96%);
+  --ink:hsl(206 45% 13%);
+  --ink-soft:hsl(206 35% 26%);
+  --mist:hsl(210 40% 97%);
+  --line:hsl(210 20% 88%);
+}
+*{box-sizing:border-box}
+@page{size:A4;margin:16mm 14mm 18mm}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  color:var(--ink);font-size:10.2pt;line-height:1.5;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+h1,h2,h3,.display{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.01em}
+
+/* ---------- couverture ---------- */
+.couv{
+  height:252mm;display:flex;flex-direction:column;justify-content:center;
+  page-break-after:always;padding:0 4mm;
+}
+.logo{display:flex;align-items:baseline;gap:2mm;margin-bottom:14mm}
+.logo .a{font-family:'Fraunces',serif;font-size:26pt;font-weight:700;color:var(--teal)}
+.logo .b{font-family:'Fraunces',serif;font-size:26pt;font-weight:700;color:var(--coral)}
+.couv h1{font-size:34pt;line-height:1.1;margin:0 0 6mm}
+.couv .sous{font-size:13pt;color:var(--ink-soft);max-width:132mm;line-height:1.5}
+.couv .trait{width:34mm;height:3px;background:var(--coral);margin:9mm 0}
+.couv .pied{margin-top:auto;font-size:9pt;color:var(--ink-soft)}
+
+/* ---------- structure ---------- */
+h2{
+  font-size:17pt;margin:0 0 4mm;padding-bottom:2.5mm;
+  border-bottom:2px solid var(--teal);color:var(--ink);
+}
+.section{page-break-before:always}
+h3{font-size:12pt;margin:7mm 0 2.5mm;color:var(--sage)}
+p{margin:0 0 3mm}
+ul,ol{margin:0 0 3mm;padding-left:5mm}
+li{margin-bottom:1.6mm}
+strong{font-weight:650}
+.petit{font-size:9pt;color:var(--ink-soft)}
+
+/* ---------- blocs ---------- */
+.etapes{display:flex;gap:0;margin:5mm 0 7mm;align-items:stretch}
+.etape{
+  flex:1;background:var(--mist);border:1px solid var(--line);
+  border-radius:4mm;padding:3.5mm;position:relative;
+}
+.etape + .etape{margin-left:2.5mm}
+.etape .n{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:6mm;height:6mm;border-radius:50%;background:var(--teal);color:#fff;
+  font-size:8.5pt;font-weight:700;margin-bottom:2mm;
+}
+.etape h4{margin:0 0 1.5mm;font-size:10.5pt;font-weight:700}
+.etape p{margin:0;font-size:8.6pt;color:var(--ink-soft);line-height:1.4}
+
+.astuce,.piege,.note{
+  border-radius:3mm;padding:3.5mm 4mm;margin:4mm 0;
+  border-left:3px solid;page-break-inside:avoid;
+}
+.astuce{background:var(--teal-soft);border-color:var(--teal)}
+.piege{background:var(--coral-soft);border-color:var(--coral)}
+.note{background:var(--cream);border-color:hsl(36 40% 70%)}
+.astuce .t,.piege .t,.note .t{
+  font-size:8pt;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+  display:block;margin-bottom:1.5mm;
+}
+.astuce .t{color:var(--sage)}
+.piege .t{color:hsl(23 80% 38%)}
+.note .t{color:hsl(36 60% 30%)}
+.astuce p:last-child,.piege p:last-child,.note p:last-child{margin-bottom:0}
+
+table{width:100%;border-collapse:collapse;margin:3mm 0 5mm;font-size:9.4pt}
+th{
+  background:var(--ink);color:#fff;text-align:left;padding:2.2mm 3mm;
+  font-weight:600;font-size:8.6pt;text-transform:uppercase;letter-spacing:.04em;
+}
+td{padding:2.2mm 3mm;border-bottom:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:var(--mist)}
+th:first-child,td:first-child{border-radius:0}
+.bouton{
+  display:inline-block;background:var(--teal);color:#fff;border-radius:10mm;
+  padding:.4mm 2.2mm;font-size:8.6pt;font-weight:700;white-space:nowrap;
+}
+.onglet{
+  display:inline-block;border-bottom:2px solid var(--teal);
+  font-weight:650;padding-bottom:.3mm;white-space:nowrap;
+}
+.note100{
+  display:inline-block;background:var(--coral);color:#fff;border-radius:10mm;
+  padding:.4mm 2.2mm;font-size:8.6pt;font-weight:700;
+}
+.deux{display:flex;gap:5mm}
+.deux > *{flex:1}
+.cloture{
+  page-break-before:always;height:250mm;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.fin{padding:8mm 7mm;background:var(--ink);color:#fff;border-radius:5mm}
+.fin h3{color:#fff;margin:0 0 5mm;font-size:16pt}
+.fin p{color:hsl(210 25% 88%);font-size:11.5pt;margin-bottom:3.5mm}
+.fin p:last-child{margin-bottom:0}
+.fin .num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:6.5mm;height:6.5mm;border-radius:50%;background:var(--coral);color:#fff;
+  font-size:9pt;font-weight:700;margin-right:2.5mm;
+}
+.cloture .rappel{margin-top:9mm;text-align:center;font-size:9.5pt;color:var(--ink-soft)}
+.cloture .rappel strong{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ COUVERTURE ══════════════ -->
+<div class="couv">
+  <div class="logo"><span class="a">AVIS</span><span class="b">DOC</span></div>
+  <h1>Prospection<br>et Clients</h1>
+  <div class="trait"></div>
+  <p class="sous">
+    Le mode d'emploi du commercial : trouver une entreprise, monter son dossier,
+    la suivre jusqu'à la signature, et garder le fichier client à jour.
+  </p>
+  <div class="pied">
+    Hub AvisDoc — <strong>admin.avisdoc.fr</strong><br>
+    Septembre 2026
+  </div>
+</div>
+
+<!-- ══════════════ 1. LE PARCOURS ══════════════ -->
+<div class="section" style="page-break-before:avoid">
+<h2>Le parcours, d'un bout à l'autre</h2>
+
+<p>
+  Une entreprise traverse quatre écrans, toujours dans le même ordre. Chaque passage
+  garde ce qui a été trouvé avant : vous ne ressaisissez jamais rien.
+</p>
+
+<div class="etapes">
+  <div class="etape">
+    <span class="n">1</span>
+    <h4>Merx</h4>
+    <p>Vous dites qui vous voulez démarcher. Il cherche et crée les fiches.</p>
+  </div>
+  <div class="etape">
+    <span class="n">2</span>
+    <h4>Prospection</h4>
+    <p>Les entreprises trouvées, notées sur 100. Vous approfondissez celles qui valent le coup.</p>
+  </div>
+  <div class="etape">
+    <span class="n">3</span>
+    <h4>Pipeline</h4>
+    <p>Celles que vous travaillez vraiment, colonne par colonne jusqu'à la signature.</p>
+  </div>
+  <div class="etape">
+    <span class="n">4</span>
+    <h4>Clients</h4>
+    <p>Le fichier de l'équipe. La fiche se crée toute seule à la signature.</p>
+  </div>
+</div>
+
+<div class="astuce">
+  <span class="t">Le principe à retenir</span>
+  <p>
+    <strong>Rien ne se perd et rien ne se supprime vraiment.</strong> Ce que vous jetez part
+    à la Corbeille et revient d'un clic pendant trente jours. Ce qui est écrit sur une fiche
+    la suit d'un écran à l'autre. Vous pouvez donc avancer sans avoir peur de casser quelque chose.
+  </p>
+</div>
+
+<h3>Ce que chacun voit</h3>
+<p>
+  La Prospection, le Pipeline et le fichier Clients sont <strong>partagés par toute l'équipe</strong> :
+  vous voyez les fiches de vos collègues, ils voient les vôtres. C'est voulu — on ne démarche
+  pas deux fois la même entreprise.
+</p>
+<p>
+  Vos <strong>débriefs vocaux</strong> font exception : l'équipe lit ce qui en est retranscrit,
+  mais <strong>personne n'écoute votre enregistrement</strong>, pas même l'administrateur.
+</p>
+</div>
+
+<!-- ══════════════ 2. PROSPECTION ══════════════ -->
+<div class="section">
+<h2>Prospection</h2>
+
+<p>
+  Toutes les entreprises que Merx a trouvées. C'est votre vivier : vous y triez, vous
+  approfondissez, et vous envoyez au Pipeline celles que vous décidez de travailler.
+</p>
+
+<h3>Les deux façons de regarder</h3>
+<table>
+  <tr><th style="width:26mm">Vue</th><th>Ce qu'elle apporte</th></tr>
+  <tr><td><strong>Kanban</strong></td><td>Une colonne par secteur : Travaux publics et BTP, Espaces verts, Agriculture et viticulture, Collectivités, Autre. Pratique pour préparer une tournée sur un même métier.</td></tr>
+  <tr><td><strong>Liste</strong></td><td>Un tableau trié : entreprise, ville, activité, interlocuteur, note. Pratique pour comparer et attaquer par les meilleures notes.</td></tr>
+</table>
+
+<h3>La note sur 100</h3>
+<p>
+  Chaque fiche porte une note. Elle ne dit pas si l'entreprise est « bien » : elle dit
+  <strong>à quel point elle ressemble à une cible AvisDoc</strong>, et pourquoi.
+</p>
+<table>
+  <tr><th style="width:34mm">Critère</th><th style="width:16mm">Points</th><th>Qui juge</th></tr>
+  <tr><td>Exposition au soleil</td><td>35</td><td>Merx, avec sa justification et sa source</td></tr>
+  <tr><td>Sensibilité santé au travail</td><td>10</td><td>Merx, avec sa justification et sa source</td></tr>
+  <tr><td>Nombre de salariés</td><td>20</td><td>Le registre officiel</td></tr>
+  <tr><td>Interlocuteur trouvé</td><td>10</td><td>Automatique</td></tr>
+  <tr><td>Plusieurs sites</td><td>10</td><td>Automatique</td></tr>
+  <tr><td>Zone géographique</td><td>15</td><td>Automatique (Gironde, Île-de-France, Occitanie, PACA)</td></tr>
+</table>
+
+<div class="note">
+  <span class="t">Un critère à 0 n'est pas un mauvais point</span>
+  <p>
+    Il s'affiche « non évalué » : cela veut dire qu'on n'a pas l'information, pas que la réponse
+    est non. Une fiche à <span class="note100">45 / 100</span> non approfondie peut monter très
+    haut une fois approfondie. Regardez le détail avant de renoncer.
+  </p>
+</div>
+
+<h3>Les quatre actions d'une fiche</h3>
+<table>
+  <tr><th style="width:36mm">Action</th><th>Ce qu'elle fait</th></tr>
+  <tr>
+    <td><span class="bouton">Approfondir</span></td>
+    <td>Va chercher le registre officiel, l'effectif, les établissements, les dirigeants, et les coordonnées sur le site de l'entreprise. Produit aussi le <strong>dossier commercial</strong>. Compter un peu plus d'une minute.</td>
+  </tr>
+  <tr>
+    <td><span class="bouton">Écrire un e-mail personnalisé</span></td>
+    <td>Merx rédige un premier contact à partir de ce que la fiche contient. C'est un brouillon : vous le relisez et l'envoyez vous-même. Rien ne part tout seul.</td>
+  </tr>
+  <tr>
+    <td><span class="bouton">Au Pipeline</span></td>
+    <td>L'entreprise devient une affaire que vous travaillez. Elle emporte sa raison sociale, son SIREN, son siège, son effectif et son interlocuteur.</td>
+  </tr>
+  <tr>
+    <td>Écarter</td>
+    <td>La fiche sort de votre vue sans être détruite. À utiliser dès qu'une entreprise ne vous intéresse pas : un vivier propre se travaille mieux.</td>
+  </tr>
+</table>
+
+<h3>Les trois onglets de la fiche</h3>
+<p>
+  <span class="onglet">Identité</span> &nbsp; ce qu'on sait officiellement : raison sociale, SIREN,
+  siège, effectif, dirigeants, coordonnées. Et le référent, c'est-à-dire vous si vous suivez ce dossier.
+</p>
+<p>
+  <span class="onglet">Approche</span> &nbsp; <strong>l'onglet qui sert avant d'appeler.</strong> On y trouve
+  le dossier commercial monté par Merx — accroche, qui aborder, faits vérifiés, arguments,
+  objections probables, offre à proposer, points à vérifier — puis pourquoi c'est une bonne cible,
+  l'angle d'approche, et la note critère par critère.
+</p>
+<p>
+  <span class="onglet">Historique</span> &nbsp; tout ce qui s'est passé, dans l'ordre : quand la fiche
+  a été trouvée, quand elle a été approfondie, vos appels, vos e-mails, vos rendez-vous, vos notes.
+  Il ne se modifie pas — un historique qu'on retouche ne vaut rien.
+</p>
+
+<div class="astuce">
+  <span class="t">Astuce · la bonne séquence</span>
+  <p>
+    Triez par note décroissante en vue Liste → ouvrez les dix premières → <strong>Approfondir</strong> →
+    lisez l'onglet <strong>Approche</strong> dans la voiture → appelez. Le dossier commercial vous donne
+    l'accroche, le bon interlocuteur, et ce qu'on va vous objecter.
+  </p>
+</div>
+
+<div class="piege">
+  <span class="t">À éviter</span>
+  <p>
+    <strong>Ne cliquez pas deux fois sur Approfondir.</strong> Chaque appel coûte et prend plus d'une
+    minute : le bouton se met en attente, laissez-le travailler. Si la fiche a déjà été approfondie,
+    le bouton devient « Approfondir à nouveau » — n'y revenez que si l'entreprise a changé.
+  </p>
+</div>
+
+<h3>Retrouver une fiche</h3>
+<p>
+  La barre de recherche cherche dans le nom et la ville. Les filtres, repliés sur téléphone,
+  permettent de croiser : <strong>note minimale</strong>, <strong>département</strong>,
+  <strong>nombre de salariés</strong>, <strong>adresse e-mail connue</strong>,
+  <strong>date d'arrivée de la fiche</strong>.
+</p>
+<div class="astuce">
+  <span class="t">Astuce · préparer une tournée</span>
+  <p>
+    Filtrez sur votre département et sur une note minimale de 60, passez en vue Kanban : vous
+    obtenez vos cibles du jour, rangées par métier. Une tournée « espaces verts » ne se prépare
+    pas comme une tournée « collectivités ».
+  </p>
+</div>
+</div>
+
+<!-- ══════════════ 3. CLIENTS ══════════════ -->
+<div class="section">
+<h2>Clients</h2>
+
+<p>
+  Le fichier client de l'équipe. Une fiche y apparaît <strong>toute seule</strong> le jour où
+  l'affaire correspondante passe en « signé » dans le Pipeline — vous n'avez rien à recopier.
+</p>
+
+<h3>Les deux vues, et le regroupement</h3>
+<p>
+  Comme en Prospection, <strong>Liste</strong> pour comparer et <strong>Kanban</strong> pour
+  visualiser. Le menu <strong>Regrouper par</strong> choisit ce qui fait les colonnes du Kanban :
+  le secteur, la ville, le mois d'entrée, ou n'importe quelle colonne que vous avez créée.
+</p>
+
+<h3>Vos propres colonnes</h3>
+<p>
+  Le fichier n'impose pas ses champs. Vous ajoutez les colonnes dont vous avez besoin —
+  « Interlocuteur RH », « Date de la prochaine campagne », « Nombre de sites » — et elles
+  deviennent disponibles pour tout le monde, dans les vues comme dans le regroupement.
+</p>
+
+<h3>Excel, dans les deux sens</h3>
+<table>
+  <tr><th style="width:32mm">Bouton</th><th>Ce qu'il fait</th></tr>
+  <tr><td><strong>Exporter</strong></td><td>Télécharge le fichier complet en <code>.xlsx</code>, colonnes libres comprises. Pour une réunion, un reporting, ou une sauvegarde.</td></tr>
+  <tr><td><strong>Modèle</strong></td><td>Télécharge un classeur vide avec les bons en-têtes. C'est le point de départ d'un import propre.</td></tr>
+  <tr><td><strong>Importer</strong></td><td>Charge un classeur. La première ligne doit donner le nom des colonnes, ensuite une ligne par client. Le Hub vous montre les correspondances qu'il propose <strong>avant</strong> d'écrire quoi que ce soit.</td></tr>
+</table>
+
+<div class="piege">
+  <span class="t">À vérifier avant d'importer</span>
+  <p>
+    Relisez l'écran de correspondance ligne à ligne : c'est le seul moment où l'on peut corriger.
+    Une colonne mal associée met les villes dans le champ « Activité », et il faut ensuite
+    reprendre chaque fiche à la main.
+  </p>
+</div>
+
+<h3>La fiche client</h3>
+<p>
+  Un clic sur une ligne <strong>ouvre la fiche en consultation</strong>. Rien n'est modifiable par
+  mégarde : pour changer quelque chose, il faut passer par <span class="bouton">Modifier</span>.
+  C'est volontaire — une information client ne doit pas bouger d'un clic malheureux.
+</p>
+<p>
+  <span class="onglet">Identité</span> &nbsp; ce qu'on sait d'eux. Si la fiche vient d'une affaire
+  signée, elle affiche aussi ce que l'affaire portait : SIREN, effectif, adresse, journées vendues,
+  dépistés, orientés. L'information est montrée <strong>à sa source</strong>, pour qu'une correction
+  là-bas se voie ici.
+</p>
+<p>
+  <span class="onglet">Approche</span> &nbsp; ce qui avait été trouvé du temps de la prospection :
+  pourquoi c'était une bonne cible, et la note critère par critère. Utile pour se remettre en tête
+  l'angle qui avait fonctionné.
+</p>
+<p>
+  <span class="onglet">Action</span> &nbsp; <strong>l'onglet du quotidien.</strong> On y note un appel,
+  un rendez-vous, un e-mail, une chose à faire — avec son jour et son heure. Tout ce que vous y
+  posez apparaît dans votre <strong>Planning</strong>.
+</p>
+<p>
+  <span class="onglet">Historique</span> &nbsp; le fil de ce qui s'est passé avec ce client, du premier
+  contact à aujourd'hui.
+</p>
+
+<h3>Les actions toutes prêtes</h3>
+<p>
+  Dans l'onglet Action, cinq propositions ouvrent le bon formulaire avec l'intitulé déjà écrit :
+</p>
+<ul>
+  <li>Proposer une nouvelle campagne</li>
+  <li>Relancer sur une journée supplémentaire</li>
+  <li>Proposer une session sur un autre site</li>
+  <li>Présenter le volet prévention solaire</li>
+  <li>Envoyer le bilan de la dernière campagne</li>
+</ul>
+<p class="petit">
+  Un clic suffit : l'intitulé est rempli, vous n'avez plus qu'à mettre la date.
+</p>
+
+<div class="astuce">
+  <span class="t">Astuce · le réflexe qui fait la différence</span>
+  <p>
+    Dès qu'un client vous dit « rappelez-moi en janvier », posez l'action tout de suite depuis
+    l'onglet Action, avec la date. Elle vous attendra dans le Planning le jour dit. Une relance
+    notée sur un carnet est une relance perdue.
+  </p>
+</div>
+</div>
+
+<!-- ══════════════ 4. LE RÉFÉRENT + MERX ══════════════ -->
+<div class="section">
+<h2>Le référent, et ce que Merx peut faire pour vous</h2>
+
+<h3>Le référent commercial</h3>
+<p>
+  Chaque fiche porte le nom du commercial qui la suit. Vous le choisissez dans la liste déroulante
+  <strong>Référent</strong>, en haut de la fiche. Le choix s'enregistre tout seul, il n'y a pas de
+  bouton à valider.
+</p>
+<p>
+  <strong>Il suit l'entreprise.</strong> Le référent posé sur un prospect se retrouve sur l'affaire
+  quand elle passe au Pipeline, puis sur la fiche client à la signature. Vous ne le ressaisissez
+  jamais. Il reste modifiable à tout moment — un dossier qui change de main se transmet en deux clics.
+</p>
+
+<h3>Poser une question à Merx</h3>
+<p>
+  Merx n'est pas qu'un moteur de recherche : c'est à lui qu'on parle entre deux rendez-vous.
+  Il relit la fiche de l'entreprise avant de répondre, et va chercher dans ce que l'équipe a
+  appris sur le terrain.
+</p>
+<table>
+  <tr><th style="width:56mm">Ce que vous lui dites</th><th>Ce qu'il fait</th></tr>
+  <tr><td>« Des entreprises de travaux publics en Gironde »</td><td>Il cherche et crée les fiches dans Prospection.</td></tr>
+  <tr><td>« Comment j'aborde Terrassement Médoc ? »</td><td>Il relit la fiche et vous donne l'accroche, le bon interlocuteur et l'angle.</td></tr>
+  <tr><td>« Ils me disent qu'ils ont déjà la médecine du travail, je réponds quoi ? »</td><td>Il cherche dans les objections déjà entendues par l'équipe, et vous donne la réponse — plus celle qu'on vous opposera ensuite.</td></tr>
+  <tr><td>« Qu'est-ce que je peux leur proposer ? »</td><td>Il part de ce que la fiche contient pour construire une offre tenable.</td></tr>
+</table>
+
+<div class="note">
+  <span class="t">Ce que Merx ne fera jamais</span>
+  <p>
+    Il <strong>n'invente pas</strong> un chiffre, un tarif, un délai, un taux, un fait médical,
+    ni une référence client. Sur ces points-là, il dit qu'il ne sait pas. C'est une protection :
+    un chiffre inventé se retourne contre vous devant votre interlocuteur.
+  </p>
+</div>
+
+<div class="astuce">
+  <span class="t">Astuce · le micro</span>
+  <p>
+    Dans la conversation avec Merx, le bouton micro écrit votre question à votre place — pratique
+    au volant, ou quand on sort d'un rendez-vous les mains prises. Rien n'est conservé : seul le
+    texte part.
+  </p>
+</div>
+
+<h3>Le débrief, en trente secondes</h3>
+<p>
+  En sortant d'un rendez-vous, ouvrez <strong>Débrief</strong> et racontez ce qui s'est passé —
+  à la voix ou au clavier. Merx reconnaît l'entreprise, crée la fiche si elle n'existe pas,
+  pose les actions à venir dans votre Planning, écrit le compte rendu dans l'historique, et range
+  les objections entendues dans la bibliothèque de l'équipe.
+</p>
+<p>
+  <strong>Il n'y a rien à cocher ni à valider.</strong> Vous parlez, c'est classé, et l'écran vous
+  dit où c'est parti.
+</p>
+
+</div>
+
+<div class="cloture">
+  <div class="fin">
+    <h3>Trois réflexes, et vous tenez tout</h3>
+    <p><span class="num">1</span> <strong>Avant d'appeler</strong> — ouvrez l'onglet Approche de la fiche.</p>
+    <p><span class="num">2</span> <strong>Pendant l'appel</strong> — notez la suite dans l'onglet Action, avec sa date.</p>
+    <p><span class="num">3</span> <strong>En sortant</strong> — dictez votre Débrief. Le reste se range tout seul.</p>
+  </div>
+  <p class="rappel">
+    Une question sur un écran ? <strong>Demandez-la à Merx</strong>, il connaît le Hub.<br>
+    Un doute sur une suppression ? Tout revient de la <strong>Corbeille</strong> pendant trente jours.
+  </p>
+</div>
+
+</body>
+</html>
