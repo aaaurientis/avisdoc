@@ -106,7 +106,12 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     .map((p) => {
       const sun = p.exposition_soleil;
       const score: Score = {
-        soleil: sunScore(sun.niveau, sun.justification.trim(), seen.has(sun.source) ? sun.source : null),
+        // Exposé au soleil OU concerné par son métier : on retient le meilleur des deux.
+        soleil: sunScore(sun.niveau, sun.justification.trim(), seen.has(sun.source) ? sun.source : null, {
+          niveau: p.affinite_prevention?.niveau ?? "non_evalue",
+          justification: p.affinite_prevention?.justification?.trim() ?? "",
+          source: seen.has(p.affinite_prevention?.source ?? "") ? p.affinite_prevention.source : null,
+        }),
         zone: zoneScore([department(p.departement)]),
       };
       return {
@@ -186,7 +191,11 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const sun = out.exposition_soleil;
   const score: Score = {
     soleil: sun.niveau !== "non_evalue"
-      ? sunScore(sun.niveau, sun.justification.trim(), allowed(sun.source) ? sun.source : null)
+      ? sunScore(sun.niveau, sun.justification.trim(), allowed(sun.source) ? sun.source : null, {
+          niveau: out.affinite_prevention?.niveau ?? "non_evalue",
+          justification: out.affinite_prevention?.justification?.trim() ?? "",
+          source: allowed(out.affinite_prevention?.source ?? "") ? out.affinite_prevention.source : null,
+        })
       : (previous.soleil ?? sunScore("non_evalue", "", null)),
     sante_travail: healthScore(out.sante_travail.trouve && allowed(out.sante_travail.source), out.sante_travail.justification.trim(), out.sante_travail.source),
     salaries: sizeScore(company?.headcountBand ?? null, headcountLabel(company?.headcountBand ?? null), company?.headcountYear ?? null),

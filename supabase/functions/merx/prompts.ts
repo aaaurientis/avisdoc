@@ -2,7 +2,7 @@
 // se fait à la demande. Cible (Olivier, 12/09/2026) : AvisDoc vend des campagnes de dépistage dermatologique
 // à la DRH, plutôt au siège ; le critère médical premier est l'exposition des salariés au soleil.
 
-import { SECTORS, type SunLevel } from "./scoring.ts";
+import { SECTORS, type AffinityLevel, type SunLevel } from "./scoring.ts";
 import { headcountLabel, type Company } from "./annuaire.ts";
 import type { SiteContacts } from "./site-contacts.ts";
 
@@ -34,7 +34,13 @@ Le programme se double d'un volet territorial : formation des professionnels de 
 Aux ressources humaines, le plus souvent au siège ; à défaut, à un responsable santé-sécurité, qualité de vie au travail ou RSE. En collectivité, aux élus et à la direction générale des services.
 
 CE QUI FAIT UNE BONNE CIBLE
-Le critère médical premier est l'exposition des salariés au soleil : chantiers, espaces verts, voirie, agriculture, travaux en extérieur. Viennent ensuite la taille — plus il y a de collaborateurs exposés, plus la journée est rentable pour eux — et l'existence d'une démarche santé au travail déjà engagée, qui montre que le sujet sera entendu.
+Deux familles de cibles, également bonnes.
+
+LES EXPOSÉS : leurs salariés travaillent au soleil — chantiers, espaces verts, voirie, agriculture, viticulture, travaux en extérieur. Le risque est chez eux.
+
+LES CONCERNÉS PAR LE SUJET : leur métier touche la peau, le soleil ou la prévention — instituts de beauté et spas, esthétique, pharmacies et parapharmacies, laboratoires de dermatologie ou de protection solaire, centres de santé, salles de sport et bien-être. Leurs salariés ne sont pas dehors, et ce n'est pas la question : le dépistage parle à leur métier, à leurs clients et à leur image. Ils achètent pour leurs équipes, et ils orientent leur clientèle — ce sont autant des prescripteurs que des clients.
+
+Viennent ensuite, pour les deux familles, la taille — plus il y a de collaborateurs, plus la journée est rentable — et l'existence d'une démarche santé au travail déjà engagée, qui montre que le sujet sera entendu.
 
 ILS LEUR FONT DÉJÀ CONFIANCE
 Sanofi, Groupama, Viabeez, Extreme. En collectivité, le département de la Nièvre, dont le maire de Varzy, Gilles Noël, a soutenu publiquement le programme.
@@ -48,6 +54,21 @@ const POLITESSE = `TU VOUVOIES TOUJOURS, sans aucune exception : le commercial �
 const NEVER = `TU N'INVENTES JAMAIS. Une donnée non trouvée reste vide. Chaque source est l'adresse exacte d'une page que tes recherches ont réellement renvoyée. Réponds en français.
 
 TU N'ANNONCES JAMAIS UNE PIÈCE QUE TU NE PEUX PAS PRODUIRE. Si tu mentionnes un témoignage, tu en donnes le texte ; une étude, tu en donnes la source ; un chiffre, tu dis d'où il vient. Faute de quoi tu n'en parles pas du tout. Annoncer « il existe un témoignage » sans pouvoir le montrer met le commercial en défaut devant son interlocuteur : il l'aura promis, et n'aura rien à sortir.`;
+
+const AFFINITE = `L'affinité avec le sujet, pour les entreprises dont les salariés ne sont PAS dehors : « metier_de_la_peau » quand le dépistage touche directement leur métier (institut de beauté, esthétique, spa, pharmacie ou parapharmacie, dermatologie, protection solaire) ; « secteur_sante » quand elles relèvent de la santé ou du bien-être sans que la peau soit au cœur (centre de santé, salle de sport, laboratoire généraliste) ; « aucune » quand rien ne rattache leur activité au sujet ; « non_evalue » si tu n'as rien lu qui permette de trancher. Toujours une phrase de justification et la page source.
+
+Une entreprise n'a pas à cumuler : être exposée OU concernée par son métier suffit. Un chantier a le soleil, un institut a le métier — les deux sont de bonnes cibles.`;
+
+const AFFINITE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["niveau", "justification", "source"],
+  properties: {
+    niveau: { type: "string", enum: ["metier_de_la_peau", "secteur_sante", "aucune", "non_evalue"] },
+    justification: { type: "string" },
+    source: { type: "string" },
+  },
+} as const;
 
 const SUN_SCHEMA = {
   type: "object",
@@ -78,6 +99,7 @@ Pour chacune :
 - le site officiel : celui de l'entreprise elle-même, sous son propre nom de domaine, jamais une plateforme tierce (annuaire, recrutement, réseau social, presse) ; vide s'il n'apparaît pas ;
 - pourquoi elle correspond, en deux ou trois phrases ÉTAYÉES : ce que tu as lu sur elle, pas une généralité. « Entreprise de terrassement » ne dit rien ; « 60 salariés, trois chantiers de voirie en cours pour la métropole, équipes exposées toute l'année » dit quelque chose ;
 - ${SUN}
+- ${AFFINITE}
 - les adresses des pages où tu l'as trouvée.
 
 ${POLITESSE}
@@ -93,7 +115,7 @@ export const LIST_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["nom", "ville", "departement", "activite", "secteur", "site_web", "pourquoi", "exposition_soleil", "sources"],
+        required: ["nom", "ville", "departement", "activite", "secteur", "site_web", "pourquoi", "exposition_soleil", "affinite_prevention", "sources"],
         properties: {
           nom: { type: "string" },
           ville: { type: "string" },
@@ -103,12 +125,20 @@ export const LIST_SCHEMA = {
           site_web: { type: "string" },
           pourquoi: { type: "string" },
           exposition_soleil: SUN_SCHEMA,
+    affinite_prevention: AFFINITE_SCHEMA,
+          affinite_prevention: AFFINITE_SCHEMA,
           sources: { type: "array", items: { type: "string" } },
         },
       },
     },
   },
 } as const;
+
+export interface AffiniteOut {
+  niveau: AffinityLevel;
+  justification: string;
+  source: string;
+}
 
 export interface SunOut {
   niveau: SunLevel;
@@ -117,7 +147,7 @@ export interface SunOut {
 }
 
 export interface ListOut {
-  prospects: { nom: string; ville: string; departement: string; activite: string; secteur: string; site_web: string; pourquoi: string; exposition_soleil: SunOut; sources: string[] }[];
+  prospects: { nom: string; ville: string; departement: string; activite: string; secteur: string; site_web: string; pourquoi: string; exposition_soleil: SunOut; affinite_prevention: AffiniteOut; sources: string[] }[];
 }
 
 // ── Approfondissement : une seule entreprise ────────────────────────────
@@ -135,6 +165,7 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    N'invente RIEN : ni e-mail reconstruit à partir du nom de domaine, ni téléphone approché, ni nom supposé d'après un organigramme type.
    SI TU NE TROUVES PERSONNE : ne dis pas « appelez le standard » sans rien d'autre. Donne le NUMÉRO du standard — il est dans les coordonnées du site ou sur la page contact —, dis quel service demander, et pourquoi celui-là. Un conseil sans numéro à composer ne sert à rien.
 3. ${SUN}
+   ${AFFINITE}
 4. La sensibilité santé au travail : une démarche publiée (accord de qualité de vie au travail, prévention des risques, politique RSE), trouvée ou non, avec une phrase et la page source.
 5. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
@@ -152,7 +183,7 @@ Six recherches web au plus. ${POLITESSE} ${NEVER}`;
 export const ENRICH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["siren", "site_web", "contact", "exposition_soleil", "sante_travail", "angle_approche", "dossier", "sources"],
+  required: ["siren", "site_web", "contact", "exposition_soleil", "affinite_prevention", "sante_travail", "angle_approche", "dossier", "sources"],
   properties: {
     siren: { type: "string" },
     site_web: { type: "string" },
@@ -211,6 +242,7 @@ export interface EnrichOut {
   site_web: string;
   contact: { nom: string; fonction: string; email: string; telephone: string; source: string };
   exposition_soleil: SunOut;
+  affinite_prevention: AffiniteOut;
   sante_travail: { trouve: boolean; justification: string; source: string };
   angle_approche: string;
   dossier: {
