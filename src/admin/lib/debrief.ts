@@ -99,6 +99,51 @@ export async function transcrireNote(noteId: string): Promise<string> {
   return r.transcription;
 }
 
+/** Ce qui a été fait d'un débrief, pour pouvoir le dire en une phrase. */
+export interface Bilan {
+  creees: { nom: string; ou: string }[];
+  fiches: string[];
+  objections: number;
+  mouches: number;
+  actions: number;
+  nonRattachees: string[];
+}
+
+/**
+ * Le débrief, de bout en bout : Merx lit, range, et c'est fini.
+ *
+ * Il y avait une étape de validation par cases à cocher. Elle partait d'une bonne
+ * intention — une transcription se trompe sur les noms propres — mais elle ajoutait
+ * trente secondes d'attente, un écran à comprendre et deux boutons à choisir, pour un
+ * commercial qui veut juste que ce soit rangé. Et rien n'étant réellement détruit
+ * — les fiches se modifient, la corbeille garde trente jours, l'historique montre
+ * tout —, l'erreur se corrige après coup bien plus vite qu'elle ne se prévient.
+ */
+export async function traiterDebrief(texte: string, par: string, noteId: string | null): Promise<Bilan> {
+  const lu = await lireDebrief(texte);
+
+  const bilan: Bilan = { creees: [], fiches: [], objections: 0, mouches: 0, actions: 0, nonRattachees: lu.non_rattachees };
+
+  for (const e of lu.entreprises) {
+    const retenu = toutRetenir(e);
+    const { creee } = await enregistrer(e, retenu, par, noteId);
+    if (creee) bilan.creees.push(creee);
+    else if (e.fiche_id) bilan.fiches.push(e.entreprise);
+    bilan.objections += e.objections.length;
+    bilan.mouches += e.mouches.length;
+    bilan.actions += e.fiche_id || creee ? e.actions.length : 0;
+  }
+
+  // La note est traitée : elle ne doit plus jamais se reproposer au tri.
+  if (noteId) {
+    await supabaseAdmin
+      .from("admin_notes_dictees")
+      .update({ statut: "classee", extraction: lu as unknown as Record<string, unknown> })
+      .eq("id", noteId);
+  }
+  return bilan;
+}
+
 /** Demande à Merx de trier un débrief. Rien n'est écrit : il rend seulement sa lecture. */
 export async function lireDebrief(texte: string): Promise<Extraction> {
   const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "debrief", texte } });
