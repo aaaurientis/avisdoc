@@ -1,12 +1,19 @@
-// Coûts — ce que Merx dépense, demande par demande.
-// Rien n'est estimé : chaque ligne vient de la consommation réellement mesurée par la fonction
-// (jetons d'entrée, jetons de sortie, recherches web), multipliée par les tarifs relevés.
+// CAP — le coût d'acquisition par prospect.
+//
+// L'écran listait des DÉPENSES : une ligne par appel au modèle. On voyait passer l'argent
+// sans jamais savoir ce qu'avait coûté une entreprise donnée. Il montre maintenant une ligne
+// par entreprise, qu'on déplie pour voir le détail.
+//
+// Rien n'est estimé : chaque montant vient de la consommation réellement mesurée par la
+// fonction (jetons lus, jetons écrits, recherches web), multipliée par les tarifs relevés.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { coutDe, euroDollar, MODELES_ACTUELS, MODELE_PAR_DEFAUT, NOM_MODELE, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
+import { calculerCap, type DemandeBrute, type FicheBrute } from "../lib/cap";
+import { cn } from "@/lib/utils";
 
 interface Demande {
   id: string;
@@ -18,6 +25,8 @@ interface Demande {
   usage: Consommation | null;
   /** Le modèle qui a travaillé ; absent pour les demandes d'avant le 22/09/2026. */
   model: string | null;
+  prospect_id: string | null;
+  account_id: string | null;
   created_at: string;
   finished_at: string | null;
 }
@@ -72,18 +81,26 @@ const USAGES: { cle: string; titre: string; modele: string; pourquoi: string }[]
 
 export default function Couts() {
   const [demandes, setDemandes] = useState<Demande[]>([]);
+  const [fiches, setFiches] = useState<FicheBrute[]>([]);
+  /** Les entreprises dont on a ouvert le détail. */
+  const [depliees, setDepliees] = useState<Set<string>>(new Set());
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
-    const { data, error } = await supabaseAdmin
-      .from("admin_merx_demandes")
-      .select("id, kind, request, requested_by, status, found_count, usage, model, created_at, finished_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const [{ data, error }, { data: lesFiches }] = await Promise.all([
+      supabaseAdmin
+        .from("admin_merx_demandes")
+        .select("id, kind, request, requested_by, status, found_count, usage, model, prospect_id, account_id, created_at, finished_at")
+        .order("created_at", { ascending: false })
+        .limit(400),
+      // Les fiches supprimées comptent aussi : ce qu'on a dépensé pour elles a bien été dépensé.
+      supabaseAdmin.from("admin_prospects").select("id, name, found_by").limit(1000),
+    ]);
     if (error) setErreur(messageErreur(error.message));
     else setDemandes((data ?? []) as Demande[]);
+    setFiches((lesFiches ?? []) as FicheBrute[]);
     setChargement(false);
   }, []);
 
@@ -129,13 +146,23 @@ export default function Couts() {
     };
   }, [demandes]);
 
+  const cap = useMemo(() => calculerCap(demandes as unknown as DemandeBrute[], fiches), [demandes, fiches]);
+
+  const deplier = (id: string) =>
+    setDepliees((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+
   const tarif = TARIFS_MODELE[MODELE_PAR_DEFAUT];
 
   return (
     <div>
       <PageHeader
-        title="Coûts"
-        subtitle="Ce que Merx a réellement consommé, demande par demande"
+        title="CAP"
+        subtitle="Coût d’acquisition par prospect — ce que chaque entreprise a réellement coûté"
         action={
           <button
             type="button"
@@ -155,20 +182,22 @@ export default function Couts() {
         </div>
       ) : (
         <>
-          {/* Les chiffres qui comptent */}
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Chiffre titre="Ce mois-ci" valeur={euroDollar(bilan.mois)} precision="depuis le 1er du mois" />
-            <Chiffre titre="Depuis le début" valeur={euroDollar(bilan.total)} precision={`${demandes.length} demande${demandes.length > 1 ? "s" : ""}`} />
-            <Chiffre
-              titre="Une recherche"
-              valeur={euroDollar(bilan.moyenneRecherche)}
-              precision={bilan.recherches ? `moyenne sur ${bilan.recherches} recherche${bilan.recherches > 1 ? "s" : ""}` : "aucune recherche"}
-            />
-            <Chiffre
-              titre="Un prospect trouvé"
-              valeur={euroDollar(bilan.parFiche)}
-              precision={bilan.fiches ? `${bilan.fiches} fiche${bilan.fiches > 1 ? "s" : ""} trouvées` : "aucune fiche"}
-            />
+          {/* Les chiffres restent sous les yeux : la liste passe dessous. */}
+          <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border bg-background/95 px-6 pb-3 pt-1 backdrop-blur">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Chiffre titre="Ce mois-ci" valeur={euroDollar(bilan.mois)} precision="depuis le 1er du mois" />
+              <Chiffre titre="Depuis le début" valeur={euroDollar(bilan.total)} precision={`${demandes.length} demande${demandes.length > 1 ? "s" : ""}`} />
+              <Chiffre
+                titre="Coût moyen d’un prospect"
+                valeur={euroDollar(cap.acquisitions.length ? cap.totalImpute / cap.acquisitions.length : 0)}
+                precision={cap.acquisitions.length ? `sur ${cap.acquisitions.length} entreprise${cap.acquisitions.length > 1 ? "s" : ""}` : "aucune entreprise"}
+              />
+              <Chiffre
+                titre="Le plus cher"
+                valeur={euroDollar(cap.acquisitions[0]?.total ?? 0)}
+                precision={cap.acquisitions[0]?.nom ?? "—"}
+              />
+            </div>
           </div>
 
           {/* Les tarifs, en clair : deux modèles, deux usages, deux prix. */}
@@ -212,58 +241,89 @@ export default function Couts() {
           </Card>
 
           {/* Le détail */}
-          {demandes.length === 0 ? (
+          {cap.acquisitions.length === 0 && cap.horsAcquisition.length === 0 ? (
             <div className="rounded-2xl bg-muted/60 p-8 text-center">
-              <SectionLabel>Aucune demande</SectionLabel>
+              <SectionLabel>Aucune dépense</SectionLabel>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Dès que Merx cherchera, chaque demande apparaîtra ici avec ce qu’elle a coûté.
+                Dès que Merx cherchera, chaque entreprise apparaîtra ici avec ce qu’elle a coûté.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
-              <table className="w-full min-w-[820px] border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                    <th className="px-4 py-2.5 text-left">Quand</th>
-                    <th className="px-4 py-2.5 text-left">Demande</th>
-                    <th className="px-4 py-2.5 text-right">Durée</th>
-                    <th className="px-4 py-2.5 text-right">Jetons lus</th>
-                    <th className="px-4 py-2.5 text-right">Jetons écrits</th>
-                    <th className="px-4 py-2.5 text-right">Recherches</th>
-                    <th className="px-4 py-2.5 text-right">Coût</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {demandes.map((d) => {
-                    const c = coutDe(d.usage, d.model ?? undefined);
+            <>
+              {cap.acquisitions.length > 0 && (
+                <div className="mb-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                  {cap.acquisitions.map((a) => {
+                    const ouverte = depliees.has(a.prospectId);
                     return (
-                      <tr key={d.id} className="border-b border-border text-[13px] last:border-0 hover:bg-muted/30">
-                        <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{quand(d.created_at)}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="font-semibold text-avisdoc-ink">{d.request}</div>
-                          <div className="text-[11.5px] text-muted-foreground">
-                            {d.kind === "recherche" ? "Recherche" : "Approfondissement"}
-                            {d.found_count != null && d.kind === "recherche" && ` · ${d.found_count} trouvée${d.found_count > 1 ? "s" : ""}`}
-                            {d.status === "echec" && " · échec"}
+                      <div key={a.prospectId}>
+                        <button
+                          type="button"
+                          onClick={() => deplier(a.prospectId)}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                        >
+                          <ChevronRight
+                            className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouverte && "rotate-90")}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13.5px] font-semibold text-avisdoc-ink">{a.nom}</span>
+                            <span className="block text-[11.5px] text-muted-foreground">
+                              {a.lignes.length} dépense{a.lignes.length > 1 ? "s" : ""}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-display text-[15px] font-semibold text-avisdoc-ink">
+                            {euroDollar(a.total)}
+                          </span>
+                        </button>
+
+                        {ouverte && (
+                          <div className="border-t border-border bg-muted/20 px-4 py-2">
+                            {a.lignes.map((l) => (
+                              <div key={l.id} className="flex items-baseline gap-3 py-1.5 text-[12.5px]">
+                                <span className="w-28 shrink-0 text-muted-foreground">{quand(l.quand)}</span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="text-avisdoc-ink">{l.quoi}</span>
+                                  {l.partage && (
+                                    <span className="text-muted-foreground">
+                                      {" "}· partagée entre {l.partage} fiche{l.partage > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                  {l.status === "echec" && <span className="text-avisdoc-coral"> · échec</span>}
+                                </span>
+                                <span className="shrink-0 font-semibold text-avisdoc-ink">{euroDollar(l.montant)}</span>
+                              </div>
+                            ))}
                           </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">{duree(d)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground">
-                          {(d.usage?.inputTokens ?? 0).toLocaleString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground">
-                          {(d.usage?.outputTokens ?? 0).toLocaleString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground">{d.usage?.webSearches ?? 0}</td>
-                        <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold text-avisdoc-ink">
-                          {euroDollar(c.total)}
-                        </td>
-                      </tr>
+                        )}
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              )}
+
+              {/* Ce qui n'a produit aucune fiche, ou qui ne relève pas de l'acquisition :
+                  on le montre à part plutôt que de le noyer dans une moyenne. */}
+              {cap.horsAcquisition.length > 0 && (
+                <Card className="p-4">
+                  <SectionLabel>Hors acquisition — {euroDollar(cap.totalHors)}</SectionLabel>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">
+                    Recherches qui n’ont rien rendu, e-mails à des clients déjà signés, débriefs : dépensé, mais
+                    rattaché à aucune fiche de prospection.
+                  </p>
+                  <div className="mt-2 divide-y divide-border">
+                    {cap.horsAcquisition.map((l) => (
+                      <div key={l.id} className="flex items-baseline gap-3 py-1.5 text-[12.5px]">
+                        <span className="w-28 shrink-0 text-muted-foreground">{quand(l.quand)}</span>
+                        <span className="min-w-0 flex-1 truncate text-avisdoc-ink">
+                          {l.quoi}
+                          {l.status === "echec" && <span className="text-avisdoc-coral"> · échec</span>}
+                        </span>
+                        <span className="shrink-0 font-semibold text-avisdoc-ink">{euroDollar(l.montant)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </>
           )}
         </>
       )}

@@ -71,7 +71,7 @@ const MENU: Entree[] = [
     { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
     { to: "/debrief", label: "Débrief", icon: MessagesSquare, module: "merx" },
     { to: "/notes-dictees", label: "Notes dictées", icon: Mic, module: "merx" },
-    { to: "/couts", label: "Coûts", icon: Coins, module: "merx" },
+    { to: "/couts", label: "CAP", icon: Coins, module: "merx" },
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
