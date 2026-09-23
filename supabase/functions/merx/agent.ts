@@ -20,6 +20,8 @@ import {
 } from "./db.ts";
 import { complete, model, type LlmUsage, type Usage } from "./llm.ts";
 import {
+  CRITERES_SCHEMA,
+  CRITERES_SYSTEM,
   ENRICH_SCHEMA,
   ENRICH_SYSTEM,
   enrichPrompt,
@@ -30,6 +32,8 @@ import {
   type ListOut,
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
+import { headcountLabel, searchByCriteria, type Criteria, type Found } from "./annuaire.ts";
+import { metierDe } from "./metiers.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
@@ -68,6 +72,8 @@ const LIST_WEB_SEARCHES = 4;
 const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le temps d'une recherche
 // Approfondir, c'est le travail d'Opus : site, mentions légales, presse, réseaux.
 const ENRICH_WEB_SEARCHES = 6;
+// Au-delà, le commercial ne traite plus — et chaque page du registre est un appel.
+const REGISTRE_MAX = 100;
 
 // Plateformes prises à tort pour un site officiel (annuaires, recrutement, réseaux).
 const PLATFORMS = ["linkedin.com", "facebook.com", "werecruit.io", "societe.com", "pappers.fr", "verif.com", "manageo.fr", "infonet.fr", "kompass.com", "pagesjaunes.fr", "usinenouvelle.com"];
@@ -77,6 +83,76 @@ const isPlatform = (url: string) => {
 };
 const officialSite = (url: string) => (url.trim() && !isPlatform(url.trim()) ? url.trim() : null);
 const department = (code: string) => (/^(\d{2}|2A|2B|97\d)$/.test(code.trim()) ? code.trim() : null);
+
+/**
+ * La demande du commercial, traduite en critères de registre.
+ *
+ * Un appel court — deux secondes, pas de recherche web — pour extraire ce que
+ * l'annuaire sait filtrer : une famille d'activités, des départements, un effectif.
+ * On ne lui demande pas de trouver des entreprises : c'est le registre qui les a.
+ */
+async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void): Promise<Criteria | null> {
+  try {
+    const out = await complete<{ section: string; codes_naf: string[]; departements: string[]; effectif_min: number }>(
+      `Demande du commercial : ${demande}`,
+      CRITERES_SCHEMA as unknown as Record<string, unknown>,
+      { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
+    );
+    const departments = (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
+    if (!departments.length) return null;
+    const nafCodes = (out.codes_naf ?? []).filter((c) => /^\d{2}\.\d{2}[A-Z]?$/.test(c.trim()));
+    const section = /^[A-U]$/.test((out.section ?? "").trim()) ? out.section.trim() : null;
+    if (!nafCodes.length && !section) return null;
+    return { section, nafCodes, departments, minHeadcount: out.effectif_min > 0 ? out.effectif_min : null };
+  } catch {
+    return null; // le registre est un bonus : s'il échoue, la recherche web prend le relais
+  }
+}
+
+/**
+ * Les entreprises du registre, notées sans modèle.
+ *
+ * Le code d'activité dit le métier, donc l'exposition ; la tranche INSEE dit la
+ * taille ; le nombre d'établissements dit l'implantation. Trois critères sur six sont
+ * ainsi remplis par des faits, et non par une lecture de page.
+ */
+function versFiches(trouvees: Found[]): LightProspect[] {
+  const fiches: LightProspect[] = [];
+  for (const c of trouvees) {
+    const metier = metierDe(c.activityCode);
+    if (!metier) continue; // activité inconnue de notre table : on ne devine pas
+
+    // L'établissement de la zone demandée prime sur le siège : c'est là qu'on ira.
+    const local = c.localSites[0] ?? c.headOffice;
+    const source = `https://annuaire-entreprises.data.gouv.fr/entreprise/${c.siren}`;
+
+    const score: Score = {
+      soleil: sunScore(metier.soleil, metier.pourquoi, source, {
+        niveau: metier.affinite,
+        justification: metier.pourquoi,
+        source,
+      }),
+      salaries: sizeScore(c.headcountBand, headcountLabel(c.headcountBand), c.headcountYear),
+      sites: sitesScore(c.openEstablishments),
+      zone: zoneScore([local.department ?? c.headOffice.department]),
+    };
+
+    const autresSites = c.localSites.length > 1 ? ` · ${c.localSites.length} établissements dans la zone` : "";
+    fiches.push({
+      name: c.name,
+      city: local.city ?? c.headOffice.city,
+      department: local.department ?? c.headOffice.department,
+      activity: metier.activite,
+      sector: metier.secteur,
+      website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
+      rationale: `${metier.pourquoi}${autresSites}`,
+      sources: [source],
+      score,
+      scoreTotal: total(score),
+    });
+  }
+  return fiches;
+}
 
 async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage) => void) {
   const started = Date.now();
@@ -96,6 +172,30 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
       },
       timeoutMs: Math.max(5_000, BUDGET_MS - (Date.now() - started)),
     });
+  // Le registre d'abord : deux cents entreprises exactes en une seconde, là où le web
+  // en devine sept en deux minutes. Le modèle ne sert plus qu'à lire la demande.
+  const criteres = await lireLesCriteres(req.request, (u) => {
+    spent.inputTokens += u.inputTokens;
+    spent.outputTokens += u.outputTokens;
+    onUsage({ ...spent });
+  });
+  if (criteres) {
+    const trouvees = await searchByCriteria(criteres, REGISTRE_MAX);
+    const fiches = versFiches(trouvees);
+    if (fiches.length > 0) {
+      const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
+      const deja = fiches.length - inserted;
+      return {
+        found: inserted,
+        message: [
+          `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
+          deja > 0 ? `${deja} déjà dans vos fiches` : null,
+          trouvees.length > fiches.length ? `${trouvees.length - fiches.length} d’une activité non reconnue` : null,
+        ].filter(Boolean).join(" · ") + ".",
+      };
+    }
+  }
+
   let out = await ask(`Demande du commercial : ${req.request}`);
   // Réponse de mémoire, sans recherche web (vu sur une demande très large) : une seconde chance.
   if (spent.webSearches === 0 && Date.now() - started < RETRY_BEFORE_MS) {
