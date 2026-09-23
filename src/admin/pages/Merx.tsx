@@ -94,7 +94,7 @@ export default function Merx() {
         if (id && id !== conversation?.id) setConversation({ id, title: message.slice(0, 80), messages: [] });
         if (res.reply) setMessages((m) => [...m, { role: "assistant", content: res.reply! }]);
 
-        // Une recherche a été lancée : elle demande une trentaine de secondes.
+        // Une recherche a été lancée : compter une à deux minutes.
         if (res.demandeId && id) {
           setRechercheEnCours(true);
           try {
@@ -179,14 +179,7 @@ export default function Merx() {
               </div>
             ))}
 
-            {rechercheEnCours && (
-              <div className="flex justify-start">
-                <div className="inline-flex items-center gap-2 rounded-2xl bg-avisdoc-teal/10 px-4 py-3 text-[13.5px] font-semibold text-avisdoc-ink">
-                  <Search className="size-4 animate-pulse" />
-                  Merx cherche… cela prend une trentaine de secondes.
-                </div>
-              </div>
-            )}
+            {rechercheEnCours && <RechercheEnCours />}
 
             {erreur && <div className="rounded-2xl bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">{erreur}</div>}
 
@@ -302,6 +295,55 @@ export default function Merx() {
             </div>
           </Card>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * L'attente d'une recherche, montrée seconde par seconde.
+ *
+ * « cela prend une trentaine de secondes » était faux — on a mesuré 89, 110 et
+ * 141 secondes sur des demandes réelles — et un bandeau qui ne bouge pas pendant
+ * deux minutes donne l'impression que rien ne se passe, surtout devant un client.
+ *
+ * Les étapes annoncées suivent le travail réel de l'agent : il lance sa recherche,
+ * parcourt les pages trouvées, puis vérifie chaque entreprise avant de la retenir.
+ */
+function RechercheEnCours() {
+  const [secondes, setSecondes] = useState(0);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setSecondes((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const etape =
+    secondes < 15
+      ? "Merx lance la recherche"
+      : secondes < 50
+        ? "il parcourt annuaires et sites professionnels"
+        : secondes < 95
+          ? "il vérifie chaque entreprise trouvée"
+          : "il termine — encore quelques instants";
+
+  // Le budget d'une recherche est de 140 secondes : la barre dit où l'on en est.
+  const avance = Math.min(100, Math.round((secondes / 140) * 100));
+
+  return (
+    <div className="flex justify-start">
+      <div className="min-w-0 max-w-[92%] rounded-2xl bg-avisdoc-teal/10 px-4 py-3">
+        <div className="flex items-center gap-2 text-[13.5px] font-semibold text-avisdoc-ink">
+          <Search className="size-4 shrink-0 animate-pulse text-avisdoc-teal" />
+          <span className="min-w-0">{etape}</span>
+          <span className="ml-auto shrink-0 font-mono text-[12.5px] text-muted-foreground">{secondes} s</span>
+        </div>
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-avisdoc-teal/20">
+          <div className="h-full rounded-full bg-avisdoc-teal transition-[width] duration-1000 ease-linear" style={{ width: `${avance}%` }} />
+        </div>
+        <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+          Une recherche demande une à deux minutes. Les fiches arriveront dans Prospection.
+        </p>
       </div>
     </div>
   );
