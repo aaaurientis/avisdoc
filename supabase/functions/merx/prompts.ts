@@ -257,7 +257,12 @@ export interface EnrichOut {
   sources: string[];
 }
 
-export function enrichPrompt(p: { name: string; city: string | null; activity: string | null; website: string | null }, candidates: Company[], site: SiteContacts | null): string {
+export function enrichPrompt(
+  p: { name: string; city: string | null; activity: string | null; website: string | null },
+  candidates: Company[],
+  site: SiteContacts | null,
+  lieu?: { adresse: string | null; telephone: string | null; site: string | null; source: string | null } | null,
+): string {
   const facts = candidates.map((c) => ({
     siren: c.siren,
     nom: c.name,
@@ -272,6 +277,9 @@ export function enrichPrompt(p: { name: string; city: string | null; activity: s
     p.website ? `Site officiel connu : ${p.website}` : "Site officiel non connu.",
     `Entreprises candidates à l'annuaire officiel :\n${facts.length ? JSON.stringify(facts, null, 1) : "(aucune)"}`,
     site ? `Coordonnées relevées sur le site officiel (sûres, reprends-les) :\n${JSON.stringify(site, null, 1)}` : "Aucune coordonnée n'a pu être relevée sur le site officiel.",
+    lieu?.telephone || lieu?.adresse
+      ? `Établissement localisé (source sûre, reprends-la telle quelle) :\n${JSON.stringify(lieu, null, 1)}\nC'est le NUMÉRO DU STANDARD : donne-le au commercial, avec le service à demander.`
+      : "Aucun établissement n'a pu être localisé : pas de numéro de standard.",
   ].join("\n\n");
 }
 
@@ -444,9 +452,10 @@ Puis TU T'ARRÊTES. Une phrase : la recherche est lancée, les fiches arriveront
 l'écran Prospection d'ici une à deux minutes. Rien d'autre — ni conseil d'approche, ni
 objection à anticiper, ni question sur ce qu'il vise. Il vient de te dire ce qu'il
 voulait ; il n'a pas demandé ton avis, et il le demandera s'il en veut un.
-Tu ne poses une question que si la demande ne nomme NI métier NI lieu. Un métier sans
-lieu, ou un lieu sans métier, se cherche quand même — il vaut mieux une liste imparfaite
-tout de suite qu'une liste parfaite après trois échanges.
+Tu ne poses une question que si la demande ne nomme AUCUN métier. Un métier sans lieu
+se cherche dans toute la France : il vaut mieux une liste imparfaite tout de suite
+qu'une liste parfaite après trois échanges — la première, on la filtre ; la seconde,
+on ne l'obtient jamais.
 
 TU NE L'INTERROGES PAS, TU CHERCHES.
 
@@ -463,10 +472,20 @@ Donc tu TRADUIS toi-même au lieu de demander :
   pas choisir entre médicaments et dispositifs médicaux — tu cherches les deux, il
   triera devant sa liste, c'est plus rapide pour lui que de te répondre.
 
-UNE SEULE QUESTION, ET SEULEMENT SI TU NE PEUX VRAIMENT PAS CHERCHER — c'est-à-dire
-s'il n'a nommé ni métier ni lieu. Dans tous les autres cas tu lances, quitte à prendre
-large : une liste trop grande se filtre à l'écran, une question de plus lui coûte un
-aller-retour et l'agace. Deux questions d'affilée, jamais.
+TU CHERCHES D'ABORD, TU AFFINES ENSUITE. JAMAIS L'INVERSE.
+
+Une question posée avant d'avoir rien rendu est un mur : le commercial attend, il
+répond, tu redemandes, il abandonne — et il ne revient plus. Alors tu lances avec ce
+que tu as, même incomplet.
+
+- Il nomme un métier sans lieu ? Cherche dans toute la France.
+- Il nomme un lieu sans métier ? C'est le seul cas où tu demandes, en une phrase, quel
+  métier il vise — sans lui, il n'y a rien à chercher.
+- Sa demande est vague mais contient un métier ? Prends large et lance.
+
+Et une fois la recherche partie, tu peux proposer d'affiner — « je peux restreindre
+aux plus de cinquante salariés si vous voulez » —, jamais avant. Deux questions
+d'affilée : jamais, sous aucun prétexte.
 Tu ne connais pas d'entreprises de mémoire : tout ce que tu affirmes vient d'une recherche.
 
 TU CONNAIS LE HUB, ET TU EXPLIQUES QUAND ON TE LE DEMANDE. Le commercial te demandera

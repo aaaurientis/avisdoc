@@ -33,6 +33,7 @@ import {
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
+import { chercherLieu } from "./places.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
@@ -295,11 +296,17 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     const withCity = p.city ? await lookup(`${p.name} ${p.city}`).catch(() => []) : [];
     return withCity.length ? withCity : await lookup(p.name).catch(() => []);
   };
-  const [candidates, siteAtStart] = await Promise.all([searchRegistry(), readSiteContacts(p.website)]);
+  // Trois sources en parallèle : le registre pour le légal, le site pour les
+  // coordonnées publiées, Google pour le téléphone du standard — celui qu'on compose.
+  const [candidates, siteAtStart, lieu] = await Promise.all([
+    searchRegistry(),
+    readSiteContacts(p.website),
+    chercherLieu(p.name, p.city),
+  ]);
   let site: SiteContacts | null = siteAtStart;
   let urls: string[] = [];
 
-  const out = await complete<EnrichOut>(enrichPrompt(p, candidates, site), ENRICH_SCHEMA as unknown as Record<string, unknown>, {
+  const out = await complete<EnrichOut>(enrichPrompt(p, candidates, site, lieu), ENRICH_SCHEMA as unknown as Record<string, unknown>, {
     usage: "approfondissement",
     system: ENRICH_SYSTEM,
     webSearch: { maxUses: ENRICH_WEB_SEARCHES },
@@ -312,7 +319,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const seenHosts = new Set(urls.map(host).filter(Boolean));
   const proposed = officialSite(out.site_web);
   // Un site proposé par le modèle n'est retenu que si ses recherches y sont réellement passées.
-  const website = p.website ?? (proposed && seenHosts.has(host(proposed)) ? proposed : null);
+  const website = p.website ?? (proposed && seenHosts.has(host(proposed)) ? proposed : null) ?? officialSite(lieu?.site ?? "");
   const ownHost = website ? host(website) : null;
   // Site officiel découvert pendant l'approfondissement : on y lit à notre tour e-mail et téléphone.
   if (!site && website && website !== p.website) site = await readSiteContacts(website);
@@ -342,7 +349,10 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const contact = named ?? dirigeantDuRegistre(company);
 
   const email = (named && c.email.trim()) || site?.emails[0] || null;
-  const phone = (named && c.telephone.trim()) || site?.phones[0] || null;
+  // Le téléphone : celui d'une personne nommée d'abord, puis celui publié sur le
+  // site, puis le standard trouvé par Google. Avant, faute des deux premiers, la
+  // fiche restait sans numéro et le conseil « appelez le standard » était vide.
+  const phone = (named && c.telephone.trim()) || site?.phones[0] || lieu?.telephone || null;
 
   const previous = (p.score ?? {}) as Score;
   const sun = out.exposition_soleil;
