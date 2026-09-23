@@ -11,8 +11,18 @@ import { garder, listerEnAttente, oublier, type NoteEnAttente } from "./dictee/s
 import { cn } from "@/lib/utils";
 import BoutonRetour from "../components/BoutonRetour";
 
-// 10 minutes : un débrief de fin de journée couvre quatre ou cinq entreprises, et
-// découper l'enregistrement ferait perdre le fil. (3 min à l'origine, porté à 10 le 22/09.)
+// Deux limites, pour deux dangers différents.
+//
+// LA TAILLE est la vraie contrainte technique : le service de transcription refuse
+// au-delà de 25 Mo. On s'arrête à 24, et la barrière tient quel que soit l'appareil —
+// un iPhone enregistre en AAC, un Android en Opus, et le même quart d'heure ne pèse
+// pas du tout pareil.
+const MAX_OCTETS = 24_000_000;
+
+// LA DURÉE ne protège pas la transcription — 25 Mo, c'est plus d'une heure de parole —
+// mais la dictée oubliée : le téléphone qui retourne dans la poche sans qu'on ait
+// appuyé sur stop et qui enregistre tout le trajet de retour. On le transcrirait, et
+// on le paierait. (3 min à l'origine, porté à 10 le 22/09.)
 const DUREE_MAX_S = 600;
 const ALERTE_S = DUREE_MAX_S - 30; // on prévient trente secondes avant l'arrêt
 
@@ -22,12 +32,15 @@ export default function Dictee() {
   const { user } = useAuth();
   const [enregistre, setEnregistre] = useState(false);
   const [secondes, setSecondes] = useState(0);
+  const [octets, setOctets] = useState(0);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [enAttente, setEnAttente] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
+  /** Ce que pèse l'enregistrement en cours : c'est la limite qui compte vraiment. */
+  const octetsRef = useRef(0);
   const morceauxRef = useRef<Blob[]>([]);
   const minuteurRef = useRef<number | null>(null);
   const secondesRef = useRef(0);
@@ -97,9 +110,23 @@ export default function Dictee() {
       const recorder = new MediaRecorder(flux);
       morceauxRef.current = [];
       secondesRef.current = 0;
+      octetsRef.current = 0;
       setSecondes(0);
+      setOctets(0);
 
-      recorder.ondataavailable = (e) => e.data.size > 0 && morceauxRef.current.push(e.data);
+      octetsRef.current = 0;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size === 0) return;
+        morceauxRef.current.push(e.data);
+        octetsRef.current += e.data.size;
+        setOctets(octetsRef.current);
+        // On arrête AVANT de dépasser : un fichier trop lourd serait refusé à la
+        // transcription, et tout le récit serait perdu.
+        if (octetsRef.current >= MAX_OCTETS) {
+          setMessage("Enregistrement arrêté : la taille maximale est atteinte. Vous pouvez en redicter un autre.");
+          arreter();
+        }
+      };
       recorder.onstop = async () => {
         const blob = new Blob(morceauxRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 1000) {
@@ -138,6 +165,8 @@ export default function Dictee() {
   useEffect(() => () => arreter(), [arreter]);
 
   const presqueFini = enregistre && secondes >= ALERTE_S;
+  /** Passé les trois quarts, la taille mérite d'être annoncée. */
+  const lourd = enregistre && octets >= MAX_OCTETS * 0.75;
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-md flex-col px-5 py-8">
@@ -179,7 +208,13 @@ export default function Dictee() {
               {chrono(secondes)}
             </div>
             <div className="text-[12.5px] text-muted-foreground">
-              {presqueFini ? `Arrêt automatique à ${chrono(DUREE_MAX_S)}` : "Appuyez pour arrêter"}
+              {/* La taille ne se montre qu'au moment où elle devient un sujet : l'annoncer
+                  plus tôt ferait douter sans raison. */}
+              {lourd
+                ? `${(octets / 1_000_000).toFixed(1)} Mo sur ${MAX_OCTETS / 1_000_000} — arrêt automatique à la limite`
+                : presqueFini
+                  ? `Arrêt automatique à ${chrono(DUREE_MAX_S)}`
+                  : "Appuyez pour arrêter"}
             </div>
           </>
         ) : envoiEnCours ? (
