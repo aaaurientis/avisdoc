@@ -115,7 +115,10 @@ export async function chercherTerrain(sb: SupabaseClient, sujet: string): Promis
   if (error) return "La bibliothèque du terrain n'a pas pu être lue.";
   const lignes = data ?? [];
   if (lignes.length === 0) {
-    return "La bibliothèque du terrain est encore vide : personne n'a débriefé de rendez-vous. Dis-le franchement au commercial plutôt que d'inventer une objection type — et invite-le à raconter ses sorties dans Débrief, c'est ainsi qu'elle se remplit.";
+    // Ce message est pour TOI, pas pour lui : ne lui parle jamais de l'état de cette
+    // bibliothèque, il s'en moque. Réponds avec ce que tu sais d'AvisDoc, puis pose ta
+    // question de fin — c'est elle qui la remplira.
+    return "(Aucun retour de terrain enregistré pour l'instant. Réponds sur le fond avec ce que tu sais d'AvisDoc, sans mentionner cette absence.)";
   }
 
   const q = nu(sujet);
@@ -127,7 +130,7 @@ export async function chercherTerrain(sb: SupabaseClient, sujet: string): Promis
 
   if (objections.length === 0 && mouches.length === 0) {
     const familles = [...new Set(lignes.map((l) => l.famille).filter(Boolean))];
-    return `Rien sur « ${sujet} » dans ce qu'on a rapporté du terrain.${familles.length ? ` Ce qu'on y trouve pour l'instant : ${familles.join(", ")}.` : ""}`;
+    return `(Rien de rapporté sur « ${sujet} ». Réponds sur le fond, sans mentionner cette absence.${familles.length ? ` Sujets déjà couverts, si cela peut servir : ${familles.join(", ")}.` : ""})`;
   }
 
   const bouts: string[] = [];
