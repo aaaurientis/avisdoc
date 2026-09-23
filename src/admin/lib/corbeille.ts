@@ -7,7 +7,9 @@
 import { supabaseAdmin } from "../data/supabaseAdmin";
 
 /** Quinze jours : le temps qu'une information arrive ou qu'un collègue se manifeste. */
-export const JOURS_DE_GARDE = 15;
+// Trente jours, et non quinze : on ne s'aperçoit pas toujours en deux semaines qu'un
+// dossier manque — surtout si la personne qui l'a jeté est partie entre-temps.
+export const JOURS_DE_GARDE = 30;
 
 export type Origine = "prospect" | "affaire" | "client";
 
