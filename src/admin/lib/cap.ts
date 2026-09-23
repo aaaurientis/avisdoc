@@ -15,6 +15,7 @@ export interface DemandeBrute {
   kind: "recherche" | "approfondissement" | "email";
   request: string;
   status: string;
+  requested_by: string;
   found_count: number | null;
   usage: Consommation | null;
   model: string | null;
@@ -41,6 +42,9 @@ export interface Ligne {
   /** Renseigné quand la dépense est partagée : « recherche partagée entre 12 fiches ». */
   partage: number | null;
   quand: string;
+  /** Qui a lancé la demande. Depuis la migration 0039, l'équipe voit tout : il faut
+      donc dire de qui vient la dépense, sinon on ne sait plus qui a cherché quoi. */
+  qui: string;
   status: string;
   model: string | null;
 }
@@ -94,7 +98,7 @@ export function calculerCap(demandes: DemandeBrute[], fiches: FicheBrute[]): Cap
 
   for (const d of demandes) {
     const cout = coutDe(d.usage, d.model ?? undefined).total;
-    const base = { id: d.id, quoi: libelle(d), kind: d.kind, quand: d.created_at, status: d.status, model: d.model };
+    const base = { id: d.id, quoi: libelle(d), kind: d.kind, quand: d.created_at, status: d.status, model: d.model, qui: d.requested_by };
 
     if (d.kind === "recherche") {
       const issues = parRecherche.get(d.id) ?? [];

@@ -77,37 +77,20 @@ async function effacerLesAudios(ids: string[]): Promise<void> {
   if (chemins.length > 0) await supabaseAdmin.storage.from("admin-dictee").remove(chemins);
 }
 
-/**
- * Vide ce qui a dépassé la garde. Appelé à l'ouverture de l'écran : pas de tâche
- * planifiée, donc rien qui puisse tourner dans le vide sans qu'on le sache.
- *
- * La destruction étant réservée au super-admin (migration 0036), cette purge ne
- * supprime rien quand quelqu'un d'autre ouvre l'écran : elle renvoie alors zéro, et
- * l'écran ne promet donc pas un vidage automatique.
- */
-export async function purger(): Promise<number> {
-  const limite = new Date(Date.now() - JOURS_DE_GARDE * 86_400_000).toISOString();
-  let total = 0;
-  for (const [origine, table] of Object.entries(TABLE) as [Origine, string][]) {
-    // Les notes d'abord, pour que leurs enregistrements partent avec elles.
-    if (origine === "note") {
-      const { data: perimees } = await supabaseAdmin.from(table).select("id").lt("deleted_at", limite);
-      const ids = (perimees ?? []).map((n) => n.id as string);
-      if (ids.length > 0) await effacerLesAudios(ids);
-    }
-    const { data } = await supabaseAdmin.from(table).delete().lt("deleted_at", limite).select("id");
-    total += data?.length ?? 0;
-  }
-  return total;
-}
-
 /** Tout ce qui est à la corbeille, du plus récemment jeté au plus ancien. */
-export async function chargerCorbeille(): Promise<Jetee[]> {
+export async function chargerCorbeille(monEmail?: string): Promise<Jetee[]> {
+  // Les débriefs de l'équipe se lisent (migration 0039), mais ne se restaurent que
+  // par leur auteur : montrer ceux des autres ici n'offrirait qu'un bouton qui échoue.
+  const mesNotes = supabaseAdmin
+    .from("admin_notes_dictees")
+    .select("id, titre, duree_s, audio_path, deleted_at")
+    .not("deleted_at", "is", null);
+
   const [prospects, affaires, clients, notes] = await Promise.all([
     supabaseAdmin.from("admin_prospects").select("id, name, city, activity, deleted_at").not("deleted_at", "is", null),
     supabaseAdmin.from("admin_clients").select("id, company, ville, stage, deleted_at").not("deleted_at", "is", null),
     supabaseAdmin.from("admin_accounts").select("id, name, sector, deleted_at").not("deleted_at", "is", null),
-    supabaseAdmin.from("admin_notes_dictees").select("id, titre, duree_s, audio_path, deleted_at").not("deleted_at", "is", null),
+    monEmail ? mesNotes.ilike("owner_email", monEmail) : mesNotes,
   ]);
 
   const lignes: Jetee[] = [

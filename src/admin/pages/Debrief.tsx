@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { ArrowRight, Check, Loader2, Mic, PenLine, Play, Sparkles, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { nomLisible } from "../lib/membres";
 import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
 import BoutonRetour from "../components/BoutonRetour";
 import { confirmer } from "../components/Confirmation";
@@ -28,6 +29,9 @@ import { cn } from "@/lib/utils";
 interface Passe {
   id: string;
   audio_path: string | null;
+  /** Qui l'a dicté. Depuis la migration 0039, l'équipe lit les débriefs de tous,
+      mais chacun n'écoute que les siens : la voix ne se partage pas. */
+  owner_email?: string | null;
   duree_s: number | null;
   statut: string;
   message: string | null;
@@ -161,6 +165,10 @@ function CompteRendu({ bilan, onFermer }: { bilan: Bilan; onFermer: () => void }
 
 export default function Debrief() {
   const { user } = useAuth();
+  /** Un débrief se lit par toute l'équipe, mais ne se modifie et ne s'écoute que
+      par celui qui l'a dicté — c'est la règle de la migration 0039. */
+  const estAMoi = (n: Passe) =>
+    !n.owner_email || n.owner_email.toLowerCase() === (user?.email ?? "").toLowerCase();
   const [texte, setTexte] = useState("");
   const [mode, setMode] = useState<"texte" | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -173,7 +181,7 @@ export default function Debrief() {
   const chargerPasses = useCallback(async () => {
     const { data } = await supabaseAdmin
       .from("admin_notes_dictees")
-      .select("id, audio_path, duree_s, statut, message, titre, transcription, extraction, created_at")
+      .select("id, audio_path, duree_s, statut, message, titre, transcription, extraction, created_at, owner_email")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -388,9 +396,10 @@ export default function Debrief() {
                   <span className="block text-[11.5px] text-muted-foreground">
                     {quandCourt(n.created_at)}
                     {n.duree_s != null && ` · ${chrono(n.duree_s)}`} · {etatDe(n)}
+                    {!estAMoi(n) && ` · ${nomLisible(n.owner_email)}`}
                   </span>
                 </span>
-                {n.audio_path && (
+                {n.audio_path && estAMoi(n) && (
                   <button
                     type="button"
                     onClick={() => void ecouter(n)}
@@ -399,15 +408,17 @@ export default function Debrief() {
                     <Play className="size-3.5" /> Réécouter
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void jeterLaNote(n)}
-                  aria-label={`Supprimer ${titreDe(n)}`}
-                  title="Mettre à la corbeille"
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                {estAMoi(n) && (
+                  <button
+                    type="button"
+                    onClick={() => void jeterLaNote(n)}
+                    aria-label={`Supprimer ${titreDe(n)}`}
+                    title="Mettre à la corbeille"
+                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
 
                 {/* Une note en échec se reprend ; une note rangée, jamais. */}
                 {n.statut === "echec" && (

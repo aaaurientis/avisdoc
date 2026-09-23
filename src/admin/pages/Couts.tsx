@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
+import { nomLisible } from "../lib/membres";
 import { coutDe, euroDollar, MODELES_ACTUELS, MODELE_PAR_DEFAUT, NOM_MODELE, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
 import { calculerCap, type DemandeBrute, type FicheBrute } from "../lib/cap";
 import { useActualisation } from "../lib/actualisation";
@@ -400,6 +401,7 @@ export default function Couts() {
                                     </span>
                                   )}
                                   {l.status === "echec" && <span className="text-avisdoc-coral"> · échec</span>}
+                                  <span className="text-muted-foreground"> · {nomLisible(l.qui)}</span>
                                 </span>
                                 <span className="shrink-0 font-semibold text-avisdoc-ink">{euroDollar(l.montant)}</span>
                               </div>

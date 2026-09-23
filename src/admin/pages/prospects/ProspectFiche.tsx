@@ -6,6 +6,7 @@ import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, S
 import type { Client } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Card, SectionLabel } from "../../components/ui";
+import ChoixReferent from "../../components/ChoixReferent";
 import { CATEGORIES, CRITERES, effectifLabel, tonNote, type Prospect } from "../../lib/merx";
 import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../../lib/conversion";
 import { euroDollar } from "../../lib/couts";
@@ -259,6 +260,10 @@ export default function ProspectFiche({
       <div>
           {onglet === "identite" && (
             <>
+            {/* Qui suit ce prospect. Le choix le suivra au Pipeline puis au fichier client. */}
+            <div className="mb-4">
+              <ChoixReferent quoi="prospect" id={p.id} />
+            </div>
             {/* Ce que l’approfondissement a trouvé */}
             <div className="mb-5 rounded-2xl border border-border">
               <div className="border-b border-border px-4 py-2.5">

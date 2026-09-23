@@ -15,7 +15,6 @@ import {
   joursRestants,
   JOURS_DE_GARDE,
   LIBELLE,
-  purger,
   restaurer,
   type Jetee,
   type Origine,
@@ -30,7 +29,7 @@ const leJour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day:
 export default function Corbeille() {
   // La destruction définitive est réservée au super-admin, et la base le fait respecter :
   // masquer le bouton ne protège personne, c'est la règle SQL qui tient (migration 0036).
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user } = useAuth();
   const [lignes, setLignes] = useState<Jetee[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -42,10 +41,10 @@ export default function Corbeille() {
   const charger = useCallback(async () => {
     setChargement(true);
     try {
-      // On vide d'abord ce qui a fait son temps : la liste montre alors ce qui reste vraiment.
-      const purgees = await purger();
-      setLignes(await chargerCorbeille());
-      setMessage(purgees > 0 ? `${purgees} fiche${purgees > 1 ? "s" : ""} de plus de ${JOURS_DE_GARDE} jours ${purgees > 1 ? "ont été vidées" : "a été vidée"}.` : null);
+      // Plus de purge ici : depuis la migration 0039, une tâche de nuit vide ce qui a
+      // dépassé la garde, à heure fixe et pour tout le monde. L'écran se contente donc
+      // de montrer ce qui reste.
+      setLignes(await chargerCorbeille(user?.email ?? undefined));
       setErreur(null);
     } catch (e) {
       const m = e instanceof Error ? e.message : "Chargement impossible.";
@@ -57,7 +56,7 @@ export default function Corbeille() {
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => {
     void charger();
@@ -113,15 +112,15 @@ export default function Corbeille() {
         subtitle={
           chargement
             ? "Chargement…"
-            : `${lignes.length} fiche${lignes.length > 1 ? "s" : ""} — gardée${lignes.length > 1 ? "s" : ""} au moins ${JOURS_DE_GARDE} jours`
+            : `${lignes.length} fiche${lignes.length > 1 ? "s" : ""} — vidée${lignes.length > 1 ? "s" : ""} automatiquement ${JOURS_DE_GARDE} jours après leur suppression`
         }
       />
 
       {/* Un bouton absent sans explication laisse croire à une panne. */}
       {!isSuperAdmin && lignes.length > 0 && (
         <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
-          Vous pouvez restaurer ce qui a été jeté, mais pas le détruire : seule l’administration le peut — c’est
-          elle aussi qui vide ce qui a dépassé {JOURS_DE_GARDE} jours. Rien ne disparaît avant.
+          Vous pouvez restaurer ce qui a été jeté, mais pas le détruire tout de suite : seule l’administration le
+          peut. Chaque fiche part d’elle-même {JOURS_DE_GARDE} jours après le jour où elle a été jetée.
         </div>
       )}
 
