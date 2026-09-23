@@ -98,16 +98,18 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-avisdoc-ink">
+    // Sur téléphone, titre et action s'empilent : côte à côte, le bouton écrasait le
+    // sous-titre sur trois lignes et mordait dessus.
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-semibold text-avisdoc-ink sm:text-3xl">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          <p className="mt-1 text-[13px] text-muted-foreground sm:text-sm">{subtitle}</p>
         )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -127,12 +129,17 @@ export function Modal({
       onClick={onClose}
       // Au-dessus d'une fiche (z-50) : un brouillon ouvert depuis une fiche doit passer
       // devant elle, pas se cacher derrière.
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-avisdoc-ink/45 p-4"
+      //
+      // Le défilement est porté par CE conteneur, et l'alignement part du haut : une
+      // fenêtre plus haute que l'écran était centrée, donc coupée en haut ET en bas,
+      // et l'on ne pouvait plus atteindre les boutons. Sur un téléphone, on se
+      // retrouvait enfermé dans le formulaire.
+      className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto overscroll-contain bg-avisdoc-ink/45 p-4 sm:items-center"
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ width, maxWidth: "100%" }}
-        className="animate-scale-in rounded-3xl bg-card p-8 shadow-floating"
+        className="animate-scale-in my-auto rounded-3xl bg-card p-5 shadow-floating sm:p-8"
       >
         {children}
       </div>

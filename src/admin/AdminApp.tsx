@@ -47,9 +47,10 @@ function Garde({ module, children }: { module: Module; children: React.ReactNode
  * et le bouton Retour mène au reste. Sur un écran large, rien ne change.
  */
 function Accueil() {
-  const { peut } = useAuth();
   const surTelephone = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
-  const versLaDictee = surTelephone && lireArrivee() === "dictee" && peut("merx");
+  // Sans condition sur le module : les droits ne sont pas encore chargés à cet instant.
+  // La garde de /dictee fera le tri si l'accès manque.
+  const versLaDictee = surTelephone && lireArrivee() === "dictee";
   return <Navigate to={versLaDictee ? "/dictee" : "/dashboard"} replace />;
 }
 
