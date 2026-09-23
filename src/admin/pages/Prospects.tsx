@@ -3,7 +3,8 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUpDown, Check, Loader2, Mail, Pencil, Phone, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -16,10 +17,8 @@ import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
 import NouveauProspect from "./prospects/NouveauProspect";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
-import { coutMoyen, type Consommation } from "../lib/couts";
+import { coutMoyen, euroDollar, type Consommation } from "../lib/couts";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
-import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
-import PastillesPrevues from "../components/PastillesPrevues";
 import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
 import { confirmer } from "../components/Confirmation";
@@ -38,85 +37,6 @@ interface Demande {
   finished_at: string | null;
 }
 
-function Carte({
-  p,
-  onOuvrir,
-  onModifier,
-  onSupprimer,
-  cochee,
-  onCocher,
-  selectionEnCours,
-  prevu,
-}: {
-  p: Prospect;
-  onOuvrir: () => void;
-  onModifier: () => void;
-  onSupprimer: () => void;
-  cochee: boolean;
-  onCocher: () => void;
-  selectionEnCours: boolean;
-  prevu?: Prevu;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOuvrir}
-      onKeyDown={(e) => e.key === "Enter" && onOuvrir()}
-      className={cn(
-        "ad-card-clickable group w-full cursor-pointer rounded-xl border bg-card p-3 text-left transition-colors",
-        cochee ? "border-avisdoc-teal ring-1 ring-avisdoc-teal/40" : "border-border hover:border-avisdoc-teal",
-      )}
-    >
-      {!p.opened_at && (
-        <Badge className="mb-1.5 bg-amber-100 uppercase tracking-wide text-amber-800">Nouveau</Badge>
-      )}
-      <div className="flex items-start gap-2">
-        <CaseFiche cochee={cochee} onBascule={onCocher} libelle={p.name} visible={selectionEnCours} />
-        <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">{p.name}</div>
-        <Badge className={`${tonNote(p.score_total)} shrink-0`}>{p.score_total ?? "—"}</Badge>
-        <div
-          className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={onModifier}
-            aria-label={`Modifier ${p.name}`}
-            title="Modifier"
-            className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onSupprimer}
-            aria-label={`Supprimer ${p.name}`}
-            title="Supprimer"
-            className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      </div>
-      <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-        {[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
-      </div>
-      {p.rationale && <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">{p.rationale}</p>}
-      <PastillesPrevues prevu={prevu} />
-
-      {(p.contact_email || p.contact_phone) && (
-        <div className="mt-2 flex items-center gap-2 text-muted-foreground">
-          {p.contact_email && <Mail className="size-3.5" />}
-          {p.contact_phone && <Phone className="size-3.5" />}
-          <span className="truncate text-[11px]">{p.contact_name ?? p.contact_email ?? p.contact_phone}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Une table absente veut dire « migration pas encore appliquée » : on le dit en français. */
 function messageErreur(brut: string): string {
   // Uniquement la table absente : une colonne manquante est un vrai défaut, qu'il faut voir.
   return /Could not find the table .* in the schema cache/i.test(brut)
@@ -125,7 +45,7 @@ function messageErreur(brut: string): string {
 }
 
 /** Les colonnes sur lesquelles on peut trier. */
-type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note";
+type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "approfondie";
 
 /** L'ordre des tranches INSEE : « 250 à 499 » doit passer après « 50 à 99 », pas avant. */
 const ORDRE_EFFECTIF = ["NN", "00", "01", "02", "03", "11", "12", "21", "22", "31", "32", "41", "42", "51", "52", "53"];
@@ -181,20 +101,13 @@ export default function Prospects() {
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
-  const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
-  // Le tableau d'abord, comme dans le Pipeline ; la liste pour qui la préfère.
-  // Plus de kanban en Prospection. Une recherche au registre rend des dizaines, voire
-  // des centaines d'entreprises : en colonnes on ne retrouve plus rien. La liste se
-  // trie, se filtre et se parcourt — c'est le seul affichage qui tient à cette échelle.
-
-  /** Ce qui attend sur chaque fiche : une action notée doit se voir depuis le tableau. */
-  useEffect(() => {
-    let vivant = true;
-    void actionsPrevues().then((m) => vivant && setPrevues(m));
-    return () => {
-      vivant = false;
-    };
-  }, [prospects]);
+  // Plus de kanban en Prospection : une recherche au registre rend des dizaines, voire
+  // des centaines d'entreprises, et en colonnes on ne retrouve plus rien. La liste se
+  // trie, se filtre et se parcourt — c'est le seul affichage qui tienne à cette échelle.
+  //
+  // Plus d'actions prévues non plus : une entreprise sur laquelle on a prévu quelque
+  // chose est passée au Pipeline. Ce qu'on veut voir ici, c'est ce qui reste à
+  // approfondir.
   const [coches, setCoches] = useState<Set<string>>(new Set());
 
   const cocher = (id: string) =>
@@ -329,6 +242,8 @@ export default function Prospects() {
         case "ville": return parTexte(a.city, b.city);
         case "interlocuteur": return parTexte(a.contact_name ?? a.contact_email, b.contact_name ?? b.contact_email);
         case "salaries": return sens * (rangEffectif(a.headcount_band) - rangEffectif(b.headcount_band));
+        // Les non approfondies d'abord au premier clic : c'est le travail qui reste.
+        case "approfondie": return sens * ((a.enriched_at ? 1 : 0) - (b.enriched_at ? 1 : 0));
         default: return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
       }
     };
@@ -403,6 +318,58 @@ export default function Prospects() {
     },
     [charger],
   );
+
+  /** Où en est l'approfondissement de la sélection : null quand rien ne tourne. */
+  const [lot, setLot] = useState<{ fait: number; total: number } | null>(null);
+
+  /**
+   * Approfondir toute une sélection, une fiche après l'autre.
+   *
+   * Séquentiel et non parallèle : chaque approfondissement occupe une fonction
+   * pendant plus d'une minute, et les lancer ensemble les ferait tous expirer.
+   *
+   * Le coût et la durée sont annoncés AVANT : cocher deux cents fiches et cliquer,
+   * c'est plusieurs heures et plusieurs dizaines d'euros. On ne découvre pas ça après.
+   */
+  const approfondirLesCoches = useCallback(async () => {
+    const aFaire = selectionnees.filter((p) => !p.enriched_at);
+    if (aFaire.length === 0 || lot) return;
+
+    const minutes = Math.ceil((aFaire.length * 80) / 60);
+    // Le coût moyen est mesuré sur les approfondissements déjà faits ; à défaut une
+    // estimation. On l'annonce comme un ordre de grandeur, pas comme un devis.
+    const unitaire = couts.approfondissement.montant;
+    const cout = unitaire > 0 ? `environ ${euroDollar(unitaire * aFaire.length)}` : null;
+    if (
+      !(await confirmer({
+        titre: `Approfondir ${aFaire.length} fiche${aFaire.length > 1 ? "s" : ""} ?`,
+        message:
+          `Merx va chercher pour chacune l’identité officielle, l’effectif, les dirigeants et le dossier commercial. ` +
+          `Comptez ${minutes} minute${minutes > 1 ? "s" : ""}${cout ? `, ${cout}` : ""}. ` +
+          `Vous pouvez continuer à travailler pendant ce temps ; les fiches se mettent à jour au fur et à mesure.`,
+        action: "Approfondir",
+      }))
+    )
+      return;
+
+    setLot({ fait: 0, total: aFaire.length });
+    let echecs = 0;
+    for (const [i, p] of aFaire.entries()) {
+      try {
+        const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "approfondir", prospectId: p.id } });
+        if (error || (data as { error?: string })?.error) echecs++;
+      } catch {
+        echecs++;
+      }
+      setLot({ fait: i + 1, total: aFaire.length });
+    }
+    setLot(null);
+    setCoches(new Set());
+    await charger();
+    const reussies = aFaire.length - echecs;
+    if (echecs === 0) toast.success(`${reussies} fiche${reussies > 1 ? "s" : ""} approfondie${reussies > 1 ? "s" : ""}.`);
+    else toast.warning(`${reussies} approfondie${reussies > 1 ? "s" : ""}, ${echecs} en échec — relancez-les depuis leur fiche.`);
+  }, [selectionnees, lot, couts.approfondissement, charger]);
 
   /** Le lien est gardé sur la fiche : un prospect ne devient une affaire qu'une fois. */
   const mettreAuPipeline = useCallback(
@@ -515,9 +482,7 @@ export default function Prospects() {
                 <EnTete colonne="interlocuteur" libelle="Interlocuteur" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="salaries" libelle="Salariés" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="note" libelle="Note" tri={tri} onTrier={trierPar} />
-                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-                  Prévu
-                </th>
+                <EnTete colonne="approfondie" libelle="Approfondie" tri={tri} onTrier={trierPar} />
                 <th className="px-2" />
               </tr>
             </thead>
@@ -551,8 +516,17 @@ export default function Prospects() {
                   <td className="px-4 py-2.5">
                     <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"}</Badge>
                   </td>
-                  <td className="px-4 py-2.5">
-                    <PastillesPrevues prevu={prevues.get(p.id)} />
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    {/* Une fiche non approfondie n'a ni dossier commercial ni effectif :
+                        c'est ce qu'on regarde avant de décider par où commencer. */}
+                    {p.enriched_at ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-bold text-emerald-700">
+                        <Check className="size-3" />
+                        {new Date(p.enriched_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground">À approfondir</span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-2" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -590,6 +564,11 @@ export default function Prospects() {
         onEmail={ecrireAuxCoches}
         onSupprimer={() => void supprimerLesCoches()}
         onEffacer={() => setCoches(new Set())}
+        approfondir={{
+          aFaire: selectionnees.filter((p) => !p.enriched_at).length,
+          enCours: lot,
+          lancer: () => void approfondirLesCoches(),
+        }}
       />
 
       {(ajout || aModifier) && (
