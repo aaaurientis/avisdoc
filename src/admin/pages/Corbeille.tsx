@@ -22,10 +22,14 @@ import {
 import FicheJetee from "./corbeille/FicheJetee";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
+import { useAuth } from "../auth/AuthContext";
 
 const leJour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
 export default function Corbeille() {
+  // La destruction définitive est réservée au super-admin, et la base le fait respecter :
+  // masquer le bouton ne protège personne, c'est la règle SQL qui tient (migration 0036).
+  const { isSuperAdmin } = useAuth();
   const [lignes, setLignes] = useState<Jetee[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -112,6 +116,14 @@ export default function Corbeille() {
         }
       />
 
+      {/* Un bouton absent sans explication laisse croire à une panne. */}
+      {!isSuperAdmin && lignes.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
+          Vous pouvez restaurer ce qui a été jeté, mais pas le détruire : seule l’administration le peut. Ce qui
+          reste ici part de lui-même au bout de {JOURS_DE_GARDE} jours.
+        </div>
+      )}
+
       {erreur && <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">{erreur}</div>}
       {message && <div className="mb-4 rounded-2xl bg-sky-100 px-4 py-3 text-[13px] font-semibold text-sky-700">{message}</div>}
 
@@ -139,14 +151,16 @@ export default function Corbeille() {
               {enCours ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
               Restaurer{selection.length > 0 ? ` (${selection.length})` : ""}
             </button>
-            <button
-              type="button"
-              onClick={() => void agir("detruire")}
-              disabled={selection.length === 0 || enCours}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-rose-300 hover:text-rose-700 disabled:opacity-50"
-            >
-              <Trash2 className="size-4" /> Supprimer définitivement
-            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => void agir("detruire")}
+                disabled={selection.length === 0 || enCours}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-rose-300 hover:text-rose-700 disabled:opacity-50"
+              >
+                <Trash2 className="size-4" /> Supprimer définitivement
+              </button>
+            )}
             {coches.size > 0 ? (
               <button
                 type="button"
