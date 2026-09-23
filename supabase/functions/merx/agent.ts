@@ -56,9 +56,15 @@ const BUDGET_MS = 140_000;
 /** Quel modèle sert à quelle sorte de demande : sert à enregistrer le bon tarif. */
 const modeleDe = (kind: string): Usage => (kind === "approfondissement" ? "approfondissement" : "recherche");
 // Sonnet cherche vraiment : on lui en laisse les moyens. Deux recherches donnaient
-// « trois noms à la ramasse » ; six permettent de croiser annuaires, presse locale et
-// fédérations professionnelles.
-const LIST_WEB_SEARCHES = 6;
+// « trois noms à la ramasse » ; il en faut plusieurs pour croiser annuaires, presse
+// locale et fédérations professionnelles.
+//
+// Ramené de six à quatre le 23/09, en démonstration : chaque recherche verse le
+// contenu des pages dans le contexte, et à six la demande atteignait 178 000 jetons
+// d'entrée pour 135 secondes — au ras du budget de 140. Une réponse en une minute et
+// demie avec quatre ou cinq fiches vaut mieux qu'une réponse en deux minutes et
+// quart qui risque d'expirer.
+const LIST_WEB_SEARCHES = 4;
 const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le temps d'une recherche
 // Approfondir, c'est le travail d'Opus : site, mentions légales, presse, réseaux.
 const ENRICH_WEB_SEARCHES = 6;
