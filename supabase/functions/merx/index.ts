@@ -363,6 +363,19 @@ Deno.serve(async (req: Request) => {
             .update({ status: "terminee", usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
+        // On ne croit pas le modèle sur parole quant aux identifiants : s'il rattache
+        // à une fiche qui n'existe pas, l'écran afficherait « fiche reconnue » sans
+        // qu'on puisse jamais la retrouver. On vérifie, et on efface ce qui est faux —
+        // l'entreprise redevient alors une nouvelle, qu'on proposera de créer.
+        const connus = new Set(fiches.map((f) => `${f.type}:${f.id}`));
+        for (const e of out.entreprises ?? []) {
+          if (e.fiche_id && !connus.has(`${e.fiche_type}:${e.fiche_id}`)) {
+            e.fiche_id = "";
+            e.fiche_type = "";
+            if (!e.a_creer) e.a_creer = "prospect";
+          }
+        }
+
         // Rien n'est écrit ici : le commercial valide à l'écran, puis l'application enregistre.
         return json(out);
       } catch (e) {

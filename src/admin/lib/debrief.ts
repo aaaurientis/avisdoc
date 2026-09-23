@@ -205,10 +205,13 @@ export async function enregistrer(
   par: string,
   noteId: string | null,
   etapeDeDepart?: string,
-): Promise<void> {
+): Promise<{ creee: { nom: string; ou: string } | null }> {
   // Créer d'abord, s'il y a lieu : tout ce qui suit a besoin d'une fiche où se ranger.
   const vue = r.creer && !e.fiche_id ? await creerLaFiche(e, par, etapeDeDepart) : e;
   const cles = clesDe(vue);
+  // Ce qui vient d'être créé, pour pouvoir le dire : une fiche qu'on ne retrouve pas
+  // vaut à peine mieux qu'une fiche qu'on n'a pas créée.
+  const creee = r.creer && !e.fiche_id && vue.fiche_id ? { nom: vue.entreprise, ou: vue.fiche_type } : null;
   const maintenant = new Date().toISOString();
 
   // Ce qui s'est passé, dans l'historique de la fiche.
@@ -265,4 +268,13 @@ export async function enregistrer(
     const { error } = await supabaseAdmin.from("admin_clients").update({ stage: vue.etape.trim() }).eq("id", vue.fiche_id);
     if (error) throw new Error(error.message);
   }
+
+  return { creee };
 }
+
+/** L'écran où une fiche est allée, et son libellé — pour le dire et pour y mener. */
+export const OU_TROUVER: Record<string, { ecran: string; route: string }> = {
+  prospect: { ecran: "Prospection", route: "/prospects" },
+  affaire: { ecran: "Pipeline", route: "/crm" },
+  client: { ecran: "Clients", route: "/fichier-client" },
+};

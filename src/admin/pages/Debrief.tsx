@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Check, HandHelping, Loader2, Mail, Mic, NotebookPen, PenLine, Phone, Play, Sparkles, Target } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, HandHelping, Loader2, Mail, Mic, NotebookPen, PenLine, Phone, Play, Sparkles, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
@@ -20,6 +20,7 @@ import {
   compte,
   enregistrer,
   lireDebrief,
+  OU_TROUVER,
   toutRetenir,
   transcrireNote,
   type EntrepriseVue,
@@ -231,6 +232,8 @@ export default function Debrief() {
   const [ecoute, setEcoute] = useState<string | null>(null);
   /** L'identifiant de la note en cours de transcription : le bouton doit le dire. */
   const [enTranscription, setEnTranscription] = useState<string | null>(null);
+  /** Les fiches créées par le dernier enregistrement, pour pouvoir y aller. */
+  const [nouvelles, setNouvelles] = useState<{ nom: string; ou: string }[]>([]);
   /** Ce qu'on a déjà tenté : une transcription qui échoue ne repart pas en boucle. */
   const dejaLancees = useRef<Set<string>>(new Set());
 
@@ -332,10 +335,15 @@ export default function Debrief() {
     if (!extraction || envoi || total === 0) return;
     setEnvoi(true);
     try {
+      const creees: { nom: string; ou: string }[] = [];
       for (const [i, e] of extraction.entreprises.entries()) {
-        await enregistrer(e, retenus[i], user?.email ?? "", null);
+        const { creee } = await enregistrer(e, retenus[i], user?.email ?? "", null);
+        if (creee) creees.push(creee);
       }
       toast.success(`${total} élément${total > 1 ? "s" : ""} enregistré${total > 1 ? "s" : ""}.`);
+      // Ce qui vient d'être créé reste à l'écran, avec un lien : une fiche qu'on ne
+      // retrouve pas vaut à peine mieux qu'une fiche qu'on n'a pas créée.
+      setNouvelles(creees);
       setExtraction(null);
       setRetenus([]);
       setTexte("");
@@ -353,6 +361,38 @@ export default function Debrief() {
         subtitle="Racontez votre sortie. Merx range, vous validez."
         action={mode !== null && !extraction ? <BoutonRetour onRetour={() => setMode(null)} /> : undefined}
       />
+
+      {nouvelles.length > 0 && (
+        <Card className="mb-4 border-l-4 border-l-avisdoc-teal p-4">
+          <SectionLabel>
+            {nouvelles.length === 1 ? "Fiche créée" : `${nouvelles.length} fiches créées`}
+          </SectionLabel>
+          <div className="mt-2 space-y-1.5">
+            {nouvelles.map((n) => {
+              const ou = OU_TROUVER[n.ou] ?? OU_TROUVER.prospect;
+              return (
+                <div key={n.nom} className="flex flex-wrap items-center gap-2 text-[13.5px]">
+                  <span className="font-semibold text-avisdoc-ink">{n.nom}</span>
+                  <span className="text-muted-foreground">dans</span>
+                  <Link
+                    to={ou.route}
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                  >
+                    {ou.ecran} <ArrowRight className="size-3.5" />
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setNouvelles([])}
+            className="mt-2.5 text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
+          >
+            Masquer
+          </button>
+        </Card>
+      )}
 
       {!extraction && mode === null && passes.length > 0 && (
         <Card className="mb-4 p-4">
