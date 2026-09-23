@@ -78,6 +78,22 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
  * que `on conflict (colonnes)` ne sait pas viser. On écarte donc les doublons avant d'écrire, puis on
  * insère fiche par fiche — le volume est faible (dix au plus) et une fiche refusée n'emporte pas les autres.
  */
+/**
+ * Les secteurs que la base accepte aujourd'hui.
+ *
+ * `admin_prospects` porte une contrainte CHECK sur `sector`. Y écrire une valeur
+ * qu'elle ne connaît pas fait échouer l'insertion de TOUTE la liste — c'est ce qui
+ * est arrivé en ajoutant « santé et beauté » côté code sans la migration : le
+ * registre trouvait deux cent cinquante entreprises et pas une seule n'entrait.
+ *
+ * On replie donc sur « autre » plutôt que de tout perdre. Une fois la migration 0041
+ * collée, « sante_beaute » passera et les fiches iront dans leur colonne.
+ */
+const SECTEURS_EN_BASE = new Set(["btp", "espaces_verts", "agriculture", "collectivites", "autre"]);
+
+/** Le secteur tel que la base l'accepte, quitte à le ranger dans « autre ». */
+const secteurSur = (secteur: string): string => (SECTEURS_EN_BASE.has(secteur) ? secteur : "autre");
+
 export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
   if (!prospects.length) return 0;
 
@@ -134,7 +150,7 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       city: p.city,
       department: p.department,
       activity: p.activity,
-      sector: p.sector,
+      sector: secteurSur(p.sector),
       website: p.website,
       rationale: p.rationale,
       sources: p.sources,

@@ -298,7 +298,11 @@ L'ACTIVITÉ, de deux façons au choix :
 - « section » : une lettre, pour une famille large. F = construction et BTP. A = agriculture, sylviculture, pêche.
 - « codes_naf » : des codes précis, pour un métier. Ils l'emportent sur la section.
 
-Les codes utiles au métier d'AvisDoc :
+TU CHERCHES CE QU'ON TE DEMANDE, quel que soit le métier. Si le commercial veut les fabricants de feux d'artifice, tu cherches les fabricants de feux d'artifice — pas des chantiers parce que ce serait plus « dans la cible ». Il sait ce qu'il fait : peut-être un salon, un partenariat, une piste que tu ignores. Tu ne corriges jamais sa demande, tu l'exécutes.
+
+La liste ci-dessous n'est qu'une aide pour les métiers qu'il demande souvent. Pour tout autre métier, donne le code NAF si tu le connais, sinon la section qui le contient.
+
+Les codes les plus demandés :
 - Travaux publics et voirie : 42.11Z, 42.13A, 42.13B, 42.21Z, 42.22Z, 42.99Z
 - Terrassement, démolition, gros œuvre : 43.11Z, 43.12A, 43.12B, 43.99C
 - Couverture et étanchéité : 43.91A, 43.91B, 43.99A
