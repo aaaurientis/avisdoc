@@ -1,14 +1,15 @@
 // La corbeille du Commercial : prospects, affaires et fiches clients supprimés.
 //
 // Supprimer pose une date. La fiche quitte son tableau, se retrouve ici, et se
-// restaure d'un clic. Ce qui a plus de quinze jours part pour de bon — la purge se
-// fait à l'ouverture de l'écran, sans tâche planifiée à surveiller.
+// restaure d'un clic. Ce qui a dépassé la garde part pour de bon — la purge se fait à
+// l'ouverture de l'écran, sans tâche planifiée à surveiller.
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
 
-/** Quinze jours : le temps qu'une information arrive ou qu'un collègue se manifeste. */
-// Trente jours, et non quinze : on ne s'aperçoit pas toujours en deux semaines qu'un
-// dossier manque — surtout si la personne qui l'a jeté est partie entre-temps.
+/**
+ * Trente jours : on ne s'aperçoit pas toujours en deux semaines qu'un dossier manque,
+ * surtout si la personne qui l'a jeté est partie entre-temps.
+ */
 export const JOURS_DE_GARDE = 30;
 
 export type Origine = "prospect" | "affaire" | "client" | "note";
@@ -77,8 +78,12 @@ async function effacerLesAudios(ids: string[]): Promise<void> {
 }
 
 /**
- * Vide ce qui a dépassé les quinze jours. Appelé à l'ouverture de l'écran : pas de
- * tâche planifiée, donc rien qui puisse tourner dans le vide sans qu'on le sache.
+ * Vide ce qui a dépassé la garde. Appelé à l'ouverture de l'écran : pas de tâche
+ * planifiée, donc rien qui puisse tourner dans le vide sans qu'on le sache.
+ *
+ * La destruction étant réservée au super-admin (migration 0036), cette purge ne
+ * supprime rien quand quelqu'un d'autre ouvre l'écran : elle renvoie alors zéro, et
+ * l'écran ne promet donc pas un vidage automatique.
  */
 export async function purger(): Promise<number> {
   const limite = new Date(Date.now() - JOURS_DE_GARDE * 86_400_000).toISOString();
