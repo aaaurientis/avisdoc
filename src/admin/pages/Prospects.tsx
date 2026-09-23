@@ -279,9 +279,21 @@ export default function Prospects() {
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
   const nouvelles = useMemo(() => prospects.filter((p) => !p.converted_client_id && !p.opened_at).length, [prospects]);
 
-  /** Les départements réellement présents : on ne propose pas un filtre qui ne rendrait rien. */
+  /** Ce qui est réellement présent : on ne propose pas un filtre qui ne rendrait rien. */
   const departements = useMemo(
     () => [...new Set(prospects.map((p) => p.department).filter((d): d is string => Boolean(d)))].sort(),
+    [prospects],
+  );
+  const villes = useMemo(
+    () => [...new Set(prospects.map((p) => p.city).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b, "fr")),
+    [prospects],
+  );
+  // Par libellé et non par code : « btp » et « Construction » sont le même secteur.
+  const secteurs = useMemo(
+    () =>
+      [...new Set(prospects.map((p) => secteurLisible(p.sector)).filter((s) => s !== "—"))].sort((a, b) =>
+        a.localeCompare(b, "fr"),
+      ),
     [prospects],
   );
 
@@ -456,7 +468,13 @@ export default function Prospects() {
           />
         </div>
         <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
-          <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
+          <FiltresProspects
+            filtres={filtres}
+            onChange={setFiltres}
+            secteurs={secteurs}
+            villes={villes}
+            departements={departements}
+          />
         </FiltresRepliables>
       </div>
 
