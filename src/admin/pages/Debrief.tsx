@@ -1,39 +1,26 @@
-// Débrief : le commercial raconte sa sortie, Merx range, le commercial valide.
+// Débrief : le commercial raconte, Merx range, c'est fini.
 //
-// Deux façons de raconter — à la voix ou au clavier — et une seule suite. Elles vivaient
-// dans deux rubriques séparées, « Notes dictées » et « Débrief », ce qui obligeait à
-// choisir un écran selon qu'on tape ou qu'on parle. C'est la même chose : on raconte.
+// Il y avait une étape de validation — des cases à cocher, un second bouton. Elle
+// partait d'une bonne intention, mais elle coûtait trente secondes d'attente, un écran
+// à comprendre et un choix à faire, pour quelqu'un qui veut seulement que ce soit
+// rangé. Et rien n'étant vraiment détruit — les fiches se modifient, la corbeille
+// garde trente jours, l'historique montre tout —, une erreur se corrige après coup
+// plus vite qu'elle ne se prévient.
 //
-// L'ordre compte. On dit d'abord ce qu'on a vécu, sans se soucier de la forme ; Merx
-// propose ensuite un tri, entreprise par entreprise ; et rien ne part en base avant
-// qu'on ait décoché ce qui ne va pas.
+// Deux façons de raconter, à la voix ou au clavier, et la même suite : ça part, ça se
+// range, on dit où.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, CalendarClock, Check, HandHelping, Loader2, Mail, Mic, NotebookPen, PenLine, Phone, Play, Sparkles, Target } from "lucide-react";
+import { ArrowRight, Check, Loader2, Mic, PenLine, Play, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
+import BoutonRetour from "../components/BoutonRetour";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useActualisation } from "../lib/actualisation";
-import {
-  compte,
-  enregistrer,
-  lireDebrief,
-  OU_TROUVER,
-  toutRetenir,
-  transcrireNote,
-  type EntrepriseVue,
-  type Extraction,
-  type Retenu,
-} from "../lib/debrief";
+import { OU_TROUVER, traiterDebrief, transcrireNote, type Bilan } from "../lib/debrief";
 import { cn } from "@/lib/utils";
-import BoutonRetour from "../components/BoutonRetour";
-
-const ICONES: Record<string, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
-
-/** Où une nouvelle entreprise peut être rangée, dit en clair. */
-const OU: Record<string, string> = { prospect: "la Prospection", affaire: "le Pipeline", client: "le fichier client" };
 
 /** Un débrief déjà raconté — dicté ou écrit, c'est la même table. */
 interface Passe {
@@ -57,164 +44,86 @@ const EXEMPLE =
   "avec un rendez-vous, ça a changé. Ils veulent une proposition pour deux journées. " +
   "Sinon j’ai rappelé Jardin Eau Bois, personne, à relancer jeudi.";
 
-/** Une case qui se coche, avec ce qu'elle retient à côté. */
-function Coche({
-  cochee,
-  onBascule,
-  children,
-  ton,
-}: {
-  cochee: boolean;
-  onBascule: () => void;
-  children: React.ReactNode;
-  ton?: "objection" | "mouche";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onBascule}
-      className={cn(
-        "flex w-full items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
-        cochee ? "border-avisdoc-teal bg-avisdoc-teal/5" : "border-border opacity-55 hover:opacity-100",
-      )}
-    >
-      <span
-        className={cn(
-          "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border-2",
-          cochee ? "border-avisdoc-teal bg-avisdoc-teal text-white" : "border-muted-foreground/40",
-        )}
-      >
-        {cochee && <Check className="size-2.5" strokeWidth={4} />}
-      </span>
-      <span className="min-w-0 flex-1">{children}</span>
-      {ton && (
-        <span
-          className={cn(
-            "mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold",
-            ton === "objection" ? "bg-avisdoc-coral/15 text-avisdoc-coral" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-          )}
-        >
-          {ton === "objection" ? "a bloqué" : "a porté"}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function FicheVue({
-  vue,
-  retenu,
-  onChange,
-}: {
-  vue: EntrepriseVue;
-  retenu: Retenu;
-  onChange: (r: Retenu) => void;
-}) {
-  const bascule = <K extends "objections" | "mouches" | "actions">(cle: K, i: number) => {
-    const suivant = [...retenu[cle]];
-    suivant[i] = !suivant[i];
-    onChange({ ...retenu, [cle]: suivant });
-  };
-
-  const reconnue = Boolean(vue.fiche_id);
+/** Ce que Merx vient de faire, dit en clair et sans jargon. */
+function CompteRendu({ bilan, onFermer }: { bilan: Bilan; onFermer: () => void }) {
+  const rien = bilan.creees.length === 0 && bilan.fiches.length === 0 && bilan.nonRattachees.length === 0;
 
   return (
-    <Card className="mb-3 p-4">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-display text-lg font-semibold text-avisdoc-ink">{vue.entreprise}</h3>
-        {reconnue ? (
-          <span className="rounded-full bg-avisdoc-teal/10 px-2.5 py-1 text-[11px] font-bold text-avisdoc-teal">
-            fiche reconnue · {vue.fiche_type}
-          </span>
-        ) : (
-          <span className="rounded-full bg-avisdoc-coral/15 px-2.5 py-1 text-[11px] font-bold text-avisdoc-coral">
-            aucune fiche trouvée
-          </span>
-        )}
+    <Card className="mb-4 border-l-4 border-l-avisdoc-teal p-4">
+      <div className="flex items-center gap-1.5">
+        <Check className="size-4 text-avisdoc-teal" />
+        <SectionLabel className="text-avisdoc-teal">C’est rangé</SectionLabel>
       </div>
 
-      {!reconnue && !vue.a_creer?.trim() && (
-        <p className="mb-3 rounded-xl border border-l-4 border-border border-l-avisdoc-coral px-3.5 py-2.5 text-[12.5px] leading-snug text-muted-foreground">
-          Merx n’a pas retrouvé cette entreprise dans vos fiches. Ce qui a bloqué et ce qui a porté sera quand
-          même gardé — c’est utile à l’équipe. En revanche, le résumé et les actions ne peuvent se ranger nulle part.
+      {rien ? (
+        <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+          Merx n’a reconnu aucune entreprise dans ce récit. Citez-les par leur nom, même approximatif, et il fera
+          le lien.
         </p>
-      )}
-
-      {/* Une entreprise inconnue se crée d'ici : sans fiche, il n'y a nulle part où
-          ranger ce qui s'est passé, et le récit se perdrait. */}
-      {!reconnue && vue.a_creer?.trim() && (
-        <div className="mb-3">
-          <Coche cochee={retenu.creer} onBascule={() => onChange({ ...retenu, creer: !retenu.creer })}>
-            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-avisdoc-coral">
-              Nouvelle entreprise
-            </span>
-            <span className="mt-0.5 block text-[13.5px] leading-snug text-avisdoc-ink">
-              Créer <span className="font-semibold">{vue.entreprise}</span>
-              {vue.ville?.trim() ? `, à ${vue.ville}` : ""} dans{" "}
-              <span className="font-semibold">{OU[vue.a_creer] ?? "la prospection"}</span>
-              {vue.a_creer === "affaire" && vue.etape?.trim() ? `, à l’étape ${vue.etape}` : ""}
-            </span>
-            {!retenu.creer && (
-              <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                Décoché : seuls les objections et les arguments seront gardés, sans fiche à quoi les rattacher.
-              </span>
-            )}
-          </Coche>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {vue.resume.trim() && (reconnue || retenu.creer) && (
-          <Coche cochee={retenu.resume} onBascule={() => onChange({ ...retenu, resume: !retenu.resume })}>
-            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-              Dans l’historique
-            </span>
-            <span className="mt-0.5 block text-[13.5px] leading-snug text-avisdoc-ink">{vue.resume}</span>
-          </Coche>
-        )}
-
-        {vue.objections.map((o, i) => (
-          <Coche key={`o${i}`} cochee={retenu.objections[i]} onBascule={() => bascule("objections", i)} ton="objection">
-            <span className="block text-[13.5px] font-semibold italic leading-snug text-avisdoc-ink">« {o.verbatim} »</span>
-            {o.reponse && <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">Réponse : {o.reponse}</span>}
-            {o.famille && <span className="mt-0.5 block text-[11.5px] text-muted-foreground">rangé dans « {o.famille} »</span>}
-          </Coche>
-        ))}
-
-        {vue.mouches.map((m, i) => (
-          <Coche key={`m${i}`} cochee={retenu.mouches[i]} onBascule={() => bascule("mouches", i)} ton="mouche">
-            <span className="block text-[13.5px] font-semibold leading-snug text-avisdoc-ink">{m.verbatim}</span>
-            {m.famille && <span className="mt-0.5 block text-[11.5px] text-muted-foreground">rangé dans « {m.famille} »</span>}
-          </Coche>
-        ))}
-
-        {(reconnue || retenu.creer) &&
-          vue.actions.map((a, i) => {
-            const Icone = ICONES[a.genre] ?? NotebookPen;
+      ) : (
+        <div className="mt-2.5 space-y-2">
+          {bilan.creees.map((c) => {
+            const ou = OU_TROUVER[c.ou] ?? OU_TROUVER.prospect;
             return (
-              <Coche key={`a${i}`} cochee={retenu.actions[i]} onBascule={() => bascule("actions", i)}>
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-avisdoc-coral">
-                  <Icone className="size-3.5" /> À faire
+              <div key={`c-${c.nom}`} className="flex flex-wrap items-center gap-2 text-[13.5px]">
+                <span className="rounded-full bg-avisdoc-teal/10 px-2 py-0.5 text-[11px] font-bold text-avisdoc-teal">
+                  créée
                 </span>
-                <span className="mt-0.5 block text-[13.5px] leading-snug text-avisdoc-ink">{a.quoi}</span>
-                <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                  {a.quand ? new Date(a.quand).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : "sans date — posée aujourd’hui"}
-                </span>
-              </Coche>
+                <span className="font-semibold text-avisdoc-ink">{c.nom}</span>
+                <Link
+                  to={ou.route}
+                  className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                >
+                  {ou.ecran} <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
             );
           })}
 
-        {vue.etape.trim() && (vue.fiche_type === "affaire" || (retenu.creer && vue.a_creer === "affaire")) && (
-          <Coche cochee={retenu.etape} onBascule={() => onChange({ ...retenu, etape: !retenu.etape })}>
-            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-              Dans le Pipeline
-            </span>
-            <span className="mt-0.5 block text-[13.5px] leading-snug text-avisdoc-ink">
-              Passer à l’étape <span className="font-semibold">{vue.etape}</span>
-            </span>
-          </Coche>
-        )}
-      </div>
+          {bilan.fiches.map((nom) => (
+            <div key={`f-${nom}`} className="flex flex-wrap items-center gap-2 text-[13.5px]">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                mise à jour
+              </span>
+              <span className="font-semibold text-avisdoc-ink">{nom}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(bilan.objections > 0 || bilan.mouches > 0 || bilan.actions > 0) && (
+        <p className="mt-3 border-t border-border pt-2.5 text-[12.5px] text-muted-foreground">
+          {[
+            bilan.actions > 0 && `${bilan.actions} action${bilan.actions > 1 ? "s" : ""} au planning`,
+            bilan.objections > 0 && `${bilan.objections} objection${bilan.objections > 1 ? "s" : ""} retenue${bilan.objections > 1 ? "s" : ""}`,
+            bilan.mouches > 0 && `${bilan.mouches} argument${bilan.mouches > 1 ? "s" : ""} qui a porté`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+
+      {bilan.nonRattachees.length > 0 && (
+        <div className="mt-3 border-t border-border pt-2.5">
+          <SectionLabel>Ce que Merx n’a pas su ranger</SectionLabel>
+          <ul className="mt-1.5 space-y-1">
+            {bilan.nonRattachees.map((n) => (
+              <li key={n} className="flex gap-2 text-[12.5px] leading-snug text-muted-foreground">
+                <span className="mt-[6px] size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                <span>{n}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onFermer}
+        className="mt-3 text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
+      >
+        Masquer
+      </button>
     </Card>
   );
 }
@@ -222,22 +131,14 @@ function FicheVue({
 export default function Debrief() {
   const { user } = useAuth();
   const [texte, setTexte] = useState("");
-  /** `null` tant qu'on n'a pas choisi la voix ou le clavier. */
   const [mode, setMode] = useState<"texte" | null>(null);
-  const [lecture, setLecture] = useState(false);
-  const [extraction, setExtraction] = useState<Extraction | null>(null);
-  const [retenus, setRetenus] = useState<Retenu[]>([]);
-  const [envoi, setEnvoi] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+  const [bilan, setBilan] = useState<Bilan | null>(null);
   const [passes, setPasses] = useState<Passe[]>([]);
   const [ecoute, setEcoute] = useState<string | null>(null);
-  /** L'identifiant de la note en cours de transcription : le bouton doit le dire. */
-  const [enTranscription, setEnTranscription] = useState<string | null>(null);
-  /** Les fiches créées par le dernier enregistrement, pour pouvoir y aller. */
-  const [nouvelles, setNouvelles] = useState<{ nom: string; ou: string }[]>([]);
-  /** Ce qu'on a déjà tenté : une transcription qui échoue ne repart pas en boucle. */
-  const dejaLancees = useRef<Set<string>>(new Set());
+  /** Ce qu'on a déjà pris en charge : rien ne repart deux fois. */
+  const traitees = useRef<Set<string>>(new Set());
 
-  /** Ce qu'on a déjà raconté : dicté comme écrit, les deux vivent dans la même table. */
   const chargerPasses = useCallback(async () => {
     const { data } = await supabaseAdmin
       .from("admin_notes_dictees")
@@ -251,58 +152,52 @@ export default function Debrief() {
     void chargerPasses();
   }, [chargerPasses]);
 
-  /**
-   * Transcrire sans qu'on le demande.
-   *
-   * Une note arrive du téléphone en attente ; cliquer sur « Transcrire » était une
-   * corvée de plus, et la première chose qu'on oublie. On s'en charge dès qu'on la
-   * voit — une par une, pour ne pas lancer cinq transcriptions à la fois, et jamais
-   * deux fois la même grâce à la trace gardée dans `dejaLancees`.
-   */
-  useEffect(() => {
-    const aFaire = passes.find((n) => n.statut === "recue" && n.audio_path && !dejaLancees.current.has(n.id));
-    if (!aFaire || enTranscription) return;
-    dejaLancees.current.add(aFaire.id);
-    setEnTranscription(aFaire.id);
-    void transcrireNote(aFaire.id)
-      .then(() => toast.success("Note transcrite."))
-      .catch((e) => toast.error(e instanceof Error ? e.message : "La transcription a échoué."))
-      .finally(() => {
-        setEnTranscription(null);
-        void chargerPasses();
-      });
-  }, [passes, enTranscription, chargerPasses]);
-
-  // Une transcription se termine au loin : l'écran suit sans qu'on clique.
   useActualisation(chargerPasses, passes.some((n) => n.statut === "recue"));
 
+  /** Merx lit et range. Un seul geste, qu'on vienne de la voix ou du clavier. */
+  const ranger = useCallback(
+    async (texteDit: string, noteId: string | null) => {
+      if (texteDit.trim().length < 20) return;
+      setEnCours(true);
+      setBilan(null);
+      try {
+        const b = await traiterDebrief(texteDit.trim(), user?.email ?? "", noteId);
+        setBilan(b);
+        setTexte("");
+        setMode(null);
+        await chargerPasses();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Merx n’a pas pu ranger ce débrief.");
+      } finally {
+        setEnCours(false);
+      }
+    },
+    [chargerPasses, user?.email],
+  );
+
   /**
-   * Reprend une note dictée : on la transcrit, et son texte remplit la zone de saisie.
-   * Le commercial peut alors le corriger avant de lancer le tri — une transcription se
-   * trompe sur les noms propres, et on ne range pas une erreur d'oreille sans la voir.
+   * Une note dictée va jusqu'au bout toute seule : transcrite, puis rangée. Le
+   * commercial a parlé, il n'a rien d'autre à faire — c'était tout l'objet du Débrief,
+   * et la moindre étape en plus est celle qu'on oublie.
    */
-  const reprendre = async (n: Passe) => {
-    if (enTranscription) return;
-    // Déjà transcrite : on la charge telle quelle, sans repayer une transcription.
-    if (n.transcription) {
-      setTexte(n.transcription);
-      setMode("texte");
-      return;
-    }
-    setEnTranscription(n.id);
-    try {
-      const texteDit = await transcrireNote(n.id);
-      setTexte(texteDit);
-      setMode("texte");
-      await chargerPasses();
-      toast.success("Transcription faite : relisez-la, puis lancez le tri.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "La transcription a échoué.");
-      await chargerPasses();
-    } finally {
-      setEnTranscription(null);
-    }
-  };
+  useEffect(() => {
+    if (enCours) return;
+    const aFaire = passes.find(
+      (n) => n.statut !== "classee" && n.statut !== "echec" && !traitees.current.has(n.id) && (n.transcription || n.audio_path),
+    );
+    if (!aFaire) return;
+    traitees.current.add(aFaire.id);
+
+    void (async () => {
+      try {
+        const texteDit = aFaire.transcription ?? (await transcrireNote(aFaire.id));
+        await ranger(texteDit, aFaire.id);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "La note n’a pas pu être traitée.");
+        await chargerPasses();
+      }
+    })();
+  }, [passes, enCours, ranger, chargerPasses]);
 
   const ecouter = async (n: Passe) => {
     if (!n.audio_path) return;
@@ -314,160 +209,52 @@ export default function Debrief() {
     setEcoute(data.signedUrl);
   };
 
-  const lire = async () => {
-    if (lecture || texte.trim().length < 20) return;
-    setLecture(true);
-    try {
-      const r = await lireDebrief(texte.trim());
-      setExtraction(r);
-      setRetenus(r.entreprises.map(toutRetenir));
-      if (r.entreprises.length === 0) toast.message("Merx n’a reconnu aucune entreprise dans ce texte.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Merx n’a pas pu lire ce débrief.");
-    } finally {
-      setLecture(false);
-    }
-  };
-
-  const total = retenus.reduce((n, r, i) => n + compte(r, extraction?.entreprises[i]), 0);
-
-  const tout = async () => {
-    if (!extraction || envoi || total === 0) return;
-    setEnvoi(true);
-    try {
-      const creees: { nom: string; ou: string }[] = [];
-      for (const [i, e] of extraction.entreprises.entries()) {
-        const { creee } = await enregistrer(e, retenus[i], user?.email ?? "", null);
-        if (creee) creees.push(creee);
-      }
-      toast.success(`${total} élément${total > 1 ? "s" : ""} enregistré${total > 1 ? "s" : ""}.`);
-      // Ce qui vient d'être créé reste à l'écran, avec un lien : une fiche qu'on ne
-      // retrouve pas vaut à peine mieux qu'une fiche qu'on n'a pas créée.
-      setNouvelles(creees);
-      setExtraction(null);
-      setRetenus([]);
-      setTexte("");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "L’enregistrement a échoué.");
-    } finally {
-      setEnvoi(false);
-    }
-  };
+  const etatDe = (n: Passe) =>
+    n.statut === "classee"
+      ? "rangée"
+      : n.statut === "echec"
+        ? n.message ?? "échec"
+        : traitees.current.has(n.id)
+          ? "en cours de traitement…"
+          : "en attente";
 
   return (
     <div>
       <PageHeader
         title="Débrief"
-        subtitle="Racontez votre sortie. Merx range, vous validez."
-        action={mode !== null && !extraction ? <BoutonRetour onRetour={() => setMode(null)} /> : undefined}
+        subtitle="Racontez votre sortie. Merx range, et vous dit où."
+        action={mode !== null ? <BoutonRetour onRetour={() => setMode(null)} /> : undefined}
       />
 
-      {nouvelles.length > 0 && (
-        <Card className="mb-4 border-l-4 border-l-avisdoc-teal p-4">
-          <SectionLabel>
-            {nouvelles.length === 1 ? "Fiche créée" : `${nouvelles.length} fiches créées`}
-          </SectionLabel>
-          <div className="mt-2 space-y-1.5">
-            {nouvelles.map((n) => {
-              const ou = OU_TROUVER[n.ou] ?? OU_TROUVER.prospect;
-              return (
-                <div key={n.nom} className="flex flex-wrap items-center gap-2 text-[13.5px]">
-                  <span className="font-semibold text-avisdoc-ink">{n.nom}</span>
-                  <span className="text-muted-foreground">dans</span>
-                  <Link
-                    to={ou.route}
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-                  >
-                    {ou.ecran} <ArrowRight className="size-3.5" />
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={() => setNouvelles([])}
-            className="mt-2.5 text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
-          >
-            Masquer
-          </button>
-        </Card>
+      {enCours && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal px-4 py-3 text-[13.5px] font-semibold text-avisdoc-ink">
+          <Loader2 className="size-4 animate-spin text-avisdoc-teal" />
+          Merx lit et range… une trentaine de secondes.
+        </div>
       )}
 
-      {!extraction && mode === null && passes.length > 0 && (
-        <Card className="mb-4 p-4">
-          <SectionLabel>Ce que vous avez déjà raconté</SectionLabel>
-          <div className="mt-2 divide-y divide-border">
-            {passes.map((n) => (
-              <div key={n.id} className="flex flex-wrap items-center gap-3 py-2.5">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  {n.audio_path ? <Mic className="size-3.5" /> : <PenLine className="size-3.5" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">
-                    {n.titre ?? (n.audio_path ? "Débrief dicté" : "Débrief écrit")}
-                  </span>
-                  <span className="block text-[11.5px] text-muted-foreground">
-                    {quandCourt(n.created_at)}
-                    {n.duree_s != null && ` · ${chrono(n.duree_s)}`}
-                    {n.statut === "recue" && " · en attente de transcription"}
-                    {n.statut === "echec" && ` · ${n.message ?? "échec"}`}
-                  </span>
-                </span>
-                {n.audio_path && (
-                  <button
-                    type="button"
-                    onClick={() => void ecouter(n)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-                  >
-                    <Play className="size-3.5" /> Réécouter
-                  </button>
-                )}
-                {/* Une note en attente ou en échec se reprend d'ici : on transcrit, puis
-                    le texte arrive dans la zone de saisie, où Merx le trie comme le reste. */}
-                {n.statut !== "classee" && (
-                  <button
-                    type="button"
-                    disabled={enTranscription === n.id}
-                    onClick={() => void reprendre(n)}
-                    className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
-                  >
-                    {enTranscription === n.id ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    {enTranscription === n.id
-                      ? "Transcription…"
-                      : n.statut === "echec"
-                        ? "Réessayer"
-                        : n.transcription
-                          ? "Trier avec Merx"
-                          : "Transcrire"}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {bilan && !enCours && <CompteRendu bilan={bilan} onFermer={() => setBilan(null)} />}
 
-      {!extraction && mode === null && (
-        <div className="grid gap-3 sm:grid-cols-2">
+      {mode === null && !enCours && (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
           <Link
             to="/dictee"
-            className="group rounded-2xl border border-border bg-card p-6 transition-colors hover:border-avisdoc-teal"
+            className="rounded-2xl border border-border bg-card p-6 transition-colors hover:border-avisdoc-teal"
           >
             <span className="flex size-11 items-center justify-center rounded-full bg-avisdoc-teal/10 text-avisdoc-teal">
               <Mic className="size-5" />
             </span>
             <h2 className="mt-3 font-display text-lg font-semibold text-avisdoc-ink">À la voix</h2>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              En sortant d’un rendez-vous, ou le soir pour toute la journée. Jusqu’à dix minutes, même sans réseau —
-              la note part dès que vous en retrouvez un.
+              En sortant d’un rendez-vous, ou le soir pour toute la journée. Jusqu’à dix minutes, même sans réseau.
+              Tout se fait ensuite sans vous.
             </p>
           </Link>
 
           <button
             type="button"
             onClick={() => setMode("texte")}
-            className="group rounded-2xl border border-border bg-card p-6 text-left transition-colors hover:border-avisdoc-teal"
+            className="rounded-2xl border border-border bg-card p-6 text-left transition-colors hover:border-avisdoc-teal"
           >
             <span className="flex size-11 items-center justify-center rounded-full bg-avisdoc-coral/10 text-avisdoc-coral">
               <PenLine className="size-5" />
@@ -481,11 +268,11 @@ export default function Debrief() {
         </div>
       )}
 
-      {!extraction && mode === "texte" && (
-        <Card className="p-4">
+      {mode === "texte" && !enCours && (
+        <Card className="mb-4 p-4">
           <SectionLabel>Ce qui s’est passé</SectionLabel>
           <p className="mt-1 text-[12.5px] text-muted-foreground">
-            Écrivez comme vous parleriez : plusieurs entreprises, dans le désordre, peu importe. Merx s’occupe du tri.
+            Écrivez comme vous parleriez : plusieurs entreprises, dans le désordre, peu importe.
           </p>
           <textarea
             value={texte}
@@ -497,12 +284,11 @@ export default function Debrief() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => void lire()}
-              disabled={lecture || texte.trim().length < 20}
+              onClick={() => void ranger(texte, null)}
+              disabled={texte.trim().length < 20}
               className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              {lecture ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {lecture ? "Merx lit… une trentaine de secondes" : "Merx trie ça"}
+              <Sparkles className="size-4" /> Merx range ça
             </button>
             {!texte && (
               <button
@@ -513,74 +299,66 @@ export default function Debrief() {
                 Voir un exemple
               </button>
             )}
-
           </div>
         </Card>
       )}
 
-      {extraction && (
-        <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void tout()}
-              disabled={envoi || total === 0}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-            >
-              {envoi ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-              Enregistrer {total > 0 ? `(${total})` : ""}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setExtraction(null);
-                setRetenus([]);
-              }}
-              className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink hover:text-avisdoc-ink"
-            >
-              Reprendre le texte
-            </button>
-            <span className="text-[12.5px] text-muted-foreground">
-              Décochez ce qui ne va pas : rien n’est écrit avant que vous enregistriez.
-            </span>
-          </div>
-
-          {extraction.entreprises.map((e, i) => (
-            <FicheVue
-              key={`${e.entreprise}-${i}`}
-              vue={e}
-              retenu={retenus[i]}
-              onChange={(r) => setRetenus((prev) => prev.map((x, j) => (j === i ? r : x)))}
-            />
-          ))}
-
-          {extraction.non_rattachees.length > 0 && (
-            <Card className="p-4">
-              <div className="flex items-center gap-1.5">
-                <HandHelping className="size-3.5 text-muted-foreground" />
-                <SectionLabel>Ce que Merx n’a pas su ranger</SectionLabel>
+      {passes.length > 0 && (
+        <Card className="p-4">
+          <SectionLabel>Ce que vous avez raconté</SectionLabel>
+          <div className="mt-2 divide-y divide-border">
+            {passes.map((n) => (
+              <div key={n.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-full",
+                    n.statut === "classee" ? "bg-avisdoc-teal/10 text-avisdoc-teal" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {n.statut === "classee" ? (
+                    <Check className="size-3.5" />
+                  ) : n.audio_path ? (
+                    <Mic className="size-3.5" />
+                  ) : (
+                    <PenLine className="size-3.5" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">
+                    {n.titre ?? (n.audio_path ? "Débrief dicté" : "Débrief écrit")}
+                  </span>
+                  <span className="block text-[11.5px] text-muted-foreground">
+                    {quandCourt(n.created_at)}
+                    {n.duree_s != null && ` · ${chrono(n.duree_s)}`} · {etatDe(n)}
+                  </span>
+                </span>
+                {n.audio_path && (
+                  <button
+                    type="button"
+                    onClick={() => void ecouter(n)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+                  >
+                    <Play className="size-3.5" /> Réécouter
+                  </button>
+                )}
+                {/* Une note en échec se reprend ; une note rangée, jamais. */}
+                {n.statut === "echec" && (
+                  <button
+                    type="button"
+                    disabled={enCours}
+                    onClick={() => {
+                      traitees.current.delete(n.id);
+                      void chargerPasses();
+                    }}
+                    className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
+                  >
+                    <Sparkles className="size-3.5" /> Réessayer
+                  </button>
+                )}
               </div>
-              <ul className="mt-2 space-y-1">
-                {extraction.non_rattachees.map((n) => (
-                  <li key={n} className="flex gap-2 text-[13px] leading-snug text-muted-foreground">
-                    <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                    <span>{n}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {extraction.entreprises.length === 0 && extraction.non_rattachees.length === 0 && (
-            <div className="rounded-2xl bg-muted/60 p-8 text-center">
-              <Target className="mx-auto mb-2 size-5 text-muted-foreground" />
-              <SectionLabel>Rien à ranger</SectionLabel>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Merx n’a reconnu aucune entreprise. Citez-les par leur nom, même approximatif, et il fera le lien.
-              </p>
-            </div>
-          )}
-        </>
+            ))}
+          </div>
+        </Card>
       )}
 
       {/* La lecture ne démarre jamais toute seule. */}
