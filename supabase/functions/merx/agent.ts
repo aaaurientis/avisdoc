@@ -143,8 +143,18 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
 function versFiches(trouvees: Found[]): LightProspect[] {
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
-    const metier = metierDe(c.activityCode);
-    if (!metier) continue; // activité inconnue de notre table : on ne devine pas
+    // Une activité que notre table ne connaît pas ne fait PAS disparaître l'entreprise :
+    // elle existe, elle est dans la zone, elle a le bon effectif. On la garde en disant
+    // qu'on n'a pas évalué son exposition — l'approfondissement tranchera. Jeter une
+    // fiche faute de savoir, c'était rendre « aucun résultat » sur deux cent trente-sept
+    // entreprises bien réelles.
+    const metier = metierDe(c.activityCode) ?? {
+      secteur: "autre" as const,
+      soleil: "non_evalue" as const,
+      affinite: "non_evalue" as const,
+      activite: c.activityCode ? `Activité ${c.activityCode}` : "Activité non précisée",
+      pourquoi: "",
+    };
 
     // L'établissement de la zone demandée prime sur le siège : c'est là qu'on ira.
     const local = c.localSites[0] ?? c.headOffice;
@@ -161,7 +171,7 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       zone: zoneScore([local.department ?? c.headOffice.department]),
     };
 
-    const autresSites = c.localSites.length > 1 ? ` · ${c.localSites.length} établissements dans la zone` : "";
+    const autresSites = c.localSites.length > 1 ? `${metier.pourquoi ? " · " : ""}${c.localSites.length} établissements dans la zone` : "";
     fiches.push({
       name: c.name,
       city: local.city ?? c.headOffice.city,
@@ -169,7 +179,7 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       activity: metier.activite,
       sector: metier.secteur,
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
-      rationale: `${metier.pourquoi}${autresSites}`,
+      rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source],
       score,
       scoreTotal: total(score),

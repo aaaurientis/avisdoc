@@ -312,11 +312,26 @@ Les codes utiles au métier d'AvisDoc :
 - Pharmacies : 47.73Z — Parapharmacie et parfumerie : 47.75Z
 - Cabinets médicaux et dermatologie : 86.21Z, 86.22C — Centres de santé : 86.90F
 - Salles de sport : 93.13Z
-- Industrie pharmaceutique et cosmétique : 21.20Z, 20.42Z
+- Industrie pharmaceutique et cosmétique : 21.10Z, 21.20Z, 20.42Z
+- Dispositifs et matériel médical : 32.50A, 32.50B
+- Commerce de gros pharmaceutique : 46.46Z — Optique : 47.78A
+- Laboratoires d'analyses : 86.90B — Infirmiers et kinés : 86.90D, 86.90E
 
 L'EFFECTIF MINIMUM, en salariés, seulement s'il est dit (« plus de 50 » donne 50). Sinon 0.
 
-Si la demande ne permet ni section ni code — elle ne nomme aucun métier —, rends une section vide et une liste de codes vide.`;
+TU RENDS TOUJOURS QUELQUE CHOSE DÈS QU'UN MÉTIER EST NOMMÉ. Si tu n'es pas sûr du code exact, donne la SECTION qui le contient plutôt que rien :
+- C = industrie manufacturière (fabrication, y compris médicale et cosmétique)
+- F = construction et BTP
+- A = agriculture, sylviculture, pêche
+- G = commerce de gros et de détail
+- Q = santé humaine et action sociale
+- S = autres services, dont coiffure et soins de beauté
+- N = services administratifs et de soutien, dont l'aménagement paysager
+- O = administration publique
+
+Une section large vaut mieux qu'une liste vide : le commercial filtrera sa liste à l'écran, alors qu'une liste vide le renvoie à une recherche web longue et incertaine.
+
+Ne rends une section vide ET une liste de codes vide QUE si la demande ne nomme réellement aucun métier — « trouve-moi des clients », « cherche en Alsace ».`;
 
 export const CRITERES_SCHEMA = {
   type: "object",

@@ -67,6 +67,9 @@ const TABLE: Record<string, Metier> = {
   "87.": { secteur: "sante_beaute", ...SANTE, activite: "Hébergement médico-social", pourquoi: "Établissements de soin : sujet de santé entendu, personnel nombreux." },
   "93.13": { secteur: "sante_beaute", ...SANTE, activite: "Centres de culture physique", pourquoi: "Clientèle attentive à sa santé, et pratiques sportives souvent en extérieur." },
   "21.": { secteur: "sante_beaute", ...SANTE, activite: "Industrie pharmaceutique", pourquoi: "Secteur de la santé : le sujet est cohérent avec leur métier et leur image." },
+  "32.50": { secteur: "sante_beaute", ...SANTE, activite: "Fabrication de matériel médical", pourquoi: "Dispositifs médicaux : le dépistage relève de leur univers, et leurs équipes y sont sensibles." },
+  "46.46": { secteur: "sante_beaute", ...SANTE, activite: "Commerce de gros pharmaceutique", pourquoi: "Distribution de produits de santé : sujet entendu, réseau de clients à sensibiliser." },
+  "47.78A": { secteur: "sante_beaute", ...SANTE, activite: "Optique", pourquoi: "Santé visuelle : même logique de dépistage en proximité, clientèle réceptive." },
 };
 
 /** Le métier correspondant à un code NAF, ou rien si on ne le connaît pas. */
