@@ -112,6 +112,13 @@ const USAGES: { cle: string; titre: string; modele: string; pourquoi: string }[]
     pourquoi: "Le modèle le plus capable, sur une seule entreprise : l’identité légale, l’interlocuteur, et le dossier commercial — accroche, arguments, objections, offre. C’est là qu’on accepte de payer plus, parce que c’est là que se gagne le rendez-vous.",
   },
   {
+    cle: "chat",
+    titre: "Conseiller le commercial",
+    modele: MODELES_ACTUELS.chat,
+    pourquoi:
+      "Quoi répondre à une objection, comment aborder ce client, par où l’autre va résister. Le modèle le plus capable, là aussi : c’est ce qu’on lui dit avant d’entrer chez un client. Sans recherche web, un échange coûte quelques centimes.",
+  },
+  {
     cle: "email",
     titre: "Rédiger un e-mail",
     modele: MODELES_ACTUELS.email,
