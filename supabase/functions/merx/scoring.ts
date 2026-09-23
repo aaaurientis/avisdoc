@@ -14,7 +14,7 @@ export const CATEGORIES: { id: Category; label: string; criteria: CriterionId[] 
 ];
 
 export const CRITERIA: Record<CriterionId, { label: string; max: number }> = {
-  soleil: { label: "Exposition au soleil", max: 35 },
+  soleil: { label: "Concernés par le dépistage", max: 35 },
   sante_travail: { label: "Sensibilité santé au travail", max: 10 },
   salaries: { label: "Nombre de salariés", max: 20 },
   interlocuteur: { label: "Interlocuteur trouvé", max: 10 },
@@ -42,8 +42,41 @@ export const COVERED_ZONES: { label: string; departments: string[] }[] = [
 export type SunLevel = "majorite_dehors" | "partie_dehors" | "interieur" | "non_evalue";
 const SUN_POINTS: Record<SunLevel, number | null> = { majorite_dehors: 35, partie_dehors: 15, interieur: 0, non_evalue: null };
 
-export function sunScore(level: SunLevel, justification: string, source: string | null): CriterionScore {
-  return { points: SUN_POINTS[level], justification, source };
+/**
+ * Le second chemin vers le critère médical premier.
+ *
+ * Un institut de beauté, une pharmacie, un laboratoire de dermatologie n'ont
+ * personne au soleil : avec la seule exposition, ils sortaient à quinze sur cent et
+ * le commercial les écartait. Or ce sont des cibles — leur métier touche la peau,
+ * le sujet leur parle, et ils orientent leurs clients.
+ *
+ * On ne crée pas un septième critère : on ouvre une seconde porte vers le même.
+ */
+export type AffinityLevel = "metier_de_la_peau" | "secteur_sante" | "aucune" | "non_evalue";
+const AFFINITY_POINTS: Record<AffinityLevel, number | null> = {
+  metier_de_la_peau: 35, // esthétique, dermatologie, protection solaire : le sujet EST leur métier
+  secteur_sante: 20, // santé ou bien-être au sens large : le sujet leur parle
+  aucune: 0,
+  non_evalue: null,
+};
+
+/**
+ * Concernés par le dépistage : par l'exposition de leurs salariés, ou par leur métier.
+ * On retient le meilleur des deux — une entreprise n'a pas à cumuler pour être une cible.
+ */
+export function sunScore(
+  level: SunLevel,
+  justification: string,
+  source: string | null,
+  affinity?: { niveau: AffinityLevel; justification: string; source: string | null },
+): CriterionScore {
+  const parSoleil = SUN_POINTS[level];
+  const parMetier = affinity ? AFFINITY_POINTS[affinity.niveau] : null;
+
+  if (parMetier !== null && (parSoleil === null || parMetier > parSoleil)) {
+    return { points: parMetier, justification: affinity!.justification, source: affinity!.source };
+  }
+  return { points: parSoleil, justification, source };
 }
 
 export function healthScore(found: boolean, justification: string, source: string | null): CriterionScore {
@@ -94,6 +127,7 @@ export const SECTORS = [
   { id: "espaces_verts", label: "Espaces verts" },
   { id: "agriculture", label: "Agriculture et viticulture" },
   { id: "collectivites", label: "Collectivités" },
+  { id: "sante_beaute", label: "Santé et beauté" },
   { id: "autre", label: "Autre" },
 ] as const;
 

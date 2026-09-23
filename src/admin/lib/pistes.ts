@@ -10,6 +10,11 @@ const SECTEURS_PISTE: { label: string; mots: string[] }[] = [
   { label: "espaces verts", mots: ["espaces verts", "paysagiste", "jardin", "elagage", "parc"] },
   { label: "agriculture et viticulture", mots: ["agricole", "agriculture", "viticole", "viticulture", "vigne", "exploitation"] },
   { label: "collectivités", mots: ["collectivite", "mairie", "commune", "ville de", "departement", "agglomeration"] },
+  // Personne au soleil, mais le sujet est leur métier : ils achètent pour leurs équipes
+  // et orientent leur clientèle.
+  { label: "instituts de beauté et spas", mots: ["institut de beaute", "esthetique", "spa", "beaute"] },
+  { label: "pharmacies et parapharmacies", mots: ["pharmacie", "parapharmacie", "officine"] },
+  { label: "centres de santé et cabinets de dermatologie", mots: ["centre de sante", "dermatolog", "cabinet medical"] },
 ];
 
 /** Zones couvertes, les mêmes que la grille de notation. */

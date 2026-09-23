@@ -7,6 +7,8 @@ export const SECTEURS = [
   { id: "espaces_verts", label: "Espaces verts", tone: "emerald" },
   { id: "agriculture", label: "Agriculture et viticulture", tone: "teal" },
   { id: "collectivites", label: "Collectivités", tone: "violet" },
+  // Instituts, pharmacies, dermatologie : personne au soleil, mais le sujet EST leur métier.
+  { id: "sante_beaute", label: "Santé et beauté", tone: "coral" },
   { id: "autre", label: "Autre", tone: "slate" },
 ] as const;
 
@@ -21,7 +23,7 @@ export const CATEGORIES: { id: string; label: string; criteres: CritereId[] }[] 
 ];
 
 export const CRITERES: Record<CritereId, { label: string; max: number }> = {
-  soleil: { label: "Exposition au soleil", max: 35 },
+  soleil: { label: "Concernés par le dépistage", max: 35 },
   sante_travail: { label: "Sensibilité santé au travail", max: 10 },
   salaries: { label: "Nombre de salariés", max: 20 },
   interlocuteur: { label: "Interlocuteur trouvé", max: 10 },
