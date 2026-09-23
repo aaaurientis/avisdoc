@@ -10,6 +10,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { pistes } from "../lib/pistes";
 import { cn } from "@/lib/utils";
+import BoutonMicro from "../components/BoutonMicro";
 
 interface Message {
   role: "user" | "assistant";
@@ -196,14 +197,18 @@ export default function Merx() {
                 disabled={occupe}
                 className="min-h-[52px] flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-avisdoc-teal disabled:opacity-60"
               />
+              {/* Au volant, on ne tape pas : on appuie, on parle, on relit. */}
+              <BoutonMicro onTexte={(t) => setSaisie((avant) => (avant.trim() ? `${avant.trim()} ${t}` : t))} />
               <button
                 type="button"
                 onClick={() => void envoyer()}
                 disabled={!saisie.trim() || occupe}
-                className="ad-btn-accent inline-flex h-[52px] items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 text-sm font-bold text-white disabled:opacity-50"
+                className="ad-btn-accent inline-flex h-[52px] shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 text-sm font-bold text-white disabled:opacity-50 sm:px-5"
               >
                 {occupe ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                Envoyer
+                {/* À trois éléments sur une ligne de 375 pixels, le libellé faisait
+                    déborder le bouton : l'icône suffit à le reconnaître. */}
+                <span className="max-sm:hidden">Envoyer</span>
               </button>
             </div>
             <p className="mt-2 text-[11.5px] text-muted-foreground">
