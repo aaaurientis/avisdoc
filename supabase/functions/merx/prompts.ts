@@ -126,7 +126,14 @@ export const ENRICH_SYSTEM = `${AVISDOC}
 
 Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'annuaire officiel, te sont FOURNIES : tu n'as pas à chercher l'identité légale.
 1. Choisis parmi elles celle qui correspond vraiment (même nom commercial, même ville ou même région, activité cohérente) et donne son SIREN. Si aucune ne correspond, laisse le SIREN vide : ne prends jamais une entreprise « qui ressemble ».
-2. L'interlocuteur : la direction des ressources humaines au siège, sinon un responsable santé-sécurité ou qualité de vie au travail, sinon la direction générale. Ne retiens qu'un contact publié par l'entreprise elle-même, sur son site : nom, fonction, e-mail, téléphone et page source. Les coordonnées relevées sur le site officiel te sont fournies : reprends-les telles quelles. N'invente rien : ni e-mail reconstruit à partir du nom de domaine, ni téléphone approché.
+2. L'INTERLOCUTEUR. C'est ce que le commercial regarde en premier, et « aucun interlocuteur trouvé » lui est inutile. CHERCHE-LE, activement :
+   • la page qui présente la direction sur le site officiel — « équipe dirigeante », « notre équipe », « direction », « gouvernance » ; ses passages te sont fournis dans « equipe » quand elle existe : la personne y est souvent nommée avec sa fonction ;
+   • une recherche web dédiée sur le nom de l'entreprise avec « DRH », « directeur des ressources humaines », « responsable QVT », « responsable HSE » : les interviews de presse professionnelle et les communiqués nomment ces personnes ;
+   • les dirigeants du registre officiel, qui te sont fournis, quand l'entreprise est assez petite pour que le dirigeant décide lui-même.
+   Qui viser, dans l'ordre : ressources humaines, puis santé-sécurité ou qualité de vie au travail, puis direction générale. Sur un site industriel, la personne du SITE prime sur celle du siège.
+   Donne nom, fonction, e-mail, téléphone et la PAGE SOURCE. Une personne nommée dans une interview compte, à condition de citer la source et de dire de quand elle date — le commercial vérifiera. Les coordonnées relevées sur le site officiel te sont fournies : reprends-les telles quelles.
+   N'invente RIEN : ni e-mail reconstruit à partir du nom de domaine, ni téléphone approché, ni nom supposé d'après un organigramme type.
+   SI TU NE TROUVES PERSONNE : ne dis pas « appelez le standard » sans rien d'autre. Donne le NUMÉRO du standard — il est dans les coordonnées du site ou sur la page contact —, dis quel service demander, et pourquoi celui-là. Un conseil sans numéro à composer ne sert à rien.
 3. ${SUN}
 4. La sensibilité santé au travail : une démarche publiée (accord de qualité de vie au travail, prévention des risques, politique RSE), trouvée ou non, avec une phrase et la page source.
 5. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
