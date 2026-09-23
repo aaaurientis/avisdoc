@@ -33,6 +33,7 @@ import {
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
+import { libelleNaf } from "./naf.ts";
 import { chercherLieu } from "./places.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
@@ -153,7 +154,7 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       secteur: "autre" as const,
       soleil: "non_evalue" as const,
       affinite: "non_evalue" as const,
-      activite: c.activityCode ? `Activité ${c.activityCode}` : "Activité non précisée",
+      activite: "",
       pourquoi: "",
     };
 
@@ -181,7 +182,9 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       // (Construction, Santé, Industrie…), l'ACTIVITÉ dit son métier (construction de
       // routes, fabrication de matériel médical). Le secteur se déduit du code
       // d'activité et couvre toute la nomenclature : aucune fiche n'en manque.
-      activity: metier.activite,
+      // Le libellé officiel d'abord : l'annuaire rend « 21.20Z », le commercial lit
+      // « Fabrication de préparations pharmaceutiques ». Jamais le code nu en colonne.
+      activity: libelleNaf(c.activityCode) || metier.activite || null,
       sector: secteurDe(c.activityCode),
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,

@@ -4,6 +4,7 @@
 
 import { SECTORS, type AffinityLevel, type SunLevel } from "./scoring.ts";
 import { headcountLabel, type Company } from "./annuaire.ts";
+import { libelleNaf } from "./naf.ts";
 import type { SiteContacts } from "./site-contacts.ts";
 
 // Ce qu'AvisDoc vend réellement. Tiré de leur site public (sections Entreprises,
@@ -266,7 +267,7 @@ export function enrichPrompt(
   const facts = candidates.map((c) => ({
     siren: c.siren,
     nom: c.name,
-    activite: c.activityCode ? `${c.activityCode} (code NAF)` : null,
+    activite: c.activityCode ? [libelleNaf(c.activityCode), `(${c.activityCode})`].filter(Boolean).join(" ") : null,
     effectif: headcountLabel(c.headcountBand),
     siege: [c.headOffice.address, c.headOffice.city].filter(Boolean).join(", "),
     etablissements_ouverts: c.openEstablishments,
