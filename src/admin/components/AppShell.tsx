@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
-import { useAuth } from "../auth/AuthContext";
 import { lireArrivee } from "../lib/arrivee";
 import AvisdocLogo from "@/components/AvisdocLogo";
 
@@ -17,7 +16,6 @@ export default function AppShell() {
   const [tiroir, setTiroir] = useState(false);
   const { pathname } = useLocation();
   const naviguer = useNavigate();
-  const { peut } = useAuth();
 
   // On a choisi : le tiroir n'a plus de raison d'être ouvert.
   useEffect(() => setTiroir(false), [pathname]);
@@ -33,7 +31,11 @@ export default function AppShell() {
   useEffect(() => {
     const surTelephone = window.matchMedia("(max-width: 767px)").matches;
     const veutLaDictee = lireArrivee() === "dictee";
-    if (surTelephone && veutLaDictee && (pathname === "/dashboard" || pathname === "/") && peut("merx")) {
+    // On ne vérifie PAS le droit au module ici : les droits arrivent de la base APRÈS
+    // ce premier rendu, et on croyait toujours que l'accès manquait — la redirection
+    // ne partait jamais. Si le droit manque vraiment, la garde de /dictee ramène au
+    // tableau de bord, et cet effet ne se rejoue pas : pas de va-et-vient.
+    if (surTelephone && veutLaDictee && (pathname === "/dashboard" || pathname === "/")) {
       naviguer("/dictee", { replace: true });
     }
     // Au montage seulement : c'est l'arrivée qui nous intéresse, pas les allées et venues.

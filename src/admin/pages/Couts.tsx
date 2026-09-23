@@ -87,10 +87,12 @@ function EnTete({
 
 function Chiffre({ titre, valeur, precision }: { titre: string; valeur: string; precision?: string }) {
   return (
-    <Card className="p-4">
-      <SectionLabel>{titre}</SectionLabel>
-      <div className="mt-1 font-display text-2xl font-semibold text-avisdoc-ink">{valeur}</div>
-      {precision && <div className="mt-0.5 text-[11.5px] text-muted-foreground">{precision}</div>}
+    // Plus compact sur téléphone : à pleine taille, les quatre cartes mangeaient
+    // l'écran et il ne restait rien pour la liste, qui est l'essentiel.
+    <Card className="p-2.5 sm:p-4">
+      <SectionLabel className="text-[10px] sm:text-[11px]">{titre}</SectionLabel>
+      <div className="mt-0.5 font-display text-lg font-semibold text-avisdoc-ink sm:mt-1 sm:text-2xl">{valeur}</div>
+      {precision && <div className="mt-0.5 hidden text-[11.5px] text-muted-foreground sm:block">{precision}</div>}
     </Card>
   );
 }
@@ -244,8 +246,8 @@ export default function Couts() {
       ) : (
         <>
           {/* Les chiffres restent sous les yeux : la liste passe dessous. */}
-          <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border bg-background/95 px-6 pb-3 pt-1 backdrop-blur">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 pb-2.5 pt-1 backdrop-blur sm:-mx-6 sm:px-6 sm:pb-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
               <Chiffre titre="Ce mois-ci" valeur={euroDollar(bilan.mois)} precision="depuis le 1er du mois" />
               <Chiffre titre="Depuis le début" valeur={euroDollar(bilan.total)} precision={`${demandes.length} demande${demandes.length > 1 ? "s" : ""}`} />
               <Chiffre
