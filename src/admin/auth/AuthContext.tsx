@@ -30,6 +30,8 @@ interface AuthValue {
   isSuperAdmin: boolean;
   /** Modules de 1er niveau autorisés (admin_droits ; défaut si non listé). */
   modules: Module[];
+  /** Faux tant que les droits n'ont pas été lus : ne jugez aucun accès avant. */
+  droitsCharges: boolean;
   /** L'utilisateur a-t-il accès à ce module ? (super-admin : toujours oui.) */
   peut: (m: Module) => boolean;
   signIn: () => Promise<void>;
@@ -59,6 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [modules, setModules] = useState<Module[]>(MODULES_DEFAUT);
+  /**
+   * Les droits arrivent de la base APRÈS le premier rendu. Tant qu'ils ne sont pas là,
+   * juger d'un accès revient à le refuser à tort — c'est ce qui renvoyait au tableau de
+   * bord ceux qui avaient bien le droit, et faisait boucler l'aiguillage du téléphone.
+   */
+  const [droitsCharges, setDroitsCharges] = useState(false);
 
   // Hydratation initiale.
   useEffect(() => {
@@ -70,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (raw) {
           setUser(JSON.parse(raw));
           setIsSuperAdmin(true); // en démo, l'écran d'audit est explorable
+          setDroitsCharges(true); // rien à lire en base : on ne fait pas attendre
           setStatus("authenticated");
           return;
         }
@@ -131,15 +140,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       // Modules autorisés (admin_droits) — défaut si l'utilisateur n'est pas
       // listé, ou si la migration 0021 n'est pas encore appliquée.
-      supabaseAdmin
-        .from("admin_droits")
-        .select("modules")
-        .eq("email", email)
-        .maybeSingle()
-        .then(({ data }) => {
+      //
+      // En try/catch plutôt qu'en `.catch` : tout l'écran attend ce drapeau, et une
+      // erreur qui ne serait pas rattrapée laisserait tourner le chargement sans fin.
+      void (async () => {
+        try {
+          const { data } = await supabaseAdmin.from("admin_droits").select("modules").eq("email", email).maybeSingle();
           if (active && data?.modules) setModules(data.modules as Module[]);
-        })
-        .catch(() => { /* table absente → défauts */ });
+        } catch {
+          /* table absente ou réseau : on s'en tient aux modules par défaut */
+        } finally {
+          if (active) setDroitsCharges(true);
+        }
+      })();
     };
 
     supabaseAdmin.auth.getSession().then(({ data }) => void applySession(data.session, false));
@@ -160,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await new Promise((r) => setTimeout(r, 700));
       localStorage.setItem(DEMO_KEY, JSON.stringify(DEMO_USER));
       setUser(DEMO_USER);
+      setDroitsCharges(true);
       setStatus("authenticated");
       return;
     }
@@ -191,11 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthValue>(
     () => ({
-      status, user, error, isSuperAdmin, modules,
+      status, user, error, isSuperAdmin, modules, droitsCharges,
       peut: (m: Module) => isSuperAdmin || modules.includes(m),
       signIn, signOut,
     }),
-    [status, user, error, isSuperAdmin, modules, signIn, signOut],
+    [status, user, error, isSuperAdmin, modules, droitsCharges, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

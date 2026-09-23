@@ -12,6 +12,9 @@ import Sidebar from "./Sidebar";
 import { lireArrivee } from "../lib/arrivee";
 import AvisdocLogo from "@/components/AvisdocLogo";
 
+/** Hors de React : un remontage de la coquille ne doit PAS relancer l'aiguillage. */
+let dejaAiguille = false;
+
 export default function AppShell() {
   const [tiroir, setTiroir] = useState(false);
   const { pathname } = useLocation();
@@ -23,22 +26,19 @@ export default function AppShell() {
   /**
    * Ouvrir le Hub depuis un téléphone mène à la dictée.
    *
-   * L'aiguillage ne peut pas se contenter de l'adresse vide : le téléphone garde
-   * « #/dashboard » en favori ou dans son historique, et on retombait sur le tableau
-   * de bord. On regarde donc où l'on ARRIVE, une seule fois par ouverture — cliquer
-   * ensuite sur « Tableau de bord » y mène normalement.
+   * UNE SEULE FOIS par chargement de page, et le drapeau vit hors de React exprès.
+   * La dictée est hors de la coquille : y aller démonte la coquille, et si la garde
+   * renvoie au tableau de bord — ce qu'elle fait tant que les droits ne sont pas
+   * arrivés de la base — la coquille se remonte et l'aiguillage repartirait. C'est
+   * exactement la boucle qui a rendu l'écran blanc sur téléphone.
    */
   useEffect(() => {
+    if (dejaAiguille) return;
+    dejaAiguille = true;
     const surTelephone = window.matchMedia("(max-width: 767px)").matches;
-    const veutLaDictee = lireArrivee() === "dictee";
-    // On ne vérifie PAS le droit au module ici : les droits arrivent de la base APRÈS
-    // ce premier rendu, et on croyait toujours que l'accès manquait — la redirection
-    // ne partait jamais. Si le droit manque vraiment, la garde de /dictee ramène au
-    // tableau de bord, et cet effet ne se rejoue pas : pas de va-et-vient.
-    if (surTelephone && veutLaDictee && (pathname === "/dashboard" || pathname === "/")) {
+    if (surTelephone && lireArrivee() === "dictee" && (pathname === "/dashboard" || pathname === "/")) {
       naviguer("/dictee", { replace: true });
     }
-    // Au montage seulement : c'est l'arrivée qui nous intéresse, pas les allées et venues.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

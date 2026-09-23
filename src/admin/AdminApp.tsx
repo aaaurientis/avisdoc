@@ -34,7 +34,9 @@ function FullScreenLoader() {
 
 /** Garde d'accès : la page n'est servie que si le module est autorisé. */
 function Garde({ module, children }: { module: Module; children: React.ReactNode }) {
-  const { peut } = useAuth();
+  const { peut, droitsCharges } = useAuth();
+  // Juger avant d'avoir lu les droits, c'est refuser à tort : on attend.
+  if (!droitsCharges) return <FullScreenLoader />;
   if (!peut(module)) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
