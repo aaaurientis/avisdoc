@@ -144,8 +144,12 @@ export default function Merx() {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_440px]">
         {/* ── La conversation ── */}
-        <Card className="flex h-[calc(100dvh-19rem)] min-h-[300px] flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
-          <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        <Card className="flex h-[calc(100dvh-19rem)] min-h-[300px] min-w-0 flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
+          {/* overflow-x-hidden : « overflow-y: auto » rend aussi l'axe horizontal
+              défilable. Il suffisait qu'une réponse de Merx contienne un mot que rien
+              ne casse — une adresse, une référence — pour que la page passe de 375 à
+              859 pixels de large et qu'on doive faire défiler de côté pour lire. */}
+          <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-6">
             {messages.length === 0 && (
               <div className="mx-auto max-w-lg rounded-2xl bg-muted/60 p-6 text-center">
                 <SectionLabel>Par où commencer</SectionLabel>
@@ -158,8 +162,8 @@ export default function Merx() {
                 <div
                   className={
                     m.role === "user"
-                      ? "max-w-[78%] whitespace-pre-wrap rounded-2xl bg-avisdoc-teal px-4 py-3 text-[13.5px] leading-relaxed text-white"
-                      : "max-w-[78%] whitespace-pre-wrap rounded-2xl bg-muted px-4 py-3 text-[13.5px] leading-relaxed text-avisdoc-ink"
+                      ? "max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded-2xl bg-avisdoc-teal px-4 py-3 text-[13.5px] leading-relaxed text-white"
+                      : "max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded-2xl bg-muted px-4 py-3 text-[13.5px] leading-relaxed text-avisdoc-ink"
                   }
                 >
                   {m.content}
