@@ -15,47 +15,58 @@
 //     préférence qui exclut n'est plus une préférence, c'est un filtre déguisé.
 
 import { useState } from "react";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, Plus, Search, X } from "lucide-react";
 import { SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
-/** Les métiers demandés couramment. « Autre » ouvre un champ libre : rien n'est fermé. */
-const METIERS: { groupe: string; valeurs: string[] }[] = [
+/**
+ * Les secteurs d'activité.
+ *
+ * Pas des métiers : « couvreur » ou « terrassier » sont trop fins, il y en a des
+ * centaines et on ne s'y retrouve pas dans un menu. Un secteur suffit à lancer, et
+ * la liste se filtre ensuite sur l'activité précise, colonne par colonne.
+ *
+ * Les secteurs qu'AvisDoc démarche le plus sont en tête ; les autres suivent, car
+ * rien n'interdit de chercher ailleurs.
+ */
+const SECTEURS: { groupe: string; valeurs: string[] }[] = [
   {
-    groupe: "Travail en extérieur",
+    groupe: "Les plus démarchés",
     valeurs: [
       "Travaux publics et BTP",
-      "Terrassement et gros œuvre",
-      "Couverture et étanchéité",
       "Espaces verts et paysagistes",
-      "Agriculture et grandes cultures",
-      "Viticulture et arboriculture",
-      "Exploitation forestière",
-      "Collectivités et services techniques",
+      "Agriculture et viticulture",
+      "Collectivités et administrations",
+      "Beauté et bien-être",
+      "Pharmacie et santé",
     ],
   },
   {
-    groupe: "Santé et beauté",
-    valeurs: [
-      "Instituts de beauté et spas",
-      "Coiffure",
-      "Pharmacies et parapharmacies",
-      "Cabinets médicaux et dermatologie",
-      "Fabrication de matériel médical",
-      "Industrie pharmaceutique et cosmétique",
-      "Salles de sport et bien-être",
-    ],
-  },
-  {
-    groupe: "Autres secteurs",
+    groupe: "Tous les autres secteurs",
     valeurs: [
       "Industrie et fabrication",
-      "Transport et logistique",
       "Commerce et distribution",
+      "Transport et logistique",
       "Hôtellerie et restauration",
+      "Bâtiment second œuvre",
+      "Énergie, eau et déchets",
       "Banque et assurance",
+      "Immobilier",
+      "Services aux entreprises",
+      "Enseignement et formation",
+      "Arts, sport et loisirs",
+      "Services à la personne",
     ],
   },
+];
+
+/** Les zones proposées en suggestion : le champ reste libre, rien n'y est imposé. */
+const ZONES = [
+  "toute la France",
+  "Alsace", "Aquitaine", "Auvergne", "Bourgogne", "Bretagne", "Centre-Val de Loire",
+  "Grand Est", "Hauts-de-France", "Île-de-France", "Normandie", "Nouvelle-Aquitaine",
+  "Occitanie", "Pays de la Loire", "Provence-Alpes-Côte d'Azur", "Auvergne-Rhône-Alpes",
+  "Gironde", "Bas-Rhin", "Haut-Rhin", "Hérault", "Bouches-du-Rhône", "Haute-Garonne",
 ];
 
 /** Les tailles, dites comme un commercial les dit — l'effectif suit entre parenthèses. */
@@ -90,6 +101,35 @@ const POSTES: { valeur: string; label: string }[] = [
   { valeur: "dg", label: "Direction générale" },
 ];
 
+/**
+ * Les marqueurs que le commercial ajoute lui-même.
+ *
+ * La liste livrée ne peut pas tout prévoir : « certifiées MASE », « avec un service
+ * de santé interne », « adhérentes à la fédération ». Chacun garde les siens.
+ *
+ * Gardés sur l'appareil, pas en base : c'est un réglage personnel, il n'a pas à
+ * traverser l'équipe ni à attendre une migration. Un navigateur vidé les oublie, et
+ * ce n'est pas grave — on les retape en cinq secondes.
+ */
+const CLE_PERSOS = "avisdoc.merx.marqueurs";
+
+function lirePersos(): { id: string; label: string; phrase: string }[] {
+  try {
+    const brut = localStorage.getItem(CLE_PERSOS);
+    return brut ? (JSON.parse(brut) as { id: string; label: string; phrase: string }[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function ecrirePersos(liste: { id: string; label: string; phrase: string }[]) {
+  try {
+    localStorage.setItem(CLE_PERSOS, JSON.stringify(liste));
+  } catch {
+    /* navigation privée, stockage plein : le panneau marche quand même */
+  }
+}
+
 const champCls =
   "ad-input w-full rounded-xl border border-border bg-background px-3 py-2 text-[12.5px] outline-none transition-colors focus:border-avisdoc-teal";
 
@@ -101,12 +141,41 @@ export default function PanneauRecherche({
   /** Reçoit la demande rédigée : le reste du chemin ne change pas. */
   onChercher: (demande: string) => void;
 }) {
-  const [metier, setMetier] = useState("");
-  const [metierLibre, setMetierLibre] = useState("");
+  const [secteur, setSecteur] = useState("");
+  const [secteurLibre, setSecteurLibre] = useState("");
   const [ou, setOu] = useState("");
   const [taille, setTaille] = useState("");
   const [poste, setPoste] = useState("");
   const [marqueurs, setMarqueurs] = useState<Set<string>>(new Set());
+  const [persos, setPersos] = useState(lirePersos);
+  const [nouveau, setNouveau] = useState<string | null>(null);
+
+  const tousLesMarqueurs = [...MARQUEURS, ...persos];
+
+  const ajouterMarqueur = () => {
+    const texte = (nouveau ?? "").trim();
+    if (!texte) {
+      setNouveau(null);
+      return;
+    }
+    const ajout = { id: `perso-${Date.now()}`, label: texte, phrase: `en privilégiant : ${texte}` };
+    const liste = [...persos, ajout];
+    setPersos(liste);
+    ecrirePersos(liste);
+    setMarqueurs((avant) => new Set(avant).add(ajout.id));
+    setNouveau(null);
+  };
+
+  const retirerMarqueur = (id: string) => {
+    const liste = persos.filter((m) => m.id !== id);
+    setPersos(liste);
+    ecrirePersos(liste);
+    setMarqueurs((avant) => {
+      const apres = new Set(avant);
+      apres.delete(id);
+      return apres;
+    });
+  };
 
   const basculer = (id: string) =>
     setMarqueurs((avant) => {
@@ -116,7 +185,7 @@ export default function PanneauRecherche({
       return apres;
     });
 
-  const quoi = (metier === "autre" ? metierLibre : metier).trim();
+  const quoi = (secteur === "autre" ? secteurLibre : secteur).trim();
   const pret = quoi.length > 1 && !occupe;
 
   /** La demande, écrite comme le commercial l'aurait dite. */
@@ -126,15 +195,15 @@ export default function PanneauRecherche({
     else morceaux.push("dans toute la France");
     const t = TAILLES.find((x) => x.valeur === taille)?.phrase;
     if (t) morceaux.push(t);
-    for (const m of MARQUEURS) if (marqueurs.has(m.id)) morceaux.push(m.phrase);
+    for (const m of tousLesMarqueurs) if (marqueurs.has(m.id)) morceaux.push(m.phrase);
     const p = POSTES.find((x) => x.valeur === poste);
     if (p?.valeur) morceaux.push(`— interlocuteur à viser : ${p.label.toLowerCase()}`);
     return morceaux.join(" ") + ".";
   };
 
   const vider = () => {
-    setMetier("");
-    setMetierLibre("");
+    setSecteur("");
+    setSecteurLibre("");
     setOu("");
     setTaille("");
     setPoste("");
@@ -152,10 +221,12 @@ export default function PanneauRecherche({
       </div>
 
       <label className="block">
-        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Métier</span>
-        <select value={metier} onChange={(e) => setMetier(e.target.value)} className={cn(champCls, "mt-1")}>
-          <option value="">Choisissez un métier…</option>
-          {METIERS.map((g) => (
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          Secteur d’activité
+        </span>
+        <select value={secteur} onChange={(e) => setSecteur(e.target.value)} className={cn(champCls, "mt-1")}>
+          <option value="">Choisissez un secteur…</option>
+          {SECTEURS.map((g) => (
             <optgroup key={g.groupe} label={g.groupe}>
               {g.valeurs.map((v) => (
                 <option key={v} value={v}>
@@ -168,10 +239,10 @@ export default function PanneauRecherche({
         </select>
       </label>
 
-      {metier === "autre" && (
+      {secteur === "autre" && (
         <input
-          value={metierLibre}
-          onChange={(e) => setMetierLibre(e.target.value)}
+          value={secteurLibre}
+          onChange={(e) => setSecteurLibre(e.target.value)}
           autoFocus
           placeholder="Fabricants de feux d’artifice, scieries, garages…"
           className={champCls}
@@ -179,13 +250,21 @@ export default function PanneauRecherche({
       )}
 
       <label className="block">
-        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Où</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          Région, département ou pays
+        </span>
         <input
           value={ou}
           onChange={(e) => setOu(e.target.value)}
-          placeholder="Bas-Rhin, Alsace, Gironde… vide = toute la France"
+          list="zones-merx"
+          placeholder="Vide = toute la France"
           className={cn(champCls, "mt-1")}
         />
+        <datalist id="zones-merx">
+          {ZONES.map((z) => (
+            <option key={z} value={z} />
+          ))}
+        </datalist>
       </label>
 
       <label className="block">
@@ -217,25 +296,67 @@ export default function PanneauRecherche({
           Ce qu’on préfère
         </span>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {MARQUEURS.map((m) => {
+          {tousLesMarqueurs.map((m) => {
             const actif = marqueurs.has(m.id);
+            const perso = m.id.startsWith("perso-");
             return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => basculer(m.id)}
-                aria-pressed={actif}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-[11.5px] font-bold transition-colors",
-                  actif
-                    ? "border-avisdoc-teal bg-avisdoc-teal text-white"
-                    : "border-border text-muted-foreground hover:border-avisdoc-teal hover:text-avisdoc-ink",
+              <span key={m.id} className="inline-flex items-center">
+                <button
+                  type="button"
+                  onClick={() => basculer(m.id)}
+                  aria-pressed={actif}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[11.5px] font-bold transition-colors",
+                    actif
+                      ? "border-avisdoc-teal bg-avisdoc-teal text-white"
+                      : "border-border text-muted-foreground hover:border-avisdoc-teal hover:text-avisdoc-ink",
+                    perso && "rounded-r-none border-r-0",
+                  )}
+                >
+                  {m.label}
+                </button>
+                {perso && (
+                  <button
+                    type="button"
+                    onClick={() => retirerMarqueur(m.id)}
+                    aria-label={`Retirer « ${m.label} »`}
+                    title="Retirer ce bouton"
+                    className={cn(
+                      "rounded-full rounded-l-none border border-l-0 py-1.5 pl-1 pr-2.5 transition-colors",
+                      actif
+                        ? "border-avisdoc-teal bg-avisdoc-teal text-white/80 hover:text-white"
+                        : "border-border text-muted-foreground hover:text-rose-600",
+                    )}
+                  >
+                    <X className="size-3" />
+                  </button>
                 )}
-              >
-                {m.label}
-              </button>
+              </span>
             );
           })}
+
+          {nouveau === null ? (
+            <button
+              type="button"
+              onClick={() => setNouveau("")}
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-[11.5px] font-bold text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
+            >
+              <Plus className="size-3" /> Ajouter
+            </button>
+          ) : (
+            <input
+              value={nouveau}
+              onChange={(e) => setNouveau(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") ajouterMarqueur();
+                if (e.key === "Escape") setNouveau(null);
+              }}
+              onBlur={ajouterMarqueur}
+              autoFocus
+              placeholder="Certifiées MASE, service de santé interne…"
+              className="rounded-full border border-avisdoc-teal bg-background px-3 py-1.5 text-[11.5px] outline-none"
+            />
+          )}
         </div>
       </div>
 
