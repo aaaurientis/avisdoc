@@ -8,11 +8,12 @@
 // fonction (jetons lus, jetons écrits, recherches web), multipliée par les tarifs relevés.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { coutDe, euroDollar, MODELES_ACTUELS, MODELE_PAR_DEFAUT, NOM_MODELE, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
 import { calculerCap, type DemandeBrute, type FicheBrute } from "../lib/cap";
+import { useActualisation } from "../lib/actualisation";
 import { cn } from "@/lib/utils";
 
 interface Demande {
@@ -108,6 +109,10 @@ export default function Couts() {
     void charger();
   }, [charger]);
 
+  // Une recherche met deux minutes : l'écran regarde où elle en est plutôt que
+  // d'attendre qu'on clique.
+  useActualisation(charger, demandes.some((d) => d.status === "en_cours" || d.status === "en_attente"));
+
   const bilan = useMemo(() => {
     const debutDuMois = new Date();
     debutDuMois.setDate(1);
@@ -163,15 +168,6 @@ export default function Couts() {
       <PageHeader
         title="CAP"
         subtitle="Coût d’acquisition par prospect — ce que chaque entreprise a réellement coûté"
-        action={
-          <button
-            type="button"
-            onClick={() => void charger()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-          >
-            <RefreshCw className="size-4" /> Actualiser
-          </button>
-        }
       />
 
       {erreur && <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">{erreur}</div>}
