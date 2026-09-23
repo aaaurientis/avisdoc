@@ -44,6 +44,25 @@ function messageErreur(brut: string): string {
     : brut;
 }
 
+/**
+ * Quand la fiche est arrivée.
+ *
+ * L'heure pour celles du jour : après une recherche qui en rend cent cinquante, on
+ * ne retrouvait pas les quinze qui viennent d'arriver au milieu des autres. La date
+ * seule ne suffit pas quand tout porte la même.
+ */
+function quandArrivee(iso: string): string {
+  const d = new Date(iso);
+  const aujourdhui = new Date();
+  const memeJour =
+    d.getDate() === aujourdhui.getDate() &&
+    d.getMonth() === aujourdhui.getMonth() &&
+    d.getFullYear() === aujourdhui.getFullYear();
+  return memeJour
+    ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+}
+
 /** Les colonnes sur lesquelles on peut trier. */
 type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "approfondie";
 
@@ -500,7 +519,7 @@ export default function Prospects() {
                     <CaseFiche cochee={coches.has(p.id)} onBascule={() => cocher(p.id)} libelle={p.name} visible={coches.size > 0} />
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[12.5px] text-muted-foreground">
-                    {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                    {quandArrivee(p.created_at)}
                   </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold text-avisdoc-ink">
                     {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}

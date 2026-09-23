@@ -52,9 +52,18 @@ export default function Merx() {
       .select("id, title, messages, updated_at")
       .order("updated_at", { ascending: false })
       .limit(30);
-    setHistorique((convs ?? []) as Conversation[]);
+    const liste = (convs ?? []) as Conversation[];
+    setHistorique(liste);
 
-    const { data: demandes } = await supabaseAdmin.from("admin_merx_demandes").select("request").eq("kind", "recherche");
+    // On reprend la dernière conversation là où elle en était. Quitter l'écran pour
+    // aller voir ses fiches et revenir sur une page blanche, c'est perdre le fil de
+    // ce qu'on était en train de préparer. Seul « Nouvelle conversation » repart de zéro.
+    setConversation((ouverte) => {
+      if (ouverte) return ouverte;
+      const derniere = liste[0];
+      if (derniere) setMessages((derniere.messages ?? []) as Message[]);
+      return derniere ?? null;
+    });
   }, []);
 
   useEffect(() => {
@@ -240,15 +249,18 @@ export default function Merx() {
 
         <div
           className={cn(
-            "flex flex-col gap-3 max-sm:min-h-0 sm:h-[calc(100vh-13rem)] sm:min-h-[420px]",
+            // Le bouton « Chercher » débordait sur les conversations : le panneau est
+            // plus haut que la place disponible. La colonne défile donc d'un bloc, et
+            // chaque carte garde sa hauteur naturelle.
+            "flex flex-col gap-3 max-sm:min-h-0 sm:h-[calc(100vh-13rem)] sm:min-h-[420px] sm:overflow-y-auto sm:pr-1",
             !panneauOuvert && "max-sm:hidden",
           )}
         >
-          <Card className="flex min-h-0 flex-col p-4">
+          <Card className="shrink-0 p-4">
             <PanneauRecherche occupe={occupe} onChercher={(demande) => void envoyer(demande)} />
           </Card>
 
-          <Card className="flex min-h-[124px] flex-1 flex-col overflow-hidden p-4">
+          <Card className="flex min-h-[140px] shrink-0 flex-col p-4">
             <SectionLabel>Vos conversations</SectionLabel>
             <div className="mt-2 flex-1 space-y-1 overflow-y-auto">
               {historique.length === 0 && (
