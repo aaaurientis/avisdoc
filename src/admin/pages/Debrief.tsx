@@ -21,6 +21,7 @@ import {
   enregistrer,
   lireDebrief,
   toutRetenir,
+  transcrireNote,
   type EntrepriseVue,
   type Extraction,
   type Retenu,
@@ -201,6 +202,8 @@ export default function Debrief() {
   const [envoi, setEnvoi] = useState(false);
   const [passes, setPasses] = useState<Passe[]>([]);
   const [ecoute, setEcoute] = useState<string | null>(null);
+  /** L'identifiant de la note en cours de transcription : le bouton doit le dire. */
+  const [enTranscription, setEnTranscription] = useState<string | null>(null);
 
   /** Ce qu'on a déjà raconté : dicté comme écrit, les deux vivent dans la même table. */
   const chargerPasses = useCallback(async () => {
@@ -218,6 +221,28 @@ export default function Debrief() {
 
   // Une transcription se termine au loin : l'écran suit sans qu'on clique.
   useActualisation(chargerPasses, passes.some((n) => n.statut === "recue"));
+
+  /**
+   * Reprend une note dictée : on la transcrit, et son texte remplit la zone de saisie.
+   * Le commercial peut alors le corriger avant de lancer le tri — une transcription se
+   * trompe sur les noms propres, et on ne range pas une erreur d'oreille sans la voir.
+   */
+  const reprendre = async (n: Passe) => {
+    if (enTranscription) return;
+    setEnTranscription(n.id);
+    try {
+      const texteDit = await transcrireNote(n.id);
+      setTexte(texteDit);
+      setMode("texte");
+      await chargerPasses();
+      toast.success("Transcription faite : relisez-la, puis lancez le tri.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "La transcription a échoué.");
+      await chargerPasses();
+    } finally {
+      setEnTranscription(null);
+    }
+  };
 
   const ecouter = async (n: Passe) => {
     if (!n.audio_path) return;
@@ -299,6 +324,19 @@ export default function Debrief() {
                     className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
                   >
                     <Play className="size-3.5" /> Réécouter
+                  </button>
+                )}
+                {/* Une note en attente ou en échec se reprend d'ici : on transcrit, puis
+                    le texte arrive dans la zone de saisie, où Merx le trie comme le reste. */}
+                {n.audio_path && n.statut !== "classee" && (
+                  <button
+                    type="button"
+                    disabled={enTranscription === n.id}
+                    onClick={() => void reprendre(n)}
+                    className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
+                  >
+                    {enTranscription === n.id ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    {enTranscription === n.id ? "Transcription…" : n.statut === "echec" ? "Réessayer" : "Transcrire"}
                   </button>
                 )}
               </div>
