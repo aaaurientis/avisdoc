@@ -45,22 +45,18 @@ function messageErreur(brut: string): string {
 }
 
 /**
- * Quand la fiche est arrivée.
+ * Quand la fiche est arrivée : la date, puis l'heure en dessous.
  *
- * L'heure pour celles du jour : après une recherche qui en rend cent cinquante, on
- * ne retrouvait pas les quinze qui viennent d'arriver au milieu des autres. La date
- * seule ne suffit pas quand tout porte la même.
+ * Les deux, toujours. La date situe, l'heure distingue : après une recherche qui
+ * rend cent cinquante fiches, elles portent toutes la même date et l'on ne retrouve
+ * plus les quinze qui viennent d'arriver.
  */
-function quandArrivee(iso: string): string {
+function quandArrivee(iso: string): { date: string; heure: string } {
   const d = new Date(iso);
-  const aujourdhui = new Date();
-  const memeJour =
-    d.getDate() === aujourdhui.getDate() &&
-    d.getMonth() === aujourdhui.getMonth() &&
-    d.getFullYear() === aujourdhui.getFullYear();
-  return memeJour
-    ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  return {
+    date: d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
+    heure: d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+  };
 }
 
 /** Les colonnes sur lesquelles on peut trier. */
@@ -519,7 +515,8 @@ export default function Prospects() {
                     <CaseFiche cochee={coches.has(p.id)} onBascule={() => cocher(p.id)} libelle={p.name} visible={coches.size > 0} />
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[12.5px] text-muted-foreground">
-                    {quandArrivee(p.created_at)}
+                    <span className="block">{quandArrivee(p.created_at).date}</span>
+                    <span className="block text-[11px] opacity-70">{quandArrivee(p.created_at).heure}</span>
                   </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold text-avisdoc-ink">
                     {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}
