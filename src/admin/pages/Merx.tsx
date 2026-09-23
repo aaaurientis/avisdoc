@@ -1,10 +1,13 @@
 // Merx — l’agent commercial de prospection.
 // La conversation au centre ; à droite, les pistes à explorer (modifiables) et l’historique.
+// Sur un téléphone, ces deux-là passent sous la conversation et se replient : dépliés,
+// ils ajoutaient 566 pixels sous l’écran et obligeaient à faire défiler la page entière
+// avant d’atteindre la conversation, qui a déjà son propre défilement.
 // Quand le commercial demande de chercher, Merx lance une recherche puis écrit lui-même son
 // résultat dans le fil. Les fiches trouvées partent dans Prospection.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, MessageSquare, Play, Plus, Search, Send } from "lucide-react";
+import { ChevronDown, Lightbulb, Loader2, MessageSquare, Play, Plus, Search, Send } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
@@ -126,6 +129,11 @@ export default function Merx() {
 
   const occupe = envoiEnCours || rechercheEnCours;
 
+  // Replié par défaut sur un téléphone : on ouvre Merx pour lui parler, pas pour
+  // parcourir des pistes. Sur grand écran, ce réglage ne sert à rien — le panneau
+  // est toujours visible, à droite.
+  const [panneauOuvert, setPanneauOuvert] = useState(false);
+
   return (
     <div>
       <PageHeader
@@ -144,14 +152,14 @@ export default function Merx() {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_440px]">
         {/* ── La conversation ── */}
-        <Card className="flex h-[calc(100dvh-19rem)] min-h-[300px] min-w-0 flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
+        <Card className="flex h-[calc(100dvh-20rem)] min-h-[300px] min-w-0 flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
           {/* overflow-x-hidden : « overflow-y: auto » rend aussi l'axe horizontal
               défilable. Il suffisait qu'une réponse de Merx contienne un mot que rien
               ne casse — une adresse, une référence — pour que la page passe de 375 à
               859 pixels de large et qu'on doive faire défiler de côté pour lire. */}
-          <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-6">
+          <div className="min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
             {messages.length === 0 && (
-              <div className="mx-auto max-w-lg rounded-2xl bg-muted/60 p-6 text-center">
+              <div className="mx-auto max-w-lg rounded-2xl bg-muted/60 p-4 text-center sm:p-6">
                 <SectionLabel>Par où commencer</SectionLabel>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{ACCUEIL}</p>
               </div>
@@ -185,7 +193,7 @@ export default function Merx() {
             <div ref={finRef} />
           </div>
 
-          <div className="border-t border-border p-4">
+          <div className="border-t border-border p-3 sm:p-4">
             <div className="flex items-end gap-2">
               <textarea
                 value={saisie}
@@ -199,7 +207,7 @@ export default function Merx() {
                 rows={2}
                 placeholder="Des entreprises de travaux publics en Gironde…"
                 disabled={occupe}
-                className="min-h-[52px] flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-avisdoc-teal disabled:opacity-60"
+                className="min-h-[52px] min-w-0 flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-avisdoc-teal disabled:opacity-60 sm:px-4"
               />
               {/* Au volant, on ne tape pas : on appuie, on parle, on relit. */}
               <BoutonMicro onTexte={(t) => setSaisie((avant) => (avant.trim() ? `${avant.trim()} ${t}` : t))} />
@@ -222,7 +230,28 @@ export default function Merx() {
         </Card>
 
         {/* ── Pistes et historique ── */}
-        <div className="flex flex-col gap-3 max-sm:min-h-0 sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
+        {/* « hidden » retire l'élément de la grille : à partir de sm, la mise en page
+            à deux colonnes retrouve exactement ses deux enfants. */}
+        <button
+          type="button"
+          onClick={() => setPanneauOuvert((o) => !o)}
+          aria-expanded={panneauOuvert}
+          className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-[13px] font-bold text-avisdoc-ink sm:hidden"
+        >
+          <Lightbulb className="size-4 shrink-0 text-avisdoc-teal" />
+          <span className="min-w-0 flex-1 truncate text-left">
+            Pistes et conversations
+            {propositions.length > 0 && <span className="text-muted-foreground"> ({propositions.length})</span>}
+          </span>
+          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", panneauOuvert && "rotate-180")} />
+        </button>
+
+        <div
+          className={cn(
+            "flex flex-col gap-3 max-sm:min-h-0 sm:h-[calc(100vh-13rem)] sm:min-h-[420px]",
+            !panneauOuvert && "max-sm:hidden",
+          )}
+        >
           <Card className="flex min-h-0 flex-col p-4">
             <SectionLabel>Pistes à explorer</SectionLabel>
             <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
@@ -233,7 +262,14 @@ export default function Merx() {
                 <p className="text-[12.5px] text-muted-foreground">Tous les croisements ont été explorés — écrivez votre propre demande.</p>
               )}
               {propositions.map((piste, i) => (
-                <PisteModifiable key={piste} piste={piste} occupe={occupe} onLancer={(t) => void envoyer(t)} index={i} />
+                <PisteModifiable
+                  key={piste}
+                  piste={piste}
+                  occupe={occupe}
+                  onLancer={(t) => void envoyer(t)}
+                  index={i}
+                  visible={panneauOuvert}
+                />
               ))}
             </div>
           </Card>
@@ -277,21 +313,39 @@ function PisteModifiable({
   index,
   occupe,
   onLancer,
+  visible,
 }: {
   piste: string;
   index: number;
   occupe: boolean;
   onLancer: (texte: string) => void;
+  /** Sur téléphone, le panneau est replié en CSS : le champ existe mais n'a pas de
+      taille, et se régler à ce moment-là le figeait à huit pixels. */
+  visible: boolean;
 }) {
   const [texte, setTexte] = useState(piste);
+  const champ = useRef<HTMLTextAreaElement>(null);
+
+  // Deux lignes suffisent sur un écran large ; sur 343 pixels, la même piste en prend
+  // trois et la fin disparaissait dans un champ qu'il fallait faire défiler. Le champ
+  // se règle donc sur son texte — y compris pendant qu'on le corrige, et au moment où
+  // le panneau s'ouvre, seul instant où l'on connaît sa vraie taille sur téléphone.
+  useEffect(() => {
+    const el = champ.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [texte, visible]);
+
   return (
     <div className="flex items-center gap-2 rounded-xl border border-border p-2">
       <textarea
+        ref={champ}
         value={texte}
         onChange={(e) => setTexte(e.target.value)}
         rows={2}
         aria-label={`Piste ${index + 1}`}
-        className="min-w-0 flex-1 resize-none rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] leading-snug text-avisdoc-ink outline-none"
+        className="min-w-0 flex-1 resize-none overflow-hidden rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] leading-snug text-avisdoc-ink outline-none"
       />
       <button
         type="button"
