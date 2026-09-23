@@ -12,11 +12,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, Check, Loader2, Mic, PenLine, Play, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Loader2, Mic, PenLine, Play, Sparkles, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
 import BoutonRetour from "../components/BoutonRetour";
+import { confirmer } from "../components/Confirmation";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useActualisation } from "../lib/actualisation";
 import { OU_TROUVER, traiterDebrief, transcrireNote, type Bilan } from "../lib/debrief";
@@ -228,6 +229,35 @@ export default function Debrief() {
     })();
   }, [passes, enCours, ranger, chargerPasses]);
 
+  /**
+   * Retirer une note.
+   *
+   * L'enregistrement part avec elle : une voix gardée sur un serveur sans raison n'a
+   * rien à y faire. Ce que Merx en avait tiré — la fiche créée, les actions, la ligne
+   * d'historique — reste en place : ce sont des faits qui ont leur vie propre, et les
+   * effacer d'un coup ferait plus de dégâts que de bien. On le dit clairement.
+   */
+  const supprimer = async (n: Passe) => {
+    const ok = await confirmer({
+      titre: "Supprimer cette note ?",
+      message:
+        "L’enregistrement sera effacé définitivement. Ce que Merx en a rangé — la fiche, les actions, l’historique — reste en place.",
+      action: "Supprimer",
+      definitif: true,
+    });
+    if (!ok) return;
+    try {
+      if (n.audio_path) await supabaseAdmin.storage.from("admin-dictee").remove([n.audio_path]);
+      const { error } = await supabaseAdmin.from("admin_notes_dictees").delete().eq("id", n.id);
+      if (error) throw new Error(error.message);
+      traitees.current.delete(n.id);
+      await chargerPasses();
+      toast.success("Note supprimée.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "La note n’a pas pu être supprimée.");
+    }
+  };
+
   const ecouter = async (n: Passe) => {
     if (!n.audio_path) return;
     const { data, error } = await supabaseAdmin.storage.from("admin-dictee").createSignedUrl(n.audio_path, 3600);
@@ -370,6 +400,16 @@ export default function Debrief() {
                     <Play className="size-3.5" /> Réécouter
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => void supprimer(n)}
+                  aria-label={`Supprimer ${titreDe(n)}`}
+                  title="Supprimer cette note"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+
                 {/* Une note en échec se reprend ; une note rangée, jamais. */}
                 {n.statut === "echec" && (
                   <button

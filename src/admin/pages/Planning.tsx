@@ -226,14 +226,14 @@ export default function Planning() {
                                 {NOMS[a.kind]}
                               </span>
                             </span>
-                            <span className="mt-1 block line-clamp-2 text-[13px] font-semibold leading-snug text-avisdoc-ink">
+                            <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[13px] font-semibold leading-snug text-avisdoc-ink">
                               {a.titre}
                             </span>
-                            <span className="mt-1 block line-clamp-2 text-[12px] font-semibold leading-snug text-avisdoc-teal">
+                            <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[12px] font-semibold leading-snug text-avisdoc-teal">
                               {a.fiche}
                             </span>
                             {a.detail && (
-                              <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
+                              <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
                             )}
 
                           </span>
