@@ -230,31 +230,30 @@ export default function Debrief() {
   }, [passes, enCours, ranger, chargerPasses]);
 
   /**
-   * Retirer une note.
+   * Effacer l'enregistrement, garder ce qui a été dit.
    *
-   * L'enregistrement part avec elle : une voix gardée sur un serveur sans raison n'a
-   * rien à y faire. Ce que Merx en avait tiré — la fiche créée, les actions, la ligne
-   * d'historique — reste en place : ce sont des faits qui ont leur vie propre, et les
-   * effacer d'un coup ferait plus de dégâts que de bien. On le dit clairement.
+   * C'est la voix qui pèse et qui est sensible, pas le texte. On l'efface du coffre et
+   * la ligne reste, avec sa transcription : on sait toujours ce qu'on a raconté ce
+   * jour-là et où c'est parti. Ce que Merx en avait tiré — la fiche, les actions,
+   * l'historique — ne bouge pas non plus : ce sont des faits qui ont leur vie propre.
    */
-  const supprimer = async (n: Passe) => {
+  const effacerLaVoix = async (n: Passe) => {
     const ok = await confirmer({
-      titre: "Supprimer cette note ?",
+      titre: "Effacer l’enregistrement ?",
       message:
-        "L’enregistrement sera effacé définitivement. Ce que Merx en a rangé — la fiche, les actions, l’historique — reste en place.",
-      action: "Supprimer",
+        "La voix sera supprimée définitivement du coffre. Ce que vous avez dit reste écrit, et ce que Merx en a rangé ne bouge pas.",
+      action: "Effacer l’enregistrement",
       definitif: true,
     });
     if (!ok) return;
     try {
       if (n.audio_path) await supabaseAdmin.storage.from("admin-dictee").remove([n.audio_path]);
-      const { error } = await supabaseAdmin.from("admin_notes_dictees").delete().eq("id", n.id);
+      const { error } = await supabaseAdmin.from("admin_notes_dictees").update({ audio_path: null }).eq("id", n.id);
       if (error) throw new Error(error.message);
-      traitees.current.delete(n.id);
       await chargerPasses();
-      toast.success("Note supprimée.");
+      toast.success("Enregistrement effacé. Le texte est conservé.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "La note n’a pas pu être supprimée.");
+      toast.error(e instanceof Error ? e.message : "L’enregistrement n’a pas pu être effacé.");
     }
   };
 
@@ -400,15 +399,17 @@ export default function Debrief() {
                     <Play className="size-3.5" /> Réécouter
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void supprimer(n)}
-                  aria-label={`Supprimer ${titreDe(n)}`}
-                  title="Supprimer cette note"
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                {n.audio_path && (
+                  <button
+                    type="button"
+                    onClick={() => void effacerLaVoix(n)}
+                    aria-label={`Effacer l’enregistrement de ${titreDe(n)}`}
+                    title="Effacer l’enregistrement, garder le texte"
+                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
 
                 {/* Une note en échec se reprend ; une note rangée, jamais. */}
                 {n.statut === "echec" && (
