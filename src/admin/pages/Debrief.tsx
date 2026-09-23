@@ -44,11 +44,23 @@ interface Passe {
  */
 function titreDe(n: Passe): string {
   if (n.titre?.trim()) return n.titre;
-  const e = n.extraction as { lecture?: { entreprises?: { entreprise?: string }[] }; entreprises?: { entreprise?: string }[] } | null;
+
+  type Vue = { entreprise?: string; a_creer?: string; fiche_type?: string };
+  const e = n.extraction as { lecture?: { entreprises?: Vue[] }; entreprises?: Vue[] } | null;
   const liste = e?.lecture?.entreprises ?? e?.entreprises ?? [];
-  const noms = liste.map((x) => x?.entreprise).filter(Boolean) as string[];
-  if (noms.length > 0) return noms.join(" · ");
-  return n.audio_path ? "Débrief dicté" : "Débrief écrit";
+
+  // La destination se déduit de ce que Merx avait décidé : l'endroit où il allait la
+  // créer, ou celui de la fiche qu'il avait reconnue. Sans elle, on lit un nom sans
+  // savoir où le retrouver — ce qui ne vaut guère mieux que « Débrief dicté ».
+  const bouts = liste
+    .filter((x) => x?.entreprise)
+    .map((x) => {
+      const ou = OU_TROUVER[x.a_creer || x.fiche_type || ""]?.ecran;
+      return ou ? `${x.entreprise} → ${ou}` : (x.entreprise as string);
+    });
+
+  if (bouts.length === 0) return n.audio_path ? "Débrief dicté" : "Débrief écrit";
+  return bouts.length <= 3 ? bouts.join(" · ") : `${bouts.slice(0, 3).join(" · ")} et ${bouts.length - 3} autre${bouts.length - 3 > 1 ? "s" : ""}`;
 }
 
 const chrono = (s: number | null) => (s == null ? "—" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
