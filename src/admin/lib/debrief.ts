@@ -69,6 +69,22 @@ export function compte(r: Retenu): number {
   );
 }
 
+/**
+ * Transcrit une note dictée, et rend son texte.
+ *
+ * L'appel est long — dix minutes d'audio traversent le réseau puis se transcrivent —
+ * mais il n'écrit rien d'autre que la transcription sur la note : le tri par Merx et
+ * la validation restent des étapes distinctes.
+ */
+export async function transcrireNote(noteId: string): Promise<string> {
+  const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "transcrire", noteId } });
+  if (error) throw new Error(error.message);
+  const r = data as { transcription?: string; error?: string };
+  if (r.error) throw new Error(r.error);
+  if (!r.transcription) throw new Error("La transcription est revenue vide.");
+  return r.transcription;
+}
+
 /** Demande à Merx de trier un débrief. Rien n'est écrit : il rend seulement sa lecture. */
 export async function lireDebrief(texte: string): Promise<Extraction> {
   const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "debrief", texte } });

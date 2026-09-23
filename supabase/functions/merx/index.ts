@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
+import { transcrire } from "./transcription.ts";
 import { complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
   CHAT_SYSTEM,
@@ -244,6 +245,41 @@ Deno.serve(async (req: Request) => {
             .eq("id", demande.id);
         }
         return json({ error: "Le brouillon n'a pas pu être écrit. Vous pouvez réessayer." }, 500);
+      }
+    }
+
+    // ── Transcrire une note dictée ───────────────────────────────────────
+    if (body.action === "transcrire") {
+      if (!body.noteId) return json({ error: "Note non précisée." }, 400);
+      const cle = Deno.env.get("OPENAI_API_KEY");
+      if (!cle) return json({ error: "La clé de transcription n'est pas configurée sur le projet." }, 500);
+
+      const { data: note } = await sb
+        .from("admin_notes_dictees")
+        .select("id, audio_path, statut, transcription")
+        .eq("id", body.noteId)
+        .maybeSingle();
+      if (!note) return json({ error: "Note introuvable." }, 404);
+      // Déjà faite : on rend ce qu'on a plutôt que de repayer une transcription.
+      if (note.transcription) return json({ transcription: note.transcription, deja: true });
+      if (!note.audio_path) return json({ error: "Cette note n'a pas d'enregistrement." }, 400);
+
+      try {
+        const { data: fichier, error: erreurFichier } = await sb.storage.from("admin-dictee").download(note.audio_path as string);
+        if (erreurFichier || !fichier) throw new Error("L'enregistrement n'a pas pu être lu.");
+
+        const texte = await transcrire(fichier, cle);
+        await sb
+          .from("admin_notes_dictees")
+          .update({ transcription: texte, statut: "transcrite", message: null })
+          .eq("id", note.id);
+        return json({ transcription: texte });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        // Le motif est gardé sur la note : le commercial doit savoir pourquoi, et
+        // décider s'il redicte ou s'il réessaie.
+        await sb.from("admin_notes_dictees").update({ statut: "echec", message }).eq("id", note.id);
+        return json({ error: message }, 500);
       }
     }
 
