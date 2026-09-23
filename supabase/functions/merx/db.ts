@@ -142,20 +142,31 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
   for (const p of prospects) {
     if (dejaConnue(p.name, p.city, null)) continue;
     connus.push({ nom: nu(p.name), ville: nu(p.city ?? ""), siren: "" });
-    const { error } = await sb.from("admin_prospects").insert({
+    const ligne = (secteur: string) => ({
       found_by: demandeId,
       owner_email: owner,
       name: p.name,
       city: p.city,
       department: p.department,
       activity: p.activity,
-      sector: secteurSur(p.sector),
+      sector: secteur,
       website: p.website,
       rationale: p.rationale,
       sources: p.sources,
       score: p.score,
       score_total: p.scoreTotal,
     });
+
+    let { error } = await sb.from("admin_prospects").insert(ligne(secteurSur(p.sector)));
+
+    // La base peut encore porter l'ancienne liste fermée de secteurs (migration 0041
+    // non collée). Plutôt que de perdre la fiche — et avec elle toute la recherche —,
+    // on la range dans « autre » et on réessaie. Une étiquette approximative vaut
+    // infiniment mieux qu'une entreprise qui n'apparaît jamais.
+    if (error && /sector/i.test(error.message)) {
+      ({ error } = await sb.from("admin_prospects").insert(ligne("autre")));
+    }
+
     // Une fiche créée entre-temps par une autre recherche : ce n'est pas une erreur.
     if (error && !/duplicate key|unique constraint/i.test(error.message)) throw new Error(error.message);
     if (!error) ajoutes++;
