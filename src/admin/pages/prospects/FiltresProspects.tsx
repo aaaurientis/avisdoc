@@ -25,11 +25,20 @@ const SALARIES: { valeur: string; label: string; bandes: string[] }[] = [
   { valeur: "inconnu", label: "Non renseigné", bandes: [] },
 ];
 
-const ARRIVEE: { valeur: string; label: string; jours: number }[] = [
-  { valeur: "1", label: "Aujourd’hui", jours: 1 },
-  { valeur: "7", label: "7 derniers jours", jours: 7 },
-  { valeur: "30", label: "30 derniers jours", jours: 30 },
-  { valeur: "90", label: "3 derniers mois", jours: 90 },
+/**
+ * Deux façons de lire une date d'arrivée.
+ *
+ * « récent » sert à voir ce qui vient d'arriver ; « ancien » sert à retrouver ce
+ * qu'on a laissé dormir. Une fiche de plus de trois mois qu'on n'a jamais appelée
+ * est au moins aussi intéressante qu'une fiche du jour.
+ */
+const ARRIVEE: { valeur: string; label: string; jours: number; sens: "recent" | "ancien" }[] = [
+  { valeur: "1", label: "Aujourd’hui", jours: 1, sens: "recent" },
+  { valeur: "7", label: "7 derniers jours", jours: 7, sens: "recent" },
+  { valeur: "30", label: "30 derniers jours", jours: 30, sens: "recent" },
+  { valeur: "90", label: "3 derniers mois", jours: 90, sens: "recent" },
+  { valeur: "+30", label: "Plus de 30 jours", jours: 30, sens: "ancien" },
+  { valeur: "+90", label: "Plus de 3 mois", jours: 90, sens: "ancien" },
 ];
 
 /** Applique les filtres et la recherche à une fiche. */
@@ -46,9 +55,13 @@ export function retenue(p: Prospect, f: Filtres, recherche: string): boolean {
   }
 
   if (f.arrivee) {
-    const jours = ARRIVEE.find((a) => a.valeur === f.arrivee)?.jours ?? 0;
-    const limite = Date.now() - jours * 24 * 3600 * 1000;
-    if (new Date(p.created_at).getTime() < limite) return false;
+    const choix = ARRIVEE.find((a) => a.valeur === f.arrivee);
+    if (choix) {
+      const limite = Date.now() - choix.jours * 24 * 3600 * 1000;
+      const arrivee = new Date(p.created_at).getTime();
+      // « récent » garde ce qui est APRÈS la limite, « ancien » ce qui est avant.
+      if (choix.sens === "recent" ? arrivee < limite : arrivee >= limite) return false;
+    }
   }
 
   if (f.email === "avec" && !p.contact_email) return false;
