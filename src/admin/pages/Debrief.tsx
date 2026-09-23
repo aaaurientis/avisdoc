@@ -31,7 +31,24 @@ interface Passe {
   message: string | null;
   titre: string | null;
   transcription: string | null;
+  extraction: unknown;
   created_at: string;
+}
+
+/**
+ * Ce qu'on affiche pour une note déjà rangée.
+ *
+ * Le titre porte le résumé depuis le 23/09 ; les notes d'avant ne l'ont pas, alors on
+ * le reconstruit depuis ce que Merx avait lu — « Débrief dicté » ne disait rien de ce
+ * qui avait été rangé, ni où.
+ */
+function titreDe(n: Passe): string {
+  if (n.titre?.trim()) return n.titre;
+  const e = n.extraction as { lecture?: { entreprises?: { entreprise?: string }[] }; entreprises?: { entreprise?: string }[] } | null;
+  const liste = e?.lecture?.entreprises ?? e?.entreprises ?? [];
+  const noms = liste.map((x) => x?.entreprise).filter(Boolean) as string[];
+  if (noms.length > 0) return noms.join(" · ");
+  return n.audio_path ? "Débrief dicté" : "Débrief écrit";
 }
 
 const chrono = (s: number | null) => (s == null ? "—" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
@@ -142,7 +159,7 @@ export default function Debrief() {
   const chargerPasses = useCallback(async () => {
     const { data } = await supabaseAdmin
       .from("admin_notes_dictees")
-      .select("id, audio_path, duree_s, statut, message, titre, transcription, created_at")
+      .select("id, audio_path, duree_s, statut, message, titre, transcription, extraction, created_at")
       .order("created_at", { ascending: false })
       .limit(20);
     setPasses((data ?? []) as Passe[]);
@@ -325,7 +342,7 @@ export default function Debrief() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-semibold text-avisdoc-ink">
-                    {n.titre ?? (n.audio_path ? "Débrief dicté" : "Débrief écrit")}
+                    {titreDe(n)}
                   </span>
                   <span className="block text-[11.5px] text-muted-foreground">
                     {quandCourt(n.created_at)}

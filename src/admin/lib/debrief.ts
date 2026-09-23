@@ -135,13 +135,31 @@ export async function traiterDebrief(texte: string, par: string, noteId: string 
   }
 
   // La note est traitée : elle ne doit plus jamais se reproposer au tri.
+  //
+  // On garde le BILAN à côté de la lecture : « Débrief dicté » ne dit rien, alors que
+  // « Tous au marché → Prospection » se relit d'un coup d'œil des semaines plus tard.
   if (noteId) {
     await supabaseAdmin
       .from("admin_notes_dictees")
-      .update({ statut: "classee", extraction: lu as unknown as Record<string, unknown> })
+      .update({
+        statut: "classee",
+        titre: resumerBilan(bilan),
+        extraction: { lecture: lu, bilan } as unknown as Record<string, unknown>,
+      })
       .eq("id", noteId);
   }
   return bilan;
+}
+
+/** Ce qu'on lira dans l'historique : les entreprises et où elles sont parties. */
+export function resumerBilan(b: Bilan): string {
+  const bouts = [
+    ...b.creees.map((c) => `${c.nom} → ${OU_TROUVER[c.ou]?.ecran ?? "Prospection"}`),
+    ...b.fiches.map((nom) => `${nom} (mise à jour)`),
+  ];
+  if (bouts.length === 0) return "Aucune entreprise reconnue";
+  // Au-delà de trois, la ligne devient illisible : on compte le reste.
+  return bouts.length <= 3 ? bouts.join(" · ") : `${bouts.slice(0, 3).join(" · ")} et ${bouts.length - 3} autre${bouts.length - 3 > 1 ? "s" : ""}`;
 }
 
 /** Demande à Merx de trier un débrief. Rien n'est écrit : il rend seulement sa lecture. */
