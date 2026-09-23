@@ -4,7 +4,7 @@
 // Elle est la même dans la prospection, le Pipeline et le fichier client : cocher des
 // fiches et agir dessus doit se faire du même geste partout.
 
-import { Mail, Trash2, X } from "lucide-react";
+import { Loader2, Mail, Sparkles, Trash2, X } from "lucide-react";
 
 export default function BarreSelection({
   nombre,
@@ -15,6 +15,7 @@ export default function BarreSelection({
   onSupprimer,
   onTout,
   onEffacer,
+  approfondir,
 }: {
   nombre: number;
   /** Combien de fiches sont affichées à l'écran : « tout cocher » n'en prend pas d'autres. */
@@ -27,6 +28,8 @@ export default function BarreSelection({
   onSupprimer: () => void;
   onTout: () => void;
   onEffacer: () => void;
+  /** Propre à la prospection : lancer l'approfondissement sur toute la sélection. */
+  approfondir?: { aFaire: number; enCours: { fait: number; total: number } | null; lancer: () => void };
 }) {
   if (nombre === 0) return null;
 
@@ -44,6 +47,27 @@ export default function BarreSelection({
             className="rounded-full px-3 py-1.5 text-[12.5px] font-bold text-avisdoc-teal underline-offset-2 hover:underline"
           >
             Tout cocher ({total})
+          </button>
+        )}
+
+        {approfondir && (
+          <button
+            type="button"
+            onClick={approfondir.lancer}
+            disabled={approfondir.aFaire === 0 || approfondir.enCours !== null}
+            title={approfondir.aFaire === 0 ? "Toutes les fiches cochées sont déjà approfondies" : undefined}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
+          >
+            {approfondir.enCours ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                {approfondir.enCours.fait} / {approfondir.enCours.total}
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-3.5" /> Approfondir {approfondir.aFaire > 0 ? approfondir.aFaire : "—"}
+              </>
+            )}
           </button>
         )}
 
