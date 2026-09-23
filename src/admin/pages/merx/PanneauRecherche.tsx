@@ -31,28 +31,79 @@ import { cn } from "@/lib/utils";
  */
 const SECTEURS: { groupe: string; valeurs: string[] }[] = [
   {
-    groupe: "Les plus démarchés",
+    groupe: "Travail en extérieur",
     valeurs: [
       "Travaux publics et BTP",
+      "Terrassement et gros œuvre",
+      "Couverture et étanchéité",
+      "Bâtiment second œuvre",
       "Espaces verts et paysagistes",
-      "Agriculture et viticulture",
+      "Voirie et assainissement",
       "Collectivités et administrations",
-      "Beauté et bien-être",
-      "Pharmacie et santé",
     ],
   },
   {
-    groupe: "Tous les autres secteurs",
+    groupe: "Agriculture et forêt",
+    valeurs: [
+      "Agriculture et grandes cultures",
+      "Viticulture et arboriculture",
+      "Maraîchage et horticulture",
+      "Élevage",
+      "Exploitation forestière et sylviculture",
+      "Coopératives et services agricoles",
+      "Pêche et aquaculture",
+    ],
+  },
+  {
+    groupe: "Santé et beauté",
+    valeurs: [
+      "Instituts de beauté et spas",
+      "Coiffure",
+      "Pharmacies et parapharmacies",
+      "Cabinets médicaux et dermatologie",
+      "Laboratoires d’analyses",
+      "Cliniques et hôpitaux",
+      "Maisons de retraite et EHPAD",
+      "Fabrication de matériel médical",
+      "Industrie pharmaceutique et cosmétique",
+      "Salles de sport et bien-être",
+    ],
+  },
+  {
+    groupe: "Industrie et énergie",
     valeurs: [
       "Industrie et fabrication",
-      "Commerce et distribution",
-      "Transport et logistique",
-      "Hôtellerie et restauration",
-      "Bâtiment second œuvre",
+      "Agroalimentaire",
+      "Métallurgie et travail des métaux",
+      "Automobile et équipementiers",
+      "Bois, papier et ameublement",
+      "Plastique, caoutchouc et chimie",
       "Énergie, eau et déchets",
+      "Industries extractives et carrières",
+    ],
+  },
+  {
+    groupe: "Commerce et transport",
+    valeurs: [
+      "Commerce de gros",
+      "Commerce de détail",
+      "Garages et concessions",
+      "Transport de marchandises",
+      "Transport de voyageurs",
+      "Logistique et entreposage",
+      "Hôtellerie et restauration",
+    ],
+  },
+  {
+    groupe: "Services",
+    valeurs: [
+      "Services aux entreprises",
+      "Nettoyage et propreté",
+      "Sécurité et gardiennage",
+      "Intérim et recrutement",
       "Banque et assurance",
       "Immobilier",
-      "Services aux entreprises",
+      "Informatique et numérique",
       "Enseignement et formation",
       "Arts, sport et loisirs",
       "Services à la personne",
@@ -251,13 +302,13 @@ export default function PanneauRecherche({
 
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-          Région, département ou pays
+          Où — tapez ou choisissez
         </span>
         <input
           value={ou}
           onChange={(e) => setOu(e.target.value)}
           list="zones-merx"
-          placeholder="Vide = toute la France"
+          placeholder="Région, département, ville… vide = toute la France"
           className={cn(champCls, "mt-1")}
         />
         <datalist id="zones-merx">
