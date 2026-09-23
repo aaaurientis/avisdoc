@@ -11,18 +11,20 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 // dossier manque — surtout si la personne qui l'a jeté est partie entre-temps.
 export const JOURS_DE_GARDE = 30;
 
-export type Origine = "prospect" | "affaire" | "client";
+export type Origine = "prospect" | "affaire" | "client" | "note";
 
 const TABLE: Record<Origine, string> = {
   prospect: "admin_prospects",
   affaire: "admin_clients",
   client: "admin_accounts",
+  note: "admin_notes_dictees",
 };
 
 export const LIBELLE: Record<Origine, string> = {
   prospect: "Prospection",
   affaire: "Pipeline",
   client: "Clients",
+  note: "Débrief",
 };
 
 export interface Jetee {
@@ -60,8 +62,18 @@ export async function restaurer(origine: Origine, ids: string[]): Promise<void> 
 /** Supprime pour de bon. Sans retour possible. */
 export async function detruire(origine: Origine, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Une note emporte son enregistrement : sans cela, la voix resterait au coffre
+  // indéfiniment, invisible et payée.
+  if (origine === "note") await effacerLesAudios(ids);
   const { error } = await supabaseAdmin.from(TABLE[origine]).delete().in("id", ids);
   if (error) throw new Error(error.message);
+}
+
+/** Retire du coffre les enregistrements des notes qu'on s'apprête à détruire. */
+async function effacerLesAudios(ids: string[]): Promise<void> {
+  const { data } = await supabaseAdmin.from("admin_notes_dictees").select("audio_path").in("id", ids);
+  const chemins = (data ?? []).map((n) => n.audio_path as string | null).filter(Boolean) as string[];
+  if (chemins.length > 0) await supabaseAdmin.storage.from("admin-dictee").remove(chemins);
 }
 
 /**
@@ -71,7 +83,13 @@ export async function detruire(origine: Origine, ids: string[]): Promise<void> {
 export async function purger(): Promise<number> {
   const limite = new Date(Date.now() - JOURS_DE_GARDE * 86_400_000).toISOString();
   let total = 0;
-  for (const table of Object.values(TABLE)) {
+  for (const [origine, table] of Object.entries(TABLE) as [Origine, string][]) {
+    // Les notes d'abord, pour que leurs enregistrements partent avec elles.
+    if (origine === "note") {
+      const { data: perimees } = await supabaseAdmin.from(table).select("id").lt("deleted_at", limite);
+      const ids = (perimees ?? []).map((n) => n.id as string);
+      if (ids.length > 0) await effacerLesAudios(ids);
+    }
     const { data } = await supabaseAdmin.from(table).delete().lt("deleted_at", limite).select("id");
     total += data?.length ?? 0;
   }
@@ -80,10 +98,11 @@ export async function purger(): Promise<number> {
 
 /** Tout ce qui est à la corbeille, du plus récemment jeté au plus ancien. */
 export async function chargerCorbeille(): Promise<Jetee[]> {
-  const [prospects, affaires, clients] = await Promise.all([
+  const [prospects, affaires, clients, notes] = await Promise.all([
     supabaseAdmin.from("admin_prospects").select("id, name, city, activity, deleted_at").not("deleted_at", "is", null),
     supabaseAdmin.from("admin_clients").select("id, company, ville, stage, deleted_at").not("deleted_at", "is", null),
     supabaseAdmin.from("admin_accounts").select("id, name, sector, deleted_at").not("deleted_at", "is", null),
+    supabaseAdmin.from("admin_notes_dictees").select("id, titre, duree_s, audio_path, deleted_at").not("deleted_at", "is", null),
   ]);
 
   const lignes: Jetee[] = [
@@ -103,6 +122,17 @@ export async function chargerCorbeille(): Promise<Jetee[]> {
       detail: [c.stage, c.ville].filter(Boolean).join(" · ") || null,
       supprimeLe: c.deleted_at,
     })),
+    ...((notes.data ?? []) as { id: string; titre: string | null; duree_s: number | null; audio_path: string | null; deleted_at: string }[]).map(
+      (n) => ({
+        id: n.id,
+        origine: "note" as const,
+        nom: n.titre ?? "Débrief",
+        detail: [n.duree_s != null ? `${n.duree_s} s` : null, n.audio_path ? "avec l’enregistrement" : "texte seul"]
+          .filter(Boolean)
+          .join(" · "),
+        supprimeLe: n.deleted_at,
+      }),
+    ),
     ...((clients.data ?? []) as { id: string; name: string; sector: string | null; deleted_at: string }[]).map((a) => ({
       id: a.id,
       origine: "client" as const,
@@ -126,6 +156,7 @@ export const DESTINATIONS: Record<Origine, { cle: Origine; label: string; ou: st
   prospect: [{ cle: "prospect", label: "Prospection", ou: "Elle reprend sa place parmi les fiches trouvées par Merx." }],
   affaire: [{ cle: "affaire", label: "Pipeline", ou: "Elle retrouve la colonne qu’elle occupait, sans rien perdre." }],
   client: [{ cle: "client", label: "Clients", ou: "Elle reprend sa place dans le fichier commun de l’équipe." }],
+  note: [{ cle: "note", label: "Débrief", ou: "Elle réapparaît dans ce que vous avez raconté, avec son enregistrement." }],
 };
 
 const vide = (v: unknown) => v === null || v === undefined || String(v).trim() === "" || String(v) === "{}";

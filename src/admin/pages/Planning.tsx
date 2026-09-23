@@ -48,6 +48,9 @@ const chemin: Record<Origine, (id: string) => string> = {
   affaire: (id) => `/crm/${id}`,
   prospect: () => "/prospects",
   client: () => "/fichier-client",
+  // Une note n'apparaît jamais au planning — elle n'est pas une action à faire —,
+  // mais le type l'exige : on renvoie au Débrief, d'où elle vient.
+  note: () => "/debrief",
 };
 
 export default function Planning() {

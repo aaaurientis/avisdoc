@@ -18,6 +18,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Card, Modal, PageHeader, SectionLabel } from "../components/ui";
 import BoutonRetour from "../components/BoutonRetour";
 import { confirmer } from "../components/Confirmation";
+import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useActualisation } from "../lib/actualisation";
 import { OU_TROUVER, traiterDebrief, transcrireNote, type Bilan } from "../lib/debrief";
@@ -173,6 +174,7 @@ export default function Debrief() {
     const { data } = await supabaseAdmin
       .from("admin_notes_dictees")
       .select("id, audio_path, duree_s, statut, message, titre, transcription, extraction, created_at")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(20);
     setPasses((data ?? []) as Passe[]);
@@ -230,30 +232,28 @@ export default function Debrief() {
   }, [passes, enCours, ranger, chargerPasses]);
 
   /**
-   * Effacer l'enregistrement, garder ce qui a été dit.
+   * Jeter une note — à la corbeille, comme tout le reste du Hub.
    *
-   * C'est la voix qui pèse et qui est sensible, pas le texte. On l'efface du coffre et
-   * la ligne reste, avec sa transcription : on sait toujours ce qu'on a raconté ce
-   * jour-là et où c'est parti. Ce que Merx en avait tiré — la fiche, les actions,
-   * l'historique — ne bouge pas non plus : ce sont des faits qui ont leur vie propre.
+   * Elle partait définitivement, ce qui était une incohérence : prospects, affaires et
+   * fiches clients ont tous leurs trente jours de sursis. Une note aussi, désormais,
+   * avec son enregistrement — on peut se tromper de ligne.
+   *
+   * Ce que Merx en avait tiré ne bouge pas : la fiche, les actions et l'historique
+   * sont des faits qui ont leur vie propre.
    */
-  const effacerLaVoix = async (n: Passe) => {
+  const jeterLaNote = async (n: Passe) => {
     const ok = await confirmer({
-      titre: "Effacer l’enregistrement ?",
-      message:
-        "La voix sera supprimée définitivement du coffre. Ce que vous avez dit reste écrit, et ce que Merx en a rangé ne bouge pas.",
-      action: "Effacer l’enregistrement",
-      definitif: true,
+      titre: `Supprimer « ${titreDe(n)} » ?`,
+      message: `Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille. Ce que Merx en a rangé — la fiche, les actions, l’historique — reste en place.`,
     });
     if (!ok) return;
     try {
-      if (n.audio_path) await supabaseAdmin.storage.from("admin-dictee").remove([n.audio_path]);
-      const { error } = await supabaseAdmin.from("admin_notes_dictees").update({ audio_path: null }).eq("id", n.id);
-      if (error) throw new Error(error.message);
+      await jeter("note", [n.id]);
+      traitees.current.delete(n.id);
       await chargerPasses();
-      toast.success("Enregistrement effacé. Le texte est conservé.");
+      toast.success("Note envoyée à la corbeille.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "L’enregistrement n’a pas pu être effacé.");
+      toast.error(e instanceof Error ? e.message : "La note n’a pas pu être supprimée.");
     }
   };
 
@@ -399,17 +399,15 @@ export default function Debrief() {
                     <Play className="size-3.5" /> Réécouter
                   </button>
                 )}
-                {n.audio_path && (
-                  <button
-                    type="button"
-                    onClick={() => void effacerLaVoix(n)}
-                    aria-label={`Effacer l’enregistrement de ${titreDe(n)}`}
-                    title="Effacer l’enregistrement, garder le texte"
-                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void jeterLaNote(n)}
+                  aria-label={`Supprimer ${titreDe(n)}`}
+                  title="Mettre à la corbeille"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-rose-700"
+                >
+                  <Trash2 className="size-4" />
+                </button>
 
                 {/* Une note en échec se reprend ; une note rangée, jamais. */}
                 {n.statut === "echec" && (
