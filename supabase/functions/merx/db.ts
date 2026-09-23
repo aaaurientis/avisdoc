@@ -79,20 +79,19 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
  * insère fiche par fiche — le volume est faible (dix au plus) et une fiche refusée n'emporte pas les autres.
  */
 /**
- * Les secteurs que la base accepte aujourd'hui.
+ * Le secteur n'est qu'une étiquette de rangement : il ne doit JAMAIS empêcher une
+ * fiche d'exister.
  *
- * `admin_prospects` porte une contrainte CHECK sur `sector`. Y écrire une valeur
- * qu'elle ne connaît pas fait échouer l'insertion de TOUTE la liste — c'est ce qui
- * est arrivé en ajoutant « santé et beauté » côté code sans la migration : le
- * registre trouvait deux cent cinquante entreprises et pas une seule n'entrait.
+ * La colonne portait une liste fermée de cinq valeurs. Le jour où le code en a
+ * proposé une sixième, la base a refusé — et une seule valeur invalide fait échouer
+ * l'insertion de toute la liste : deux cent cinquante entreprises trouvées au
+ * registre ne sont jamais entrées, et le commercial a vu « aucun résultat » sur une
+ * recherche parfaitement bonne.
  *
- * On replie donc sur « autre » plutôt que de tout perdre. Une fois la migration 0041
- * collée, « sante_beaute » passera et les fiches iront dans leur colonne.
+ * La migration 0041 lève la contrainte. Ce repli reste comme ceinture : un secteur
+ * vide devient « autre », et rien ne peut plus faire échouer une insertion.
  */
-const SECTEURS_EN_BASE = new Set(["btp", "espaces_verts", "agriculture", "collectivites", "autre"]);
-
-/** Le secteur tel que la base l'accepte, quitte à le ranger dans « autre ». */
-const secteurSur = (secteur: string): string => (SECTEURS_EN_BASE.has(secteur) ? secteur : "autre");
+const secteurSur = (secteur: string): string => secteur.trim() || "autre";
 
 export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
   if (!prospects.length) return 0;
