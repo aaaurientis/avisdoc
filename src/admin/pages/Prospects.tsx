@@ -140,7 +140,9 @@ export default function Prospects() {
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
   // Le tableau d'abord, comme dans le Pipeline ; la liste pour qui la préfère.
-  const [vue, setVue] = useState<"kanban" | "liste">("kanban");
+  // Plus de kanban en Prospection. Une recherche au registre rend des dizaines, voire
+  // des centaines d'entreprises : en colonnes on ne retrouve plus rien. La liste se
+  // trie, se filtre et se parcourt — c'est le seul affichage qui tient à cette échelle.
 
   /** Ce qui attend sur chaque fiche : une action notée doit se voir depuis le tableau. */
   useEffect(() => {
@@ -390,24 +392,6 @@ export default function Prospects() {
         <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
           <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
         </FiltresRepliables>
-        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
-          {([
-            { id: "liste", label: "Liste", Icone: List },
-            { id: "kanban", label: "Kanban", Icone: LayoutGrid },
-          ] as const).map(({ id, label, Icone }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setVue(id)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors",
-                vue === id ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
-              )}
-            >
-              <Icone className="size-4" /> {label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {chargement ? (
@@ -418,10 +402,10 @@ export default function Prospects() {
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
           <SectionLabel>Aucune fiche pour l’instant</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, rangées par secteur.
+            Demandez une recherche à Merx : les entreprises qu’il trouve arrivent ici, les mieux notées en tête.
           </p>
         </div>
-      ) : vue === "liste" ? (
+      ) : (
         /* ── Liste : toutes les fiches d'un coup, triées par note ── */
         <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[720px] border-collapse">
@@ -489,40 +473,6 @@ export default function Prospects() {
               ))}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <div
-          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
-          style={{ gridTemplateColumns: `repeat(${SECTEURS.length}, minmax(300px, 380px))` }}
-        >
-          {SECTEURS.map((s) => {
-            const liste = visibles.filter((p) => secteurDe(p) === s.id);
-            return (
-              <div key={s.id} className={COLONNE_KANBAN}>
-                <div className="mb-2.5 flex items-center justify-between gap-2">
-                  <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground">{s.label}</div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${TONES[s.tone].dot}`}>
-                    {liste.length}
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col gap-2">
-                  {liste.map((p) => (
-                    <Carte
-                      key={p.id}
-                      p={p}
-                      onOuvrir={() => void ouvrir(p)}
-                      onModifier={() => setAModifier(p)}
-                      onSupprimer={() => void supprimerUne(p)}
-                      cochee={coches.has(p.id)}
-                      onCocher={() => cocher(p.id)}
-                      selectionEnCours={coches.size > 0}
-                      prevu={prevues.get(p.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
 

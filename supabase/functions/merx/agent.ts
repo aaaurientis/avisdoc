@@ -177,7 +177,10 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       city: local.city ?? c.headOffice.city,
       department: local.department ?? c.headOffice.department,
       activity: metier.activite,
-      sector: metier.secteur,
+      // Le secteur, c'est le métier réel de l'entreprise — pas une case parmi cinq.
+      // Il y a autant de secteurs qu'il y a de métiers : de la construction de routes
+      // à la fabrication de matériel médical, chacun s'écrit tel qu'il est.
+      sector: metier.activite,
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source],

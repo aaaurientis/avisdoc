@@ -111,14 +111,21 @@ export default function NouveauProspect({
         </label>
         <label className="block">
           <SectionLabel>Secteur</SectionLabel>
-          <select value={secteur} onChange={(e) => setSecteur(e.target.value)} className={cn(champCls, "mt-1")}>
-            <option value="">À déterminer</option>
-            {SECTEURS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
+          {/* Champ libre : il y a autant de secteurs que de métiers. Une liste fermée
+              interdisait d'entrer une usine automobile ou une banque — qui ont pourtant
+              des salariés à faire dépister comme les autres. */}
+          <input
+            value={secteur}
+            onChange={(e) => setSecteur(e.target.value)}
+            list="secteurs-connus"
+            placeholder="Travaux publics, coiffure, fabrication de matériel médical…"
+            className={cn(champCls, "mt-1")}
+          />
+          <datalist id="secteurs-connus">
+            {SECTEURS.filter((s) => s.id !== "autre").map((s) => (
+              <option key={s.id} value={s.label} />
             ))}
-          </select>
+          </datalist>
         </label>
       </div>
 

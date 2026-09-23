@@ -79,19 +79,18 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
  * insère fiche par fiche — le volume est faible (dix au plus) et une fiche refusée n'emporte pas les autres.
  */
 /**
- * Le secteur n'est qu'une étiquette de rangement : il ne doit JAMAIS empêcher une
- * fiche d'exister.
+ * Le secteur d'une fiche est son MÉTIER, écrit tel qu'il est.
  *
- * La colonne portait une liste fermée de cinq valeurs. Le jour où le code en a
- * proposé une sixième, la base a refusé — et une seule valeur invalide fait échouer
- * l'insertion de toute la liste : deux cent cinquante entreprises trouvées au
- * registre ne sont jamais entrées, et le commercial a vu « aucun résultat » sur une
- * recherche parfaitement bonne.
+ * Il n'y a jamais eu de raison de le restreindre : une usine automobile a autant le
+ * droit de faire dépister ses salariés qu'une entreprise de terrassement. La colonne
+ * portait pourtant une liste fermée de cinq valeurs — le jour où le code en a proposé
+ * une sixième, la base a refusé chaque fiche, et deux cent cinquante entreprises
+ * trouvées au registre ne sont jamais entrées.
  *
- * La migration 0041 lève la contrainte. Ce repli reste comme ceinture : un secteur
- * vide devient « autre », et rien ne peut plus faire échouer une insertion.
+ * La migration 0041 lève cette limite. On n'écrit donc plus « autre » à la place du
+ * vrai métier ; le repli ci-dessous ne sert qu'à ne pas écrire une valeur vide.
  */
-const secteurSur = (secteur: string): string => secteur.trim() || "autre";
+const secteurSur = (secteur: string): string => secteur.trim() || "Non précisé";
 
 export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
   if (!prospects.length) return 0;
@@ -159,10 +158,11 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
 
     let { error } = await sb.from("admin_prospects").insert(ligne(secteurSur(p.sector)));
 
-    // La base peut encore porter l'ancienne liste fermée de secteurs (migration 0041
-    // non collée). Plutôt que de perdre la fiche — et avec elle toute la recherche —,
-    // on la range dans « autre » et on réessaie. Une étiquette approximative vaut
-    // infiniment mieux qu'une entreprise qui n'apparaît jamais.
+    // Tant que la migration 0041 n'est pas collée, la base refuse tout métier qui
+    // n'est pas dans son ancienne liste. On réessaie alors sous « autre » — non pas
+    // parce que c'est juste, mais parce qu'une fiche rangée approximativement vaut
+    // mieux qu'une entreprise qui n'apparaît nulle part. Une fois la migration passée,
+    // ce rattrapage ne sert plus jamais et le vrai métier est conservé.
     if (error && /sector/i.test(error.message)) {
       ({ error } = await sb.from("admin_prospects").insert(ligne("autre")));
     }
