@@ -7,19 +7,20 @@
 // Ce qui est fait part dans l'historique, qui ne se modifie pas.
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Loader2, Mail, NotebookPen, PenLine, Phone } from "lucide-react";
+import { CalendarClock, ListTodo, Loader2, Mail, NotebookPen, PenLine, Phone } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { SectionLabel } from "./ui";
 import { actionsAVenir, ajouterEchange, libelleGenre, type ClesFiche, type Echange, type GenreEchange } from "../lib/echanges";
 import ModifierAction from "./ModifierAction";
 import { cn } from "@/lib/utils";
 
-const ICONES: Record<GenreEchange, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
+const ICONES: Record<GenreEchange, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, tache: ListTodo, note: NotebookPen };
 
 const GENRES: { valeur: GenreEchange; label: string; icone: typeof Phone; quand: boolean; aide: string }[] = [
   { valeur: "appel", label: "Appel", icone: Phone, quand: true, aide: "Quand appelez-vous, et pourquoi ?" },
   { valeur: "email", label: "E-mail", icone: Mail, quand: false, aide: "Ce que vous écrivez, ou ce que Merx a rédigé." },
   { valeur: "rdv", label: "Rendez-vous", icone: CalendarClock, quand: true, aide: "Le jour, l’heure, et ce qui s’y joue." },
+  { valeur: "tache", label: "À faire", icone: ListTodo, quand: true, aide: "Ce qu’il reste à faire pour eux, et pour quand." },
   { valeur: "note", label: "Note", icone: NotebookPen, quand: false, aide: "Ce qu’il faut se rappeler." },
 ];
 
