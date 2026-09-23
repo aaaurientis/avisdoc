@@ -8,7 +8,7 @@
 // propose ensuite un tri, entreprise par entreprise ; et rien ne part en base avant
 // qu'on ait décoché ce qui ne va pas.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, Check, HandHelping, Loader2, Mail, Mic, NotebookPen, PenLine, Phone, Play, Sparkles, Target } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -31,6 +31,9 @@ import BoutonRetour from "../components/BoutonRetour";
 
 const ICONES: Record<string, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
 
+/** Où une nouvelle entreprise peut être rangée, dit en clair. */
+const OU: Record<string, string> = { prospect: "la Prospection", affaire: "le Pipeline", client: "le fichier client" };
+
 /** Un débrief déjà raconté — dicté ou écrit, c'est la même table. */
 interface Passe {
   id: string;
@@ -39,6 +42,7 @@ interface Passe {
   statut: string;
   message: string | null;
   titre: string | null;
+  transcription: string | null;
   created_at: string;
 }
 
@@ -128,15 +132,38 @@ function FicheVue({
         )}
       </div>
 
-      {!reconnue && (
+      {!reconnue && !vue.a_creer?.trim() && (
         <p className="mb-3 rounded-xl border border-l-4 border-border border-l-avisdoc-coral px-3.5 py-2.5 text-[12.5px] leading-snug text-muted-foreground">
           Merx n’a pas retrouvé cette entreprise dans vos fiches. Ce qui a bloqué et ce qui a porté sera quand
           même gardé — c’est utile à l’équipe. En revanche, le résumé et les actions ne peuvent se ranger nulle part.
         </p>
       )}
 
+      {/* Une entreprise inconnue se crée d'ici : sans fiche, il n'y a nulle part où
+          ranger ce qui s'est passé, et le récit se perdrait. */}
+      {!reconnue && vue.a_creer?.trim() && (
+        <div className="mb-3">
+          <Coche cochee={retenu.creer} onBascule={() => onChange({ ...retenu, creer: !retenu.creer })}>
+            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-avisdoc-coral">
+              Nouvelle entreprise
+            </span>
+            <span className="mt-0.5 block text-[13.5px] leading-snug text-avisdoc-ink">
+              Créer <span className="font-semibold">{vue.entreprise}</span>
+              {vue.ville?.trim() ? `, à ${vue.ville}` : ""} dans{" "}
+              <span className="font-semibold">{OU[vue.a_creer] ?? "la prospection"}</span>
+              {vue.a_creer === "affaire" && vue.etape?.trim() ? `, à l’étape ${vue.etape}` : ""}
+            </span>
+            {!retenu.creer && (
+              <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+                Décoché : seuls les objections et les arguments seront gardés, sans fiche à quoi les rattacher.
+              </span>
+            )}
+          </Coche>
+        </div>
+      )}
+
       <div className="space-y-2">
-        {vue.resume.trim() && reconnue && (
+        {vue.resume.trim() && (reconnue || retenu.creer) && (
           <Coche cochee={retenu.resume} onBascule={() => onChange({ ...retenu, resume: !retenu.resume })}>
             <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
               Dans l’historique
@@ -160,7 +187,7 @@ function FicheVue({
           </Coche>
         ))}
 
-        {reconnue &&
+        {(reconnue || retenu.creer) &&
           vue.actions.map((a, i) => {
             const Icone = ICONES[a.genre] ?? NotebookPen;
             return (
@@ -176,7 +203,7 @@ function FicheVue({
             );
           })}
 
-        {vue.etape.trim() && vue.fiche_type === "affaire" && (
+        {vue.etape.trim() && (vue.fiche_type === "affaire" || (retenu.creer && vue.a_creer === "affaire")) && (
           <Coche cochee={retenu.etape} onBascule={() => onChange({ ...retenu, etape: !retenu.etape })}>
             <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
               Dans le Pipeline
@@ -204,12 +231,14 @@ export default function Debrief() {
   const [ecoute, setEcoute] = useState<string | null>(null);
   /** L'identifiant de la note en cours de transcription : le bouton doit le dire. */
   const [enTranscription, setEnTranscription] = useState<string | null>(null);
+  /** Ce qu'on a déjà tenté : une transcription qui échoue ne repart pas en boucle. */
+  const dejaLancees = useRef<Set<string>>(new Set());
 
   /** Ce qu'on a déjà raconté : dicté comme écrit, les deux vivent dans la même table. */
   const chargerPasses = useCallback(async () => {
     const { data } = await supabaseAdmin
       .from("admin_notes_dictees")
-      .select("id, audio_path, duree_s, statut, message, titre, created_at")
+      .select("id, audio_path, duree_s, statut, message, titre, transcription, created_at")
       .order("created_at", { ascending: false })
       .limit(20);
     setPasses((data ?? []) as Passe[]);
@@ -218,6 +247,28 @@ export default function Debrief() {
   useEffect(() => {
     void chargerPasses();
   }, [chargerPasses]);
+
+  /**
+   * Transcrire sans qu'on le demande.
+   *
+   * Une note arrive du téléphone en attente ; cliquer sur « Transcrire » était une
+   * corvée de plus, et la première chose qu'on oublie. On s'en charge dès qu'on la
+   * voit — une par une, pour ne pas lancer cinq transcriptions à la fois, et jamais
+   * deux fois la même grâce à la trace gardée dans `dejaLancees`.
+   */
+  useEffect(() => {
+    const aFaire = passes.find((n) => n.statut === "recue" && n.audio_path && !dejaLancees.current.has(n.id));
+    if (!aFaire || enTranscription) return;
+    dejaLancees.current.add(aFaire.id);
+    setEnTranscription(aFaire.id);
+    void transcrireNote(aFaire.id)
+      .then(() => toast.success("Note transcrite."))
+      .catch((e) => toast.error(e instanceof Error ? e.message : "La transcription a échoué."))
+      .finally(() => {
+        setEnTranscription(null);
+        void chargerPasses();
+      });
+  }, [passes, enTranscription, chargerPasses]);
 
   // Une transcription se termine au loin : l'écran suit sans qu'on clique.
   useActualisation(chargerPasses, passes.some((n) => n.statut === "recue"));
@@ -229,6 +280,12 @@ export default function Debrief() {
    */
   const reprendre = async (n: Passe) => {
     if (enTranscription) return;
+    // Déjà transcrite : on la charge telle quelle, sans repayer une transcription.
+    if (n.transcription) {
+      setTexte(n.transcription);
+      setMode("texte");
+      return;
+    }
     setEnTranscription(n.id);
     try {
       const texteDit = await transcrireNote(n.id);
@@ -269,7 +326,7 @@ export default function Debrief() {
     }
   };
 
-  const total = retenus.reduce((n, r) => n + compte(r), 0);
+  const total = retenus.reduce((n, r, i) => n + compte(r, extraction?.entreprises[i]), 0);
 
   const tout = async () => {
     if (!extraction || envoi || total === 0) return;
@@ -328,7 +385,7 @@ export default function Debrief() {
                 )}
                 {/* Une note en attente ou en échec se reprend d'ici : on transcrit, puis
                     le texte arrive dans la zone de saisie, où Merx le trie comme le reste. */}
-                {n.audio_path && n.statut !== "classee" && (
+                {n.statut !== "classee" && (
                   <button
                     type="button"
                     disabled={enTranscription === n.id}
@@ -336,7 +393,13 @@ export default function Debrief() {
                     className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
                   >
                     {enTranscription === n.id ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    {enTranscription === n.id ? "Transcription…" : n.statut === "echec" ? "Réessayer" : "Transcrire"}
+                    {enTranscription === n.id
+                      ? "Transcription…"
+                      : n.statut === "echec"
+                        ? "Réessayer"
+                        : n.transcription
+                          ? "Trier avec Merx"
+                          : "Transcrire"}
                   </button>
                 )}
               </div>
