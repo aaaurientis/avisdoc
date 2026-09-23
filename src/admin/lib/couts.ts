@@ -28,7 +28,7 @@ export const NOM_MODELE: Record<string, string> = {
 export const MODELES_ACTUELS: Record<string, string> = {
   recherche: "claude-sonnet-5",
   approfondissement: "claude-opus-5",
-  chat: "claude-opus-5",
+  chat: "claude-sonnet-5",
   email: "claude-sonnet-5",
 };
 

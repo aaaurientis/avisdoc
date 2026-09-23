@@ -49,13 +49,14 @@ const MAX_TOOL_ROUNDS = 3; // conversation : allers-retours d'outil au plus, par
 export type Usage = "recherche" | "approfondissement" | "chat" | "email";
 
 const DEFAUTS: Record<Usage, string> = {
+  // La règle d'Olivier depuis le début : Sonnet pour le large, Opus pour approfondir.
+  // La conversation relève du large — elle doit surtout être VIVE, le commercial
+  // écrit entre deux rendez-vous. Opus y avait été mis pour la qualité du conseil ;
+  // il la rendait lente, ce qui coûtait plus qu'il ne rapportait.
   recherche: "claude-sonnet-5",
-  approfondissement: "claude-opus-5",
-  // Opus aussi pour la conversation : c'est là que le commercial vient chercher un
-  // appui avant d'entrer chez un client, et un conseil tiède ne vaut rien. Le chat ne
-  // fait pas de recherche web, il consomme peu : quelques centimes par échange.
-  chat: "claude-opus-5",
+  chat: "claude-sonnet-5",
   email: "claude-sonnet-5",
+  approfondissement: "claude-opus-5",
 };
 
 const VARIABLES: Record<Usage, string> = {
