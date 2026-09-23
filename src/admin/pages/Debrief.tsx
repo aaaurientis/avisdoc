@@ -26,6 +26,7 @@ import {
   type Retenu,
 } from "../lib/debrief";
 import { cn } from "@/lib/utils";
+import BoutonRetour from "../components/BoutonRetour";
 
 const ICONES: Record<string, typeof Phone> = { appel: Phone, email: Mail, rdv: CalendarClock, note: NotebookPen };
 
@@ -268,6 +269,7 @@ export default function Debrief() {
       <PageHeader
         title="Débrief"
         subtitle="Racontez votre sortie. Merx range, vous validez."
+        action={mode !== null && !extraction ? <BoutonRetour onRetour={() => setMode(null)} /> : undefined}
       />
 
       {!extraction && mode === null && passes.length > 0 && (
@@ -370,13 +372,7 @@ export default function Debrief() {
                 Voir un exemple
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setMode(null)}
-              className="text-[13px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
-            >
-              Retour
-            </button>
+
           </div>
         </Card>
       )}

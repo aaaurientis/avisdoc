@@ -4,12 +4,12 @@
 // Sans réseau, la note attend sur l’appareil et part dès que la connexion revient.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Loader2, Mic, Square, WifiOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Check, Loader2, Mic, Square, WifiOff } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { garder, listerEnAttente, oublier, type NoteEnAttente } from "./dictee/store";
 import { cn } from "@/lib/utils";
+import BoutonRetour from "../components/BoutonRetour";
 
 // 10 minutes : un débrief de fin de journée couvre quatre ou cinq entreprises, et
 // découper l'enregistrement ferait perdre le fil. (3 min à l'origine, porté à 10 le 22/09.)
@@ -140,7 +140,13 @@ export default function Dictee() {
   const presqueFini = enregistre && secondes >= ALERTE_S;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-md flex-col items-center justify-center px-5 py-8 text-center">
+    <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-md flex-col px-5 py-8">
+      {/* Au même endroit que sur le Débrief écrit : en haut à droite. */}
+      <div className="mb-6 flex justify-end">
+        <BoutonRetour vers="/debrief" />
+      </div>
+
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
       <h1 className="font-display text-3xl font-semibold text-avisdoc-ink">Dictée</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Dictez votre compte rendu en sortant du rendez-vous. Merx le relira et le rangera dans la bonne fiche.
@@ -179,7 +185,7 @@ export default function Dictee() {
         ) : envoiEnCours ? (
           <div className="text-[13px] font-semibold text-muted-foreground">Envoi en cours…</div>
         ) : (
-          <div className="text-[13px] text-muted-foreground">3 minutes au plus</div>
+          <div className="text-[13px] text-muted-foreground">{Math.round(DUREE_MAX_S / 60)} minutes au plus</div>
         )}
       </div>
 
@@ -197,12 +203,7 @@ export default function Dictee() {
         </div>
       )}
 
-      <Link
-        to="/notes-dictees"
-        className="mt-10 inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:text-avisdoc-ink"
-      >
-        <ArrowLeft className="size-4" /> Retour au Hub
-      </Link>
+      </div>
     </div>
   );
 }
