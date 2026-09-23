@@ -81,6 +81,29 @@ const isPlatform = (url: string) => {
   return h === null || PLATFORMS.some((p) => h === p || h.endsWith(`.${p}`));
 };
 const officialSite = (url: string) => (url.trim() && !isPlatform(url.trim()) ? url.trim() : null);
+
+/** « OLIVIER DE GUYENRO » → « Olivier De Guyenro » : le registre écrit tout en capitales. */
+const sansCapitales = (nom: string) =>
+  nom.toLowerCase().replace(/(^|[\s'-])([a-zà-ÿ])/g, (_, avant, lettre) => avant + lettre.toUpperCase());
+
+/** Les formes juridiques : le registre range aussi des sociétés parmi les dirigeants. */
+const EST_UNE_SOCIETE = /\b(sarl|sas|sasu|sa|sci|eurl|snc|selarl|société|societe|holding|groupe|group)\b/i;
+
+/**
+ * Le dirigeant à appeler, quand aucun contact n'a été trouvé sur le web.
+ *
+ * On ne retient qu'une personne physique : le registre liste aussi des sociétés
+ * mères comme dirigeantes, et « LES FERMES DE GALLY » ne décroche pas le téléphone.
+ */
+function dirigeantDuRegistre(company: Company | null): { name: string; role: string; source: string } | null {
+  const d = company?.leaders.find((l) => l.name && !EST_UNE_SOCIETE.test(l.name) && l.name.trim().includes(" "));
+  if (!d || !company) return null;
+  return {
+    name: sansCapitales(d.name.trim()),
+    role: d.role ? sansCapitales(d.role) : "Dirigeant",
+    source: `https://annuaire-entreprises.data.gouv.fr/entreprise/${company.siren}`,
+  };
+}
 const department = (code: string) => (/^(\d{2}|2A|2B|97\d)$/.test(code.trim()) ? code.trim() : null);
 
 /**
@@ -98,9 +121,11 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
       { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
     );
     const departments = (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
-    if (!departments.length) return null;
     const nafCodes = (out.codes_naf ?? []).filter((c) => /^\d{2}\.\d{2}[A-Z]?$/.test(c.trim()));
     const section = /^[A-U]$/.test((out.section ?? "").trim()) ? out.section.trim() : null;
+    // Le métier est indispensable ; la zone ne l'est pas. Une liste de départements
+    // vide vaut « toute la France » — le registre accepte de chercher sans zone, et
+    // une région n'est rien d'autre qu'une poignée de départements.
     if (!nafCodes.length && !section) return null;
     return { section, nafCodes, departments, minHeadcount: out.effectif_min > 0 ? out.effectif_min : null };
   } catch {
@@ -280,9 +305,28 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const seen = new Set(urls);
   const allowed = (source: string) => seen.has(source) || (ownHost !== null && host(source) === ownHost);
 
-  // Consigne tenue en code : un contact nommé n'est gardé que s'il vient du site de l'entreprise elle-même.
+  // Un contact nommé doit venir d'une page vérifiable. Le site de l'entreprise est la
+  // source la plus sûre ; une page réellement consultée l'est aussi, à condition que ce
+  // ne soit pas un annuaire qui recopie le registre — on n'y apprend rien et les
+  // fonctions y sont souvent périmées.
+  const sourceFiable = (source: string): boolean => {
+    const h = host(source);
+    if (!h) return false;
+    if (ownHost && h === ownHost) return true;
+    return seen.has(source) && !isPlatform(source);
+  };
+
   const c = out.contact;
-  const named = c.nom.trim() && ownHost && host(c.source) === ownHost ? { name: c.nom.trim(), role: c.fonction.trim(), source: c.source } : null;
+  const named = c.nom.trim() && sourceFiable(c.source)
+    ? { name: c.nom.trim(), role: c.fonction.trim(), source: c.source }
+    : null;
+
+  // À défaut, le dirigeant du registre. Sur une PME — et l'essentiel des cibles en
+  // sont —, c'est lui qui décide d'une campagne, et son nom est un fait public. Sans
+  // ce repli, la fiche affichait « aucun interlocuteur » alors que le registre en
+  // donnait deux, et le commercial appelait sans savoir qui demander.
+  const contact = named ?? dirigeantDuRegistre(company);
+
   const email = (named && c.email.trim()) || site?.emails[0] || null;
   const phone = (named && c.telephone.trim()) || site?.phones[0] || null;
 
@@ -298,7 +342,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
       : (previous.soleil ?? sunScore("non_evalue", "", null)),
     sante_travail: healthScore(out.sante_travail.trouve && allowed(out.sante_travail.source), out.sante_travail.justification.trim(), out.sante_travail.source),
     salaries: sizeScore(company?.headcountBand ?? null, headcountLabel(company?.headcountBand ?? null), company?.headcountYear ?? null),
-    interlocuteur: contactScore(named, (company?.leaders.length ?? 0) > 0),
+    interlocuteur: contactScore(contact, (company?.leaders.length ?? 0) > 0),
     sites: sitesScore(company?.openEstablishments ?? null),
     zone: zoneScore([company?.headOffice.department ?? null, p.department]),
   };
@@ -312,11 +356,11 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     headOffice: company ? { address: company.headOffice.address, city: company.headOffice.city, department: company.headOffice.department } : null,
     leaders: company?.leaders ?? null,
     website,
-    contactName: named?.name ?? null,
-    contactRole: named?.role || null,
+    contactName: contact?.name ?? null,
+    contactRole: contact?.role || null,
     contactEmail: email,
     contactPhone: phone,
-    contactSource: named?.source ?? (site && (email || phone) ? site.readOn : null),
+    contactSource: contact?.source ?? (site && (email || phone) ? site.readOn : null),
     siteContacts: site,
     approach: out.angle_approche.trim() || null,
     dossier: out.dossier ?? null,
