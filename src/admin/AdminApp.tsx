@@ -38,6 +38,19 @@ function Garde({ module, children }: { module: Module; children: React.ReactNode
   return <>{children}</>;
 }
 
+/**
+ * Où l'on arrive en ouvrant le Hub.
+ *
+ * Sur un téléphone, on n'ouvre pas AvisDoc pour lire un tableau de bord : on sort d'un
+ * rendez-vous et on veut raconter avant d'avoir oublié. On arrive donc sur la dictée,
+ * et le bouton Retour mène au reste. Sur un écran large, rien ne change.
+ */
+function Accueil() {
+  const { peut } = useAuth();
+  const surTelephone = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  return <Navigate to={surTelephone && peut("merx") ? "/dictee" : "/dashboard"} replace />;
+}
+
 /** Aiguillage selon l'état d'authentification. */
 function Gate() {
   const { status } = useAuth();
@@ -48,6 +61,10 @@ function Gate() {
   return (
     <AdminDataProvider>
       <Routes>
+        {/* Hors de la coquille : un dictaphone se tient à l'écran entier, sans menu.
+            Le bouton Retour, en haut à droite, ramène au Débrief. */}
+        <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
+
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/crm" element={<Garde module="crm"><Crm /></Garde>} />
@@ -59,7 +76,6 @@ function Gate() {
           <Route path="/debrief" element={<Garde module="merx"><Debrief /></Garde>} />
           {/* L'écran a fusionné avec le Débrief : un lien gardé ne tombe pas dans le vide. */}
           <Route path="/notes-dictees" element={<Navigate to="/debrief" replace />} />
-          <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
           <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
           <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
           <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
@@ -68,7 +84,7 @@ function Gate() {
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
           <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
           <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Accueil />} />
         </Route>
       </Routes>
     </AdminDataProvider>
