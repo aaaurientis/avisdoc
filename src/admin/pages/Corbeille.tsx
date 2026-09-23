@@ -2,7 +2,8 @@
 // et le fichier client. Chaque ligne dit d'où elle vient, quand elle a été jetée, et
 // combien de jours il reste pour se raviser.
 //
-// La purge se fait à l'ouverture : ce qui a plus de quinze jours part pour de bon.
+// La purge se fait à l'ouverture de l'écran, et seule l'administration peut détruire :
+// pour tous les autres, ce qui a dépassé la garde attend qu'elle passe.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RotateCcw, Trash2 } from "lucide-react";
@@ -112,15 +113,15 @@ export default function Corbeille() {
         subtitle={
           chargement
             ? "Chargement…"
-            : `${lignes.length} fiche${lignes.length > 1 ? "s" : ""} — vidée${lignes.length > 1 ? "s" : ""} automatiquement au bout de ${JOURS_DE_GARDE} jours`
+            : `${lignes.length} fiche${lignes.length > 1 ? "s" : ""} — gardée${lignes.length > 1 ? "s" : ""} au moins ${JOURS_DE_GARDE} jours`
         }
       />
 
       {/* Un bouton absent sans explication laisse croire à une panne. */}
       {!isSuperAdmin && lignes.length > 0 && (
         <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
-          Vous pouvez restaurer ce qui a été jeté, mais pas le détruire : seule l’administration le peut. Ce qui
-          reste ici part de lui-même au bout de {JOURS_DE_GARDE} jours.
+          Vous pouvez restaurer ce qui a été jeté, mais pas le détruire : seule l’administration le peut — c’est
+          elle aussi qui vide ce qui a dépassé {JOURS_DE_GARDE} jours. Rien ne disparaît avant.
         </div>
       )}
 
