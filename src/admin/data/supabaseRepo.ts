@@ -366,9 +366,11 @@ export class SupabaseRepo implements AdminRepo {
       .eq("converted_client_id", clientId)
       .maybeSingle();
     if (!data) return null;
-    // Le libellé du secteur se lit ; à défaut, l'activité trouvée par Merx.
-    const connu = SECTEURS.find((x) => x.id === data.sector);
-    return connu && connu.id !== "autre" ? connu.label : (data.activity ?? null);
+    // Le secteur porte le métier, écrit tel quel. Les fiches d'avant portent encore un
+    // identifiant (« btp », « espaces_verts ») : on leur rend leur libellé.
+    const ancien = SECTEURS.find((x) => x.id === data.sector);
+    if (ancien) return ancien.id === "autre" ? (data.activity ?? null) : ancien.label;
+    return (data.sector as string | null)?.trim() || data.activity || null;
   }
 
   async createAccount(a: Account): Promise<void> {
