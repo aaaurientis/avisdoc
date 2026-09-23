@@ -15,7 +15,6 @@ import ActionsFiche from "../../components/ActionsFiche";
 import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import { approfondirProspect, redigerEmailClient } from "../../lib/merx-appels";
-import { jeter } from "../../lib/corbeille";
 import { confirmer } from "../../components/Confirmation";
 import { useAuth } from "../../auth/AuthContext";
 import type { GenreEchange } from "../../lib/echanges";
@@ -88,9 +87,10 @@ export default function FicheClient({
   };
 
   /**
-   * On s'est trompé de colonne : l'affaire repart au Pipeline et la fiche client va à
-   * la corbeille. La marque « fiche créée » est levée, sinon une nouvelle signature ne
-   * recréerait jamais la fiche.
+   * On s'est trompé de colonne. La fiche client ne part pas à la corbeille : elle
+   * n'aurait jamais dû exister, on l'ANNULE. L'affaire, elle, continue sa vie au
+   * Pipeline avec tout ce qu'on avait noté — la fonction en base rend les échanges
+   * à l'affaire avant de détruire la fiche (migration 0040).
    */
   const remettreAuPipeline = async () => {
     if (!fiche?.clientId || !affaire || enCours) return;
@@ -102,7 +102,7 @@ export default function FicheClient({
     if (
       !(await confirmer({
         titre: `Remettre ${fiche.name} au Pipeline ?`,
-        message: `L’affaire repart à l’étape « ${cible} » et cette fiche client part à la corbeille, d’où elle se restaure pendant trente jours.`,
+        message: `L’affaire repart à l’étape « ${cible} ». Cette fiche client disparaît — elle n’aurait pas dû être créée — et tout ce qui y a été noté retourne sur l’affaire.`,
         action: "Remettre au Pipeline",
       }))
     )
@@ -110,13 +110,26 @@ export default function FicheClient({
     setEnCours("pipeline");
     setSouci(null);
     try {
+      // L'étape d'abord : si l'annulation échouait, l'affaire serait déjà sortie de
+      // « signé », donc aucune fiche ne serait recréée dans son dos.
       setClientStage(fiche.clientId, cible);
+      const { data: rendus, error } = await supabaseAdmin.rpc("annuler_fiche_client", { fiche: fiche.id });
+      if (error) throw new Error(error.message);
       updateClientFields(fiche.clientId, { ficheClientCreee: false });
-      await jeter("client", [fiche.id]);
-      toast.success(`${fiche.name} est repartie à l’étape « ${cible} ».`);
+      toast.success(
+        `${fiche.name} est repartie à l’étape « ${cible} »` +
+          (typeof rendus === "number" && rendus > 0
+            ? ` — ${rendus} action${rendus > 1 ? "s" : ""} rendue${rendus > 1 ? "s" : ""} à l’affaire.`
+            : "."),
+      );
       onClose();
     } catch (e) {
-      setSouci(e instanceof Error ? e.message : "L’opération a échoué.");
+      const m = e instanceof Error ? e.message : "L’opération a échoué.";
+      setSouci(
+        /annuler_fiche_client|function .* does not exist/i.test(m)
+          ? "Cette annulation attend la migration 0040 : collez-la dans le SQL Editor."
+          : m,
+      );
       setEnCours(null);
     }
   };
