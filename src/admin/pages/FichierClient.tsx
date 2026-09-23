@@ -24,6 +24,7 @@ import ColonnesClient from "./clients/ColonnesClient";
 import FicheClient from "./clients/FicheClient";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
+import FiltresRepliables from "../components/FiltresRepliables";
 
 /** Valeur d’une case : les trois colonnes du socle ont leur champ, les autres sont dans `data`. */
 function valeur(a: Account, f: AccountField): string {
@@ -325,13 +326,16 @@ export default function FichierClient() {
         subtitle={`${accounts.length} fiche${accounts.length > 1 ? "s" : ""} — le fichier commun de l’équipe`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setColonnes(true)} className={boutonSecondaire}>
+            {/* Gérer les colonnes, importer un tableur, l'exporter : cela se fait devant
+                un ordinateur. Sur un téléphone, ces trois boutons repoussaient les
+                fiches hors de l'écran sans jamais servir. */}
+            <button type="button" onClick={() => setColonnes(true)} className={cn(boutonSecondaire, "max-sm:hidden")}>
               <Columns3 className="size-4" /> Colonnes
             </button>
-            <button type="button" onClick={() => setImportOuvert(true)} className={boutonSecondaire}>
+            <button type="button" onClick={() => setImportOuvert(true)} className={cn(boutonSecondaire, "max-sm:hidden")}>
               <Upload className="size-4" /> Importer
             </button>
-            <button type="button" onClick={() => void exporter()} className={boutonSecondaire}>
+            <button type="button" onClick={() => void exporter()} className={cn(boutonSecondaire, "max-sm:hidden")}>
               <Download className="size-4" /> Exporter
             </button>
             <button
@@ -372,7 +376,9 @@ export default function FichierClient() {
             className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           />
         </div>
-        <FiltresClients filtres={filtres} onChange={setFiltres} secteurs={tousSecteurs} />
+        <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
+          <FiltresClients filtres={filtres} onChange={setFiltres} secteurs={tousSecteurs} />
+        </FiltresRepliables>
         {vue === "kanban" && (
           <select
             value={groupePar}

@@ -143,7 +143,7 @@ export default function Merx() {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_440px]">
         {/* ── La conversation ── */}
-        <Card className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col">
+        <Card className="flex h-[calc(100dvh-19rem)] min-h-[300px] flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
           <div className="flex-1 space-y-4 overflow-y-auto p-6">
             {messages.length === 0 && (
               <div className="mx-auto max-w-lg rounded-2xl bg-muted/60 p-6 text-center">
@@ -213,7 +213,7 @@ export default function Merx() {
         </Card>
 
         {/* ── Pistes et historique ── */}
-        <div className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col gap-3">
+        <div className="flex flex-col gap-3 max-sm:min-h-0 sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
           <Card className="flex min-h-0 flex-col p-4">
             <SectionLabel>Pistes à explorer</SectionLabel>
             <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
