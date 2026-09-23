@@ -3,10 +3,11 @@
 // rangement dans la fiche arrivent à l’étape suivante (il faut la clé du service de transcription).
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Mic, Play, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Mic, Play, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Modal, PageHeader, SectionLabel } from "../components/ui";
+import { useActualisation } from "../lib/actualisation";
 
 interface Note {
   id: string;
@@ -53,6 +54,9 @@ export default function NotesDictees() {
     void charger();
   }, [charger]);
 
+  // Une note arrive du téléphone, et sa transcription se termine au loin : l'écran suit.
+  useActualisation(charger, notes.some((n) => n.statut === "recue"));
+
   /** L’audio est privé : on demande une adresse signée, valable quelques minutes. */
   const ecouter = async (note: Note) => {
     if (!note.audio_path) return;
@@ -74,21 +78,12 @@ export default function NotesDictees() {
         title="Notes dictées"
         subtitle={chargement ? "Chargement…" : `${notes.length} note${notes.length > 1 ? "s" : ""}`}
         action={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void charger()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-            >
-              <RefreshCw className="size-4" /> Actualiser
-            </button>
-            <Link
-              to="/dictee"
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
-            >
-              <Mic className="size-4" /> Dicter
-            </Link>
-          </div>
+          <Link
+            to="/dictee"
+            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+          >
+            <Mic className="size-4" /> Dicter
+          </Link>
         }
       />
 

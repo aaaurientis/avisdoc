@@ -23,6 +23,7 @@ import PastillesPrevues from "../components/PastillesPrevues";
 import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../lib/conversion";
 import { useAdminData } from "../data/AdminDataContext";
 import { confirmer } from "../components/Confirmation";
+import { useActualisation } from "../lib/actualisation";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -128,6 +129,8 @@ export default function Prospects() {
   const { stages, clients, addClient, addProjectContact } = useAdminData();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
+  /** Une recherche de Merx est en route : les fiches vont arriver. */
+  const [enRecherche, setEnRecherche] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
@@ -216,6 +219,12 @@ export default function Prospects() {
 
   const charger = useCallback(async () => {
     setErreur(null);
+    // Une demande encore en route : on repassera voir.
+    const { count } = await supabaseAdmin
+      .from("admin_merx_demandes")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["en_attente", "en_cours"]);
+    setEnRecherche((count ?? 0) > 0);
     const { data, error } = await supabaseAdmin
       .from("admin_prospects")
       .select("*")
@@ -235,6 +244,9 @@ export default function Prospects() {
   useEffect(() => {
     void charger();
   }, [charger]);
+
+  // Tant qu'une recherche tourne, les fiches arrivent d'elles-mêmes.
+  useActualisation(charger, enRecherche);
 
   /** Les fiches de l’onglet courant, avant que les filtres ne s’en mêlent. */
   const duVivier = useMemo(
