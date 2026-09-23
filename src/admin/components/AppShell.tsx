@@ -10,6 +10,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import { useAuth } from "../auth/AuthContext";
+import { lireArrivee } from "../lib/arrivee";
 import AvisdocLogo from "@/components/AvisdocLogo";
 
 export default function AppShell() {
@@ -31,7 +32,8 @@ export default function AppShell() {
    */
   useEffect(() => {
     const surTelephone = window.matchMedia("(max-width: 767px)").matches;
-    if (surTelephone && (pathname === "/dashboard" || pathname === "/") && peut("merx")) {
+    const veutLaDictee = lireArrivee() === "dictee";
+    if (surTelephone && veutLaDictee && (pathname === "/dashboard" || pathname === "/") && peut("merx")) {
       naviguer("/dictee", { replace: true });
     }
     // Au montage seulement : c'est l'arrivée qui nous intéresse, pas les allées et venues.
