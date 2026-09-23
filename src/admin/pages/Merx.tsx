@@ -1,8 +1,8 @@
 // Merx — l’agent commercial de prospection.
-// La conversation au centre ; à droite, les pistes à explorer (modifiables) et l’historique.
+// La conversation à gauche ; à droite, le panneau de recherche et l’historique.
 // Sur un téléphone, ces deux-là passent sous la conversation et se replient : dépliés,
-// ils ajoutaient 566 pixels sous l’écran et obligeaient à faire défiler la page entière
-// avant d’atteindre la conversation, qui a déjà son propre défilement.
+// ils ajoutaient des centaines de pixels sous l’écran et obligeaient à faire défiler la
+// page entière avant d’atteindre la conversation, qui a déjà son propre défilement.
 // Quand le commercial demande de chercher, Merx lance une recherche puis écrit lui-même son
 // résultat dans le fil. Les fiches trouvées partent dans Prospection.
 
@@ -11,9 +11,9 @@ import { ChevronDown, Lightbulb, Loader2, MessageSquare, Play, Plus, Search, Sen
 import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
-import { pistes } from "../lib/pistes";
 import { cn } from "@/lib/utils";
 import BoutonMicro from "../components/BoutonMicro";
+import PanneauRecherche from "./merx/PanneauRecherche";
 
 interface Message {
   role: "user" | "assistant";
@@ -39,14 +39,13 @@ export default function Merx() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [historique, setHistorique] = useState<Conversation[]>([]);
-  const [propositions, setPropositions] = useState<string[]>([]);
   const [saisie, setSaisie] = useState("");
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
 
-  /** Les conversations de la personne, et les pistes que personne n’a encore demandées. */
+  /** Les conversations de la personne. */
   const chargerLeContexte = useCallback(async () => {
     const { data: convs } = await supabaseAdmin
       .from("admin_merx_conversations")
@@ -56,7 +55,6 @@ export default function Merx() {
     setHistorique((convs ?? []) as Conversation[]);
 
     const { data: demandes } = await supabaseAdmin.from("admin_merx_demandes").select("request").eq("kind", "recherche");
-    setPropositions(pistes((demandes ?? []).map((d: { request: string }) => d.request)));
   }, []);
 
   useEffect(() => {
@@ -108,7 +106,7 @@ export default function Merx() {
         setErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
       } finally {
         setEnvoiEnCours(false);
-        // Les pistes lancées disparaissent, les conversations remontent.
+        // Les conversations remontent : la dernière en tête.
         void chargerLeContexte();
       }
     },
@@ -130,7 +128,7 @@ export default function Merx() {
   const occupe = envoiEnCours || rechercheEnCours;
 
   // Replié par défaut sur un téléphone : on ouvre Merx pour lui parler, pas pour
-  // parcourir des pistes. Sur grand écran, ce réglage ne sert à rien — le panneau
+  // remplir un formulaire. Sur grand écran, ce réglage ne sert à rien — le panneau
   // est toujours visible, à droite.
   const [panneauOuvert, setPanneauOuvert] = useState(false);
 
@@ -150,7 +148,9 @@ export default function Merx() {
         }
       />
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_440px]">
+      {/* La conversation occupait toute la largeur pour trois bulles. Elle se resserre,
+          et le panneau de recherche prend la place des pistes. */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
         {/* ── La conversation ── */}
         <Card className="flex h-[calc(100dvh-20rem)] min-h-[300px] min-w-0 flex-col sm:h-[calc(100vh-13rem)] sm:min-h-[420px]">
           {/* overflow-x-hidden : « overflow-y: auto » rend aussi l'axe horizontal
@@ -233,8 +233,7 @@ export default function Merx() {
         >
           <Lightbulb className="size-4 shrink-0 text-avisdoc-teal" />
           <span className="min-w-0 flex-1 truncate text-left">
-            Pistes et conversations
-            {propositions.length > 0 && <span className="text-muted-foreground"> ({propositions.length})</span>}
+            Recherche et conversations
           </span>
           <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", panneauOuvert && "rotate-180")} />
         </button>
@@ -246,25 +245,7 @@ export default function Merx() {
           )}
         >
           <Card className="flex min-h-0 flex-col p-4">
-            <SectionLabel>Pistes à explorer</SectionLabel>
-            <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
-              Des croisements que personne n’a encore demandés — modifiez le texte avant de lancer.
-            </p>
-            <div className="mt-2.5 min-h-0 space-y-2 overflow-y-auto">
-              {propositions.length === 0 && (
-                <p className="text-[12.5px] text-muted-foreground">Tous les croisements ont été explorés — écrivez votre propre demande.</p>
-              )}
-              {propositions.map((piste, i) => (
-                <PisteModifiable
-                  key={piste}
-                  piste={piste}
-                  occupe={occupe}
-                  onLancer={(t) => void envoyer(t)}
-                  index={i}
-                  visible={panneauOuvert}
-                />
-              ))}
-            </div>
+            <PanneauRecherche occupe={occupe} onChercher={(demande) => void envoyer(demande)} />
           </Card>
 
           <Card className="flex min-h-[124px] flex-1 flex-col overflow-hidden p-4">
@@ -349,54 +330,3 @@ function RechercheEnCours() {
   );
 }
 
-/** Une piste : un texte qu’on peut corriger avant de l’envoyer à Merx. */
-function PisteModifiable({
-  piste,
-  index,
-  occupe,
-  onLancer,
-  visible,
-}: {
-  piste: string;
-  index: number;
-  occupe: boolean;
-  onLancer: (texte: string) => void;
-  /** Sur téléphone, le panneau est replié en CSS : le champ existe mais n'a pas de
-      taille, et se régler à ce moment-là le figeait à huit pixels. */
-  visible: boolean;
-}) {
-  const [texte, setTexte] = useState(piste);
-  const champ = useRef<HTMLTextAreaElement>(null);
-
-  // Deux lignes suffisent sur un écran large ; sur 343 pixels, la même piste en prend
-  // trois et la fin disparaissait dans un champ qu'il fallait faire défiler. Le champ
-  // se règle donc sur son texte — y compris pendant qu'on le corrige, et au moment où
-  // le panneau s'ouvre, seul instant où l'on connaît sa vraie taille sur téléphone.
-  useEffect(() => {
-    const el = champ.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [texte, visible]);
-
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-border p-2">
-      <textarea
-        ref={champ}
-        value={texte}
-        onChange={(e) => setTexte(e.target.value)}
-        rows={2}
-        aria-label={`Piste ${index + 1}`}
-        className="min-w-0 flex-1 resize-none overflow-hidden rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] leading-snug text-avisdoc-ink outline-none"
-      />
-      <button
-        type="button"
-        onClick={() => onLancer(texte)}
-        disabled={occupe || !texte.trim()}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[12px] font-bold text-avisdoc-ink transition-colors hover:bg-avisdoc-teal hover:text-white disabled:opacity-50"
-      >
-        <Play className="size-3.5" /> Lancer
-      </button>
-    </div>
-  );
-}
