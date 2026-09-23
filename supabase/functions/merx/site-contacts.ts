@@ -12,6 +12,10 @@ const PAGES = [
   "", "contact", "nous-contacter", "contactez-nous", "mentions-legales",
   "equipe", "notre-equipe", "equipe-dirigeante", "direction", "gouvernance",
   "qui-sommes-nous", "a-propos", "notre-entreprise",
+  // Les pages de recrutement sont la meilleure source d'adresses RH : c'est là
+  // qu'une entreprise publie « recrutement@ », « rh@ », et souvent le nom de la
+  // personne qui reçoit les candidatures.
+  "recrutement", "carrieres", "carriere", "nous-rejoindre", "rejoignez-nous", "emploi", "offres-emploi",
 ];
 
 /** Les fonctions qui nous intéressent : celles qui décident d'une campagne de dépistage. */
