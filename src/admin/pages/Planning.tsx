@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Mail, NotebookPen, Pencil, Phone, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, ListTodo, Loader2, Mail, NotebookPen, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import { PageHeader, SectionLabel } from "../components/ui";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/planning";
@@ -25,6 +25,7 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
   email: Mail,
   rdv: CalendarClock,
+  tache: ListTodo,
   note: NotebookPen,
 };
 
@@ -32,10 +33,11 @@ const TEINTES: Record<GenreEchange, string> = {
   appel: "bg-avisdoc-teal text-white",
   rdv: "bg-avisdoc-coral text-white",
   email: "bg-violet-500 text-white",
+  tache: "bg-amber-500 text-white",
   note: "bg-slate-500 text-white",
 };
 
-const NOMS: Record<GenreEchange, string> = { appel: "appel", rdv: "rendez-vous", email: "e-mail", note: "note" };
+const NOMS: Record<GenreEchange, string> = { appel: "appel", rdv: "rendez-vous", email: "e-mail", tache: "à faire", note: "note" };
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 

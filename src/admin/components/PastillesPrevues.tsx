@@ -3,7 +3,7 @@
 // Discrètes tant que l'échéance est loin, elles passent en orange le jour venu —
 // on ne doit pas avoir à ouvrir la fiche pour savoir qu'un appel attend.
 
-import { CalendarClock, Mail, NotebookPen, Phone } from "lucide-react";
+import { CalendarClock, ListTodo, Mail, NotebookPen, Phone } from "lucide-react";
 import type { GenreEchange } from "../lib/echanges";
 import type { Prevu } from "../lib/actions-prevues";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
   email: Mail,
   rdv: CalendarClock,
+  tache: ListTodo,
   note: NotebookPen,
 };
 
@@ -20,6 +21,7 @@ const TEINTES: Record<GenreEchange, string> = {
   appel: "bg-avisdoc-teal text-white",
   rdv: "bg-avisdoc-coral text-white",
   email: "bg-violet-500 text-white",
+  tache: "bg-amber-500 text-white",
   note: "bg-slate-500 text-white",
 };
 
@@ -27,6 +29,7 @@ const NOMS: Record<GenreEchange, string> = {
   appel: "appel",
   email: "e-mail",
   rdv: "rendez-vous",
+  tache: "à faire",
   note: "note",
 };
 

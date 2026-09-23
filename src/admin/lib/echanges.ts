@@ -6,7 +6,9 @@
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
 
-export type GenreEchange = "appel" | "email" | "rdv" | "note";
+// « tache » : ce qui n'est ni un appel, ni un e-mail, ni un rendez-vous —
+// préparer une tournée, passer au salon. Une action qui n'a pas d'autre nom.
+export type GenreEchange = "appel" | "email" | "rdv" | "note" | "tache";
 
 export interface Echange {
   id: string;
@@ -28,6 +30,7 @@ export const GENRES: { valeur: GenreEchange; label: string }[] = [
   { valeur: "appel", label: "Appel" },
   { valeur: "email", label: "E-mail" },
   { valeur: "rdv", label: "Rendez-vous" },
+  { valeur: "tache", label: "À faire" },
   { valeur: "note", label: "Note" },
 ];
 

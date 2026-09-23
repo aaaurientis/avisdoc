@@ -33,7 +33,8 @@ export const memeJour = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 /**
- * Ce qui est PROGRAMMÉ entre deux dates, avec le nom de la fiche concernée.
+ * Ce qui est PROGRAMMÉ entre deux dates, avec le nom de la fiche concernée quand il
+ * y en a une.
  *
  * Les notes en sont exclues. Une note est un compte rendu de ce qui s'est passé, pas
  * une action à venir : elle encombrait le planning d'un pavé qu'on ne pouvait ni faire
@@ -43,7 +44,7 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
   const { data, error } = await supabaseAdmin
     .from("admin_echanges")
     .select("id, kind, titre, detail, au, par, prospect_id, client_id, account_id")
-    .in("kind", ["appel", "rdv", "email"])
+    .in("kind", ["appel", "rdv", "email", "tache"])
     .gte("au", du.toISOString())
     .lt("au", au.toISOString())
     .order("au", { ascending: true });

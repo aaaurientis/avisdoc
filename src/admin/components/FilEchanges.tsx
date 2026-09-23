@@ -8,7 +8,7 @@
 // frappe n'est pas un fait.
 
 import { useCallback, useEffect, useState } from "react";
-import { Mail, NotebookPen, Phone, Trash2, CalendarClock } from "lucide-react";
+import { ListTodo, Mail, NotebookPen, Phone, Trash2, CalendarClock } from "lucide-react";
 import {
   chargerEchanges,
   supprimerEchange,
@@ -25,6 +25,7 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
   email: Mail,
   rdv: CalendarClock,
+  tache: ListTodo,
   note: NotebookPen,
 };
 

@@ -8,7 +8,7 @@
 // aussi dans sa fiche —, mais ce n'est pas obligatoire : c'est tout l'objet de cet écran.
 
 import { useEffect, useState } from "react";
-import { CalendarClock, Loader2, Mail, Phone } from "lucide-react";
+import { CalendarClock, ListTodo, Loader2, Mail, Phone } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Modal, SectionLabel } from "./ui";
 import { supabaseAdmin } from "../data/supabaseAdmin";
@@ -16,12 +16,14 @@ import { ajouterEchange, type GenreEchange } from "../lib/echanges";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { cn } from "@/lib/utils";
 
-// Les trois genres que le planning affiche. Une note n'y a pas sa place : c'est un
-// compte rendu de ce qui s'est passé, pas quelque chose à faire.
+// Les genres que le planning affiche. Une note n'y a pas sa place : c'est un compte
+// rendu de ce qui s'est passé, pas quelque chose à faire. « À faire » recueille tout
+// le reste — ce qui n'est ni un appel, ni un rendez-vous, ni un e-mail.
 const GENRES: { valeur: GenreEchange; label: string; icone: typeof Phone; aide: string }[] = [
-  { valeur: "appel", label: "Appel", icone: Phone, aide: "Qui appeler, et pourquoi." },
   { valeur: "rdv", label: "Rendez-vous", icone: CalendarClock, aide: "Le lieu, l’objet, ce qui s’y joue." },
+  { valeur: "appel", label: "Appel", icone: Phone, aide: "Qui appeler, et pourquoi." },
   { valeur: "email", label: "E-mail", icone: Mail, aide: "Le message à écrire, et à qui." },
+  { valeur: "tache", label: "À faire", icone: ListTodo, aide: "Tout le reste : préparer une tournée, passer au salon." },
 ];
 
 const champCls =
@@ -54,7 +56,7 @@ export default function NouvelleAction({
   onFait: () => Promise<void> | void;
 }) {
   const { user } = useAuth();
-  const [genre, setGenre] = useState<GenreEchange>("appel");
+  const [genre, setGenre] = useState<GenreEchange>("rdv");
   const [titre, setTitre] = useState("");
   const [detail, setDetail] = useState("");
   const [date, setDate] = useState(() => jour.toLocaleDateString("sv-SE"));
@@ -114,8 +116,8 @@ export default function NouvelleAction({
     } catch (e) {
       const m = e instanceof Error ? e.message : "L’action n’a pas pu être enregistrée.";
       setErreur(
-        /admin_echanges_une_seule_fiche/.test(m)
-          ? "Une action sans entreprise attend la migration 0038 : collez-la dans le SQL Editor."
+        /admin_echanges_une_seule_fiche|admin_echanges_kind_check/.test(m)
+          ? "Cette action attend la migration 0038 : collez-la dans le SQL Editor."
           : m,
       );
     } finally {
