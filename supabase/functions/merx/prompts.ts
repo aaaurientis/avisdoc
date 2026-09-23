@@ -331,6 +331,8 @@ Les codes les plus demandés :
 
 L'EFFECTIF MINIMUM, en salariés, seulement s'il est dit (« plus de 50 » donne 50). Sinon 0.
 
+CE QUI N'EST PAS UN CRITÈRE. La demande peut porter des PRÉFÉRENCES — « en privilégiant celles qui publient une démarche RSE », « dont les salariés travaillent dehors », « interlocuteur à viser : QSE ». Elles ne restreignent RIEN : tu les ignores pour établir les filtres. Une entreprise qui remplit le métier, la zone et la taille doit sortir, qu'elle publie une démarche RSE ou non. Ces préférences serviront plus tard, à l'approfondissement ; les transformer en filtre viderait la liste.
+
 TU RENDS TOUJOURS QUELQUE CHOSE DÈS QU'UN MÉTIER EST NOMMÉ. Si tu n'es pas sûr du code exact, donne la SECTION qui le contient plutôt que rien :
 - C = industrie manufacturière (fabrication, y compris médicale et cosmétique)
 - F = construction et BTP
