@@ -8,7 +8,7 @@
 // fonction (jetons lus, jetons écrits, recherches web), multipliée par les tarifs relevés.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { coutDe, euroDollar, MODELES_ACTUELS, MODELE_PAR_DEFAUT, NOM_MODELE, TARIFS_MODELE, TARIF_RECHERCHE_WEB, type Consommation } from "../lib/couts";
@@ -48,6 +48,43 @@ const duree = (d: Demande) => {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
 };
 
+type Colonne = "nom" | "depenses" | "cout";
+
+/** Un en-tête qui trie. La flèche dit la colonne active et son sens. */
+function EnTete({
+  colonne,
+  libelle,
+  tri,
+  onTrier,
+  className,
+}: {
+  colonne: Colonne;
+  libelle: string;
+  tri: { colonne: Colonne; sens: "asc" | "desc" };
+  onTrier: (c: Colonne) => void;
+  className?: string;
+}) {
+  const active = tri.colonne === colonne;
+  return (
+    <button
+      type="button"
+      onClick={() => onTrier(colonne)}
+      className={cn(
+        "flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.05em] transition-colors",
+        active ? "text-avisdoc-ink" : "text-muted-foreground hover:text-avisdoc-ink",
+        className,
+      )}
+    >
+      {libelle}
+      {active ? (
+        tri.sens === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+      ) : (
+        <ArrowUpDown className="size-3 opacity-40" />
+      )}
+    </button>
+  );
+}
+
 function Chiffre({ titre, valeur, precision }: { titre: string; valeur: string; precision?: string }) {
   return (
     <Card className="p-4">
@@ -85,6 +122,9 @@ export default function Couts() {
   const [fiches, setFiches] = useState<FicheBrute[]>([]);
   /** Les entreprises dont on a ouvert le détail. */
   const [depliees, setDepliees] = useState<Set<string>>(new Set());
+  const [recherche, setRecherche] = useState("");
+  /** Le tri courant. Par défaut le plus cher en tête : c'est ce qu'on vient voir. */
+  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "cout", sens: "desc" });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -152,6 +192,31 @@ export default function Couts() {
   }, [demandes]);
 
   const cap = useMemo(() => calculerCap(demandes as unknown as DemandeBrute[], fiches), [demandes, fiches]);
+
+  /**
+   * Ce qu'on affiche : la liste filtrée par la recherche, puis triée.
+   * Les chiffres du bandeau restent globaux — un filtre ne change pas ce qu'on a dépensé.
+   */
+  const listeAffichee = useMemo(() => {
+    const nu = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const q = nu(recherche);
+    const filtrees = q ? cap.acquisitions.filter((a) => nu(a.nom).includes(q)) : cap.acquisitions;
+    const sens = tri.sens === "asc" ? 1 : -1;
+    return [...filtrees].sort((a, b) => {
+      if (tri.colonne === "nom") return sens * a.nom.localeCompare(b.nom, "fr");
+      if (tri.colonne === "depenses") return sens * (a.lignes.length - b.lignes.length);
+      return sens * (a.total - b.total);
+    });
+  }, [cap.acquisitions, recherche, tri]);
+
+  /** Un clic sur une colonne : on la trie, un second clic inverse le sens. */
+  const trierPar = (colonne: Colonne) =>
+    setTri((prev) =>
+      prev.colonne === colonne
+        ? { colonne, sens: prev.sens === "asc" ? "desc" : "asc" }
+        : // Un nom se lit de A à Z ; un montant, du plus gros au plus petit.
+          { colonne, sens: colonne === "nom" ? "asc" : "desc" },
+    );
 
   const deplier = (id: string) =>
     setDepliees((prev) => {
@@ -247,8 +312,50 @@ export default function Couts() {
           ) : (
             <>
               {cap.acquisitions.length > 0 && (
-                <div className="mb-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                  {cap.acquisitions.map((a) => {
+                <>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[240px] flex-1">
+                      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={recherche}
+                        onChange={(e) => setRecherche(e.target.value)}
+                        placeholder="Chercher une entreprise…"
+                        className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-10 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+                      />
+                      {recherche && (
+                        <button
+                          type="button"
+                          onClick={() => setRecherche("")}
+                          aria-label="Effacer la recherche"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-avisdoc-ink"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      )}
+                    </div>
+                    {recherche && (
+                      <span className="text-[12.5px] text-muted-foreground">
+                        {listeAffichee.length} sur {cap.acquisitions.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-card">
+                    {/* En-tête : chaque colonne se trie, un second clic inverse le sens. */}
+                    <div className="flex items-center gap-3 border-b border-border bg-muted/50 px-4 py-2">
+                      <span className="size-4 shrink-0" />
+                      <EnTete colonne="nom" libelle="Entreprise" tri={tri} onTrier={trierPar} className="min-w-0 flex-1" />
+                      <EnTete colonne="depenses" libelle="Dépenses" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
+                      <EnTete colonne="cout" libelle="Coût" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
+                    </div>
+
+                    {listeAffichee.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+                        Aucune entreprise ne porte ce nom.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-border">
+                  {listeAffichee.map((a) => {
                     const ouverte = depliees.has(a.prospectId);
                     return (
                       <div key={a.prospectId}>
@@ -260,13 +367,13 @@ export default function Couts() {
                           <ChevronRight
                             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouverte && "rotate-90")}
                           />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13.5px] font-semibold text-avisdoc-ink">{a.nom}</span>
-                            <span className="block text-[11.5px] text-muted-foreground">
-                              {a.lignes.length} dépense{a.lignes.length > 1 ? "s" : ""}
-                            </span>
+                          <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-avisdoc-ink">
+                            {a.nom}
                           </span>
-                          <span className="shrink-0 font-display text-[15px] font-semibold text-avisdoc-ink">
+                          <span className="w-24 shrink-0 text-right text-[12.5px] text-muted-foreground">
+                            {a.lignes.length}
+                          </span>
+                          <span className="w-24 shrink-0 text-right font-display text-[15px] font-semibold text-avisdoc-ink">
                             {euroDollar(a.total)}
                           </span>
                         </button>
@@ -293,7 +400,10 @@ export default function Couts() {
                       </div>
                     );
                   })}
-                </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               {/* Ce qui n'a produit aucune fiche, ou qui ne relève pas de l'acquisition :
