@@ -24,6 +24,7 @@ import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../
 import { useAdminData } from "../data/AdminDataContext";
 import { confirmer } from "../components/Confirmation";
 import { useActualisation } from "../lib/actualisation";
+import FiltresRepliables from "../components/FiltresRepliables";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -386,7 +387,9 @@ export default function Prospects() {
             className="ad-input w-full rounded-full border border-border bg-card py-2 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           />
         </div>
-        <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
+        <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
+          <FiltresProspects filtres={filtres} onChange={setFiltres} departements={departements} />
+        </FiltresRepliables>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           {([
             { id: "liste", label: "Liste", Icone: List },

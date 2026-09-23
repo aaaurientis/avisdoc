@@ -169,14 +169,19 @@ export default function Planning() {
           <Loader2 className="size-4 animate-spin" /> Chargement…
         </div>
       ) : (
-        <div className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-contain" style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(260px, 1fr))` }}>
+        <div
+          // Sur un téléphone, les jours s'empilent : en colonnes, la semaine faisait
+          // 1348 pixels de large, soit quatre écrans à faire défiler pour voir vendredi.
+          className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-contain max-sm:!grid-cols-1 max-sm:overflow-x-visible"
+          style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(260px, 1fr))` }}
+        >
           {semaine.map(({ jour, actions }) => {
             const aujourdhui = memeJour(jour, new Date());
             return (
               <div
                 key={jour.toISOString()}
                 className={cn(
-                  "flex min-h-[320px] flex-col rounded-2xl border p-3.5",
+                  "flex flex-col rounded-2xl border p-3.5 max-sm:min-h-0 sm:min-h-[320px]",
                   aujourdhui ? "border-avisdoc-teal bg-avisdoc-teal/5" : "border-border",
                 )}
               >
