@@ -65,6 +65,7 @@ function Section({
   compte,
   defaultOpen = true,
   actions,
+  fermer,
   children,
   locked = false,
   lockedHint,
@@ -73,6 +74,9 @@ function Section({
   compte?: number;
   defaultOpen?: boolean;
   actions?: ReactNode;
+  /** Fermer la fiche. Séparé des actions : sur un téléphone il reste sur la ligne
+      du titre, là où on le cherche, pendant que les actions passent en dessous. */
+  fermer?: () => void;
   children: ReactNode;
   locked?: boolean;
   lockedHint?: string;
@@ -97,15 +101,17 @@ function Section({
 
   return (
     <Card className="overflow-hidden">
-      {/* Sur un téléphone, les actions passent SOUS le titre. Sur une seule ligne,
-          « Modifier », « Supprimer » et la croix prenaient les 375 pixels et le nom de
-          l'entreprise disparaissait — on ne savait plus quelle fiche on regardait, et
-          la croix se retrouvait au bord. */}
+      {/* Sur un téléphone : le nom et la croix sur la première ligne, les actions
+          rangées en dessous, alignées à gauche. Tout sur une seule ligne, « Modifier »,
+          « Supprimer » et la croix prenaient les 375 pixels et le nom de l'entreprise
+          disparaissait ; en les renvoyant simplement à la ligne, elles s'empilaient en
+          escalier à droite et la croix se perdait au bout.
+          L'ordre du DOM garde la croix en dernier : sur grand écran, rien ne bouge. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex min-w-0 flex-1 basis-full items-center gap-3 text-left sm:basis-auto"
+          className="order-1 flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <ChevronDown
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
@@ -118,7 +124,18 @@ function Section({
           )}
         </button>
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">{actions}</div>
+          <div className="order-3 flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full sm:order-2">{actions}</div>
+        )}
+        {fermer && (
+          <button
+            type="button"
+            onClick={fermer}
+            title="Fermer la fiche"
+            aria-label="Fermer la fiche"
+            className="order-2 shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:text-avisdoc-ink sm:order-3"
+          >
+            <X className="size-5" />
+          </button>
         )}
       </div>
       {open && <div className="border-t border-border px-5 pb-5 pt-4">{children}</div>}
@@ -376,16 +393,9 @@ export default function ProjectView({
                   <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
                 </>
               )}
-              <button
-                type="button"
-                onClick={onClose}
-                title="Fermer le projet"
-                className="rounded-lg p-1 text-muted-foreground transition-colors hover:text-avisdoc-ink"
-              >
-                <X className="size-5" />
-              </button>
             </>
           }
+          fermer={onClose}
         >
           {editing ? (
             <div className="flex flex-col gap-2">
