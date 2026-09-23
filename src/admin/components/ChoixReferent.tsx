@@ -88,21 +88,29 @@ export default function ChoixReferent({
   };
 
   return (
-    <label className={cn("inline-flex items-center gap-2", className)}>
-      <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
+    // Sans fond ni contraste, la liste se perdait au milieu de la fiche : personne
+    // ne la voyait. Elle se signale donc tant que la fiche n'a pas de référent.
+    <label
+      className={cn(
+        "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
+        valeur ? "border-border bg-muted/50" : "border-avisdoc-coral bg-avisdoc-coral/10",
+        className,
+      )}
+    >
+      <UserRound className={cn("size-4 shrink-0", valeur ? "text-avisdoc-teal" : "text-avisdoc-coral")} />
       <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-        Référent
+        Suivi par
       </span>
       <select
         value={valeur}
         disabled={envoi}
         onChange={(e) => void enregistrer(e.target.value)}
         className={cn(
-          "ad-input min-w-0 rounded-full border bg-background px-3 py-1.5 text-[12.5px] font-semibold outline-none transition-colors",
+          "ad-input min-w-0 cursor-pointer rounded-full border bg-background px-3 py-1 text-[12.5px] font-bold outline-none transition-colors",
           erreur ? "border-rose-300 text-rose-700" : "border-border text-avisdoc-ink focus:border-avisdoc-teal",
         )}
       >
-        <option value="">Personne</option>
+        <option value="">— à attribuer —</option>
         {choix.map((m) => (
           <option key={m} value={m}>
             {nomLisible(m)}

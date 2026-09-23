@@ -367,6 +367,9 @@ export default function ProjectView({
           titre={client.company}
           actions={
             <>
+              {/* Qui suit cette affaire — visible même section repliée. Le choix descend
+                  tout seul sur la fiche client le jour où elle est signée. */}
+              <ChoixReferent quoi="affaire" id={client.id} />
               <QontoTag clientId={client.id} />
               {editing ? (
                 <>
@@ -448,9 +451,6 @@ export default function ProjectView({
                 <span className="font-bold text-blue-700">données Pappers ✓</span>
               </div>
               <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
-              {/* Qui suit cette affaire. Le choix descend tout seul sur la fiche
-                  client le jour où elle est signée. */}
-              <ChoixReferent quoi="affaire" id={client.id} className="mt-3" />
             </div>
           )}
 

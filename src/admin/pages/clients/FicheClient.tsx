@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, X } from "lucide-react";
+import { Loader2, Pencil, Sparkles, Undo2, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
@@ -14,7 +14,9 @@ import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
 import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import BrouillonEmail from "../prospects/BrouillonEmail";
-import { redigerEmailClient } from "../../lib/merx-appels";
+import { approfondirProspect, redigerEmailClient } from "../../lib/merx-appels";
+import { jeter } from "../../lib/corbeille";
+import { confirmer } from "../../components/Confirmation";
 import { useAuth } from "../../auth/AuthContext";
 import type { GenreEchange } from "../../lib/echanges";
 import type { Jalon } from "../../lib/echanges";
@@ -51,7 +53,7 @@ export default function FicheClient({
   mode?: "lecture" | "edition";
   onClose: () => void;
 }) {
-  const { accountFields, addAccount, saveAccount, getClient } = useAdminData();
+  const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("identite");
   const [origine, setOrigine] = useState<Prospect | null>(null);
@@ -60,6 +62,64 @@ export default function FicheClient({
   const [brouillon, setBrouillon] = useState<{ objet: string; corps: string; destinataire: string | null } | null>(null);
   const compter = useCallback((n: number) => setNbEchanges(n), []);
   const { user } = useAuth();
+  const [enCours, setEnCours] = useState<"approfondir" | "pipeline" | null>(null);
+  const [souci, setSouci] = useState<string | null>(null);
+
+  /**
+   * Approfondir un client, c'est approfondir la fiche d'origine : c'est elle qui porte
+   * l'identité officielle, la note et le dossier commercial, et c'est elle que les
+   * onglets de cette fenêtre affichent. Un client reste une entreprise à démarcher —
+   * on lui reproposera une campagne.
+   */
+  const approfondir = async () => {
+    if (!origine || enCours) return;
+    setEnCours("approfondir");
+    setSouci(null);
+    try {
+      await approfondirProspect(origine.id);
+      const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("id", origine.id).maybeSingle();
+      if (data) setOrigine(data as Prospect);
+      toast.success("Fiche approfondie.");
+    } catch (e) {
+      setSouci(e instanceof Error ? e.message : "L’approfondissement a échoué.");
+    } finally {
+      setEnCours(null);
+    }
+  };
+
+  /**
+   * On s'est trompé de colonne : l'affaire repart au Pipeline et la fiche client va à
+   * la corbeille. La marque « fiche créée » est levée, sinon une nouvelle signature ne
+   * recréerait jamais la fiche.
+   */
+  const remettreAuPipeline = async () => {
+    if (!fiche?.clientId || !affaire || enCours) return;
+    // On recule d'une seule étape : une affaire signée par erreur repart en
+    // négociation, pas au tout début — le travail déjà fait reste visible.
+    const i = stages.findIndex((e) => e.label === affaire.stage);
+    const cible = i > 0 ? stages[i - 1].label : stages[0]?.label;
+    if (!cible || cible === affaire.stage) return;
+    if (
+      !(await confirmer({
+        titre: `Remettre ${fiche.name} au Pipeline ?`,
+        message: `L’affaire repart à l’étape « ${cible} » et cette fiche client part à la corbeille, d’où elle se restaure pendant trente jours.`,
+        action: "Remettre au Pipeline",
+      }))
+    )
+      return;
+    setEnCours("pipeline");
+    setSouci(null);
+    try {
+      setClientStage(fiche.clientId, cible);
+      updateClientFields(fiche.clientId, { ficheClientCreee: false });
+      await jeter("client", [fiche.id]);
+      toast.success(`${fiche.name} est repartie à l’étape « ${cible} ».`);
+      onClose();
+    } catch (e) {
+      setSouci(e instanceof Error ? e.message : "L’opération a échoué.");
+      setEnCours(null);
+    }
+  };
 
   /**
    * Merx écrit à un client qu'on connaît : il relit ce qui s'est passé avec eux et
@@ -169,6 +229,8 @@ export default function FicheClient({
                     .join(" · ") || "Fiche client"
                 : "Modifiez ce qu’il faut, puis enregistrez."}
           </p>
+          {/* Hors des onglets : on doit voir qui suit ce client en ouvrant la fiche. */}
+          {fiche && mode === "lecture" && <ChoixReferent quoi="client" id={fiche.id} className="mt-2.5" />}
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
           <X className="size-5" />
@@ -185,11 +247,6 @@ export default function FicheClient({
         <div className="max-h-[52vh] overflow-y-auto">
         {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
             elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
-        {/* Qui suit ce client. Repris de l'affaire à la signature, modifiable ensuite. */}
-        <div className="mb-3">
-          <ChoixReferent quoi="client" id={fiche.id} />
-        </div>
-
         {affaire && (
           <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
             <SectionLabel>Ce qu’on sait d’eux</SectionLabel>
@@ -274,8 +331,31 @@ export default function FicheClient({
           <div className="max-h-[52vh] overflow-y-auto pr-1">
             {origine ? (
               <>
-                {/* Un client reste une entreprise qu'on démarche : le dossier garde sa valeur
-                    pour proposer une nouvelle campagne. */}
+                {/* Approfondir vaut aussi pour un client : les effectifs changent, les
+                    dirigeants aussi, et le dossier sert à reproposer une campagne. */}
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border p-3">
+                  <button
+                    type="button"
+                    onClick={() => void approfondir()}
+                    disabled={enCours !== null}
+                    className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {enCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    {enCours === "approfondir"
+                      ? "Merx cherche… une bonne minute"
+                      : dossierRempli(origine.dossier)
+                        ? "Approfondir à nouveau"
+                        : "Approfondir"}
+                  </button>
+                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
+                    {dossierRempli(origine.dossier)
+                      ? "Remet à jour l’identité officielle, l’effectif et le dossier commercial."
+                      : "Va chercher l’identité officielle, l’effectif, les dirigeants, et monte le dossier commercial."}
+                  </span>
+                </div>
+                {souci && (
+                  <p className="mb-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p>
+                )}
                 {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
                 {origine.rationale && (
                   <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
@@ -350,6 +430,19 @@ export default function FicheClient({
             >
               <Pencil className="size-4" /> Modifier
             </button>
+            {/* Une signature par erreur se défait : l'affaire repart au Pipeline et
+                la fiche client va à la corbeille, d'où elle revient si besoin. */}
+            {fiche?.clientId && affaire && (
+              <button
+                type="button"
+                onClick={() => void remettreAuPipeline()}
+                disabled={enCours !== null}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
+              >
+                {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+                Remettre au Pipeline
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

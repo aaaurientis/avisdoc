@@ -16,6 +16,7 @@ export default function FicheEntreprise({
   titre,
   sousTitre,
   badge,
+  referent,
   identite,
   actions,
   message,
@@ -31,6 +32,9 @@ export default function FicheEntreprise({
   sousTitre?: ReactNode;
   /** À droite du titre : la note, l'étape, ce qui qualifie la fiche d'un coup d'œil. */
   badge?: ReactNode;
+  /** Sous le titre : qui suit cette entreprise. Hors des onglets, pour qu'on le voie
+      en ouvrant la fiche sans avoir à chercher. */
+  referent?: ReactNode;
   /** Identité officielle : SIREN, raison sociale, adresse. */
   identite?: ReactNode;
   actions?: ReactNode;
@@ -55,6 +59,7 @@ export default function FicheEntreprise({
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-2xl font-semibold text-avisdoc-ink">{titre}</h2>
             {sousTitre && <p className="mt-1 text-[13px] text-muted-foreground">{sousTitre}</p>}
+            {referent && <div className="mt-2.5">{referent}</div>}
           </div>
           {badge}
           <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
