@@ -541,7 +541,14 @@ export default function Prospects() {
                     {p.name}
                   </td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{secteurLisible(p.sector)}</td>
-                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.activity || "—"}</td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
+                    {/* Deux lignes au plus : une description de cinq lignes étire la rangée
+                        et l'on ne balaie plus la liste. Le texte entier reste dans la fiche,
+                        et s'affiche au survol. */}
+                    <span className="line-clamp-2 max-w-[22rem]" title={p.activity ?? undefined}>
+                      {p.activity || "—"}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.city || "—"}</td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.contact_name || p.contact_email || "—"}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[13px] text-muted-foreground">
