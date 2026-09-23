@@ -144,7 +144,7 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
   const { user, signOut, isSuperAdmin, peut } = useAuth();
   const [theme, setTheme] = useState<Theme>(themeCourant());
   const basculerTheme = () => {
@@ -156,7 +156,10 @@ export default function Sidebar() {
   const menu = MENU.filter((m) => m.module === null || peut(m.module));
 
   return (
-    <aside className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6">
+    <aside
+      data-ouvert={ouvert ? "oui" : "non"}
+      className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6"
+    >
       <div className="flex flex-col gap-1.5 px-2.5 pb-6">
         <AvisdocLogo className="h-12 w-auto self-start" />
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
