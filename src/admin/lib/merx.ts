@@ -91,6 +91,19 @@ export interface Prospect {
 /** Colonne où ranger une fiche : son secteur, « Autre » à défaut. */
 export const secteurDe = (p: Prospect): Secteur => (p.sector && SECTEURS.some((s) => s.id === p.sector) ? p.sector : "autre");
 
+/**
+ * Le secteur tel qu'on l'affiche.
+ *
+ * Il porte aujourd'hui le libellé réel — « Construction », « Santé et action
+ * sociale » —, mais les fiches d'avant portent encore un identifiant (« btp »,
+ * « espaces_verts ») : on leur rend leur libellé plutôt que d'afficher du code.
+ */
+export function secteurLisible(sector: string | null): string {
+  const brut = (sector ?? "").trim();
+  if (!brut) return "—";
+  return SECTEURS.find((s) => s.id === brut)?.label ?? brut;
+}
+
 /** Couleur de la note : elle suit le total sur 100, sans jamais rien inventer quand il est absent. */
 export function tonNote(total: number | null): string {
   if (total === null) return "bg-muted text-muted-foreground";

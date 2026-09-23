@@ -32,7 +32,7 @@ import {
   type ListOut,
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
-import { metierDe } from "./metiers.ts";
+import { metierDe, secteurDe } from "./metiers.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
@@ -176,11 +176,12 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       name: c.name,
       city: local.city ?? c.headOffice.city,
       department: local.department ?? c.headOffice.department,
+      // Deux niveaux, qui ne disent pas la même chose : le SECTEUR situe l'entreprise
+      // (Construction, Santé, Industrie…), l'ACTIVITÉ dit son métier (construction de
+      // routes, fabrication de matériel médical). Le secteur se déduit du code
+      // d'activité et couvre toute la nomenclature : aucune fiche n'en manque.
       activity: metier.activite,
-      // Le secteur, c'est le métier réel de l'entreprise — pas une case parmi cinq.
-      // Il y a autant de secteurs qu'il y a de métiers : de la construction de routes
-      // à la fabrication de matériel médical, chacun s'écrit tel qu'il est.
-      sector: metier.activite,
+      sector: secteurDe(c.activityCode),
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source],

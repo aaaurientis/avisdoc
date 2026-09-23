@@ -81,3 +81,43 @@ export function metierDe(naf: string | null): Metier | null {
   for (const p of prefixes) if (code.startsWith(p)) return TABLE[p];
   return null;
 }
+
+// ── Le secteur : la famille, au-dessus du métier ─────────────────────────
+//
+// « Secteur » et « activité » ne disent pas la même chose : la construction de
+// routes et la couverture sont deux métiers d'un même secteur, le bâtiment. La
+// liste ci-dessous couvre TOUTE la nomenclature, ce qui garantit qu'aucune fiche
+// n'arrive sans secteur — même une activité qu'on n'a jamais rencontrée.
+//
+// Les divisions viennent de la nomenclature officielle : les deux premiers
+// chiffres du code d'activité suffisent à situer l'entreprise.
+
+const SECTIONS: { de: number; a: number; label: string }[] = [
+  { de: 1, a: 3, label: "Agriculture et pêche" },
+  { de: 5, a: 9, label: "Industries extractives" },
+  { de: 10, a: 33, label: "Industrie" },
+  { de: 35, a: 35, label: "Énergie" },
+  { de: 36, a: 39, label: "Eau et déchets" },
+  { de: 41, a: 43, label: "Construction" },
+  { de: 45, a: 47, label: "Commerce" },
+  { de: 49, a: 53, label: "Transport et logistique" },
+  { de: 55, a: 56, label: "Hôtellerie et restauration" },
+  { de: 58, a: 63, label: "Information et communication" },
+  { de: 64, a: 66, label: "Banque et assurance" },
+  { de: 68, a: 68, label: "Immobilier" },
+  { de: 69, a: 75, label: "Services aux entreprises" },
+  { de: 77, a: 82, label: "Services administratifs et de soutien" },
+  { de: 84, a: 84, label: "Administration publique" },
+  { de: 85, a: 85, label: "Enseignement" },
+  { de: 86, a: 88, label: "Santé et action sociale" },
+  { de: 90, a: 93, label: "Arts, sport et loisirs" },
+  { de: 94, a: 96, label: "Services à la personne" },
+  { de: 97, a: 99, label: "Autres" },
+];
+
+/** Le secteur d'une entreprise, déduit de son code d'activité. Toujours renseigné. */
+export function secteurDe(naf: string | null): string {
+  const division = Number.parseInt((naf ?? "").trim().slice(0, 2), 10);
+  if (Number.isNaN(division)) return "Non précisé";
+  return SECTIONS.find((s) => division >= s.de && division <= s.a)?.label ?? "Non précisé";
+}

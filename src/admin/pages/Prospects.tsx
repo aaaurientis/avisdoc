@@ -7,7 +7,7 @@ import { LayoutGrid, List, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } 
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
-import { SECTEURS, secteurDe, tonNote, type Prospect } from "../lib/merx";
+import { effectifLabel, secteurLisible, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
@@ -408,11 +408,11 @@ export default function Prospects() {
       ) : (
         /* ── Liste : toutes les fiches d'un coup, triées par note ── */
         <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
-          <table className="w-full min-w-[720px] border-collapse">
+          <table className="w-full min-w-[980px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="w-10 px-3" />
-                {["Entreprise", "Activité", "Ville", "Interlocuteur", "Note", "Prévu"].map((t) => (
+                {["Créée", "Entreprise", "Secteur", "Activité", "Ville", "Interlocuteur", "Salariés", "Note", "Prévu"].map((t) => (
                   <th
                     key={t}
                     className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
@@ -436,13 +436,20 @@ export default function Prospects() {
                   <td className="px-3" onClick={(e) => e.stopPropagation()}>
                     <CaseFiche cochee={coches.has(p.id)} onBascule={() => cocher(p.id)} libelle={p.name} visible={coches.size > 0} />
                   </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-[12.5px] text-muted-foreground">
+                    {new Date(p.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                  </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold text-avisdoc-ink">
                     {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}
                     {p.name}
                   </td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{secteurLisible(p.sector)}</td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.activity || "—"}</td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.city || "—"}</td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{p.contact_name || p.contact_email || "—"}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-[13px] text-muted-foreground">
+                    {effectifLabel(p.headcount_band) ?? "—"}
+                  </td>
                   <td className="px-4 py-2.5">
                     <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"}</Badge>
                   </td>
