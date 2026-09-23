@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutGrid, List, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUpDown, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -122,6 +122,49 @@ function messageErreur(brut: string): string {
   return /Could not find the table .* in the schema cache/i.test(brut)
     ? "Cet écran attend sa migration : le SQL n’a pas encore été exécuté sur la base."
     : brut;
+}
+
+/** Les colonnes sur lesquelles on peut trier. */
+type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note";
+
+/** L'ordre des tranches INSEE : « 250 à 499 » doit passer après « 50 à 99 », pas avant. */
+const ORDRE_EFFECTIF = ["NN", "00", "01", "02", "03", "11", "12", "21", "22", "31", "32", "41", "42", "51", "52", "53"];
+const rangEffectif = (band: string | null): number => {
+  const i = ORDRE_EFFECTIF.indexOf(band ?? "");
+  return i === -1 ? -1 : i; // effectif inconnu : en fin de liste
+};
+
+/** Un en-tête qui trie. La flèche dit la colonne active et son sens. */
+function EnTete({
+  colonne,
+  libelle,
+  tri,
+  onTrier,
+  className,
+}: {
+  colonne: Colonne;
+  libelle: string;
+  tri: { colonne: Colonne; sens: "asc" | "desc" };
+  onTrier: (c: Colonne) => void;
+  className?: string;
+}) {
+  const active = tri.colonne === colonne;
+  return (
+    <th className={cn("whitespace-nowrap px-4 py-2.5 text-left", className)}>
+      <button
+        type="button"
+        onClick={() => onTrier(colonne)}
+        className={cn(
+          "inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.05em] transition-colors",
+          active ? "text-avisdoc-ink" : "text-muted-foreground hover:text-avisdoc-ink",
+        )}
+      >
+        {libelle}
+        <ArrowUpDown className={cn("size-3", active ? "opacity-100" : "opacity-40")} />
+        {active && <span className="text-[10px]">{tri.sens === "asc" ? "▲" : "▼"}</span>}
+      </button>
+    </th>
+  );
 }
 
 export default function Prospects() {
@@ -257,10 +300,51 @@ export default function Prospects() {
     [prospects],
   );
 
-  const visibles = useMemo(
-    () => duVivier.filter((p) => retenue(p, filtres, recherche)),
-    [duVivier, filtres, recherche],
-  );
+  /** Le tri de la liste : une colonne, un sens. Par défaut les meilleures notes d'abord. */
+  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "note", sens: "desc" });
+
+  const visibles = useMemo(() => {
+    const retenues = duVivier.filter((p) => retenue(p, filtres, recherche));
+    const sens = tri.sens === "asc" ? 1 : -1;
+    /**
+     * Comparaison de textes, les valeurs absentes toujours en fin.
+     *
+     * Sans cela, trier par ville en ordre croissant remontait en tête toutes les
+     * fiches qui n'en ont pas : le commercial voyait d'abord ce qu'on ne sait pas.
+     */
+    const parTexte = (x: string | null | undefined, y: string | null | undefined): number => {
+      const a = (x ?? "").trim();
+      const b = (y ?? "").trim();
+      if (!a && !b) return 0;
+      if (!a) return 1; // « a » vide : après, quel que soit le sens
+      if (!b) return -1;
+      return sens * a.localeCompare(b, "fr");
+    };
+    const compare = (a: Prospect, b: Prospect): number => {
+      switch (tri.colonne) {
+        case "creee": return sens * a.created_at.localeCompare(b.created_at);
+        case "nom": return sens * a.name.localeCompare(b.name, "fr");
+        case "secteur": return parTexte(secteurLisible(a.sector), secteurLisible(b.sector));
+        case "activite": return parTexte(a.activity, b.activity);
+        case "ville": return parTexte(a.city, b.city);
+        case "interlocuteur": return parTexte(a.contact_name ?? a.contact_email, b.contact_name ?? b.contact_email);
+        case "salaries": return sens * (rangEffectif(a.headcount_band) - rangEffectif(b.headcount_band));
+        default: return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
+      }
+    };
+    return retenues.sort(compare);
+  }, [duVivier, filtres, recherche, tri]);
+
+  /** Un clic trie, un second inverse le sens. */
+  const trierPar = (colonne: Colonne) =>
+    setTri((avant) =>
+      avant.colonne === colonne
+        ? { colonne, sens: avant.sens === "asc" ? "desc" : "asc" }
+        : { colonne, sens: colonne === "note" || colonne === "creee" || colonne === "salaries" ? "desc" : "asc" },
+    );
+
+  /** Toutes les fiches visibles sont-elles cochées ? */
+  const toutesCochees = visibles.length > 0 && visibles.every((p) => coches.has(p.id));
 
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
   const nouvelles = useMemo(() => prospects.filter((p) => !p.converted_client_id && !p.opened_at).length, [prospects]);
@@ -411,16 +495,30 @@ export default function Prospects() {
           <table className="w-full min-w-[980px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="w-10 px-3" />
-                {["Créée", "Entreprise", "Secteur", "Activité", "Ville", "Interlocuteur", "Salariés", "Note", "Prévu"].map((t) => (
-                  <th
-                    key={t}
-                    className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
-                  >
-                    {t}
-                  </th>
-                ))}
-                <th className="w-20" />
+                {/* Tout cocher d'un clic : sur une liste filtrée, cela ne prend que
+                    ce qui est affiché — un secteur, un département, une recherche. */}
+                <th className="w-10 px-3">
+                  <CaseFiche
+                    cochee={toutesCochees}
+                    onBascule={() =>
+                      setCoches(toutesCochees ? new Set() : new Set(visibles.map((p) => p.id)))
+                    }
+                    libelle={toutesCochees ? "Tout décocher" : `Tout cocher (${visibles.length})`}
+                    visible
+                  />
+                </th>
+                <EnTete colonne="creee" libelle="Créée" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="nom" libelle="Entreprise" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="secteur" libelle="Secteur" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="activite" libelle="Activité" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="ville" libelle="Ville" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="interlocuteur" libelle="Interlocuteur" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="salaries" libelle="Salariés" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="note" libelle="Note" tri={tri} onTrier={trierPar} />
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                  Prévu
+                </th>
+                <th className="px-2" />
               </tr>
             </thead>
             <tbody>
