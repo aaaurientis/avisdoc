@@ -22,6 +22,7 @@ import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
 import Droits from "./pages/Droits";
 import type { Module } from "./lib/modules";
+import { lireArrivee } from "./lib/arrivee";
 
 function FullScreenLoader() {
   return (
@@ -48,7 +49,8 @@ function Garde({ module, children }: { module: Module; children: React.ReactNode
 function Accueil() {
   const { peut } = useAuth();
   const surTelephone = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
-  return <Navigate to={surTelephone && peut("merx") ? "/dictee" : "/dashboard"} replace />;
+  const versLaDictee = surTelephone && lireArrivee() === "dictee" && peut("merx");
+  return <Navigate to={versLaDictee ? "/dictee" : "/dashboard"} replace />;
 }
 
 /** Aiguillage selon l'état d'authentification. */

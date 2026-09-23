@@ -34,6 +34,7 @@ import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
 import { initials } from "../lib/format";
+import { ecrireArrivee, lireArrivee, type Arrivee } from "../lib/arrivee";
 import type { Module } from "../lib/modules";
 import { appliquerTheme, themeCourant, type Theme } from "../lib/theme";
 import { Avatar } from "./ui";
@@ -147,6 +148,8 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
 export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
   const { user, signOut, isSuperAdmin, peut } = useAuth();
   const [theme, setTheme] = useState<Theme>(themeCourant());
+  const [arrivee, setArrivee] = useState<Arrivee>(lireArrivee);
+
   const basculerTheme = () => {
     const t: Theme = theme === "dark" ? "light" : "dark";
     appliquerTheme(t);
@@ -191,11 +194,29 @@ export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
         })}
       </nav>
 
+      {/* Où l'on arrive en ouvrant le Hub d'un téléphone. Le réglage n'apparaît que
+          là où il a un sens : sur un grand écran, on arrive toujours au tableau de bord. */}
+      <button
+        type="button"
+        onClick={() => {
+          const suivant = arrivee === "dictee" ? "dashboard" : "dictee";
+          ecrireArrivee(suivant);
+          setArrivee(suivant);
+        }}
+        className="mt-auto hidden items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-avisdoc-ink max-md:flex"
+      >
+        {arrivee === "dictee" ? <Mic className="size-[18px]" strokeWidth={2.2} /> : <LayoutDashboard className="size-[18px]" strokeWidth={2.2} />}
+        <span className="min-w-0 flex-1">
+          <span className="block">Ouvrir sur {arrivee === "dictee" ? "la dictée" : "le tableau de bord"}</span>
+          <span className="block text-[11px] font-normal text-muted-foreground/80">sur ce téléphone</span>
+        </span>
+      </button>
+
       {/* Bascule clair / sombre */}
       <button
         type="button"
         onClick={basculerTheme}
-        className="mt-auto flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-avisdoc-ink"
+        className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-avisdoc-ink max-md:mt-0 md:mt-auto"
       >
         {theme === "dark" ? (
           <Sun className="size-[18px]" strokeWidth={2.2} />
