@@ -1,19 +1,29 @@
-// Les filtres de la prospection, ceux arrêtés sur la vitrine : note, salariés, date d'arrivée,
-// e-mail, département. Ils se combinent, et « Tout » remet chacun à zéro.
+// Les filtres de la prospection : note, salariés, secteur, date d'arrivée, e-mail,
+// ville, département. Ils se combinent, et « Tout » remet chacun à zéro.
 //
 // L'effectif n'est connu que des fiches approfondies : le palier « Non renseigné » sert à les retrouver.
 
-import type { Prospect } from "../../lib/merx";
+import { secteurLisible, type Prospect } from "../../lib/merx";
 
 export interface Filtres {
   noteMin: string;
   salaries: string;
+  secteur: string;
   arrivee: string;
   email: string;
+  ville: string;
   departement: string;
 }
 
-export const FILTRES_VIDES: Filtres = { noteMin: "", salaries: "", arrivee: "", email: "", departement: "" };
+export const FILTRES_VIDES: Filtres = {
+  noteMin: "",
+  salaries: "",
+  secteur: "",
+  arrivee: "",
+  email: "",
+  ville: "",
+  departement: "",
+};
 
 /** Paliers de la grille d'Olivier : ce sont les mêmes qui donnent des points. */
 const SALARIES: { valeur: string; label: string; bandes: string[] }[] = [
@@ -54,6 +64,10 @@ export function retenue(p: Prospect, f: Filtres, recherche: string): boolean {
     }
   }
 
+  // On compare le libellé, pas le code : les fiches d'avant portent « btp » là où les
+  // nouvelles portent « Construction ». Choisir « Construction » doit rendre les deux.
+  if (f.secteur && secteurLisible(p.sector) !== f.secteur) return false;
+
   if (f.arrivee) {
     const choix = ARRIVEE.find((a) => a.valeur === f.arrivee);
     if (choix) {
@@ -66,6 +80,8 @@ export function retenue(p: Prospect, f: Filtres, recherche: string): boolean {
 
   if (f.email === "avec" && !p.contact_email) return false;
   if (f.email === "sans" && p.contact_email) return false;
+
+  if (f.ville && p.city !== f.ville) return false;
 
   if (f.departement && p.department !== f.departement) return false;
 
@@ -83,11 +99,15 @@ const selectCls =
 export default function FiltresProspects({
   filtres,
   onChange,
+  secteurs,
+  villes,
   departements,
 }: {
   filtres: Filtres;
   onChange: (f: Filtres) => void;
-  /** Les départements réellement présents dans les fiches : pas de liste morte. */
+  /** Les secteurs, villes et départements réellement présents : pas de liste morte. */
+  secteurs: string[];
+  villes: string[];
   departements: string[];
 }) {
   const set = (cle: keyof Filtres) => (e: React.ChangeEvent<HTMLSelectElement>) => onChange({ ...filtres, [cle]: e.target.value });
@@ -110,6 +130,15 @@ export default function FiltresProspects({
         ))}
       </select>
 
+      <select value={filtres.secteur} onChange={set("secteur")} className={selectCls} aria-label="Secteur d’activité">
+        <option value="">Secteur</option>
+        {secteurs.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+
       <select value={filtres.arrivee} onChange={set("arrivee")} className={selectCls} aria-label="Date d’arrivée de la fiche">
         <option value="">Date d’arrivée</option>
         {ARRIVEE.map((a) => (
@@ -123,6 +152,15 @@ export default function FiltresProspects({
         <option value="">E-mail</option>
         <option value="avec">Avec adresse</option>
         <option value="sans">Sans adresse</option>
+      </select>
+
+      <select value={filtres.ville} onChange={set("ville")} className={selectCls} aria-label="Ville">
+        <option value="">Ville</option>
+        {villes.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
       </select>
 
       <select value={filtres.departement} onChange={set("departement")} className={selectCls} aria-label="Département">
