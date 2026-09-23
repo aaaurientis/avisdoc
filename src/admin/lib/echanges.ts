@@ -72,10 +72,10 @@ export async function ajouterEchange(
 ): Promise<void> {
   const champ = cles.accountId ? "account_id" : cles.clientId ? "client_id" : "prospect_id";
   const id = cles.accountId ?? cles.clientId ?? cles.prospectId;
-  if (!id) throw new Error("Fiche inconnue : impossible de noter l’échange.");
-
+  // Sans fiche, c'est une action libre : préparer une tournée, passer au salon. Elle
+  // a sa place au planning sans concerner d'entreprise (migration 0038).
   const { error } = await supabaseAdmin.from("admin_echanges").insert({
-    [champ]: id,
+    ...(id ? { [champ]: id } : {}),
     kind: saisie.kind,
     titre: saisie.titre.trim(),
     detail: saisie.detail.trim() || null,

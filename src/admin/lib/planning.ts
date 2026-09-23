@@ -72,7 +72,10 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
 
   return lignes.map((l) => {
     const ficheId = l.client_id ?? l.prospect_id ?? l.account_id ?? "";
-    const origine: Origine = l.client_id ? "affaire" : l.prospect_id ? "prospect" : "client";
+    // Une action peut ne concerner aucune entreprise : préparer une tournée, passer
+    // au salon. Elle n'a alors pas de fiche, et l'écran n'en propose pas l'ouverture ;
+    // « note » n'est là que parce que le type exige une origine.
+    const origine: Origine = l.client_id ? "affaire" : l.prospect_id ? "prospect" : l.account_id ? "client" : "note";
     return {
       id: l.id,
       kind: l.kind,
@@ -80,7 +83,7 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
       detail: l.detail,
       au: l.au,
       par: l.par,
-      fiche: nom.get(ficheId) ?? "Fiche supprimée",
+      fiche: ficheId ? (nom.get(ficheId) ?? "Fiche supprimée") : "",
       origine,
       ficheId,
     };

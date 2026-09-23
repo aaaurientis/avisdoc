@@ -6,12 +6,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Mail, NotebookPen, Pencil, Phone, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Mail, NotebookPen, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import { PageHeader, SectionLabel } from "../components/ui";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/planning";
 import type { GenreEchange } from "../lib/echanges";
 import ModifierAction from "../components/ModifierAction";
+import NouvelleAction from "../components/NouvelleAction";
 import ApercuFiche from "../components/ApercuFiche";
 import ProjectView from "./crm/ProjectView";
 import FicheClient from "./clients/FicheClient";
@@ -61,6 +62,7 @@ export default function Planning() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [aModifier, setAModifier] = useState<Rendezvous | null>(null);
   const [aVoir, setAVoir] = useState<Rendezvous | null>(null);
+  const [ajout, setAjout] = useState(false);
   const { clients, accounts } = useAdminData();
 
   // La fiche s'ouvre telle qu'elle est ailleurs — mêmes onglets, mêmes actions.
@@ -135,7 +137,14 @@ export default function Planning() {
             : `${lignes.length} action${lignes.length > 1 ? "s" : ""} du ${duAu} — prospection, Pipeline et clients réunis`
         }
         action={
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setAjout(true)}
+              className="ad-btn-accent mr-1 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white"
+            >
+              <Plus className="size-3.5" /> Ajouter une action
+            </button>
             <button
               type="button"
               onClick={() => decaler(-1)}
@@ -232,9 +241,11 @@ export default function Planning() {
                             <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[13px] font-semibold leading-snug text-avisdoc-ink">
                               {a.titre}
                             </span>
-                            <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[12px] font-semibold leading-snug text-avisdoc-teal">
-                              {a.fiche}
-                            </span>
+                            {a.fiche && (
+                              <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[12px] font-semibold leading-snug text-avisdoc-teal">
+                                {a.fiche}
+                              </span>
+                            )}
                             {a.detail && (
                               <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[11.5px] leading-snug text-muted-foreground">{a.detail}</span>
                             )}
@@ -245,15 +256,17 @@ export default function Planning() {
                             className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <button
-                              type="button"
-                              onClick={() => setAVoir(a)}
-                              aria-label={`Voir la fiche ${a.fiche}`}
-                              title="Voir la fiche"
-                              className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
-                            >
-                              <Eye className="size-3.5" />
-                            </button>
+                            {a.fiche && (
+                              <button
+                                type="button"
+                                onClick={() => setAVoir(a)}
+                                aria-label={`Voir la fiche ${a.fiche}`}
+                                title="Voir la fiche"
+                                className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-teal"
+                              >
+                                <Eye className="size-3.5" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setAModifier(a)}
@@ -289,7 +302,7 @@ export default function Planning() {
           <SectionLabel>Semaine libre</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             Les appels, rendez-vous et relances que vous notez depuis l’onglet Action d’une fiche apparaissent ici, au
-            jour et à l’heure prévus.
+            jour et à l’heure prévus. « Ajouter une action » en pose une directement, avec ou sans entreprise.
           </p>
         </div>
       )}
@@ -308,6 +321,8 @@ export default function Planning() {
           onOuvrirVraiment={() => navigate(chemin[aVoir.origine](aVoir.ficheId))}
         />
       )}
+
+      {ajout && <NouvelleAction jour={cetteSemaine ? new Date() : debut} onClose={() => setAjout(false)} onFait={charger} />}
 
       {aModifier && (
         <ModifierAction
