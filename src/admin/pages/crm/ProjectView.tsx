@@ -97,11 +97,15 @@ function Section({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3.5">
+      {/* Sur un téléphone, les actions passent SOUS le titre. Sur une seule ligne,
+          « Modifier », « Supprimer » et la croix prenaient les 375 pixels et le nom de
+          l'entreprise disparaissait — on ne savait plus quelle fiche on regardait, et
+          la croix se retrouvait au bord. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="flex min-w-0 flex-1 basis-full items-center gap-3 text-left sm:basis-auto"
         >
           <ChevronDown
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
@@ -113,7 +117,9 @@ function Section({
             </span>
           )}
         </button>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">{actions}</div>
+        )}
       </div>
       {open && <div className="border-t border-border px-5 pb-5 pt-4">{children}</div>}
     </Card>
