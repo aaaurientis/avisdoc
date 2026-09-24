@@ -227,6 +227,11 @@ export async function listFoundNames(sb: SupabaseClient, demandeId: string): Pro
 }
 
 export interface ProspectToEnrich {
+  siren?: string | null;
+  headcountBand?: string | null;
+  contactName?: string | null;
+  contactRole?: string | null;
+  contactPhone?: string | null;
   id: string;
   name: string;
   city: string | null;
@@ -237,9 +242,23 @@ export interface ProspectToEnrich {
 }
 
 export async function getProspectForEnrichment(sb: SupabaseClient, id: string): Promise<ProspectToEnrich | null> {
-  const { data, error } = await sb.from("admin_prospects").select("id, name, city, activity, website, department, score").eq("id", id).maybeSingle();
+  // On relit aussi ce que la recherche a déjà établi : le modèle ne doit pas dépenser
+  // ses recherches web à retrouver un SIREN et un dirigeant qu'on vient de lui donner.
+  const { data, error } = await sb
+    .from("admin_prospects")
+    .select("id, name, city, activity, website, department, score, siren, headcount_band, contact_name, contact_role, contact_phone")
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return data as ProspectToEnrich | null;
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    ...(data as ProspectToEnrich),
+    headcountBand: (r.headcount_band as string) ?? null,
+    contactName: (r.contact_name as string) ?? null,
+    contactRole: (r.contact_role as string) ?? null,
+    contactPhone: (r.contact_phone as string) ?? null,
+  } as ProspectToEnrich;
 }
 
 /** La fiche telle qu'elle est, pour la compléter sans rien effacer. */

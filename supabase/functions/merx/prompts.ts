@@ -311,8 +311,31 @@ export interface EnrichOut {
   sources: string[];
 }
 
+/** Ce que la fiche porte déjà : le modèle ne doit pas gaspiller ses recherches à le retrouver. */
+function dejaConnu(p: {
+  siren?: string | null;
+  headcountBand?: string | null;
+  contactName?: string | null;
+  contactRole?: string | null;
+  contactPhone?: string | null;
+  website?: string | null;
+}): string {
+  const acquis = [
+    p.siren ? `identité légale (SIREN ${p.siren})` : null,
+    p.headcountBand ? "effectif" : null,
+    p.contactName ? `un dirigeant : ${p.contactName}${p.contactRole ? `, ${p.contactRole}` : ""}` : null,
+    p.contactPhone ? `un téléphone : ${p.contactPhone}` : null,
+    p.website ? `le site : ${p.website}` : null,
+  ].filter(Boolean);
+  if (acquis.length === 0) return "La fiche ne porte encore rien : tout est à établir.";
+  return [
+    `DÉJÀ ÉTABLI, ne le cherche pas : ${acquis.join(" · ")}.`,
+    "Consacre tes recherches à ce qui manque : l'interlocuteur du SERVICE concerné (QHSE, santé-sécurité, RH, prévention), son adresse électronique, la politique santé-sécurité, les actions de prévention récentes.",
+  ].join(" ");
+}
+
 export function enrichPrompt(
-  p: { name: string; city: string | null; activity: string | null; website: string | null },
+  p: { name: string; city: string | null; activity: string | null; website: string | null; siren?: string | null; headcountBand?: string | null; contactName?: string | null; contactRole?: string | null; contactPhone?: string | null },
   candidates: Company[],
   site: SiteContacts | null,
   lieu?: { adresse: string | null; telephone: string | null; site: string | null; source: string | null } | null,
@@ -328,6 +351,9 @@ export function enrichPrompt(
   }));
   return [
     `Entreprise à documenter : ${p.name}${p.city ? `, à ${p.city}` : ""}${p.activity ? ` (${p.activity})` : ""}.`,
+    // Ce qui est déjà établi n'a pas à être cherché : le modèle y dépensait ses
+    // recherches web et l'approfondissement durait près de deux minutes.
+    dejaConnu(p),
     p.website ? `Site officiel connu : ${p.website}` : "Site officiel non connu.",
     `Entreprises candidates à l'annuaire officiel :\n${facts.length ? JSON.stringify(facts, null, 1) : "(aucune)"}`,
     site ? `Coordonnées relevées sur le site officiel (sûres, reprends-les) :\n${JSON.stringify(site, null, 1)}` : "Aucune coordonnée n'a pu être relevée sur le site officiel.",

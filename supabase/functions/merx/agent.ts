@@ -79,7 +79,10 @@ const modeleDe = (kind: string): Usage => (kind === "approfondissement" ? "appro
 const LIST_WEB_SEARCHES = 4;
 const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le temps d'une recherche
 // Approfondir, c'est le travail d'Opus : site, mentions légales, presse, réseaux.
-const ENRICH_WEB_SEARCHES = 6;
+// Quatre recherches, plus six. La recherche remet désormais au modèle l'identité,
+// l'effectif, les dirigeants et l'adresse : il dépensait ses appels à retrouver ce
+// qu'on venait de lui donner, et l'approfondissement durait près de deux minutes.
+const ENRICH_WEB_SEARCHES = 4;
 // Au-delà, le commercial ne traite plus — et chaque page du registre est un appel.
 const REGISTRE_MAX = 100;
 
