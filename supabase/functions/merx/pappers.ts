@@ -17,6 +17,18 @@ const TIMEOUT_MS = 8_000;
 const PAR_VAGUE = 8;
 
 export interface FichePappers {
+  /**
+   * L'objet social : ce que l'entreprise déclare faire, en toutes lettres.
+   *
+   * Le registre ne donne qu'un code d'activité — « Aquaculture en mer ». Pappers rend
+   * la phrase des statuts : « élevage, production et commercialisation d'huîtres et de
+   * moules, conditionnement et expédition ». Le commercial sait alors à qui il parle.
+   */
+  objetSocial: string | null;
+  /** Le domaine d'activité en clair, plus large que le code. */
+  domaine: string | null;
+  /** Les conventions collectives : elles disent le métier réel des salariés. */
+  conventions: string[];
   site: string | null;
   telephone: string | null;
   email: string | null;
@@ -76,6 +88,11 @@ export async function chercherPappers(siren: string): Promise<FichePappers | nul
       .filter((r: any) => r.nom);
 
     return {
+      objetSocial: texte(d?.objet_social),
+      domaine: texte(d?.domaine_activite),
+      conventions: (d?.conventions_collectives ?? [])
+        .map((c: any) => texte(c?.nom) ?? texte(c?.titre) ?? texte(c))
+        .filter(Boolean) as string[],
       site: texte(d?.site_web),
       telephone: texte(d?.telephone),
       email: texte(d?.email),
