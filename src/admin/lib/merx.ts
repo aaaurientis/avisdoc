@@ -61,14 +61,6 @@ export interface Prospect {
   sector: Secteur | null;
   score_total: number | null;
   score: Partial<Record<CritereId, NoteCritere>>;
-  /**
-   * Deux notes qui ne disent pas la même chose : celle sur cent juge le PROSPECT,
-   * celle-ci juge ce qu'on AFFICHE. BB GR avait cinquante sur cent et une adresse
-   * fermée depuis 2000 — excellente note, information fausse.
-   */
-  reliability: number | null;
-  /** Le détail par information : d'où vient chaque ligne de la fiche. */
-  reliability_detail: { quoi: string; dit: string; sur: number }[] | null;
   siren: string | null;
   legal_name: string | null;
   headcount_band: string | null;
@@ -118,18 +110,6 @@ export function tonNote(total: number | null): string {
   if (total >= 70) return "bg-emerald-100 text-emerald-700";
   if (total >= 45) return "bg-amber-100 text-amber-800";
   return "bg-muted text-muted-foreground";
-}
-
-/**
- * Couleur de la fiabilité. Le vert commence haut : une fiche à sept sur dix avance
- * déjà quelque chose qu'aucune source ne tient, et le commercial doit le voir avant
- * de décrocher son téléphone.
- */
-export function tonFiabilite(note: number | null): string {
-  if (note === null) return "bg-muted text-muted-foreground";
-  if (note >= 9) return "bg-emerald-100 text-emerald-700";
-  if (note >= 7) return "bg-amber-100 text-amber-800";
-  return "bg-rose-100 text-rose-700";
 }
 
 /** Effectif en clair, tel que l’annuaire officiel le publie (tranche INSEE). */
