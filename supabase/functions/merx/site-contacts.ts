@@ -64,7 +64,16 @@ function passagesNommes(texte: string): string[] {
   return [...new Set(trouves)];
 }
 
-export async function readSiteContacts(site: string | null): Promise<SiteContacts | null> {
+/**
+ * Les seules pages qui portent presque toujours un numéro et une adresse.
+ *
+ * Lire les dix-neuf pages de PAGES pour cent entreprises dépasse le budget de la
+ * fonction. À la recherche on se limite à ces trois-là ; l'approfondissement, qui ne
+ * traite qu'une fiche, lit tout.
+ */
+const PAGES_RAPIDES = ["", "contact", "nous-contacter", "mentions-legales"];
+
+export async function readSiteContacts(site: string | null, rapide = false): Promise<SiteContacts | null> {
   if (!site) return null;
   let base: URL;
   try {
@@ -76,7 +85,7 @@ export async function readSiteContacts(site: string | null): Promise<SiteContact
   const phones = new Set<string>();
   const equipe = new Set<string>();
   await Promise.all(
-    PAGES.map(async (page) => {
+    (rapide ? PAGES_RAPIDES : PAGES).map(async (page) => {
       try {
         const res = await fetch(new URL(page, base), {
           signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
