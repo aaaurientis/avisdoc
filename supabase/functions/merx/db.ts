@@ -48,7 +48,7 @@ export interface LightProspect {
   rationale: string | null;
   sources: string[];
   score: Score;
-  scoreTotal: number;
+  scoreTotal: number | null;
 }
 
 /** Prend une demande : celle indiquée, ou la plus ancienne en attente. Rend null s'il n'y a rien à faire. */

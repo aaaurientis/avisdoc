@@ -13,6 +13,10 @@
 // introuvable ne doivent jamais faire échouer un approfondissement.
 
 const URL_RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
+
+/** La dernière raison pour laquelle Places n'a rien rendu, pour pouvoir la dire. */
+let dernierEchec: string | null = null;
+export const echecPlaces = () => dernierEchec;
 /** Par paquets de dix : cent entreprises tiennent en une dizaine de secondes. */
 const PAR_VAGUE = 10;
 const TIMEOUT_MS = 6_000;
@@ -36,7 +40,11 @@ export interface LieuTrouve {
  */
 export async function chercherLieu(nom: string, ville: string | null): Promise<LieuTrouve | null> {
   const cle = Deno.env.get("GOOGLE_MAPS_KEY");
-  if (!cle || !nom.trim()) return null;
+  if (!cle) {
+    dernierEchec = "aucune clé GOOGLE_MAPS_KEY sur le projet";
+    return null;
+  }
+  if (!nom.trim()) return null;
 
   try {
     const res = await fetch(URL_RECHERCHE, {
@@ -55,7 +63,13 @@ export async function chercherLieu(nom: string, ville: string | null): Promise<L
         maxResultCount: 1,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // L'échec ne doit plus être muet : une clé restreinte par référent HTTP est
+      // refusée depuis un serveur, et pendant des semaines la recherche a rendu des
+      // fiches sans téléphone sans que personne sache pourquoi.
+      dernierEchec = `Google Places a répondu ${res.status}${res.status === 403 ? " — la clé est probablement restreinte aux appels depuis un navigateur" : ""}`;
+      return null;
+    }
 
     const data = await res.json();
     const p = (data?.places ?? [])[0];
@@ -69,7 +83,8 @@ export async function chercherLieu(nom: string, ville: string | null): Promise<L
       site: p.websiteUri ?? null,
       source: p.id ? `https://www.google.com/maps/place/?q=place_id:${p.id}` : null,
     };
-  } catch {
+  } catch (e) {
+    dernierEchec = `Google Places injoignable : ${e instanceof Error ? e.message : String(e)}`;
     return null; // Places est un bonus : il ne fait jamais échouer un approfondissement.
   }
 }
@@ -89,7 +104,11 @@ export async function chercherLieux(
   demandes: { cle: string; nom: string; ville: string | null }[],
 ): Promise<Map<string, LieuTrouve>> {
   const trouves = new Map<string, LieuTrouve>();
-  if (!Deno.env.get("GOOGLE_MAPS_KEY")) return trouves;
+  dernierEchec = null;
+  if (!Deno.env.get("GOOGLE_MAPS_KEY")) {
+    dernierEchec = "aucune clé GOOGLE_MAPS_KEY sur le projet";
+    return trouves;
+  }
   for (let i = 0; i < demandes.length; i += PAR_VAGUE) {
     const vague = demandes.slice(i, i + PAR_VAGUE);
     const lieux = await Promise.all(vague.map((d) => chercherLieu(d.nom, d.ville)));
