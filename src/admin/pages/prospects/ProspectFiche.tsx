@@ -332,6 +332,40 @@ export default function ProspectFiche({
                 {p.registre?.tva && <Ligne label="Numéro de TVA">{p.registre.tva}</Ligne>}
                 {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
                 {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
+                {/* Toutes les personnes connues, chacune avec ce qu'on a d'elle. Une
+                    personne dont la source ne fait pas foi reste une piste : on la
+                    garde, on dit d'où elle vient, et le commercial décide. */}
+                {p.personnes?.length
+                  ? p.personnes.map((q) => (
+                      <Ligne key={`${q.nom}-${q.fonction ?? ""}`} label={q.fonction || "Personne"}>
+                        <span className="block">
+                          <span className="font-semibold text-avisdoc-ink">{q.nom}</span>
+                          {!q.sur && <span className="ml-2 text-[11.5px] text-amber-700">à confirmer</span>}
+                        </span>
+                        {(q.email || q.telephone || q.mobile) && (
+                          <span className="block text-[12.5px]">
+                            {[q.email, q.telephone, q.mobile && `mobile ${q.mobile}`].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                        {q.source && (
+                          <a
+                            href={q.source}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-[11.5px] text-avisdoc-teal underline-offset-2 hover:underline"
+                          >
+                            {(() => {
+                              try {
+                                return new URL(q.source).hostname.replace(/^www\./, "");
+                              } catch {
+                                return q.source;
+                              }
+                            })()}
+                          </a>
+                        )}
+                      </Ligne>
+                    ))
+                  : null}
                 {p.reliability !== null && p.reliability_detail?.length ? (
                   <Ligne label={`Fiabilité ${p.reliability}/10`}>
                     <span className="block space-y-0.5">
