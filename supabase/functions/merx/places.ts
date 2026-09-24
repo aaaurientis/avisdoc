@@ -13,6 +13,8 @@
 // introuvable ne doivent jamais faire échouer un approfondissement.
 
 const URL_RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
+/** Par paquets de dix : cent entreprises tiennent en une dizaine de secondes. */
+const PAR_VAGUE = 10;
 const TIMEOUT_MS = 6_000;
 
 /** Ce que Google connaît d'un établissement. */
@@ -70,4 +72,31 @@ export async function chercherLieu(nom: string, ville: string | null): Promise<L
   } catch {
     return null; // Places est un bonus : il ne fait jamais échouer un approfondissement.
   }
+}
+
+/**
+ * Le même travail, pour toute une recherche.
+ *
+ * Le standard, l'adresse exacte et le site officiel de cent entreprises d'un coup. Il
+ * fallait jusqu'ici approfondir fiche par fiche pour les obtenir, et la recherche
+ * rendait des fiches sans un numéro à composer — moins utiles qu'une recherche Google.
+ *
+ * Places est facturé à l'appel : environ un euro cinquante pour cent entreprises. Le
+ * jeu en vaut la chandelle, un commercial ne fait rien d'une fiche sans téléphone.
+ * Par vagues de dix pour ne pas saturer, et tout échec reste silencieux.
+ */
+export async function chercherLieux(
+  demandes: { cle: string; nom: string; ville: string | null }[],
+): Promise<Map<string, LieuTrouve>> {
+  const trouves = new Map<string, LieuTrouve>();
+  if (!Deno.env.get("GOOGLE_MAPS_KEY")) return trouves;
+  for (let i = 0; i < demandes.length; i += PAR_VAGUE) {
+    const vague = demandes.slice(i, i + PAR_VAGUE);
+    const lieux = await Promise.all(vague.map((d) => chercherLieu(d.nom, d.ville)));
+    vague.forEach((d, j) => {
+      const l = lieux[j];
+      if (l) trouves.set(d.cle, l);
+    });
+  }
+  return trouves;
 }

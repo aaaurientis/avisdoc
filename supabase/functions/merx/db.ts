@@ -26,6 +26,20 @@ export interface LightProspect {
   name: string;
   /** L'identifiant légal : sans lui, aucune fiche n'est vérifiable ni dédoublonnable. */
   siren?: string | null;
+  /**
+   * Ce que la recherche sait désormais remplir sans rien deviner : le dirigeant publié
+   * au registre, le standard et le site trouvés par la fiche d'établissement, l'adresse
+   * exacte, l'effectif. Une fiche sans numéro à composer ne sert à personne.
+   */
+  contactName?: string | null;
+  contactRole?: string | null;
+  contactPhone?: string | null;
+  contactSource?: string | null;
+  headOffice?: unknown;
+  leaders?: unknown;
+  headcountBand?: string | null;
+  headcountYear?: number | null;
+  openEstablishments?: number | null;
   city: string | null;
   department: string | null;
   activity: string | null;
@@ -157,6 +171,15 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       score: p.score,
       score_total: p.scoreTotal,
       siren: p.siren ?? null,
+      contact_name: p.contactName ?? null,
+      contact_role: p.contactRole ?? null,
+      contact_phone: p.contactPhone ?? null,
+      contact_source: p.contactSource ?? null,
+      head_office: p.headOffice ?? null,
+      leaders: p.leaders ?? null,
+      headcount_band: p.headcountBand ?? null,
+      headcount_year: p.headcountYear ?? null,
+      open_establishments: p.openEstablishments ?? null,
     });
 
     let { error } = await sb.from("admin_prospects").insert(ligne(secteurSur(p.sector)));

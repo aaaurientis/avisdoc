@@ -35,8 +35,8 @@ import {
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
-import { chercherLieu } from "./places.ts";
-import { deploiementScore, expositionScore, isSector, peauScore, populationScore, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
+import { chercherLieu, chercherLieux } from "./places.ts";
+import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
 function enClair(message: string): string {
@@ -158,7 +158,14 @@ function populationDuSite(local: Establishment, c: Found) {
     : populationScore(c.headcountBand, false, c.headcountYear);
 }
 
-function versFiches(trouvees: Found[]): LightProspect[] {
+async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
+  // Le standard, l'adresse exacte et le site officiel de toutes les entreprises d'un
+  // coup. Sans cela la recherche rendait des fiches sans un numéro à composer — moins
+  // utiles qu'une recherche Google, et personne n'en faisait rien.
+  const lieux = await chercherLieux(
+    trouvees.map((c) => ({ cle: c.siren, nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city })),
+  );
+
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
     // Une activité que notre table ne connaît pas ne fait PAS disparaître l'entreprise :
@@ -182,11 +189,25 @@ function versFiches(trouvees: Found[]): LightProspect[] {
     // est la seule que le registre suffise à établir. Maturité prévention et
     // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
+    const lieu = lieux.get(c.siren) ?? null;
+    // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
+    // une en publient un, et nous ne l'affichions pas.
+    const dirigeant = c.leaders[0] ?? null;
+
     const score: Score = {
+      // Étape 2 — la pertinence, que le registre suffit à établir.
       exposition: expositionScore(metier.soleil, metier.pourquoi, source),
       population: populationDuSite(local, c),
       peau: peauScore(metier.affinite, metier.pourquoi, source),
       deploiement: deploiementScore(c.openEstablishments),
+      // Étape 3 — ce que l'État publie déjà de leurs démarches, gratuitement.
+      politique_sst: signauxOfficiels(c.signals),
+      instances: indexEgalite(c.signals.egalite),
+      // Étape 4 — un dirigeant nommé vaut mieux qu'une fiche sans personne à qui parler.
+      interlocuteur: dirigeantScore(dirigeant),
+      coordonnees: lieu?.telephone
+        ? { points: 2, justification: `${lieu.telephone} — standard, fiche d’établissement Google.`, source: lieu.source }
+        : { points: null, justification: "Aucun numéro trouvé : l’approfondissement ira le chercher.", source: null },
     };
 
     const autresSites = c.localSites.length > 1 ? `${metier.pourquoi ? " · " : ""}${c.localSites.length} établissements dans la zone` : "";
@@ -203,9 +224,18 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       activity: libelleNaf(c.activityCode) || metier.activite || null,
       sector: secteurDe(c.activityCode),
       siren: c.siren,
-      website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
+      website: lieu?.site ?? null,
+      contactName: dirigeant?.name ?? null,
+      contactRole: dirigeant?.role ?? null,
+      contactPhone: lieu?.telephone ?? null,
+      contactSource: lieu?.source ?? null,
+      headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
+      leaders: c.leaders,
+      headcountBand: local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : c.headcountBand,
+      headcountYear: local.headcountYear ?? c.headcountYear,
+      openEstablishments: c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
-      sources: [source],
+      sources: [source, lieu?.source].filter(Boolean) as string[],
       score,
       scoreTotal: total(score),
     });
@@ -240,7 +270,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
   });
   if (criteres) {
     const { found: trouvees, ignores } = await searchByCriteria(criteres, REGISTRE_MAX);
-    const fiches = versFiches(trouvees);
+    const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
       const deja = fiches.length - inserted;
