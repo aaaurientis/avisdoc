@@ -163,8 +163,8 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
 function populationDuSite(local: Establishment, c: Found) {
   const duSite = local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : null;
   return duSite
-    ? populationScore(duSite, true, local.headcountYear)
-    : populationScore(c.headcountBand, false, c.headcountYear);
+    ? populationScore(duSite, true, local.headcountYear, local.employeur)
+    : populationScore(c.headcountBand, false, c.headcountYear, local.employeur);
 }
 
 async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
@@ -299,7 +299,10 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       leaders: c.leaders,
       // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
       registre: c.registre,
-      headcountBand: local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : c.headcountBand,
+      // Si le registre dit que l'établissement n'emploie personne, on n'écrit pas
+      // l'effectif du groupe à sa place : ce serait afficher mille cinq cents salariés
+      // sur un siège vide.
+      headcountBand: !local.employeur ? null : local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : c.headcountBand,
       headcountYear: local.headcountYear ?? c.headcountYear,
       openEstablishments: c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,

@@ -212,7 +212,21 @@ const POPULATION: Record<string, { clair: string; points: number }> = {
   "00": { clair: "0 salarié", points: 0 },
 };
 
-export function populationScore(band: string | null, duSite: boolean, annee: number | null): CriterionScore {
+export function populationScore(
+  band: string | null,
+  duSite: boolean,
+  annee: number | null,
+  employeur = true,
+): CriterionScore {
+  // Un établissement que le registre déclare non employeur n'a personne à dépister,
+  // quel que soit l'effectif du groupe au-dessus de lui.
+  if (!employeur) {
+    return {
+      points: 0,
+      justification: "Cet établissement n’emploie personne selon le registre — l’effectif affiché est celui du groupe.",
+      source: null,
+    };
+  }
   const p = band ? POPULATION[band] : undefined;
   if (!p) return { points: null, justification: "Effectif non connu de l'annuaire officiel.", source: null };
   return {

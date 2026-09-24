@@ -105,6 +105,26 @@ export default function ProspectFiche({
     [p.contact_phone, p.site_contacts, p.personnes],
   );
 
+  /**
+   * Le chiffre d'affaires rapporté à l'effectif.
+   *
+   * Vingt-sept millions d'euros pour mille cinq cents salariés font dix-huit mille
+   * euros par personne : c'est impossible, et cela trahit un effectif de groupe collé
+   * sur un établissement qui n'emploie personne.
+   */
+  const caParSalarie = useMemo(() => {
+    const bornes: Record<string, number> = {
+      "11": 15, "12": 35, "21": 75, "22": 150, "31": 225, "32": 375,
+      "41": 750, "42": 1500, "51": 3500, "52": 7500, "53": 15000,
+    };
+    const n = p.headcount_band ? bornes[p.headcount_band] : undefined;
+    const f = p.registre?.finances;
+    if (!n || !f) return null;
+    const annee = Object.keys(f).sort().at(-1);
+    const ca = annee ? f[annee]?.ca : undefined;
+    return typeof ca === "number" && ca > 0 ? ca / n : null;
+  }, [p.headcount_band, p.registre]);
+
   /** Le dernier exercice publié : le chiffre d'affaires dit la taille mieux qu'une tranche. */
   const dernierExercice = useMemo(() => {
     const f = p.registre?.finances;
@@ -326,6 +346,17 @@ export default function ProspectFiche({
                 {p.leaders && p.leaders.length > 0 && (
                   <Ligne label="Dirigeants">
                     {p.leaders.map((l) => (l.role ? `${l.name} (${l.role})` : l.name)).join(", ")}
+                  </Ligne>
+                )}
+                {/* Un chiffre d'affaires par salarié invraisemblable trahit un effectif
+                    de groupe collé sur un établissement qui n'emploie personne. On le
+                    dit plutôt que de laisser le commercial le découvrir au téléphone. */}
+                {caParSalarie !== null && caParSalarie < 25000 && (
+                  <Ligne label="Attention">
+                    <span className="text-amber-700">
+                      {Math.round(caParSalarie / 1000)} k€ de chiffre d’affaires par salarié : l’effectif affiché est
+                      probablement celui du groupe, pas celui de cet établissement.
+                    </span>
                   </Ligne>
                 )}
                 {dernierExercice && (

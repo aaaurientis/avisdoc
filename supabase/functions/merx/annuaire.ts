@@ -47,6 +47,16 @@ export interface Establishment {
    * en octobre 2000. Sans ce champ, rien ne distingue les deux.
    */
   active: boolean;
+  /**
+   * L'établissement emploie-t-il quelqu'un ?
+   *
+   * Le registre le dit — « caractere_employeur » — et nous ne le lisions pas. Une
+   * holding comme GLOBE déclare mille cinq cents salariés au niveau du groupe et son
+   * unique établissement n'en emploie aucun : nous affichions « 1 000 à 1 999
+   * salariés » sur un siège vide, avec vingt-sept millions de chiffre d'affaires en
+   * face. Dix-huit mille euros par salarié : personne ne peut y croire.
+   */
+  employeur: boolean;
   headcountBand: string | null;
   headcountYear: number | null;
   isHeadOffice: boolean;
@@ -127,6 +137,9 @@ function toEstablishment(e: any): Establishment {
     city: e.libelle_commune ?? null,
     department: e.departement ?? departmentOf(e.commune),
     active: e.etat_administratif !== "F",
+    // « N » veut dire : cet établissement n'emploie personne. L'absence d'information
+    // ne vaut pas refus : seul un « N » explicite compte.
+    employeur: e.caractere_employeur !== "N",
     headcountBand: e.tranche_effectif_salarie ?? null,
     headcountYear: year(e.annee_tranche_effectif_salarie),
     isHeadOffice: Boolean(e.est_siege),
