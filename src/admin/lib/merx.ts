@@ -129,7 +129,7 @@ Le total est ramené sur 10.
 
 POURQUOI DEUX SOURCES. Le registre de l’État est sûr pour l’identité et l’activité d’une entreprise. Il l’est moins pour les adresses, qu’il met parfois des années à mettre à jour. Une adresse n’obtient donc 2 points que si une autre source la confirme.
 
-UNE FICHE COURTE PEUT AVOIR 10 SUR 10. Cette note ne compte pas ce qui manque, seulement ce qui est écrit. Une fiche qui dit peu de choses, mais toutes vérifiées, vaut 10.`;
+CE QUI MANQUE COMPTE. Les huit informations sont notées, présentes ou non. Une fiche sans interlocuteur ni téléphone ne dépasse pas 4 sur 10, même si tout ce qu’elle dit est exact : il lui manque la moitié de ce qu’un commercial a besoin de savoir. L’approfondissement fait monter la note.`;
 
 export interface NoteCritere {
   points: number | null;
