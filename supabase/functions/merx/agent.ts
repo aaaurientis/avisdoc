@@ -5,7 +5,7 @@
 // Budget : une edge function Supabase tient 150 s (400 s en payant) ; on se borne à 120 s pour finir proprement.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { headcountLabel, lookup, searchByCriteria, type Company, type Criteria, type Found } from "./annuaire.ts";
+import { headcountLabel, lookup, searchByCriteria, type Company, type Criteria, type Establishment, type Found } from "./annuaire.ts";
 import {
   appendConversationMessage,
   claimRequest,
@@ -142,6 +142,25 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
  * taille ; le nombre d'établissements dit l'implantation. Trois critères sur six sont
  * ainsi remplis par des faits, et non par une lecture de page.
  */
+/**
+ * Combien de personnes sur le site où le commercial ira.
+ *
+ * L'annuaire donne un effectif par établissement ET un effectif d'entreprise. Alliance
+ * Healthcare affiche « 1000 à 1999 salariés » quand son site de Richwiller en compte
+ * six à neuf : promettre le premier chiffre à un commercial, c'est lui faire préparer
+ * une campagne de dépistage pour une agence de huit personnes.
+ */
+function effectifDuSite(local: Establishment, c: Found) {
+  const duSite = local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : null;
+  if (duSite) {
+    const s = sizeScore(duSite, headcountLabel(duSite), local.headcountYear);
+    return { ...s, justification: s.justification.replace(", annuaire officiel.", " sur ce site, annuaire officiel.") };
+  }
+  const s = sizeScore(c.headcountBand, headcountLabel(c.headcountBand), c.headcountYear);
+  if (s.points === null) return s;
+  return { ...s, justification: s.justification.replace(", annuaire officiel.", " pour l’entreprise entière — effectif du site non publié.") };
+}
+
 function versFiches(trouvees: Found[]): LightProspect[] {
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
@@ -168,7 +187,11 @@ function versFiches(trouvees: Found[]): LightProspect[] {
         justification: metier.pourquoi,
         source,
       }),
-      salaries: sizeScore(c.headcountBand, headcountLabel(c.headcountBand), c.headcountYear),
+      // L'effectif du SITE où l'on ira, pas celui du groupe : une agence de huit
+      // personnes dans une société de deux mille n'est pas un site de deux mille.
+      // L'annuaire marque « NN » les établissements qu'il ne renseigne pas : on
+      // retombe alors sur l'entreprise, en disant que c'est elle qu'on compte.
+      salaries: effectifDuSite(local, c),
       sites: sitesScore(c.openEstablishments),
       zone: zoneScore([local.department ?? c.headOffice.department]),
     };
@@ -222,7 +245,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     onUsage({ ...spent });
   });
   if (criteres) {
-    const trouvees = await searchByCriteria(criteres, REGISTRE_MAX);
+    const { found: trouvees, ignores } = await searchByCriteria(criteres, REGISTRE_MAX);
     const fiches = versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
@@ -233,6 +256,9 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
           deja > 0 ? `${deja} déjà dans vos fiches` : null,
           trouvees.length > fiches.length ? `${trouvees.length - fiches.length} d’une activité non reconnue` : null,
+          // Dit, jamais tu : le commercial doit savoir qu'on a écarté des entreprises
+          // qui ne sont plus dans sa zone, sinon il croit la recherche incomplète.
+          ignores > 0 ? `${ignores} écartée${ignores > 1 ? "s" : ""} : plus d’établissement ouvert dans la zone` : null,
         ].filter(Boolean).join(" · ") + ".",
       };
     }

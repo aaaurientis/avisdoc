@@ -38,6 +38,15 @@ export interface Establishment {
   postalCode: string | null;
   city: string | null;
   department: string | null;
+  /**
+   * L'établissement est-il encore ouvert ?
+   *
+   * L'annuaire répond au filtre « département 67 » avec les établissements FERMÉS
+   * autant qu'avec les ouverts — le paramètre d'état ne vaut que pour l'entreprise.
+   * BB GR ressortait ainsi comme prospect strasbourgeois par un établissement fermé
+   * en octobre 2000. Sans ce champ, rien ne distingue les deux.
+   */
+  active: boolean;
   headcountBand: string | null;
   headcountYear: number | null;
   isHeadOffice: boolean;
@@ -70,6 +79,7 @@ function toEstablishment(e: any): Establishment {
     postalCode: e.code_postal ?? null,
     city: e.libelle_commune ?? null,
     department: e.departement ?? departmentOf(e.commune),
+    active: e.etat_administratif !== "F",
     headcountBand: e.tranche_effectif_salarie ?? null,
     headcountYear: year(e.annee_tranche_effectif_salarie),
     isHeadOffice: Boolean(e.est_siege),
@@ -136,7 +146,14 @@ export interface Criteria {
   minHeadcount?: number | null;
 }
 
-/** Une entreprise trouvée par le registre, avec ses établissements dans la zone demandée. */
+/** Ce que rend une recherche : les entreprises retenues, et celles qui ne sont plus là. */
+export interface SearchResult {
+  found: Found[];
+  /** Entreprises écartées faute d'un établissement encore ouvert dans la zone. */
+  ignores: number;
+}
+
+/** Une entreprise trouvée par le registre, avec ses établissements OUVERTS dans la zone. */
 export interface Found extends Company {
   /** Les établissements qui répondent au filtre : c'est là que le commercial ira. */
   localSites: Establishment[];
@@ -150,8 +167,9 @@ const PER_PAGE = 25; // maximum autorisé par l'annuaire
  * On pagine jusqu'à `max` : au-delà, le commercial ne traite plus, et chaque page est
  * un appel de plus. L'annuaire limite le débit, d'où l'attente entre deux pages.
  */
-export async function searchByCriteria(c: Criteria, max = 100): Promise<Found[]> {
+export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchResult> {
   const found: Found[] = [];
+  let ignores = 0;
   const pages = Math.ceil(max / PER_PAGE);
 
   for (let page = 1; page <= pages; page++) {
@@ -187,11 +205,18 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<Found[]>
 
     for (const r of data.results) {
       const company = toCompany(r);
-      const sites = ((r.matching_etablissements ?? []) as any[]).map(toEstablishment);
-      found.push({ ...company, localSites: sites });
-      if (found.length >= max) return found;
+      const tous = ((r.matching_etablissements ?? []) as any[]).map(toEstablishment);
+      const ouverts = tous.filter((e) => e.active);
+      // Une zone demandée sans un seul établissement ouvert dedans : l'entreprise
+      // n'y est plus. La retenir, c'était envoyer le commercial à une adresse fermée.
+      if (c.departments.length && tous.length > 0 && ouverts.length === 0) {
+        ignores++;
+        continue;
+      }
+      found.push({ ...company, localSites: ouverts });
+      if (found.length >= max) return { found, ignores };
     }
     if (page >= (data.total_pages ?? 1)) break;
   }
-  return found;
+  return { found, ignores };
 }
