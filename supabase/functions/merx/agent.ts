@@ -38,6 +38,7 @@ import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
+import { chercherPappersEnLot, echecPappers } from "./pappers.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
@@ -164,9 +165,14 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
   // Le standard, l'adresse exacte et le site officiel de toutes les entreprises d'un
   // coup. Sans cela la recherche rendait des fiches sans un numéro à composer — moins
   // utiles qu'une recherche Google, et personne n'en faisait rien.
-  const lieux = await chercherLieux(
-    trouvees.map((c) => ({ cle: c.siren, nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city })),
-  );
+  // Deux sources en parallèle, chacune pour ce qu'elle sait faire. Google Places donne
+  // le standard et l'adresse exacte ; Pappers donne le site officiel, le téléphone et
+  // parfois l'adresse électronique. Aucune ne suffit seule, et l'une comme l'autre peut
+  // échouer sans conséquence — ce qui manque sera dit, plus jamais tu.
+  const [lieux, pappers] = await Promise.all([
+    chercherLieux(trouvees.map((c) => ({ cle: c.siren, nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city }))),
+    chercherPappersEnLot(trouvees.map((c) => c.siren).filter(Boolean)),
+  ]);
 
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
@@ -192,9 +198,12 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
     // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
     const lieu = lieux.get(c.siren) ?? null;
+    const pap = pappers.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
-    // une en publient un, et nous ne l'affichions pas.
-    const dirigeant = c.leaders[0] ?? null;
+    // une en publient un, et nous ne l'affichions pas. Pappers complète quand il a mieux.
+    const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
+    const telephone = pap?.telephone ?? lieu?.telephone ?? null;
+    const site = pap?.site ?? lieu?.site ?? null;
 
     const score: Score = {
       // Étape 2 — la pertinence, que le registre suffit à établir.
@@ -207,8 +216,13 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       instances: indexEgalite(c.signals.egalite),
       // Étape 4 — un dirigeant nommé vaut mieux qu'une fiche sans personne à qui parler.
       interlocuteur: dirigeantScore(dirigeant),
-      coordonnees: lieu?.telephone
-        ? { points: 2, justification: `${lieu.telephone} — standard, fiche d’établissement Google.`, source: lieu.source }
+      coordonnees: telephone || pap?.email
+        ? {
+            points: pap?.email && telephone ? 4 : 2,
+            justification: [telephone, pap?.email].filter(Boolean).join(" · ") +
+              ` — ${pap?.telephone || pap?.email ? "fiche Pappers" : "fiche d’établissement Google"}.`,
+            source: pap?.source ?? lieu?.source ?? null,
+          }
         : { points: null, justification: "Aucun numéro trouvé : l’approfondissement ira le chercher.", source: null },
     };
 
@@ -226,11 +240,12 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       activity: libelleNaf(c.activityCode) || metier.activite || null,
       sector: secteurDe(c.activityCode),
       siren: c.siren,
-      website: lieu?.site ?? null,
+      website: site,
       contactName: dirigeant?.name ?? null,
       contactRole: dirigeant?.role ?? null,
-      contactPhone: lieu?.telephone ?? null,
-      contactSource: lieu?.source ?? null,
+      contactPhone: telephone,
+      contactEmail: pap?.email ?? null,
+      contactSource: pap?.source ?? lieu?.source ?? null,
       headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
       leaders: c.leaders,
       // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
@@ -239,7 +254,7 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       headcountYear: local.headcountYear ?? c.headcountYear,
       openEstablishments: c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
-      sources: [source, lieu?.source].filter(Boolean) as string[],
+      sources: [source, lieu?.source, pap?.source].filter(Boolean) as string[],
       score,
       // Pas de note sur une fiche qu'on ne peut pas juger. Sans savoir ce que fait
       // l'entreprise ni combien de personnes y travaillent, toute note serait inventée.
@@ -330,7 +345,8 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           ignores > 0 ? `${ignores} écartée${ignores > 1 ? "s" : ""} : plus d’établissement ouvert dans la zone` : null,
           // Si le standard n'a pas pu être cherché, on le dit : une fiche sans numéro
           // n'est pas une fatalité, c'est une panne qu'il faut pouvoir réparer.
-          echecPlaces() ? `sans téléphone — ${echecPlaces()}` : null,
+          echecPlaces() ? `Google Places : ${echecPlaces()}` : null,
+          echecPappers() ? `Pappers : ${echecPappers()}` : null,
       ].filter(Boolean).join(" · ") + ".";
 
       // Un compteur n'est pas un accompagnement. Merx nomme les meilleures, dit ce qui
