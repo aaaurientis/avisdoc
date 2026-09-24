@@ -76,8 +76,19 @@ export const maxEvalue = (score: Partial<Record<CritereId, NoteCritere>>): numbe
     0,
   );
 
+/**
+ * La consigne. Une fiche sans note n'en reçoit pas une mauvaise : elle en reçoit une
+ * qui dit quoi faire — aller chercher ce qui manque. Noter le vide, c'est inventer.
+ */
+export const A_COMPLETER = {
+  min: -1,
+  libelle: "À compléter",
+  action: "Trop peu d’informations pour juger : ni l’activité ni l’effectif ne sont établis. Approfondir la fiche avant de décider.",
+  ton: "bg-slate-100 text-slate-600",
+};
+
 export const decision = (total: number | null, sur: number) =>
-  total === null || sur <= 0 ? null : DECISIONS.find((d) => (100 * total) / sur >= d.min)!;
+  total === null || sur <= 0 ? A_COMPLETER : DECISIONS.find((d) => (100 * total) / sur >= d.min)!;
 
 /** D'où sort la note sur cent — la première bulle. */
 export const EXPLICATION_NOTE = `Cette note vient de la grille de qualification commerciale d’AvisDoc. Dix critères, trois étapes.

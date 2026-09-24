@@ -586,12 +586,10 @@ export default function Prospects() {
                         d'un coup d'œil dans une liste de deux cents lignes. */}
                     {(() => {
                       const d = decision(p.score_total, maxEvalue(p.score ?? {}));
-                      return d ? (
+                      return (
                         <span title={d.action} className={cn("rounded-full px-2 py-0.5 text-[11.5px] font-bold", d.ton)}>
                           {d.libelle}
                         </span>
-                      ) : (
-                        <span className="text-[13px] text-muted-foreground">—</span>
                       );
                     })()}
                   </td>

@@ -35,8 +35,8 @@ import {
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
-import { chercherLieu, chercherLieux } from "./places.ts";
-import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
+import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
+import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
 function enClair(message: string): string {
@@ -237,7 +237,9 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source, lieu?.source].filter(Boolean) as string[],
       score,
-      scoreTotal: total(score),
+      // Pas de note sur une fiche qu'on ne peut pas juger. Sans savoir ce que fait
+      // l'entreprise ni combien de personnes y travaillent, toute note serait inventée.
+      scoreTotal: notable(score) ? total(score) : null,
     });
   }
   return fiches;
@@ -283,6 +285,9 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           // Dit, jamais tu : le commercial doit savoir qu'on a écarté des entreprises
           // qui ne sont plus dans sa zone, sinon il croit la recherche incomplète.
           ignores > 0 ? `${ignores} écartée${ignores > 1 ? "s" : ""} : plus d’établissement ouvert dans la zone` : null,
+          // Si le standard n'a pas pu être cherché, on le dit : une fiche sans numéro
+          // n'est pas une fatalité, c'est une panne qu'il faut pouvoir réparer.
+          echecPlaces() ? `sans téléphone — ${echecPlaces()}` : null,
         ].filter(Boolean).join(" · ") + ".",
       };
     }

@@ -101,6 +101,21 @@ export type Score = Partial<Record<CriterionId, CriterionScore>>;
 export const total = (s: Score): number =>
   Object.values(s).reduce((t, c) => t + (c?.points ?? 0), 0);
 
+/**
+ * A-t-on de quoi noter ?
+ *
+ * Deux choses au minimum : ce que fait l'entreprise, et combien de personnes y
+ * travaillent. Sans elles, on ne peut pas dire si une journée de dépistage a un sens
+ * ni si elle se remplira. Mettre une note quand même, c'est noter le vide — et une
+ * fiche sans la moindre information sortait à dix sur dix, ce qui ne se défend pas.
+ *
+ * Une fiche qu'on ne peut pas juger n'a pas de note. Elle a une consigne : compléter.
+ */
+export const notable = (s: Score): boolean =>
+  (s.exposition?.points ?? null) !== null || (s.peau?.points ?? null) !== null
+    ? (s.population?.points ?? null) !== null
+    : false;
+
 // ── Les seuils de décision, tels qu'AvisDoc les a posés ──────────────────
 export const DECISIONS: { min: number; libelle: string; action: string }[] = [
   { min: 70, libelle: "Prioritaire", action: "Approfondir immédiatement : contact actuel, coordonnées, angle personnalisé, preuves récentes." },
