@@ -35,6 +35,13 @@ function Ligne({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Un montant en euros, lisible : « 4,7 Md € », « 167 M € », « 850 k € ». */
+const euros = (n: number): string =>
+  n >= 1e9 ? `${(n / 1e9).toFixed(1).replace(".", ",")} Md €`
+  : n >= 1e6 ? `${Math.round(n / 1e6)} M €`
+  : n >= 1e3 ? `${Math.round(n / 1e3)} k €`
+  : `${n} €`;
+
 export default function ProspectFiche({
   prospect,
   onClose,
@@ -79,6 +86,14 @@ export default function ProspectFiche({
   ];
   const p = prospect;
   const siege = p.head_office;
+  /** Le dernier exercice publié : le chiffre d'affaires dit la taille mieux qu'une tranche. */
+  const dernierExercice = useMemo(() => {
+    const f = p.registre?.finances;
+    if (!f) return null;
+    const annee = Object.keys(f).sort().at(-1);
+    const ca = annee ? f[annee]?.ca : undefined;
+    return annee && typeof ca === "number" ? { annee, ca, resultat: f[annee]?.resultat_net ?? null } : null;
+  }, [p.registre]);
   const effectif = effectifLabel(p.headcount_band);
 
   /** Le prospect devient une affaire : on reprend ce que Merx a trouvé, sans rien réinventer. */
@@ -261,44 +276,66 @@ export default function ProspectFiche({
       <div>
           {onglet === "identite" && (
             <>
-            {/* Ce que l’approfondissement a trouvé */}
+            {/* Ce qu'on sait d'elle. Tout ce qui est connu s'affiche, approfondie ou
+                non : la recherche ramène désormais le dirigeant, l'effectif, l'adresse
+                et le chiffre d'affaires, et il n'y a aucune raison de les cacher
+                derrière un bouton. Ce qui manque est dit à la fin, sans masquer le reste. */}
             <div className="mb-5 rounded-2xl border border-border">
               <div className="border-b border-border px-4 py-2.5">
-                <SectionLabel>{p.enriched_at ? "Registre officiel et coordonnées" : "Fiche non approfondie"}</SectionLabel>
+                <SectionLabel>Ce qu’on sait d’elle</SectionLabel>
               </div>
               <div className="divide-y divide-border px-4 py-1">
-                {p.enriched_at ? (
-                  <>
-                    {p.legal_name && <Ligne label="Raison sociale">{p.legal_name}</Ligne>}
-                    {p.siren && <Ligne label="SIREN">{p.siren}</Ligne>}
-                    {effectif && (
-                      <Ligne label="Effectif">
-                        {effectif}
-                        {p.headcount_year ? <span className="text-muted-foreground"> (donnée {p.headcount_year})</span> : null}
-                      </Ligne>
-                    )}
-                    {p.open_establishments !== null && <Ligne label="Établissements ouverts">{p.open_establishments}</Ligne>}
-                    {siege && (siege.address || siege.city) && (
-                      <Ligne label="Siège">{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
-                    )}
-                    {p.contact_name && (
-                      <Ligne label="Interlocuteur">
-                        {p.contact_name}
-                        {p.contact_role ? <span className="text-muted-foreground"> — {p.contact_role}</span> : null}
-                      </Ligne>
-                    )}
-                    {p.leaders && p.leaders.length > 0 && (
-                      <Ligne label="Dirigeants">
-                        {p.leaders.map((l) => (l.role ? `${l.name} (${l.role})` : l.name)).join(", ")}
-                      </Ligne>
-                    )}
-                    {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
-                    {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
-                  </>
-                ) : (
+                {p.legal_name && <Ligne label="Raison sociale">{p.legal_name}</Ligne>}
+                {p.siren && <Ligne label="SIREN">{p.siren}</Ligne>}
+                {p.registre?.siret && <Ligne label="SIRET du siège">{p.registre.siret}</Ligne>}
+                {effectif && (
+                  <Ligne label="Effectif">
+                    {effectif}
+                    {p.headcount_year ? <span className="text-muted-foreground"> (donnée {p.headcount_year})</span> : null}
+                  </Ligne>
+                )}
+                {p.open_establishments !== null && <Ligne label="Établissements ouverts">{p.open_establishments}</Ligne>}
+                {siege && (siege.address || siege.city) && (
+                  <Ligne label="Siège">{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
+                )}
+                {p.contact_name && (
+                  <Ligne label="Interlocuteur">
+                    {p.contact_name}
+                    {p.contact_role ? <span className="text-muted-foreground"> — {p.contact_role}</span> : null}
+                  </Ligne>
+                )}
+                {p.leaders && p.leaders.length > 0 && (
+                  <Ligne label="Dirigeants">
+                    {p.leaders.map((l) => (l.role ? `${l.name} (${l.role})` : l.name)).join(", ")}
+                  </Ligne>
+                )}
+                {dernierExercice && (
+                  <Ligne label={`Chiffre d’affaires ${dernierExercice.annee}`}>
+                    {euros(dernierExercice.ca)}
+                    {dernierExercice.resultat !== null ? (
+                      <span className="text-muted-foreground"> · résultat net {euros(dernierExercice.resultat)}</span>
+                    ) : null}
+                  </Ligne>
+                )}
+                {p.registre?.categorie && (
+                  <Ligne label="Catégorie">
+                    {({ GE: "Grande entreprise", ETI: "Entreprise de taille intermédiaire", PME: "PME" } as Record<string, string>)[
+                      p.registre.categorie
+                    ] ?? p.registre.categorie}
+                  </Ligne>
+                )}
+                {p.registre?.dateCreation && (
+                  <Ligne label="Créée le">
+                    {new Date(p.registre.dateCreation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                  </Ligne>
+                )}
+                {p.registre?.tva && <Ligne label="Numéro de TVA">{p.registre.tva}</Ligne>}
+                {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
+                {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
+                {!p.enriched_at && (
                   <div className="py-3 text-[13px] text-muted-foreground">
-                    La recherche ne rend qu’une fiche légère. « Approfondir » va chercher l’identité officielle, l’effectif,
-                    les dirigeants et les coordonnées publiées — c’est gratuit, cela prend une trentaine de secondes.
+                    Ce qui manque encore — l’interlocuteur du service concerné, son e-mail, la politique santé-sécurité —
+                    se trouve sur le site de l’entreprise. « Approfondir » va l’y chercher.
                   </div>
                 )}
               </div>

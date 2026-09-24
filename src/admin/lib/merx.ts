@@ -192,6 +192,19 @@ export interface Prospect {
   contact_phone: string | null;
   contact_source: string | null;
   approach: string | null;
+  /**
+   * Tout ce que l'annuaire officiel publie, conservé tel quel (migration 0047).
+   * Le chiffre d'affaires de Colas France arrivait avec son nom ; on le jetait.
+   */
+  registre: {
+    finances?: Record<string, { ca?: number; resultat_net?: number }> | null;
+    dateCreation?: string | null;
+    categorie?: string | null;
+    siret?: string | null;
+    idcc?: string[];
+    tva?: string | null;
+    etablissements?: number | null;
+  } | null;
   /** Le dossier commercial monté par Merx à l'approfondissement (migration 0033). */
   dossier: Dossier | null;
   enriched_at: string | null;
