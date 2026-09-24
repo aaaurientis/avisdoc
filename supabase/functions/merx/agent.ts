@@ -40,7 +40,7 @@ import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
-import { chercherPappers, chercherPappersEnLot, echecPappers } from "./pappers.ts";
+import { champsPappers, chercherPappers, chercherPappersEnLot, echecPappers } from "./pappers.ts";
 import { deLaRecherche, fiabilite } from "./fiabilite.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
@@ -437,6 +437,8 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
       const deja = fiches.length - inserted;
 
+      // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.
+      const pappersUtile = fiches.some((f) => f.contactPhone || f.contactEmail || f.website);
       const compte = [
         `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
           `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
@@ -449,6 +451,11 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           // n'est pas une fatalité, c'est une panne qu'il faut pouvoir réparer.
           echecPlaces() ? `Google Places : ${echecPlaces()}` : null,
           echecPappers() ? `Pappers : ${echecPappers()}` : null,
+          // Pappers répond mais ne rend ni téléphone, ni e-mail, ni site : on affiche
+          // ce que la formule souscrite a réellement envoyé, plutôt que de le deviner.
+          !echecPappers() && champsPappers().length > 0 && !pappersUtile
+            ? `Pappers a répondu sans coordonnées — champs reçus : ${champsPappers().slice(0, 25).join(", ")}`
+            : null,
       ].filter(Boolean).join(" · ") + ".";
 
       // Un compteur n'est pas un accompagnement. Merx nomme les meilleures, dit ce qui
