@@ -50,8 +50,24 @@ const TABLE: Record<string, Metier> = {
   "01.6": { secteur: "agriculture", ...DEHORS, activite: "Services de soutien à l’agriculture", pourquoi: "Prestataires agricoles : ils suivent les travaux de saison, toujours dehors." },
   "02.": { secteur: "agriculture", ...DEHORS, activite: "Sylviculture et exploitation forestière", pourquoi: "Bûcheronnage et travaux forestiers en plein air toute l’année." },
 
+  // ── Vin et boissons : les caves coopératives ont leurs équipes aux vignes ──
+  //
+  // Le jeu de calibration d'AvisDoc l'a révélé : Wolfberger et Bestheim, deux
+  // coopératives alsaciennes de cent cinquante personnes, sortaient sans aucun point.
+  // Nous couvrions la culture de la vigne (01.2) mais pas la vinification — comme si
+  // une cave coopérative n'employait personne dehors.
+  "11.02": { secteur: "agriculture", ...PARTIE_DEHORS, activite: "Vinification", pourquoi: "Cave et vignoble : une partie des équipes suit les parcelles toute la saison." },
+  "11.03": { secteur: "agriculture", ...PARTIE_DEHORS, activite: "Fabrication de cidre et de vins de fruits", pourquoi: "Vergers et pressoirs : les équipes alternent atelier et plein champ." },
+
   // ── Espaces verts ──
   "81.3": { secteur: "espaces_verts", ...DEHORS, activite: "Aménagement paysager", pourquoi: "Jardiniers et paysagistes : dehors du premier au dernier jour de la saison." },
+
+  // ── Dehors sans être du bâtiment ──
+  "03.": { secteur: "agriculture", ...DEHORS, activite: "Pêche et aquaculture", pourquoi: "Pont, bassins et estran : le travail est en plein air, avec la réverbération de l’eau." },
+  "38.1": { secteur: "collectivites", ...DEHORS, activite: "Collecte des déchets", pourquoi: "Les équipes de collecte sont sur la voie publique toute la journée." },
+  "49.41": { secteur: "autre", ...PARTIE_DEHORS, activite: "Transports routiers de fret", pourquoi: "Chargement, bâchage et attente sur quai exposent les conducteurs." },
+  "71.12": { secteur: "btp", ...PARTIE_DEHORS, activite: "Ingénierie et études techniques", pourquoi: "Géomètres et conducteurs de travaux passent une part de leur temps sur les chantiers." },
+  "80.10": { secteur: "autre", ...PARTIE_DEHORS, activite: "Sécurité privée", pourquoi: "Rondes et surveillance de sites se font en extérieur." },
 
   // ── Collectivités ──
   "84.1": { secteur: "collectivites", ...PARTIE_DEHORS, activite: "Administration publique", pourquoi: "Services techniques, voirie et espaces verts municipaux travaillent en extérieur." },

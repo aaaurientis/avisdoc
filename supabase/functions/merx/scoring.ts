@@ -1,25 +1,93 @@
-// Grille de notation des prospects d'AvisDoc — arrêtée avec Olivier le 12/09/2026 « pour commencer, on
-// améliorera ensuite ». Trois catégories, six critères, 100 points. Un critère sans information vaut 0 point
-// et s'affiche « non évalué » : rien n'est deviné.
-// Deux critères sont jugés par le modèle (exposition au soleil, sensibilité santé au travail), avec une
-// justification et une source ; les quatre autres sont calculés ici, à partir de données vérifiables.
+// La grille de qualification commerciale d'AvisDoc.
+//
+// Elle vient de l'équipe commerciale d'AvisDoc, établie le 24/09/2026 et livrée en
+// tableur. Nous l'appliquons telle qu'elle l'a écrite : ce sont eux qui vendent, et une
+// grille que le commercial n'a pas faite est une grille qu'il ne suivra pas. Elle est
+// faite pour être ajustée au fil des retours du terrain.
+//
+// Son principe : « éliminer d'abord les faux positifs, puis scorer la pertinence
+// AvisDoc, la maturité prévention et l'accessibilité commerciale. »
+//
+//   Étape 1  filtres éliminatoires — aucun point : on passe ou l'on sort
+//   Étape 2  pertinence AvisDoc ......... 60 points
+//   Étape 3  maturité prévention ........ 25 points
+//   Étape 4  accessibilité commerciale .. 15 points
+//
+// Sa phrase de conclusion tient lieu de règle : « Le score ne remplace pas le jugement
+// commercial. La note de fiabilité des données doit rester visible séparément : une
+// fiche à 80/100 fondée sur des données douteuses n'est pas un bon prospect. » C'est
+// pourquoi la fiabilité vit dans son propre fichier et ne touche jamais à ce score.
 
-export type Category = "sante" | "commercial" | "faisabilite";
-export type CriterionId = "soleil" | "sante_travail" | "salaries" | "interlocuteur" | "sites" | "zone";
+export type Category = "pertinence" | "maturite" | "accessibilite";
+export type CriterionId =
+  | "exposition"
+  | "population"
+  | "peau"
+  | "deploiement"
+  | "politique_sst"
+  | "actions_recentes"
+  | "instances"
+  | "interlocuteur"
+  | "coordonnees"
+  | "actualite_contact";
 
 export const CATEGORIES: { id: Category; label: string; criteria: CriterionId[] }[] = [
-  { id: "sante", label: "Santé", criteria: ["soleil", "sante_travail"] },
-  { id: "commercial", label: "Commercial", criteria: ["salaries", "interlocuteur", "sites"] },
-  { id: "faisabilite", label: "Faisabilité", criteria: ["zone"] },
+  { id: "pertinence", label: "Pertinence AvisDoc", criteria: ["exposition", "population", "peau", "deploiement"] },
+  { id: "maturite", label: "Maturité prévention", criteria: ["politique_sst", "actions_recentes", "instances"] },
+  { id: "accessibilite", label: "Accessibilité commerciale", criteria: ["interlocuteur", "coordonnees", "actualite_contact"] },
 ];
 
-export const CRITERIA: Record<CriterionId, { label: string; max: number }> = {
-  soleil: { label: "Concernés par le dépistage", max: 35 },
-  sante_travail: { label: "Sensibilité santé au travail", max: 10 },
-  salaries: { label: "Nombre de salariés", max: 20 },
-  interlocuteur: { label: "Interlocuteur trouvé", max: 10 },
-  sites: { label: "Plusieurs sites", max: 10 },
-  zone: { label: "Zone géographique", max: 15 },
+export const CRITERIA: Record<CriterionId, { label: string; max: number; aide: string }> = {
+  exposition: {
+    label: "Exposition solaire professionnelle",
+    max: 25,
+    aide: "Part significative de salariés travaillant régulièrement en extérieur. Intensité, fréquence et nombre de salariés concernés.",
+  },
+  population: {
+    label: "Taille de la population concernée",
+    max: 15,
+    aide: "Collaborateurs potentiellement bénéficiaires sur le site. Cible idéale de cent à mille — sans favoriser artificiellement les très grands groupes.",
+  },
+  peau: {
+    label: "Adéquation santé / peau",
+    max: 10,
+    aide: "Activité ou population présentant un intérêt direct pour la prévention cutanée. Qualifie aussi des prospects sans forte exposition aux UV.",
+  },
+  deploiement: {
+    label: "Potentiel de déploiement",
+    max: 10,
+    aide: "Plusieurs sites ou périmètre groupe accessible depuis l’interlocuteur. Ne compte que si le premier site est lui-même pertinent.",
+  },
+  politique_sst: {
+    label: "Politique santé-sécurité structurée",
+    max: 10,
+    aide: "QHSE, MASE, ISO, prévention formalisée. Mesure la capacité de l’entreprise à intégrer une action de prévention de plus.",
+  },
+  actions_recentes: {
+    label: "Actions récentes de prévention",
+    max: 10,
+    aide: "Semaines sécurité, QVCT, ateliers, interventions SPST, OPPBTP, MSA, Carsat. Un signal concret récent vaut mieux qu’une déclaration RSE générale.",
+  },
+  instances: {
+    label: "Implication RH, CSE, santé au travail",
+    max: 5,
+    aide: "Instances ou fonctions susceptibles de porter, cofinancer ou relayer l’action.",
+  },
+  interlocuteur: {
+    label: "Interlocuteur pertinent identifiable",
+    max: 7,
+    aide: "QHSE, médecin ou infirmier santé au travail, RH, RSE selon le contexte. La personne réellement compétente, pas un titre générique.",
+  },
+  coordonnees: {
+    label: "Coordonnées directes",
+    max: 5,
+    aide: "E-mail nominatif, ligne directe ou standard coopératif. Une adresse vérifiée n’est pas une adresse déduite.",
+  },
+  actualite_contact: {
+    label: "Actualité du contact",
+    max: 3,
+    aide: "Fonction confirmée récemment. Un ancien contact non confirmé ne rapporte aucun point.",
+  },
 };
 
 /** Note d'un critère : null = non évalué (0 point). */
@@ -30,98 +98,131 @@ export interface CriterionScore {
 }
 export type Score = Partial<Record<CriterionId, CriterionScore>>;
 
-// Zones où AvisDoc peut organiser des journées de dépistage (Olivier, 12/09/2026 : « on améliorera ») :
-// Gironde, Île-de-France, Occitanie, Provence-Alpes-Côte d'Azur. Départements relevés sur geo.api.gouv.fr.
-export const COVERED_ZONES: { label: string; departments: string[] }[] = [
-  { label: "Gironde", departments: ["33"] },
-  { label: "Île-de-France", departments: ["75", "77", "78", "91", "92", "93", "94", "95"] },
-  { label: "Occitanie", departments: ["09", "11", "12", "30", "31", "32", "34", "46", "48", "65", "66", "81", "82"] },
-  { label: "Provence-Alpes-Côte d'Azur", departments: ["04", "05", "06", "13", "83", "84"] },
+export const total = (s: Score): number =>
+  Object.values(s).reduce((t, c) => t + (c?.points ?? 0), 0);
+
+// ── Les seuils de décision, tels qu'AvisDoc les a posés ──────────────────
+export const DECISIONS: { min: number; libelle: string; action: string }[] = [
+  { min: 70, libelle: "Prioritaire", action: "Approfondir immédiatement : contact actuel, coordonnées, angle personnalisé, preuves récentes." },
+  { min: 55, libelle: "À qualifier", action: "Approfondir si un critère stratégique est fort — UV, taille, prévention — ou si la recherche coûte peu." },
+  { min: 40, libelle: "Piste secondaire", action: "Garder au vivier ; pas de recherche nominative longue sans signal supplémentaire." },
+  { min: 0, libelle: "Faible priorité", action: "Ne pas approfondir, sauf information nouvelle ou demande particulière." },
 ];
+/**
+ * La décision se prend sur ce qui a PU être évalué, pas sur cent.
+ *
+ * Les seuils d'AvisDoc valent pour une fiche complète. Une fiche brute ne dispose que
+ * des soixante points de l'étape 2 : Vogel TP, trente-sept sur soixante — six chantiers
+ * de travaux publics sur dix —, sortait « faible priorité » et se retrouvait au fond du
+ * vivier. On ramène donc la note à l'échelle de ce qui était mesurable.
+ */
+export const decision = (t: number, sur = 100) =>
+  DECISIONS.find((d) => (sur > 0 ? (100 * t) / sur : 0) >= d.min)!;
+
+/** Les points maximum atteignables avec ce qui a été évalué. */
+export const maxEvalue = (s: Score): number =>
+  (Object.keys(s) as CriterionId[]).reduce((t, id) => t + (s[id] ? CRITERIA[id].max : 0), 0);
+
+// ── Étape 2 : la pertinence, ce que le registre suffit à établir ─────────
 
 export type SunLevel = "majorite_dehors" | "partie_dehors" | "interieur" | "non_evalue";
-const SUN_POINTS: Record<SunLevel, number | null> = { majorite_dehors: 35, partie_dehors: 15, interieur: 0, non_evalue: null };
+const EXPOSITION: Record<SunLevel, number | null> = {
+  majorite_dehors: 25,
+  partie_dehors: 12,
+  interieur: 0,
+  non_evalue: null,
+};
 
-/**
- * Le second chemin vers le critère médical premier.
- *
- * Un institut de beauté, une pharmacie, un laboratoire de dermatologie n'ont
- * personne au soleil : avec la seule exposition, ils sortaient à quinze sur cent et
- * le commercial les écartait. Or ce sont des cibles — leur métier touche la peau,
- * le sujet leur parle, et ils orientent leurs clients.
- *
- * On ne crée pas un septième critère : on ouvre une seconde porte vers le même.
- */
 export type AffinityLevel = "metier_de_la_peau" | "secteur_sante" | "aucune" | "non_evalue";
-const AFFINITY_POINTS: Record<AffinityLevel, number | null> = {
-  metier_de_la_peau: 35, // esthétique, dermatologie, protection solaire : le sujet EST leur métier
-  secteur_sante: 20, // santé ou bien-être au sens large : le sujet leur parle
+const PEAU: Record<AffinityLevel, number | null> = {
+  metier_de_la_peau: 10, // esthétique, dermatologie, protection solaire : le sujet EST leur métier
+  secteur_sante: 6, // santé ou bien-être au sens large : le sujet leur parle
   aucune: 0,
   non_evalue: null,
 };
 
+export function expositionScore(niveau: SunLevel, justification: string, source: string | null): CriterionScore {
+  return {
+    points: EXPOSITION[niveau],
+    justification: justification || "Exposition non évaluée.",
+    source,
+  };
+}
+
+export function peauScore(niveau: AffinityLevel, justification: string, source: string | null): CriterionScore {
+  return { points: PEAU[niveau], justification: justification || "Aucun lien direct avec la peau.", source };
+}
+
 /**
- * Concernés par le dépistage : par l'exposition de leurs salariés, ou par leur métier.
- * On retient le meilleur des deux — une entreprise n'a pas à cumuler pour être une cible.
+ * La taille de la population concernée, sur quinze.
+ *
+ * « Cible idéale ≈ 100–1 000 ; ne pas éliminer mécaniquement <100 si pertinence métier
+ * très forte » — et « valoriser la masse critique sans favoriser artificiellement les
+ * très grands groupes ». Le barème monte donc jusqu'à mille puis cesse de monter : un
+ * groupe de dix mille ne remplit pas dix fois mieux une journée de dépistage.
  */
-export function sunScore(
-  level: SunLevel,
-  justification: string,
-  source: string | null,
-  affinity?: { niveau: AffinityLevel; justification: string; source: string | null },
-): CriterionScore {
-  const parSoleil = SUN_POINTS[level];
-  const parMetier = affinity ? AFFINITY_POINTS[affinity.niveau] : null;
-
-  if (parMetier !== null && (parSoleil === null || parMetier > parSoleil)) {
-    return { points: parMetier, justification: affinity!.justification, source: affinity!.source };
-  }
-  return { points: parSoleil, justification, source };
-}
-
-export function healthScore(found: boolean, justification: string, source: string | null): CriterionScore {
-  return found ? { points: 10, justification, source } : { points: null, justification: "Aucune démarche publiée trouvée.", source: null };
-}
-
-// Paliers sur les tranches INSEE de l'entreprise entière : 250 et plus 20 ; 100 à 249 15 ; 50 à 99 10 ;
-// 10 à 49 5 ; moins de 10 0.
-const SIZE_POINTS: Record<string, number> = {
-  "53": 20, "52": 20, "51": 20, "42": 20, "41": 20, "32": 20,
-  "31": 15, "22": 15,
-  "21": 10,
-  "12": 5, "11": 5,
-  "03": 0, "02": 0, "01": 0, "00": 0, NN: 0,
+const POPULATION: Record<string, { clair: string; points: number }> = {
+  "53": { clair: "10 000 et plus", points: 13 },
+  "52": { clair: "5 000 à 9 999", points: 13 },
+  "51": { clair: "2 000 à 4 999", points: 14 },
+  "42": { clair: "1 000 à 1 999", points: 15 },
+  "41": { clair: "500 à 999", points: 15 },
+  "32": { clair: "250 à 499", points: 14 },
+  "31": { clair: "200 à 249", points: 13 },
+  "22": { clair: "100 à 199", points: 12 },
+  // Sous cent, on n'élimine pas : la pertinence métier peut compenser.
+  "21": { clair: "50 à 99", points: 7 },
+  "12": { clair: "20 à 49", points: 3 },
+  "11": { clair: "10 à 19", points: 1 },
+  "03": { clair: "6 à 9", points: 0 },
+  "02": { clair: "3 à 5", points: 0 },
+  "01": { clair: "1 à 2", points: 0 },
+  "00": { clair: "0 salarié", points: 0 },
 };
 
-export function sizeScore(band: string | null, label: string | null, year: number | null): CriterionScore {
-  if (!band || !(band in SIZE_POINTS)) return { points: null, justification: "Effectif non connu de l'annuaire officiel.", source: null };
-  return { points: SIZE_POINTS[band], justification: `${label ?? band}${year ? ` (donnée ${year})` : ""}, annuaire officiel.`, source: null };
+export function populationScore(band: string | null, duSite: boolean, annee: number | null): CriterionScore {
+  const p = band ? POPULATION[band] : undefined;
+  if (!p) return { points: null, justification: "Effectif non connu de l'annuaire officiel.", source: null };
+  return {
+    points: p.points,
+    justification: `${p.clair} ${duSite ? "sur ce site" : "pour l’entreprise entière — effectif du site non publié"}${annee ? ` (donnée ${annee})` : ""}.`,
+    source: null,
+  };
 }
 
-export function sitesScore(openEstablishments: number | null): CriterionScore {
-  if (openEstablishments === null) return { points: null, justification: "Nombre de sites non connu.", source: null };
-  const points = openEstablishments >= 3 ? 10 : openEstablishments === 2 ? 5 : 0;
-  return { points, justification: `${openEstablishments} établissement${openEstablishments > 1 ? "s" : ""} ouvert${openEstablishments > 1 ? "s" : ""}, annuaire officiel.`, source: null };
+/** Le potentiel de déploiement : plusieurs sites, donc plusieurs journées. */
+export function deploiementScore(ouverts: number | null): CriterionScore {
+  if (ouverts === null) return { points: null, justification: "Nombre d’établissements non connu.", source: null };
+  const points = ouverts >= 20 ? 10 : ouverts >= 10 ? 8 : ouverts >= 5 ? 6 : ouverts >= 2 ? 3 : 0;
+  return {
+    points,
+    justification: ouverts <= 1 ? "Établissement unique." : `${ouverts} établissements ouverts, annuaire officiel.`,
+    source: null,
+  };
 }
 
-export function zoneScore(departments: (string | null)[]): CriterionScore {
-  const known = departments.filter((d): d is string => Boolean(d));
-  if (!known.length) return { points: null, justification: "Département non connu.", source: null };
-  const zone = COVERED_ZONES.find((z) => known.some((d) => z.departments.includes(d)));
-  return zone ? { points: 15, justification: `Présente en zone couverte : ${zone.label}.`, source: null } : { points: 0, justification: "Hors des zones couvertes par AvisDoc.", source: null };
+// ── Étapes 3 et 4 : ce qui ne se découvre qu'en lisant ───────────────────
+//
+// Ces critères n'existent qu'après approfondissement : c'est le modèle qui les
+// établit, avec une justification et une page à l'appui. Sans preuve, zéro point —
+// « un ancien contact non confirmé ne doit pas rapporter de points ».
+
+/** Un critère jugé sur pièces : sans source vérifiée, il ne vaut rien. */
+export function surPreuve(
+  id: CriterionId,
+  trouve: boolean,
+  niveau: number,
+  justification: string,
+  source: string | null,
+): CriterionScore {
+  const max = CRITERIA[id].max;
+  if (!trouve || !source) {
+    return { points: 0, justification: justification || "Rien de tel n’a été trouvé.", source: null };
+  }
+  return { points: Math.max(0, Math.min(max, Math.round(niveau))), justification, source };
 }
 
-export function contactScore(contact: { name: string; role: string; source: string } | null, hasLeader: boolean): CriterionScore {
-  if (contact) return { points: 10, justification: `${contact.name}${contact.role ? `, ${contact.role}` : ""}.`, source: contact.source };
-  if (hasLeader) return { points: 5, justification: "Seulement le dirigeant inscrit à l'annuaire officiel.", source: null };
-  return { points: null, justification: "Aucun interlocuteur trouvé.", source: null };
-}
-
-export function total(score: Score): number {
-  return Object.values(score).reduce((sum, c) => sum + (c?.points ?? 0), 0);
-}
-
-// Secteurs du kanban Prospects (Olivier, 12/09/2026 : « vas-y on ajustera »).
+// ── Les secteurs, pour ranger les fiches ─────────────────────────────────
 export const SECTORS = [
   { id: "btp", label: "Travaux publics et BTP" },
   { id: "espaces_verts", label: "Espaces verts" },
@@ -130,6 +231,5 @@ export const SECTORS = [
   { id: "sante_beaute", label: "Santé et beauté" },
   { id: "autre", label: "Autre" },
 ] as const;
-
 export type Sector = (typeof SECTORS)[number]["id"];
 export const isSector = (v: string): v is Sector => SECTORS.some((s) => s.id === v);

@@ -166,10 +166,31 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    SI TU NE TROUVES PERSONNE : ne dis pas « appelez le standard » sans rien d'autre. Donne le NUMÉRO du standard — il est dans les coordonnées du site ou sur la page contact —, dis quel service demander, et pourquoi celui-là. Un conseil sans numéro à composer ne sert à rien.
 3. ${SUN}
    ${AFFINITE}
-4. La sensibilité santé au travail : une démarche publiée (accord de qualité de vie au travail, prévention des risques, politique RSE), trouvée ou non, avec une phrase et la page source.
-5. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
+4. LA MATURITÉ PRÉVENTION, en trois critères distincts — c'est la grille commerciale
+   d'AvisDoc, et chacun se juge sur une page, jamais sur une impression. Pour chacun :
+   trouvé ou non, un « niveau » de 0 au maximum indiqué, une phrase, et LA PAGE SOURCE.
+   Sans page source, mets trouve = false et niveau = 0 : un signal qu'on ne peut pas
+   montrer ne vaut rien.
+   • politique_sst (0 à 10) — une politique santé-sécurité STRUCTURÉE : service QHSE ou
+     HSE, certification MASE, ISO 45001, document unique mis en avant, charte de
+     prévention. Elle mesure la capacité de l'entreprise à intégrer une action de plus.
+     Une simple phrase « la sécurité est notre priorité » vaut 2 ou 3, pas 10.
+   • actions_recentes (0 à 10) — des actions CONCRÈTES et RÉCENTES : semaine de la
+     sécurité, journée QVCT, atelier prévention, dépistage déjà organisé, intervention
+     d'un service de prévention (SPST, OPPBTP, MSA, Carsat). Les actions de 2024 à 2026
+     comptent double par rapport aux anciennes : une action datée de 2019 vaut 3 au plus.
+     Un signal concret et récent vaut davantage qu'une déclaration RSE générale.
+   • instances (0 à 5) — l'existence de RELAIS : CSE actif, commission santé-sécurité,
+     service de santé au travail interne, infirmier ou médecin du travail sur site,
+     accord d'entreprise sur la qualité de vie au travail. Ce sont eux qui portent,
+     cofinancent ou relaient l'action.
+5. contact_confirme (0 à 3) — la fonction de l'interlocuteur que tu donnes a-t-elle été
+   confirmée RÉCEMMENT ? Une page datée de 2026 vaut 3 ; une source non datée mais
+   recoupée par une seconde page vaut 2 ; une mention ancienne vaut 1. Un ancien contact
+   non confirmé ne doit rapporter AUCUN point : mets trouve = false.
+6. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
-6. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
+7. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
    • a_retenir : trois à six faits CONCRETS sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
    • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
    • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
@@ -180,10 +201,32 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
 
 Six recherches web au plus. ${POLITESSE} ${NEVER}`;
 
+/**
+ * Un critère de la grille commerciale jugé sur pièces : trouvé ou non, à quel point,
+ * pourquoi, et sur quelle page. Sans source, il ne rapporte aucun point — « un ancien
+ * contact non confirmé ne doit pas rapporter de points ».
+ */
+const PREUVE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["trouve", "niveau", "justification", "source"],
+  properties: {
+    trouve: { type: "boolean" },
+    /** De 0 au maximum du critère : l'intensité de ce qu'on a trouvé. */
+    niveau: { type: "number" },
+    justification: { type: "string" },
+    source: { type: "string" },
+  },
+} as const;
+
 export const ENRICH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["siren", "site_web", "contact", "exposition_soleil", "affinite_prevention", "sante_travail", "angle_approche", "dossier", "sources"],
+  required: [
+    "siren", "site_web", "contact", "exposition_soleil", "affinite_prevention",
+    "politique_sst", "actions_recentes", "instances", "contact_confirme",
+    "angle_approche", "dossier", "sources",
+  ],
   properties: {
     siren: { type: "string" },
     site_web: { type: "string" },
@@ -195,12 +238,12 @@ export const ENRICH_SCHEMA = {
     },
     exposition_soleil: SUN_SCHEMA,
     affinite_prevention: AFFINITE_SCHEMA,
-    sante_travail: {
-      type: "object",
-      additionalProperties: false,
-      required: ["trouve", "justification", "source"],
-      properties: { trouve: { type: "boolean" }, justification: { type: "string" }, source: { type: "string" } },
-    },
+    // Étape 3 de la grille — maturité prévention, vingt-cinq points.
+    politique_sst: PREUVE_SCHEMA,
+    actions_recentes: PREUVE_SCHEMA,
+    instances: PREUVE_SCHEMA,
+    // Étape 4 — la fonction de l'interlocuteur a-t-elle été confirmée récemment ?
+    contact_confirme: PREUVE_SCHEMA,
     angle_approche: { type: "string" },
     dossier: {
       type: "object",
@@ -238,13 +281,23 @@ export const ENRICH_SCHEMA = {
   },
 } as const;
 
+export interface Preuve {
+  trouve: boolean;
+  niveau: number;
+  justification: string;
+  source: string;
+}
+
 export interface EnrichOut {
   siren: string;
   site_web: string;
   contact: { nom: string; fonction: string; email: string; telephone: string; source: string };
   exposition_soleil: SunOut;
   affinite_prevention: AffiniteOut;
-  sante_travail: { trouve: boolean; justification: string; source: string };
+  politique_sst: Preuve;
+  actions_recentes: Preuve;
+  instances: Preuve;
+  contact_confirme: Preuve;
   angle_approche: string;
   dossier: {
     a_retenir: string[];

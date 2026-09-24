@@ -30,12 +30,13 @@ import {
   LIST_SYSTEM,
   type EnrichOut,
   type ListOut,
+  type Preuve,
 } from "./prompts.ts";
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu } from "./places.ts";
-import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
+import { deploiementScore, expositionScore, isSector, peauScore, populationScore, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
 function enClair(message: string): string {
@@ -150,15 +151,11 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
  * six à neuf : promettre le premier chiffre à un commercial, c'est lui faire préparer
  * une campagne de dépistage pour une agence de huit personnes.
  */
-function effectifDuSite(local: Establishment, c: Found) {
+function populationDuSite(local: Establishment, c: Found) {
   const duSite = local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : null;
-  if (duSite) {
-    const s = sizeScore(duSite, headcountLabel(duSite), local.headcountYear);
-    return { ...s, justification: s.justification.replace(", annuaire officiel.", " sur ce site, annuaire officiel.") };
-  }
-  const s = sizeScore(c.headcountBand, headcountLabel(c.headcountBand), c.headcountYear);
-  if (s.points === null) return s;
-  return { ...s, justification: s.justification.replace(", annuaire officiel.", " pour l’entreprise entière — effectif du site non publié.") };
+  return duSite
+    ? populationScore(duSite, true, local.headcountYear)
+    : populationScore(c.headcountBand, false, c.headcountYear);
 }
 
 function versFiches(trouvees: Found[]): LightProspect[] {
@@ -181,19 +178,15 @@ function versFiches(trouvees: Found[]): LightProspect[] {
     const local = c.localSites[0] ?? c.headOffice;
     const source = `https://annuaire-entreprises.data.gouv.fr/entreprise/${c.siren}`;
 
+    // L'étape 2 de la grille commerciale — la pertinence AvisDoc, soixante points —
+    // est la seule que le registre suffise à établir. Maturité prévention et
+    // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
+    // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
     const score: Score = {
-      soleil: sunScore(metier.soleil, metier.pourquoi, source, {
-        niveau: metier.affinite,
-        justification: metier.pourquoi,
-        source,
-      }),
-      // L'effectif du SITE où l'on ira, pas celui du groupe : une agence de huit
-      // personnes dans une société de deux mille n'est pas un site de deux mille.
-      // L'annuaire marque « NN » les établissements qu'il ne renseigne pas : on
-      // retombe alors sur l'entreprise, en disant que c'est elle qu'on compte.
-      salaries: effectifDuSite(local, c),
-      sites: sitesScore(c.openEstablishments),
-      zone: zoneScore([local.department ?? c.headOffice.department]),
+      exposition: expositionScore(metier.soleil, metier.pourquoi, source),
+      population: populationDuSite(local, c),
+      peau: peauScore(metier.affinite, metier.pourquoi, source),
+      deploiement: deploiementScore(c.openEstablishments),
     };
 
     const autresSites = c.localSites.length > 1 ? `${metier.pourquoi ? " · " : ""}${c.localSites.length} établissements dans la zone` : "";
@@ -275,13 +268,12 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     .map((p) => {
       const sun = p.exposition_soleil;
       const score: Score = {
-        // Exposé au soleil OU concerné par son métier : on retient le meilleur des deux.
-        soleil: sunScore(sun.niveau, sun.justification.trim(), seen.has(sun.source) ? sun.source : null, {
-          niveau: p.affinite_prevention?.niveau ?? "non_evalue",
-          justification: p.affinite_prevention?.justification?.trim() ?? "",
-          source: seen.has(p.affinite_prevention?.source ?? "") ? p.affinite_prevention.source : null,
-        }),
-        zone: zoneScore([department(p.departement)]),
+        exposition: expositionScore(sun.niveau, sun.justification.trim(), seen.has(sun.source) ? sun.source : null),
+        peau: peauScore(
+          p.affinite_prevention?.niveau ?? "non_evalue",
+          p.affinite_prevention?.justification?.trim() ?? "",
+          seen.has(p.affinite_prevention?.source ?? "") ? p.affinite_prevention.source : null,
+        ),
       };
       return {
         name: p.nom.trim(),
@@ -386,19 +378,63 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
 
   const previous = (p.score ?? {}) as Score;
   const sun = out.exposition_soleil;
+
+  /** Un critère de maturité prévention, jugé sur la page qui l'atteste. */
+  const preuve = (id: "politique_sst" | "actions_recentes" | "instances" | "actualite_contact", v: Preuve) =>
+    surPreuve(id, v.trouve && allowed(v.source), v.niveau, v.justification.trim(), allowed(v.source) ? v.source : null);
+
+  /**
+   * L'interlocuteur, sur sept points. La grille dit : « privilégier la personne réellement
+   * compétente plutôt qu'un titre générique » — QHSE, médecin ou infirmier du travail,
+   * RH, RSE. Un dirigeant tiré du registre vaut moins : il décide, mais il faudra
+   * encore qu'il transmette.
+   */
+  const FONCTIONS_UTILES = /qhse|hse|qsse|sécurit|securit|préven|preven|santé|sante|infirm|médec|medec|rh\b|ressources humaines|drh|rse|qvct|social/i;
+  const interlocuteurScore = (): CriterionScore => {
+    if (!contact?.name) return { points: 0, justification: "Aucun interlocuteur identifié.", source: null };
+    const pertinent = FONCTIONS_UTILES.test(contact.role ?? "");
+    if (named) {
+      return {
+        points: pertinent ? 7 : 5,
+        justification: `${contact.name}${contact.role ? `, ${contact.role}` : ""}${pertinent ? " — fonction directement concernée" : " — nommé sur une page vérifiée"}.`,
+        source: named.source,
+      };
+    }
+    return { points: 3, justification: `${contact.name}, dirigeant au registre — il décide, mais il faudra qu'il transmette.`, source: null };
+  };
+
+  /** Les coordonnées, sur cinq. Une adresse vérifiée n'est pas une adresse déduite. */
+  const coordonneesScore = (): CriterionScore => {
+    const nominatif = Boolean(email && named && c.email.trim() === email);
+    const surSite = Boolean(email && site?.emails.includes(email));
+    if (nominatif && phone) return { points: 5, justification: "E-mail nominatif et téléphone, relevés sur une page vérifiée.", source: named?.source ?? null };
+    if ((nominatif || surSite) && phone) return { points: 4, justification: "E-mail publié par l'entreprise et téléphone.", source: site?.readOn ?? null };
+    if (email && phone) return { points: 3, justification: "E-mail et téléphone relevés, sans certitude sur le destinataire.", source: site?.readOn ?? null };
+    if (email || phone) return { points: 2, justification: email ? "E-mail seul." : "Standard seul — il faudra demander le service.", source: site?.readOn ?? null };
+    return { points: 0, justification: "Aucune coordonnée trouvée.", source: null };
+  };
+
   const score: Score = {
-    soleil: sun.niveau !== "non_evalue"
-      ? sunScore(sun.niveau, sun.justification.trim(), allowed(sun.source) ? sun.source : null, {
-          niveau: out.affinite_prevention?.niveau ?? "non_evalue",
-          justification: out.affinite_prevention?.justification?.trim() ?? "",
-          source: allowed(out.affinite_prevention?.source ?? "") ? out.affinite_prevention.source : null,
-        })
-      : (previous.soleil ?? sunScore("non_evalue", "", null)),
-    sante_travail: healthScore(out.sante_travail.trouve && allowed(out.sante_travail.source), out.sante_travail.justification.trim(), out.sante_travail.source),
-    salaries: sizeScore(company?.headcountBand ?? null, headcountLabel(company?.headcountBand ?? null), company?.headcountYear ?? null),
-    interlocuteur: contactScore(contact, (company?.leaders.length ?? 0) > 0),
-    sites: sitesScore(company?.openEstablishments ?? null),
-    zone: zoneScore([company?.headOffice.department ?? null, p.department]),
+    // Étape 2 — la pertinence. L'approfondissement affine ce que le registre avançait,
+    // mais ne l'efface pas : un critère qu'on n'a pas su juger garde son jugement d'avant.
+    exposition:
+      sun.niveau !== "non_evalue"
+        ? expositionScore(sun.niveau, sun.justification.trim(), allowed(sun.source) ? sun.source : null)
+        : (previous.exposition ?? expositionScore("non_evalue", "", null)),
+    population: populationScore(company?.headcountBand ?? null, false, company?.headcountYear ?? null),
+    peau:
+      out.affinite_prevention?.niveau && out.affinite_prevention.niveau !== "non_evalue"
+        ? peauScore(out.affinite_prevention.niveau, out.affinite_prevention.justification?.trim() ?? "", allowed(out.affinite_prevention.source) ? out.affinite_prevention.source : null)
+        : (previous.peau ?? peauScore("non_evalue", "", null)),
+    deploiement: deploiementScore(company?.openEstablishments ?? null),
+    // Étape 3 — maturité prévention.
+    politique_sst: preuve("politique_sst", out.politique_sst),
+    actions_recentes: preuve("actions_recentes", out.actions_recentes),
+    instances: preuve("instances", out.instances),
+    // Étape 4 — accessibilité commerciale.
+    interlocuteur: interlocuteurScore(),
+    coordonnees: coordonneesScore(),
+    actualite_contact: preuve("actualite_contact", out.contact_confirme),
   };
 
   await saveEnrichment(sb, req.prospectId!, {
