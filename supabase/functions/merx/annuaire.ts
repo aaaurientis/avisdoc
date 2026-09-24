@@ -86,6 +86,29 @@ export interface Company {
     /** Convention collective renseignée : elle dit le métier réel des salariés. */
     conventionConnue: boolean;
   };
+  /**
+   * Tout le reste de ce que l'État publie, conservé tel quel.
+   *
+   * Le chiffre d'affaires de Colas France — quatre milliards sept — arrivait dans la
+   * même réponse que son nom, et nous le jetions. L'ancienneté, la catégorie, le SIRET,
+   * les conventions collectives aussi. On ne jette plus rien de ce qu'on a reçu : ce
+   * qu'on ne sait pas encore afficher, on le garde.
+   */
+  registre: {
+    /** Chiffre d'affaires et résultat net, par exercice. */
+    finances: Record<string, { ca?: number; resultat_net?: number }> | null;
+    dateCreation: string | null;
+    /** PME, ETI ou GE, au sens de l'INSEE. */
+    categorie: string | null;
+    siret: string | null;
+    /** « latitude,longitude » du siège. */
+    coordonnees: string | null;
+    /** Conventions collectives appliquées : elles disent le métier réel des salariés. */
+    idcc: string[];
+    tva: string | null;
+    natureJuridique: string | null;
+    etablissements: number | null;
+  };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -133,6 +156,17 @@ export function toCompany(r: any): Company {
       achatsResponsables: Boolean(r.complements?.est_achats_responsables),
       ess: Boolean(r.complements?.est_ess),
       conventionConnue: Boolean(r.complements?.convention_collective_renseignee),
+    },
+    registre: {
+      finances: r.finances ?? null,
+      dateCreation: r.date_creation ?? null,
+      categorie: r.categorie_entreprise ?? null,
+      siret: r.siege?.siret ?? null,
+      coordonnees: r.siege?.coordonnees ?? null,
+      idcc: r.siege?.liste_idcc ?? r.complements?.liste_idcc ?? [],
+      tva: (r.tva ?? [])[0] ?? null,
+      natureJuridique: r.nature_juridique ?? null,
+      etablissements: r.nombre_etablissements ?? null,
     },
   };
 }
