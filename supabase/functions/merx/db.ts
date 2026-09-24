@@ -15,7 +15,7 @@ const STALE_MINUTES = 5; // une demande « en cours » depuis plus longtemps est
 
 export interface Demande {
   id: string;
-  kind: "recherche" | "approfondissement";
+  kind: "recherche" | "approfondissement" | "completion";
   request: string;
   prospectId: string | null;
   conversationId: string | null;
@@ -242,6 +242,30 @@ export async function getProspectForEnrichment(sb: SupabaseClient, id: string): 
   return data as ProspectToEnrich | null;
 }
 
+/** La fiche telle qu'elle est, pour la compléter sans rien effacer. */
+export async function loadProspect(
+  sb: SupabaseClient,
+  id: string,
+): Promise<{ name: string; city: string | null; siren: string | null; website: string | null; contactName: string | null; contactEmail: string | null; contactPhone: string | null } | null> {
+  const { data, error } = await sb
+    .from("admin_prospects")
+    .select("name, city, siren, website, contact_name, contact_email, contact_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const r = data as Record<string, string | null>;
+  return {
+    name: r.name ?? "",
+    city: r.city,
+    siren: r.siren,
+    website: r.website,
+    contactName: r.contact_name,
+    contactEmail: r.contact_email,
+    contactPhone: r.contact_phone,
+  };
+}
+
 export interface Enrichment {
   siren: string | null;
   legalName: string | null;
@@ -266,6 +290,58 @@ export interface Enrichment {
 }
 
 /** Un approfondissement n'efface jamais une donnée déjà là : chaque champ vide laisse l'ancien en place. */
+/**
+ * Ce qu'on complète sur une fiche existante, sans modèle.
+ *
+ * On n'écrase jamais une information déjà présente : `coalesce` côté base garderait
+ * l'ancienne, mais Supabase n'en offre pas l'équivalent — on ne transmet donc que les
+ * champs réellement trouvés, et l'appelant décide de ce qu'il envoie.
+ */
+export async function completeProspect(
+  sb: SupabaseClient,
+  id: string,
+  e: {
+    siren: string | null;
+    legalName: string | null;
+    headcountBand: string | null;
+    headcountYear: number | null;
+    openEstablishments: number | null;
+    headOffice: unknown;
+    leaders: unknown;
+    registre: unknown;
+    website: string | null;
+    contactName: string | null;
+    contactRole: string | null;
+    contactPhone: string | null;
+    contactEmail: string | null;
+    contactSource: string | null;
+    reliability: number | null;
+    reliabilityDetail: unknown;
+  },
+): Promise<void> {
+  const patch: Record<string, unknown> = {
+    siren: e.siren,
+    legal_name: e.legalName,
+    headcount_band: e.headcountBand,
+    headcount_year: e.headcountYear,
+    open_establishments: e.openEstablishments,
+    head_office: e.headOffice,
+    leaders: e.leaders,
+    registre: e.registre,
+    website: e.website,
+    contact_name: e.contactName,
+    contact_role: e.contactRole,
+    contact_phone: e.contactPhone,
+    contact_email: e.contactEmail,
+    contact_source: e.contactSource,
+    reliability: e.reliability,
+    reliability_detail: e.reliabilityDetail,
+  };
+  for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
+  const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichment): Promise<void> {
   const { data: before } = await sb.from("admin_prospects").select("sources, score, dossier").eq("id", id).maybeSingle();
   const sources = [...new Set([...((before?.sources as string[]) ?? []), ...e.sources])];

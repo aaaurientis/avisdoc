@@ -4,7 +4,7 @@
 // Elle est la même dans la prospection, le Pipeline et le fichier client : cocher des
 // fiches et agir dessus doit se faire du même geste partout.
 
-import { Loader2, Mail, Sparkles, Trash2, X } from "lucide-react";
+import { Loader2, Mail, Sparkles, Trash2, X, RefreshCw } from "lucide-react";
 
 export default function BarreSelection({
   nombre,
@@ -16,6 +16,7 @@ export default function BarreSelection({
   onTout,
   onEffacer,
   approfondir,
+  completer,
 }: {
   nombre: number;
   /** Combien de fiches sont affichées à l'écran : « tout cocher » n'en prend pas d'autres. */
@@ -30,6 +31,11 @@ export default function BarreSelection({
   onEffacer: () => void;
   /** Propre à la prospection : lancer l'approfondissement sur toute la sélection. */
   approfondir?: { aFaire: number; enCours: { fait: number; total: number } | null; lancer: () => void };
+  /**
+   * Compléter par le registre, Pappers et la fiche d'établissement — sans modèle.
+   * Deux secondes par fiche et presque rien, là où approfondir coûte douze centimes.
+   */
+  completer?: { lancer: () => void; enCours: boolean };
 }) {
   if (nombre === 0) return null;
 
@@ -47,6 +53,19 @@ export default function BarreSelection({
             className="rounded-full px-3 py-1.5 text-[12.5px] font-bold text-avisdoc-teal underline-offset-2 hover:underline"
           >
             Tout cocher ({total})
+          </button>
+        )}
+
+        {completer && (
+          <button
+            type="button"
+            onClick={completer.lancer}
+            disabled={completer.enCours}
+            title="Reprend l’identité, le dirigeant, le téléphone et le site aux registres publics — sans appeler de modèle, donc presque gratuit"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
+          >
+            {completer.enCours ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            Compléter
           </button>
         )}
 

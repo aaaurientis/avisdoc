@@ -11,7 +11,9 @@ import {
   claimRequest,
   failRequest,
   finishRequest,
+  completeProspect,
   getProspectForEnrichment,
+  loadProspect,
   insertLightProspects,
   listFoundNames,
   saveEnrichment,
@@ -38,7 +40,7 @@ import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
-import { chercherPappersEnLot, echecPappers } from "./pappers.ts";
+import { chercherPappers, chercherPappersEnLot, echecPappers } from "./pappers.ts";
 import { deLaRecherche, fiabilite } from "./fiabilite.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
@@ -323,6 +325,86 @@ async function accompagner(
   }
 }
 
+/**
+ * Compléter une fiche déjà créée, sans appeler de modèle.
+ *
+ * Les fiches d'avant ont été créées quand la recherche ne rendait qu'un nom et une
+ * ville : ni dirigeant, ni téléphone, ni note de fiabilité. Les approfondir coûterait
+ * douze centimes pièce et une trentaine de secondes ; les repasser par le registre et
+ * Pappers ne coûte presque rien et prend deux secondes.
+ *
+ * On ne remplace jamais une information déjà présente : on ne fait qu'ajouter ce qui
+ * manquait, puis on note ce que la fiche avance.
+ */
+async function runCompletion(sb: SupabaseClient, req: Demande) {
+  const p = await loadProspect(sb, req.prospectId!);
+  if (!p) return { found: 0, message: "Fiche introuvable." };
+
+  // Le SIREN de la fiche, ou celui que son nom permet de retrouver au registre.
+  const candidats = p.siren ? await lookup(p.siren) : await lookup([p.name, p.city].filter(Boolean).join(" "));
+  const c = candidats[0] ?? null;
+  if (!c) return { found: 0, message: "Aucune entreprise du registre officiel ne correspond : identité non confirmée." };
+
+  const [pap, lieu] = await Promise.all([
+    chercherPappers(c.siren),
+    chercherLieu(c.name, c.headOffice.city),
+  ]);
+
+  const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
+  const telephone = pap?.telephone ?? lieu?.telephone ?? null;
+  const site = pap?.site ?? lieu?.site ?? null;
+
+  const note = fiabilite(
+    deLaRecherche({
+      siren: c.siren,
+      villeConfirmee: Boolean(c.headOffice.city && p.city && c.headOffice.city.toUpperCase() === p.city.toUpperCase()),
+      activite: c.activityCode,
+      effectifDuSite: false,
+      effectif: c.headcountBand,
+      site: site ?? p.website,
+      siteRecoupe: Boolean(pap?.site && lieu?.site),
+      dirigeant: dirigeant?.name ?? p.contactName ?? null,
+      dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
+      email: pap?.email ?? p.contactEmail ?? null,
+      telephone: telephone ?? p.contactPhone,
+      telephoneRecoupe: Boolean(pap?.telephone && lieu?.telephone),
+    }),
+  );
+
+  await completeProspect(sb, req.prospectId!, {
+    siren: c.siren,
+    legalName: c.name,
+    headcountBand: c.headcountBand,
+    headcountYear: c.headcountYear,
+    openEstablishments: c.openEstablishments,
+    headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
+    leaders: c.leaders,
+    registre: c.registre,
+    website: site,
+    contactName: dirigeant?.name ?? null,
+    contactRole: dirigeant?.role ?? null,
+    contactPhone: telephone,
+    contactEmail: pap?.email ?? null,
+    contactSource: pap?.source ?? lieu?.source ?? null,
+    reliability: note?.note ?? null,
+    reliabilityDetail: note?.details ?? null,
+  });
+
+  const trouve = [
+    dirigeant ? "dirigeant" : null,
+    telephone ? "téléphone" : null,
+    pap?.email ? "e-mail" : null,
+    site ? "site" : null,
+  ].filter(Boolean);
+  return {
+    found: 1,
+    message:
+      (trouve.length ? `Complétée : ${trouve.join(", ")}.` : "Rien de plus que le registre.") +
+      (note ? ` Fiabilité ${note.note}/10.` : "") +
+      (echecPappers() ? ` Pappers : ${echecPappers()}.` : ""),
+  };
+}
+
 async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage) => void) {
   const started = Date.now();
   let urls: string[] = [];
@@ -593,7 +675,10 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
   let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   const onUsage = (u: LlmUsage) => (usage = u);
   try {
-    const result = req.kind === "recherche" ? await runSearch(sb, req, onUsage) : await runEnrichment(sb, req, onUsage);
+    const result =
+      req.kind === "recherche" ? await runSearch(sb, req, onUsage)
+      : req.kind === "completion" ? await runCompletion(sb, req)
+      : await runEnrichment(sb, req, onUsage);
     await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage, model: model(modeleDe(req.kind)) });
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
