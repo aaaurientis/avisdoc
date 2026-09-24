@@ -60,7 +60,7 @@ function quandArrivee(iso: string): { date: string; heure: string } {
 }
 
 /** Les colonnes sur lesquelles on peut trier. */
-type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "approfondie";
+type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "fiabilite" | "approfondie";
 
 /** L'ordre des tranches INSEE : « 250 à 499 » doit passer après « 50 à 99 », pas avant. */
 const ORDRE_EFFECTIF = ["NN", "00", "01", "02", "03", "11", "12", "21", "22", "31", "32", "41", "42", "51", "52", "53"];
@@ -259,6 +259,7 @@ export default function Prospects() {
         case "salaries": return sens * (rangEffectif(a.headcount_band) - rangEffectif(b.headcount_band));
         // Les non approfondies d'abord au premier clic : c'est le travail qui reste.
         case "approfondie": return sens * ((a.enriched_at ? 1 : 0) - (b.enriched_at ? 1 : 0));
+        case "fiabilite": return sens * ((a.reliability ?? -1) - (b.reliability ?? -1));
         default: return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
       }
     };
@@ -270,7 +271,7 @@ export default function Prospects() {
     setTri((avant) =>
       avant.colonne === colonne
         ? { colonne, sens: avant.sens === "asc" ? "desc" : "asc" }
-        : { colonne, sens: colonne === "note" || colonne === "creee" || colonne === "salaries" ? "desc" : "asc" },
+        : { colonne, sens: colonne === "note" || colonne === "fiabilite" || colonne === "creee" || colonne === "salaries" ? "desc" : "asc" },
     );
 
   /** Toutes les fiches visibles sont-elles cochées ? */
@@ -515,6 +516,7 @@ export default function Prospects() {
                 <EnTete colonne="interlocuteur" libelle="Interlocuteur" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="salaries" libelle="Salariés" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="note" libelle="Note" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="fiabilite" libelle="Fiabilité" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="approfondie" libelle="Approfondie" tri={tri} onTrier={trierPar} />
                 <th className="px-2" />
               </tr>
@@ -561,6 +563,11 @@ export default function Prospects() {
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
+                    {/* La note attend son barème : le premier sortait toutes les fiches
+                        à dix sur dix. La colonne reste, pour dire ce qui manque encore. */}
+                    {(p.reliability ?? null) === null ? "—" : `${p.reliability}/10`}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5">
                     {/* Une fiche non approfondie n'a ni dossier commercial ni effectif :
