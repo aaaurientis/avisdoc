@@ -191,14 +191,26 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
   // qui n'a pas été trouvé le sera au bouton « Compléter », fiche par fiche.
   const sites = new Map<string, SiteContacts>();
   const debutSites = Date.now();
-  const BUDGET_SITES_MS = 45_000;
-  for (let i = 0; i < trouvees.length && Date.now() - debutSites < BUDGET_SITES_MS; i += 8) {
-    const vague = trouvees.slice(i, i + 8);
+  // Vingt de front, et quatre-vingt-dix secondes : de quoi couvrir une recherche
+  // entière. Le commercial ne doit pas avoir à cliquer fiche par fiche pour obtenir un
+  // numéro — ce qui est trouvable l'est à la recherche, pas sur demande.
+  const BUDGET_SITES_MS = 90_000;
+  const DE_FRONT = 20;
+  // Les meilleures d'abord : si le temps manque, ce sont celles-là qui auront leurs
+  // coordonnées, pas les dernières de la liste.
+  const parPotentiel = [...trouvees].sort((a, b) => {
+    const poids = (c: Found) => (metierDe(c.activityCode)?.soleil === "majorite_dehors" ? 2 : 1) * (c.openEstablishments ?? 1);
+    return poids(b) - poids(a);
+  });
+  for (let i = 0; i < parPotentiel.length && Date.now() - debutSites < BUDGET_SITES_MS; i += DE_FRONT) {
+    const vague = parPotentiel.slice(i, i + DE_FRONT);
     await Promise.all(
       vague.map(async (c) => {
         const connu = pappers.get(c.siren)?.site ?? lieux.get(c.siren)?.site ?? (await devinerSite(c.name));
         if (!connu) return;
-        const lu = await readSiteContacts(connu);
+        // Lecture rapide : la page d'accueil, le contact et les mentions légales.
+        // Dix-neuf pages pour cent entreprises dépasseraient le budget de la fonction.
+        const lu = await readSiteContacts(connu, true);
         if (lu) sites.set(c.siren, lu);
       }),
     );
