@@ -264,7 +264,16 @@ export default function Prospects() {
         case "salaries": return sens * (rangEffectif(a.headcount_band) - rangEffectif(b.headcount_band));
         // Les non approfondies d'abord au premier clic : c'est le travail qui reste.
         case "approfondie": return sens * ((a.enriched_at ? 1 : 0) - (b.enriched_at ? 1 : 0));
-        case "consigne": return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
+        case "consigne": {
+          // La consigne ne suit pas la note brute mais sa part de ce qui a pu être
+          // évalué : trier sur la note donnait « Prioritaire », deux vides, puis
+          // « Prioritaire » de nouveau. Les fiches sans consigne vont à la fin.
+          const part = (p: Prospect) => {
+            const sur = maxEvalue(p.score ?? {});
+            return sur > 0 && p.score_total !== null ? (100 * p.score_total) / sur : -1;
+          };
+          return sens * (part(a) - part(b));
+        }
         case "fiabilite": return sens * ((a.reliability ?? -1) - (b.reliability ?? -1));
         default: return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
       }
