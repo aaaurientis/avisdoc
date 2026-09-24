@@ -61,6 +61,13 @@ export interface Prospect {
   sector: Secteur | null;
   score_total: number | null;
   score: Partial<Record<CritereId, NoteCritere>>;
+  /**
+   * La confiance qu'on peut faire à ce que la fiche avance, sur dix.
+   *
+   * Vide tant qu'un barème n'a pas été éprouvé : le premier sortait toutes les
+   * fiches à dix sur dix. La colonne reste en place — elle dit ce qui manque.
+   */
+  reliability: number | null;
   siren: string | null;
   legal_name: string | null;
   headcount_band: string | null;
