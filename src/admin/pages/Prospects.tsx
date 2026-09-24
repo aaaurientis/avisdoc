@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
-import { effectifLabel, secteurLisible, tonNote, type Prospect } from "../lib/merx";
+import { decision, effectifLabel, EXPLICATION_CONSIGNE, EXPLICATION_FIABILITE, EXPLICATION_NOTE, maxEvalue, secteurLisible, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
+import BulleAide from "../components/BulleAide";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
@@ -60,7 +61,7 @@ function quandArrivee(iso: string): { date: string; heure: string } {
 }
 
 /** Les colonnes sur lesquelles on peut trier. */
-type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "fiabilite" | "approfondie";
+type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "consigne" | "fiabilite" | "approfondie";
 
 /** L'ordre des tranches INSEE : « 250 à 499 » doit passer après « 50 à 99 », pas avant. */
 const ORDRE_EFFECTIF = ["NN", "00", "01", "02", "03", "11", "12", "21", "22", "31", "32", "41", "42", "51", "52", "53"];
@@ -76,12 +77,15 @@ function EnTete({
   tri,
   onTrier,
   className,
+  aide,
 }: {
   colonne: Colonne;
   libelle: string;
   tri: { colonne: Colonne; sens: "asc" | "desc" };
   onTrier: (c: Colonne) => void;
   className?: string;
+  /** D'où sort la note de cette colonne, pour qui veut le savoir. */
+  aide?: string;
 }) {
   const active = tri.colonne === colonne;
   return (
@@ -98,6 +102,7 @@ function EnTete({
         <ArrowUpDown className={cn("size-3", active ? "opacity-100" : "opacity-40")} />
         {active && <span className="text-[10px]">{tri.sens === "asc" ? "▲" : "▼"}</span>}
       </button>
+      {aide && <BulleAide titre={libelle} texte={aide} />}
     </th>
   );
 }
@@ -259,6 +264,7 @@ export default function Prospects() {
         case "salaries": return sens * (rangEffectif(a.headcount_band) - rangEffectif(b.headcount_band));
         // Les non approfondies d'abord au premier clic : c'est le travail qui reste.
         case "approfondie": return sens * ((a.enriched_at ? 1 : 0) - (b.enriched_at ? 1 : 0));
+        case "consigne": return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
         case "fiabilite": return sens * ((a.reliability ?? -1) - (b.reliability ?? -1));
         default: return sens * ((a.score_total ?? -1) - (b.score_total ?? -1));
       }
@@ -271,7 +277,7 @@ export default function Prospects() {
     setTri((avant) =>
       avant.colonne === colonne
         ? { colonne, sens: avant.sens === "asc" ? "desc" : "asc" }
-        : { colonne, sens: colonne === "note" || colonne === "fiabilite" || colonne === "creee" || colonne === "salaries" ? "desc" : "asc" },
+        : { colonne, sens: colonne === "note" || colonne === "consigne" || colonne === "fiabilite" || colonne === "creee" || colonne === "salaries" ? "desc" : "asc" },
     );
 
   /** Toutes les fiches visibles sont-elles cochées ? */
@@ -515,8 +521,9 @@ export default function Prospects() {
                 <EnTete colonne="ville" libelle="Ville" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="interlocuteur" libelle="Interlocuteur" tri={tri} onTrier={trierPar} />
                 <EnTete colonne="salaries" libelle="Salariés" tri={tri} onTrier={trierPar} />
-                <EnTete colonne="note" libelle="Note" tri={tri} onTrier={trierPar} />
-                <EnTete colonne="fiabilite" libelle="Fiabilité" tri={tri} onTrier={trierPar} />
+                <EnTete colonne="note" libelle="Note" tri={tri} onTrier={trierPar} aide={EXPLICATION_NOTE} />
+                <EnTete colonne="consigne" libelle="Consigne" tri={tri} onTrier={trierPar} aide={EXPLICATION_CONSIGNE} />
+                <EnTete colonne="fiabilite" libelle="Fiabilité" tri={tri} onTrier={trierPar} aide={EXPLICATION_FIABILITE} />
                 <EnTete colonne="approfondie" libelle="Approfondie" tri={tri} onTrier={trierPar} />
                 <th className="px-2" />
               </tr>
@@ -563,6 +570,21 @@ export default function Prospects() {
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"}</Badge>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    {/* Ce qu'il faut FAIRE. La note dit ce que vaut l'entreprise, la
+                        fiabilité ce qu'on en sait ; c'est leur croisement qui se lit
+                        d'un coup d'œil dans une liste de deux cents lignes. */}
+                    {(() => {
+                      const d = decision(p.score_total, maxEvalue(p.score ?? {}));
+                      return d ? (
+                        <span title={d.action} className={cn("rounded-full px-2 py-0.5 text-[11.5px] font-bold", d.ton)}>
+                          {d.libelle}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-muted-foreground">—</span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
                     {/* La note attend son barème : le premier sortait toutes les fiches
