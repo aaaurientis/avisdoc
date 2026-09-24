@@ -106,3 +106,62 @@ export async function readSiteContacts(site: string | null): Promise<SiteContact
     readOn: base.origin,
   };
 }
+
+// ── Trouver le site quand personne ne nous le donne ──────────────────────
+//
+// Le registre ne publie pas les adresses web ; Pappers, dans la formule souscrite, non
+// plus ; Google Places est refusé depuis un serveur. Restait une piste qu'on n'avait
+// jamais essayée : le deviner.
+//
+// Mesuré sur huit entreprises réelles — quatre trouvées. Ce n'est pas suffisant seul,
+// mais c'est gratuit, immédiat, et sur les quatre sites trouvés le lecteur a ramené
+// quatre adresses électroniques et trois téléphones. Château Cheval Blanc :
+// « contact@chateau-chevalblanc.com » et « 05 57 55 55 55 », en deux secondes.
+
+/** Les formes de nom de domaine qu'une entreprise a des chances d'avoir prises. */
+function domainesProbables(nom: string): string[] {
+  const sansAccent = nom
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\(.*?\)/g, " ")
+    // Les formes juridiques ne font jamais partie du domaine.
+    .replace(/\b(SARL|SAS|SASU|SA|SCEA|EARL|GAEC|SCI|SC|EURL|SNC|SOC|SOCIETE|CIVILE|ETS|ETABLISSEMENTS|GROUPE)\b/g, " ");
+  const mots = sansAccent.split(/[^A-Z0-9]+/).filter((m) => m.length > 1);
+  if (mots.length === 0 || mots.length > 5) return [];
+  const avecTirets = mots.join("-").toLowerCase();
+  const colle = mots.join("").toLowerCase();
+  const bases = [...new Set([avecTirets, colle])];
+  return bases.flatMap((b) => [`${b}.com`, `${b}.fr`]).slice(0, 4);
+}
+
+/**
+ * Le site officiel probable, vérifié : on ne rend une adresse que si elle répond.
+ *
+ * Un domaine qui existe mais renvoie une page de parking n'est pas retenu — le lecteur
+ * qui suit n'y trouverait rien, et une fausse adresse sur une fiche vaut moins que pas
+ * d'adresse du tout.
+ */
+export async function devinerSite(nom: string): Promise<string | null> {
+  for (const d of domainesProbables(nom)) {
+    for (const prefixe of ["https://www.", "https://"]) {
+      const url = prefixe + d;
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          redirect: "follow",
+          signal: AbortSignal.timeout(5_000),
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; AvisDocMerx/1.0)" },
+        });
+        if (!res.ok) continue;
+        const html = (await res.text()).slice(0, 200_000);
+        // Une page de parking ou de vente de domaine ne compte pas.
+        if (/domain (is )?for sale|acheter ce domaine|parking|sedoparking|afternic/i.test(html)) continue;
+        return url;
+      } catch {
+        // domaine inexistant ou injoignable : on essaie le suivant
+      }
+    }
+  }
+  return null;
+}

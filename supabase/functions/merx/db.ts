@@ -35,6 +35,7 @@ export interface LightProspect {
   contactRole?: string | null;
   contactPhone?: string | null;
   contactEmail?: string | null;
+  siteContacts?: unknown;
   contactSource?: string | null;
   headOffice?: unknown;
   leaders?: unknown;
@@ -180,6 +181,7 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       contact_role: p.contactRole ?? null,
       contact_phone: p.contactPhone ?? null,
       contact_email: p.contactEmail ?? null,
+      site_contacts: p.siteContacts ?? null,
       contact_source: p.contactSource ?? null,
       head_office: p.headOffice ?? null,
       leaders: p.leaders ?? null,
@@ -336,6 +338,7 @@ export async function completeProspect(
     contactPhone: string | null;
     contactEmail: string | null;
     contactSource: string | null;
+    siteContacts: unknown;
     reliability: number | null;
     reliabilityDetail: unknown;
   },
@@ -355,6 +358,7 @@ export async function completeProspect(
     contact_phone: e.contactPhone,
     contact_email: e.contactEmail,
     contact_source: e.contactSource,
+    site_contacts: e.siteContacts,
     reliability: e.reliability,
     reliability_detail: e.reliabilityDetail,
   };
