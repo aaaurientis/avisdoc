@@ -36,7 +36,7 @@ import {
   type ListOut,
   type Preuve,
 } from "./prompts.ts";
-import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
+import { devinerSite, readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
@@ -180,6 +180,30 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
     chercherPappersEnLot(trouvees.map((c) => c.siren).filter(Boolean)),
   ]);
 
+  // Les sites officiels : devinés, puis lus. C'est là que sont les adresses
+  // électroniques et les standards, et personne d'autre ne les donne — le registre
+  // ne publie pas d'adresse web, la formule Pappers non plus, et Google refuse les
+  // appels du serveur. Sur quatre sites trouvés dans nos essais, quatre adresses
+  // électroniques et trois téléphones.
+  //
+  // C'est lent — deviner un domaine demande jusqu'à quatre essais, le lire en demande
+  // sept. On y consacre donc un budget fixe et l'on s'arrête quand il est dépassé : ce
+  // qui n'a pas été trouvé le sera au bouton « Compléter », fiche par fiche.
+  const sites = new Map<string, SiteContacts>();
+  const debutSites = Date.now();
+  const BUDGET_SITES_MS = 45_000;
+  for (let i = 0; i < trouvees.length && Date.now() - debutSites < BUDGET_SITES_MS; i += 8) {
+    const vague = trouvees.slice(i, i + 8);
+    await Promise.all(
+      vague.map(async (c) => {
+        const connu = pappers.get(c.siren)?.site ?? lieux.get(c.siren)?.site ?? (await devinerSite(c.name));
+        if (!connu) return;
+        const lu = await readSiteContacts(connu);
+        if (lu) sites.set(c.siren, lu);
+      }),
+    );
+  }
+
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
     // Une activité que notre table ne connaît pas ne fait PAS disparaître l'entreprise :
@@ -205,11 +229,14 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
     const lieu = lieux.get(c.siren) ?? null;
     const pap = pappers.get(c.siren) ?? null;
+    const lu = sites.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
     // une en publient un, et nous ne l'affichions pas. Pappers complète quand il a mieux.
     const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
-    const telephone = pap?.telephone ?? lieu?.telephone ?? null;
-    const site = pap?.site ?? lieu?.site ?? null;
+    // Ce que l'entreprise publie elle-même passe devant.
+    const telephone = lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null;
+    const courriel = lu?.emails[0] ?? pap?.email ?? null;
+    const site = lu?.readOn ?? pap?.site ?? lieu?.site ?? null;
 
     const score: Score = {
       // Étape 2 — la pertinence, que le registre suffit à établir.
@@ -222,12 +249,12 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       instances: indexEgalite(c.signals.egalite),
       // Étape 4 — un dirigeant nommé vaut mieux qu'une fiche sans personne à qui parler.
       interlocuteur: dirigeantScore(dirigeant),
-      coordonnees: telephone || pap?.email
+      coordonnees: telephone || courriel
         ? {
-            points: pap?.email && telephone ? 4 : 2,
-            justification: [telephone, pap?.email].filter(Boolean).join(" · ") +
-              ` — ${pap?.telephone || pap?.email ? "fiche Pappers" : "fiche d’établissement Google"}.`,
-            source: pap?.source ?? lieu?.source ?? null,
+            points: courriel && telephone ? 4 : 2,
+            justification: [telephone, courriel].filter(Boolean).join(" · ") +
+              ` — ${lu ? "site officiel de l’entreprise" : pap?.telephone ? "fiche Pappers" : "fiche d’établissement Google"}.`,
+            source: lu?.readOn ?? pap?.source ?? lieu?.source ?? null,
           }
         : { points: null, justification: "Aucun numéro trouvé : l’approfondissement ira le chercher.", source: null },
     };
@@ -253,7 +280,8 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       contactName: dirigeant?.name ?? null,
       contactRole: dirigeant?.role ?? null,
       contactPhone: telephone,
-      contactEmail: pap?.email ?? null,
+      contactEmail: courriel,
+      siteContacts: lu,
       contactSource: pap?.source ?? lieu?.source ?? null,
       headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
       leaders: c.leaders,
@@ -275,12 +303,12 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
           effectifDuSite: Boolean(local.headcountBand && local.headcountBand !== "NN"),
           effectif: local.headcountBand ?? c.headcountBand,
           site,
-          siteRecoupe: Boolean(pap?.site && lieu?.site),
+          siteRecoupe: Boolean(lu && (pap?.site || lieu?.site)),
           dirigeant: dirigeant?.name ?? null,
           dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
-          email: pap?.email ?? null,
+          email: courriel,
           telephone,
-          telephoneRecoupe: Boolean(pap?.telephone && lieu?.telephone),
+          telephoneRecoupe: [lu?.phones[0], pap?.telephone, lieu?.telephone].filter(Boolean).length >= 2,
         }),
       ),
       score,
@@ -356,9 +384,19 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
     chercherLieu(c.name, c.headOffice.city),
   ]);
 
+  // Le site officiel : celui qu'on connaît, celui que Pappers ou Google donnent, ou
+  // celui qu'on devine. Une fois trouvé, on le LIT — c'est là que sont l'adresse
+  // électronique et le standard. Château Cheval Blanc publie « 05 57 55 55 55 » et
+  // « contact@chateau-chevalblanc.com » sur sa page contact : deux secondes, gratuit.
+  const siteConnu = p.website ?? pap?.site ?? lieu?.site ?? (await devinerSite(c.name));
+  const lu = siteConnu ? await readSiteContacts(siteConnu) : null;
+
   const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
-  const telephone = pap?.telephone ?? lieu?.telephone ?? null;
-  const site = pap?.site ?? lieu?.site ?? null;
+  // Le site officiel passe devant : un numéro publié par l'entreprise elle-même vaut
+  // mieux qu'un standard trouvé ailleurs.
+  const telephone = lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null;
+  const email = lu?.emails[0] ?? pap?.email ?? null;
+  const site = siteConnu;
 
   const note = fiabilite(
     deLaRecherche({
@@ -371,7 +409,7 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
       siteRecoupe: Boolean(pap?.site && lieu?.site),
       dirigeant: dirigeant?.name ?? p.contactName ?? null,
       dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
-      email: pap?.email ?? p.contactEmail ?? null,
+      email: email ?? p.contactEmail ?? null,
       telephone: telephone ?? p.contactPhone,
       telephoneRecoupe: Boolean(pap?.telephone && lieu?.telephone),
     }),
@@ -390,8 +428,9 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
     contactName: dirigeant?.name ?? null,
     contactRole: dirigeant?.role ?? null,
     contactPhone: telephone,
-    contactEmail: pap?.email ?? null,
-    contactSource: pap?.source ?? lieu?.source ?? null,
+    contactEmail: email,
+    contactSource: lu?.readOn ?? pap?.source ?? lieu?.source ?? null,
+    siteContacts: lu,
     reliability: note?.note ?? null,
     reliabilityDetail: note?.details ?? null,
   });
@@ -399,7 +438,7 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
   const trouve = [
     dirigeant ? "dirigeant" : null,
     telephone ? "téléphone" : null,
-    pap?.email ? "e-mail" : null,
+    email ? "e-mail" : null,
     site ? "site" : null,
   ].filter(Boolean);
   return {
