@@ -3,6 +3,7 @@
 // ce qui vient du navigateur.
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Fiabilite } from "./fiabilite.ts";
 import type { Score } from "./scoring.ts";
 import type { SiteContacts } from "./site-contacts.ts";
 
@@ -24,6 +25,10 @@ export interface Demande {
 
 export interface LightProspect {
   name: string;
+  /** L'identifiant légal : sans lui, aucune fiche n'est vérifiable ni dédoublonnable. */
+  siren?: string | null;
+  /** À quel point ce que la fiche avance est sûr, sur dix. */
+  fiabilite?: Fiabilite | null;
   city: string | null;
   department: string | null;
   activity: string | null;
@@ -154,9 +159,23 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       sources: p.sources,
       score: p.score,
       score_total: p.scoreTotal,
+      siren: p.siren ?? null,
+      reliability: p.fiabilite?.note ?? null,
+      reliability_detail: p.fiabilite?.details ?? null,
     });
 
     let { error } = await sb.from("admin_prospects").insert(ligne(secteurSur(p.sector)));
+
+    // Tant que la migration 0043 n'est pas collée, la base ignore les deux colonnes
+    // de fiabilité et refuse TOUTE la ligne. Une fiche sans note de confiance vaut
+    // mieux qu'une recherche qui ne rend rien : on réessaie sans elles. Hier, une
+    // colonne inconnue a fait disparaître deux cent cinquante entreprises d'un coup.
+    if (error && /reliability/i.test(error.message)) {
+      const sansFiabilite = ligne(secteurSur(p.sector)) as Record<string, unknown>;
+      delete sansFiabilite.reliability;
+      delete sansFiabilite.reliability_detail;
+      ({ error } = await sb.from("admin_prospects").insert(sansFiabilite));
+    }
 
     // Tant que la migration 0041 n'est pas collée, la base refuse tout métier qui
     // n'est pas dans son ancienne liste. On réessaie alors sous « autre » — non pas
@@ -196,6 +215,7 @@ export async function getProspectForEnrichment(sb: SupabaseClient, id: string): 
 }
 
 export interface Enrichment {
+  fiabilite: Fiabilite | null;
   siren: string | null;
   legalName: string | null;
   headcountBand: string | null;
@@ -256,6 +276,8 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     0,
   );
   const patch: Record<string, unknown> = {
+    reliability: e.fiabilite?.note ?? null,
+    reliability_detail: e.fiabilite?.details ?? null,
     siren: e.siren,
     legal_name: e.legalName,
     headcount_band: e.headcountBand,
@@ -278,7 +300,12 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     enriched_at: new Date().toISOString(),
   };
   for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
-  const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
+  let { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
+  if (error && /reliability/i.test(error.message)) {
+    delete patch.reliability;
+    delete patch.reliability_detail;
+    ({ error } = await sb.from("admin_prospects").update(patch).eq("id", id));
+  }
   if (error) throw new Error(error.message);
 }
 

@@ -2,7 +2,7 @@
 // avec sa barre, et chaque critère avec ses points, sa justification et la page qui l’atteste.
 // Rien n’est arrondi ni deviné : un critère sans information affiche « non évalué » et vaut zéro.
 
-import { CATEGORIES, CRITERES, type CritereId, type NoteCritere } from "../../lib/merx";
+import { CATEGORIES, CRITERES, tonFiabilite, type CritereId, type NoteCritere } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
 const nomDuSite = (url: string) => {
@@ -16,9 +16,15 @@ const nomDuSite = (url: string) => {
 export default function NoteDetaillee({
   total,
   score,
+  fiabilite = null,
+  detailFiabilite = null,
 }: {
   total: number | null;
   score: Partial<Record<CritereId, NoteCritere>>;
+  /** Sur dix : la confiance qu'on peut faire à ce que la fiche avance. Absente
+      pour un client ou une affaire, qui ne portent pas encore cette note. */
+  fiabilite?: number | null;
+  detailFiabilite?: { quoi: string; dit: string; sur: number }[] | null;
 }) {
   return (
     <div>
@@ -81,6 +87,36 @@ export default function NoteDetaillee({
           );
         })}
       </div>
+
+      {/* Deux notes qui répondent à deux questions sans rapport : « est-ce un bon
+          client ? » et « est-ce que ce que je lis est vrai ? ». BB GR valait
+          cinquante sur cent sur une adresse fermée depuis 2000. */}
+      {(fiabilite ?? null) !== null && (
+        <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex items-baseline gap-2">
+            <span className={cn("rounded-full px-2.5 py-1 font-mono text-sm font-bold", tonFiabilite(fiabilite))}>
+              {fiabilite} / 10
+            </span>
+            <span className="text-[13px] font-semibold text-avisdoc-ink">Fiabilité des informations</span>
+          </div>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            Cette note ne juge pas l’entreprise : elle dit d’où vient chaque ligne de la fiche. Une fiche courte
+            tenue par le registre vaut dix ; ce qu’aucune source n’appuie fait baisser la note.
+          </p>
+          {detailFiabilite?.length ? (
+            <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+              {detailFiabilite.map((d) => (
+                <li key={d.quoi} className="flex items-baseline justify-between gap-3 text-[12.5px]">
+                  <span className="font-semibold text-avisdoc-ink">{d.quoi}</span>
+                  <span className={cn("text-right", d.sur === 2 ? "text-muted-foreground" : d.sur === 1 ? "text-amber-700" : "text-rose-700")}>
+                    {d.dit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

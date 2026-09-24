@@ -391,7 +391,12 @@ export default function ProspectFiche({
             <div className="mb-5">
               <SectionLabel>La note, critère par critère</SectionLabel>
               <div className="mt-2">
-                <NoteDetaillee total={p.score_total} score={p.score ?? {}} />
+                <NoteDetaillee
+                  total={p.score_total}
+                  score={p.score ?? {}}
+                  fiabilite={p.reliability ?? null}
+                  detailFiabilite={p.reliability_detail ?? null}
+                />
               </div>
             </div>
               {brouillons.length > 0 && (
