@@ -243,7 +243,10 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       // d'activité et couvre toute la nomenclature : aucune fiche n'en manque.
       // Le libellé officiel d'abord : l'annuaire rend « 21.20Z », le commercial lit
       // « Fabrication de préparations pharmaceutiques ». Jamais le code nu en colonne.
-      activity: libelleNaf(c.activityCode) || metier.activite || null,
+      // L'objet social de Pappers dit ce que l'entreprise fait VRAIMENT — « élevage et
+      // commercialisation d'huîtres » plutôt que « Aquaculture en mer ». Le libellé
+      // officiel reste en secours.
+      activity: pap?.objetSocial || libelleNaf(c.activityCode) || metier.activite || null,
       sector: secteurDe(c.activityCode),
       siren: c.siren,
       website: site,
@@ -457,7 +460,9 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           // Pappers répond mais ne rend ni téléphone, ni e-mail, ni site : on affiche
           // ce que la formule souscrite a réellement envoyé, plutôt que de le deviner.
           !echecPappers() && champsPappers().length > 0 && !pappersUtile
-            ? `Pappers a répondu sans coordonnées — champs reçus : ${champsPappers().slice(0, 25).join(", ")}`
+            ? `Pappers a répondu sans coordonnées — ${["telephone", "email", "site_web"]
+                .map((c) => `${c} ${champsPappers().includes(c) ? "présent mais vide" : "absent de la formule"}`)
+                .join(", ")}`
             : null,
       ].filter(Boolean).join(" · ") + ".";
 
