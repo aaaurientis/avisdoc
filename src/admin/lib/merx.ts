@@ -208,6 +208,8 @@ export interface Prospect {
   contact_email: string | null;
   contact_phone: string | null;
   contact_source: string | null;
+  /** Ce qui a été relevé sur le site officiel : toutes les adresses, tous les numéros. */
+  site_contacts: { emails: string[]; phones: string[]; equipe: string[]; readOn: string } | null;
   approach: string | null;
   /**
    * Tout ce que l'annuaire officiel publie, conservé tel quel (migration 0047).
