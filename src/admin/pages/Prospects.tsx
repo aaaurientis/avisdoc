@@ -12,6 +12,7 @@ import { decision, effectifLabel, EXPLICATION_CONSIGNE, EXPLICATION_FIABILITE, E
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
 import BulleAide from "../components/BulleAide";
+import { completerStandard } from "../lib/standard";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
@@ -313,15 +314,28 @@ export default function Prospects() {
     [prospects],
   );
 
-  /** Ouvrir une fiche la marque comme vue — une seule fois. */
+  /**
+   * Ouvrir une fiche la marque comme vue — une seule fois — et va chercher son
+   * standard si elle n'en a pas.
+   *
+   * La clé Google est restreinte aux appels venus d'admin.avisdoc.fr : le serveur se
+   * fait refuser, le navigateur non. On interroge donc depuis ici, au moment où la
+   * fiche est ouverte — un appel par fiche réellement consultée plutôt que deux cents
+   * par recherche.
+   */
   const ouvrir = useCallback(
     async (p: Prospect) => {
       setOuverte(p.id);
-      if (p.opened_at) return;
-      await supabaseAdmin.from("admin_prospects").update({ opened_at: new Date().toISOString() }).eq("id", p.id);
-      setProspects((prev) => prev.map((x) => (x.id === p.id ? { ...x, opened_at: new Date().toISOString() } : x)));
+      if (!p.opened_at) {
+        await supabaseAdmin.from("admin_prospects").update({ opened_at: new Date().toISOString() }).eq("id", p.id);
+        setProspects((prev) => prev.map((x) => (x.id === p.id ? { ...x, opened_at: new Date().toISOString() } : x)));
+      }
+      if (!p.contact_phone || !p.website) {
+        const complete = await completerStandard(p);
+        if (complete) await charger();
+      }
     },
-    [],
+    [charger],
   );
   /** Parties au Pipeline : on dit où elles sont allées plutôt que de les laisser disparaître sans un mot. */
   const auPipeline = useMemo(
