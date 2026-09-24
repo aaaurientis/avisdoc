@@ -34,6 +34,7 @@ export interface LightProspect {
   contactName?: string | null;
   contactRole?: string | null;
   contactPhone?: string | null;
+  contactEmail?: string | null;
   contactSource?: string | null;
   headOffice?: unknown;
   leaders?: unknown;
@@ -176,6 +177,7 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       contact_name: p.contactName ?? null,
       contact_role: p.contactRole ?? null,
       contact_phone: p.contactPhone ?? null,
+      contact_email: p.contactEmail ?? null,
       contact_source: p.contactSource ?? null,
       head_office: p.headOffice ?? null,
       leaders: p.leaders ?? null,
