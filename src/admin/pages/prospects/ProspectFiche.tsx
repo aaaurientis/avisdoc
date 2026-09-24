@@ -86,6 +86,25 @@ export default function ProspectFiche({
   ];
   const p = prospect;
   const siege = p.head_office;
+  /**
+   * Toutes les adresses et tous les numéros, d'où qu'ils viennent, sans doublon.
+   *
+   * Ils étaient éparpillés : l'adresse principale dans un bouton sous la fiche, celles
+   * du site officiel nulle part, celles des personnes trouvées dans leur ligne. Le
+   * commercial les cherchait aux quatre coins de l'écran.
+   */
+  const adressesConnues = useMemo(
+    () => [...new Set([p.contact_email, ...(p.site_contacts?.emails ?? []), ...(p.personnes ?? []).map((q) => q.email)].filter(Boolean) as string[])],
+    [p.contact_email, p.site_contacts, p.personnes],
+  );
+  const numerosConnus = useMemo(
+    () =>
+      [...new Set(
+        [p.contact_phone, ...(p.site_contacts?.phones ?? []), ...(p.personnes ?? []).flatMap((q) => [q.telephone, q.mobile])].filter(Boolean) as string[],
+      )],
+    [p.contact_phone, p.site_contacts, p.personnes],
+  );
+
   /** Le dernier exercice publié : le chiffre d'affaires dit la taille mieux qu'une tranche. */
   const dernierExercice = useMemo(() => {
     const f = p.registre?.finances;
@@ -332,6 +351,34 @@ export default function ProspectFiche({
                 {p.registre?.tva && <Ligne label="Numéro de TVA">{p.registre.tva}</Ligne>}
                 {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
                 {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
+                {/* Toutes les adresses et tous les numéros connus, d'où qu'ils
+                    viennent : la fiche, le site officiel, les personnes trouvées. Le
+                    commercial ne doit pas avoir à les chercher ailleurs dans l'écran. */}
+                {adressesConnues.length > 0 && (
+                  <Ligne label={adressesConnues.length > 1 ? "Adresses e-mail" : "E-mail"}>
+                    {adressesConnues.map((a) => (
+                      <a key={a} href={`mailto:${a}`} className="block text-avisdoc-teal underline-offset-2 hover:underline">
+                        {a}
+                      </a>
+                    ))}
+                  </Ligne>
+                )}
+                {numerosConnus.length > 0 && (
+                  <Ligne label={numerosConnus.length > 1 ? "Téléphones" : "Téléphone"}>
+                    {numerosConnus.map((n) => (
+                      <a key={n} href={`tel:${n.replace(/\s/g, "")}`} className="block text-avisdoc-teal underline-offset-2 hover:underline">
+                        {n}
+                      </a>
+                    ))}
+                  </Ligne>
+                )}
+                {p.website && (
+                  <Ligne label="Site">
+                    <a href={p.website} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">
+                      {p.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                    </a>
+                  </Ligne>
+                )}
                 {/* Toutes les personnes connues, chacune avec ce qu'on a d'elle. Une
                     personne dont la source ne fait pas foi reste une piste : on la
                     garde, on dit d'où elle vient, et le commercial décide. */}
