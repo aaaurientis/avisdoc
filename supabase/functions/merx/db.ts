@@ -299,6 +299,8 @@ export interface Enrichment {
   contactEmail: string | null;
   contactPhone: string | null;
   contactSource: string | null;
+  /** Toutes les personnes trouvées, avec leurs coordonnées et leur degré de certitude. */
+  personnes: unknown;
   siteContacts: SiteContacts | null;
   approach: string | null;
   /** Le dossier commercial : ce qu'il faut pour décrocher son téléphone. */
@@ -411,6 +413,7 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     contact_email: e.contactEmail,
     contact_phone: e.contactPhone,
     contact_source: e.contactSource,
+    personnes: e.personnes,
     site_contacts: e.siteContacts,
     approach: e.approach,
     dossier,

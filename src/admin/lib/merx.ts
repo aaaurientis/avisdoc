@@ -188,6 +188,21 @@ export interface Prospect {
   open_establishments: number | null;
   head_office: { address?: string | null; city?: string | null; department?: string | null } | null;
   leaders: { name: string; role: string | null }[] | null;
+  /**
+   * Toutes les personnes trouvées, avec leurs coordonnées.
+   *
+   * Un responsable RH repéré à l'approfondissement finissait cité dans une
+   * justification en bas de fiche, quand le commercial le cherchait en haut.
+   */
+  personnes: {
+    nom: string;
+    fonction: string | null;
+    email: string | null;
+    telephone: string | null;
+    mobile: string | null;
+    source: string | null;
+    sur: boolean;
+  }[] | null;
   contact_name: string | null;
   contact_role: string | null;
   contact_email: string | null;

@@ -223,18 +223,33 @@ export const ENRICH_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: [
-    "siren", "site_web", "contact", "exposition_soleil", "affinite_prevention",
+    "siren", "site_web", "contacts", "exposition_soleil", "affinite_prevention",
     "politique_sst", "actions_recentes", "instances", "contact_confirme",
     "angle_approche", "dossier", "sources",
   ],
   properties: {
     siren: { type: "string" },
     site_web: { type: "string" },
-    contact: {
-      type: "object",
-      additionalProperties: false,
-      required: ["nom", "fonction", "email", "telephone", "source"],
-      properties: { nom: { type: "string" }, fonction: { type: "string" }, email: { type: "string" }, telephone: { type: "string" }, source: { type: "string" } },
+    // TOUTES les personnes trouvées, pas une seule. Un responsable RH repéré dans un
+    // annuaire d'affaires finissait cité dans une justification, en bas de page, quand
+    // le commercial le cherchait en haut de la fiche.
+    contacts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["nom", "fonction", "email", "telephone", "mobile", "source", "confiance"],
+        properties: {
+          nom: { type: "string" },
+          fonction: { type: "string" },
+          email: { type: "string" },
+          telephone: { type: "string" },
+          mobile: { type: "string" },
+          source: { type: "string" },
+          /** « sure » : site officiel ou source datée. « probable » : annuaire, page non datée. */
+          confiance: { type: "string", enum: ["sure", "probable"] },
+        },
+      },
     },
     exposition_soleil: SUN_SCHEMA,
     affinite_prevention: AFFINITE_SCHEMA,
@@ -291,7 +306,7 @@ export interface Preuve {
 export interface EnrichOut {
   siren: string;
   site_web: string;
-  contact: { nom: string; fonction: string; email: string; telephone: string; source: string };
+  contacts: { nom: string; fonction: string; email: string; telephone: string; mobile: string; source: string; confiance: "sure" | "probable" }[];
   exposition_soleil: SunOut;
   affinite_prevention: AffiniteOut;
   politique_sst: Preuve;

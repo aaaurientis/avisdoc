@@ -576,10 +576,43 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     return seen.has(source) && !isPlatform(source);
   };
 
-  const c = out.contact;
-  const named = c.nom.trim() && sourceFiable(c.source)
-    ? { name: c.nom.trim(), role: c.fonction.trim(), source: c.source }
-    : null;
+  /**
+   * Toutes les personnes trouvées, gardées telles quelles.
+   *
+   * Un responsable des ressources humaines repéré dans un annuaire d'affaires finissait
+   * cité dans une justification, en bas de page, quand le commercial le cherchait en
+   * haut de la fiche. Une personne dont on n'est pas sûr reste une piste : on la garde,
+   * on dit d'où elle vient, et le commercial décide.
+   */
+  const personnes = (out.contacts ?? [])
+    .filter((x) => x.nom.trim())
+    .map((x) => ({
+      nom: x.nom.trim(),
+      fonction: x.fonction.trim() || null,
+      email: x.email.trim() || null,
+      telephone: x.telephone.trim() || null,
+      mobile: x.mobile.trim() || null,
+      source: x.source.trim() || null,
+      sur: x.confiance === "sure" && sourceFiable(x.source),
+    }));
+
+  // Celle qu'on met en avant : une fonction du service concerné d'abord, et dont la
+  // source tient. À défaut, la première dont la source tient.
+  const UTILE = /qhse|hse|qsse|sécurit|securit|préven|preven|santé|sante|infirm|médec|medec|rh\b|ressources humaines|drh|rse|qvct/i;
+  const meilleure =
+    personnes.find((x) => x.sur && UTILE.test(x.fonction ?? "")) ??
+    personnes.find((x) => x.sur) ??
+    personnes.find((x) => UTILE.test(x.fonction ?? "")) ??
+    personnes[0] ?? null;
+
+  const c = {
+    nom: meilleure?.nom ?? "",
+    fonction: meilleure?.fonction ?? "",
+    email: meilleure?.email ?? "",
+    telephone: meilleure?.telephone ?? "",
+    source: meilleure?.source ?? "",
+  };
+  const named = meilleure?.sur ? { name: c.nom, role: c.fonction, source: c.source } : null;
 
   // À défaut, le dirigeant du registre. Sur une PME — et l'essentiel des cibles en
   // sont —, c'est lui qui décide d'une campagne, et son nom est un fait public. Sans
@@ -668,6 +701,8 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     contactEmail: email,
     contactPhone: phone,
     contactSource: contact?.source ?? (site && (email || phone) ? site.readOn : null),
+    // Toutes les personnes, pas seulement celle qu'on met en avant.
+    personnes: personnes.length ? personnes : null,
     siteContacts: site,
     approach: out.angle_approche.trim() || null,
     dossier: out.dossier ?? null,
