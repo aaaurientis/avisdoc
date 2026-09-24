@@ -414,6 +414,35 @@ export default function Prospects() {
     else toast.warning(`${reussies} approfondie${reussies > 1 ? "s" : ""}, ${echecs} en échec — relancez-les depuis leur fiche.`);
   }, [selectionnees, lot, couts.approfondissement, charger]);
 
+  /**
+   * Compléter les fiches cochées sans appeler de modèle.
+   *
+   * Le registre, Pappers et la fiche d'établissement : deux secondes par fiche et
+   * presque rien, là où un approfondissement coûte douze centimes et trente secondes.
+   * C'est ce qu'il faut aux fiches d'avant, créées quand la recherche ne rendait qu'un
+   * nom et une ville — elles n'ont ni dirigeant, ni téléphone, ni note de fiabilité.
+   */
+  const completerLot = useCallback(async () => {
+    if (lot || selectionnees.length === 0) return;
+    setLot({ fait: 0, total: selectionnees.length });
+    let echecs = 0;
+    for (const [i, p] of selectionnees.entries()) {
+      try {
+        const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "completer", prospectId: p.id } });
+        if (error || (data as { error?: string })?.error) echecs++;
+      } catch {
+        echecs++;
+      }
+      setLot({ fait: i + 1, total: selectionnees.length });
+    }
+    setLot(null);
+    setCoches(new Set());
+    await charger();
+    const ok = selectionnees.length - echecs;
+    if (echecs === 0) toast.success(`${ok} fiche${ok > 1 ? "s" : ""} complétée${ok > 1 ? "s" : ""}.`);
+    else toast.warning(`${ok} complétée${ok > 1 ? "s" : ""}, ${echecs} en échec.`);
+  }, [selectionnees, lot, charger]);
+
   /** Le lien est gardé sur la fiche : un prospect ne devient une affaire qu'une fois. */
   const mettreAuPipeline = useCallback(
     async (p: Prospect, clientId: string) => {
@@ -646,6 +675,7 @@ export default function Prospects() {
         onEmail={ecrireAuxCoches}
         onSupprimer={() => void supprimerLesCoches()}
         onEffacer={() => setCoches(new Set())}
+        completer={{ lancer: completerLot, enCours: lot !== null }}
         approfondir={{
           aFaire: selectionnees.filter((p) => !p.enriched_at).length,
           enCours: lot,

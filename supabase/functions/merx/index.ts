@@ -93,6 +93,25 @@ Deno.serve(async (req: Request) => {
       return json({ demandeId: demande.id });
     }
 
+    // ── Compléter une fiche sans modèle ──────────────────────────────────
+    // Le registre, Pappers et la fiche d'établissement : deux secondes et presque rien,
+    // là où un approfondissement coûte douze centimes et une trentaine de secondes.
+    // C'est ce qu'il faut aux fiches d'avant, créées quand la recherche ne rendait
+    // qu'un nom et une ville.
+    if (body.action === "completer") {
+      if (!body.prospectId) return json({ error: "Fiche non précisée." }, 400);
+      const { data: p } = await sb.from("admin_prospects").select("id, name").eq("id", body.prospectId).maybeSingle();
+      if (!p) return json({ error: "Fiche introuvable." }, 404);
+      const { data: demande, error } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "completion", request: p.name, prospect_id: p.id, requested_by: email })
+        .select("id")
+        .single();
+      if (error) return json({ error: error.message }, 500);
+      await runAgentTick(sb, demande.id);
+      return json({ demandeId: demande.id });
+    }
+
     // ── Rédiger l'e-mail de premier contact ──────────────────────────────
     // Merx écrit un brouillon à partir de la seule fiche ; le commercial l'envoie lui-même.
     if (body.action === "email") {
