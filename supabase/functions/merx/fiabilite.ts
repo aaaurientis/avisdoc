@@ -1,54 +1,44 @@
-// À quel point ce qu'on affiche est sûr.
+// À quel point ce qu'on affiche a été vérifié.
 //
 // Deux notes valent mieux qu'une, parce qu'elles répondent à deux questions que rien
 // ne relie : « est-ce un bon client ? » et « est-ce que ce que je lis est vrai ? ».
 // Une entreprise de mille salariés au profil parfait dont l'adresse vient d'une page
 // mal lue est un excellent prospect sur une information fausse.
 //
-// La note ne mesure PAS la complétude : une fiche qui ne dit que deux choses, mais les
-// tient du registre de l'État, vaut dix sur dix. Qu'elle en dise peu se voit ailleurs —
-// c'est la colonne « Approfondie ». Ici on ne juge que ce qui est écrit.
+// Une première version notait l'ORIGINE des informations. Toutes les fiches du
+// registre avaient la même origine : toutes sortaient à dix sur dix. Une note que
+// chacun obtient ne dit rien à personne.
 //
-// Chaque information affichée porte donc son origine, et l'origine vaut des points :
-// le registre et le site officiel de l'entreprise sont des sources qui engagent, une
-// page web citée est un indice, une affirmation sans source ne vaut rien. La note est
-// la moyenne de ces origines, ramenée sur dix.
+// Ce qui distingue vraiment deux fiches, c'est le degré de VÉRIFICATION :
+//
+//   2 — confirmé pour ce site : l'établissement est ouvert aujourd'hui, l'effectif est
+//       celui de ce site, l'interlocuteur est nommé sur le site de l'entreprise ;
+//   1 — officiel mais extrapolé : l'effectif du groupe appliqué à une agence, le
+//       dirigeant du siège donné comme interlocuteur, une page tierce, une adresse
+//       qu'on n'a pas revérifiée. Rien de faux, rien de confirmé non plus ;
+//   0 — rien ne l'appuie.
+//
+// La note est la moyenne des informations PRÉSENTES, sur dix. Elle ne mesure pas la
+// complétude : qu'une fiche dise peu se lit dans « Approfondie ». Une fiche brute du
+// registre tourne autour de sept ; il faut avoir vérifié pour dépasser.
 
-/** D'où vient une information, du plus sûr au moins sûr. */
-export type Origine =
-  | "registre" // annuaire officiel de l'État : identité, siège, effectif, activité
-  | "site_officiel" // le site de l'entreprise elle-même
-  | "lieu" // fiche d'établissement Google : adresse et standard
-  | "page_citee" // une page web que le modèle a réellement consultée
-  | "sans_source"; // affirmé sans que rien ne l'appuie
+/** Le degré de vérification d'une information. */
+export type Niveau = "confirme" | "extrapole" | "sans_source";
 
-const POINTS: Record<Origine, number> = {
-  registre: 2,
-  site_officiel: 2,
-  lieu: 2,
-  page_citee: 1,
-  sans_source: 0,
-};
+const POINTS: Record<Niveau, number> = { confirme: 2, extrapole: 1, sans_source: 0 };
 
-const DIT: Record<Origine, string> = {
-  registre: "annuaire officiel de l’État",
-  site_officiel: "site officiel de l’entreprise",
-  lieu: "fiche d’établissement Google",
-  page_citee: "page web consultée",
-  sans_source: "aucune source",
-};
-
-/** Une information affichée et son origine. */
+/** Une information affichée, ce qu'on en sait, et d'où on le tient. */
 export interface Renseignement {
-  /** Ce que c'est, en clair : « Ville », « Interlocuteur », « Téléphone »… */
+  /** Ce que c'est, en clair : « Implantation », « Effectif », « Interlocuteur »… */
   quoi: string;
-  origine: Origine;
+  niveau: Niveau;
+  /** Pourquoi ce degré, en quelques mots — c'est ce que le commercial lira. */
+  dit: string;
 }
 
 export interface Fiabilite {
   /** Sur dix. */
   note: number;
-  /** Le détail, pour que le commercial sache quoi croire, ligne par ligne. */
   details: { quoi: string; dit: string; sur: number }[];
 }
 
@@ -59,28 +49,57 @@ export interface Fiabilite {
 export function fiabilite(rens: Renseignement[]): Fiabilite | null {
   const vrais = rens.filter((r) => r.quoi.trim());
   if (vrais.length === 0) return null;
-  const somme = vrais.reduce((t, r) => t + POINTS[r.origine], 0);
+  const somme = vrais.reduce((t, r) => t + POINTS[r.niveau], 0);
   return {
     note: Math.round((10 * somme) / (2 * vrais.length)),
-    details: vrais.map((r) => ({ quoi: r.quoi, dit: DIT[r.origine], sur: POINTS[r.origine] })),
+    details: vrais.map((r) => ({ quoi: r.quoi, dit: r.dit, sur: POINTS[r.niveau] })),
   };
 }
 
 /**
- * Ce qu'une fiche sortie du registre avance, et d'où elle le tient.
+ * Ce qu'une fiche sortie du registre avance, et à quel point c'est vérifié.
  *
- * Tout vient de l'annuaire de l'État : c'est une fiche courte, mais chaque ligne est
- * tenue par une source publique. Elle mérite dix sur dix tant qu'on n'y ajoute rien.
+ * L'identité et l'activité sont des faits légaux : confirmés. L'implantation l'est
+ * depuis qu'on écarte les établissements fermés — mais seulement quand un établissement
+ * de la zone a répondu ; à défaut on affiche le siège, et le commercial doit le savoir.
+ * L'effectif est le point faible : l'annuaire ne le publie par site que pour une fiche
+ * sur trois, et le reste est l'effectif du groupe. Une agence de huit personnes dans une
+ * société de deux mille ne vaut pas deux mille.
  */
 export function duRegistre(p: {
   siren: string | null;
+  activityCode: string | null;
+  /** Un établissement OUVERT de la zone demandée a répondu (et non le siège par défaut). */
+  siteLocalOuvert: boolean;
   city: string | null;
-  activity: string | null;
-  headcountBand: string | null;
+  /** Tranche de ce site précis, « NN » ou vide quand l'annuaire ne la publie pas. */
+  bandeDuSite: string | null;
+  /** Tranche de l'entreprise entière. */
+  bandeEntreprise: string | null;
 }): Renseignement[] {
-  const r: Renseignement[] = [{ quoi: "Identité", origine: p.siren ? "registre" : "sans_source" }];
-  if (p.city) r.push({ quoi: "Implantation", origine: "registre" });
-  if (p.activity) r.push({ quoi: "Activité", origine: "registre" });
-  if (p.headcountBand) r.push({ quoi: "Effectif", origine: "registre" });
+  const r: Renseignement[] = [
+    p.siren
+      ? { quoi: "Identité", niveau: "confirme", dit: "SIREN au registre officiel" }
+      : { quoi: "Identité", niveau: "sans_source", dit: "nom seul, sans identifiant légal" },
+  ];
+
+  if (p.city) {
+    r.push(
+      p.siteLocalOuvert
+        ? { quoi: "Implantation", niveau: "confirme", dit: "établissement ouvert, vérifié ce jour" }
+        : { quoi: "Implantation", niveau: "extrapole", dit: "siège de l’entreprise, site local non confirmé" },
+    );
+  }
+
+  if (p.activityCode) r.push({ quoi: "Activité", niveau: "confirme", dit: "code d’activité officiel" });
+
+  const duSite = p.bandeDuSite && p.bandeDuSite !== "NN";
+  if (duSite) r.push({ quoi: "Effectif", niveau: "confirme", dit: "effectif publié pour ce site" });
+  else if (p.bandeEntreprise) r.push({ quoi: "Effectif", niveau: "extrapole", dit: "effectif du groupe, site non publié" });
+
+  // Ce qu'une fiche non approfondie n'a pas : on le dit, plutôt que de laisser croire
+  // qu'on a cherché. Sans ces deux lignes, une fiche brute du registre sortirait à dix.
+  r.push({ quoi: "Interlocuteur", niveau: "sans_source", dit: "non recherché — fiche non approfondie" });
+  r.push({ quoi: "Moyen de contact", niveau: "sans_source", dit: "non recherché — fiche non approfondie" });
   return r;
 }

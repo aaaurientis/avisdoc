@@ -34,7 +34,7 @@ import {
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
-import { duRegistre, fiabilite, type Origine, type Renseignement } from "./fiabilite.ts";
+import { duRegistre, fiabilite, type Renseignement } from "./fiabilite.ts";
 import { chercherLieu } from "./places.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
@@ -162,6 +162,15 @@ function effectifDuSite(local: Establishment, c: Found) {
   return { ...s, justification: s.justification.replace(", annuaire officiel.", " pour l’entreprise entière — effectif du site non publié.") };
 }
 
+/** Le nom du site d'une adresse, pour dire où l'on a lu un nom sans coller une URL. */
+const hote = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "une page consultée";
+  }
+};
+
 function versFiches(trouvees: Found[]): LightProspect[] {
   const fiches: LightProspect[] = [];
   for (const c of trouvees) {
@@ -214,7 +223,16 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       // Fiche courte, mais chaque ligne est tenue par le registre de l'État : elle
       // mérite dix sur dix. Qu'elle en dise peu se lit ailleurs — « Approfondie ».
       fiabilite: fiabilite(
-        duRegistre({ siren: c.siren, city: local.city ?? c.headOffice.city, activity: c.activityCode, headcountBand: local.headcountBand ?? c.headcountBand }),
+        duRegistre({
+          siren: c.siren,
+          activityCode: c.activityCode,
+          // Un établissement de la zone a répondu, et il est ouvert : l'adresse est sûre.
+          // Sinon on affiche le siège faute de mieux, et cela vaut d'être dit.
+          siteLocalOuvert: c.localSites.length > 0,
+          city: local.city ?? c.headOffice.city,
+          bandeDuSite: local.headcountBand,
+          bandeEntreprise: c.headcountBand,
+        }),
       ),
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
@@ -409,21 +427,44 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
 
   // Ce que la fiche avance maintenant, et d'où elle le tient. Le registre et le site
   // de l'entreprise engagent ; une page consultée est un indice ; le reste ne vaut rien.
-  const rens: Renseignement[] = [{ quoi: "Identité", origine: company?.siren ? "registre" : "sans_source" }];
-  if (company?.headOffice.city || lieu?.adresse) {
-    rens.push({ quoi: "Implantation", origine: company?.headOffice.city ? "registre" : "lieu" });
+  const rens: Renseignement[] = [
+    company?.siren
+      ? { quoi: "Identité", niveau: "confirme", dit: "SIREN au registre officiel" }
+      : { quoi: "Identité", niveau: "sans_source", dit: "aucune entreprise du registre ne correspond" },
+  ];
+  if (lieu?.adresse) rens.push({ quoi: "Implantation", niveau: "confirme", dit: "établissement localisé, adresse relevée" });
+  else if (company?.headOffice.city) rens.push({ quoi: "Implantation", niveau: "extrapole", dit: "siège au registre, adresse du site non relevée" });
+  if (company) rens.push({ quoi: "Activité", niveau: "confirme", dit: "code d’activité officiel" });
+  if (company?.headcountBand) {
+    rens.push({ quoi: "Effectif", niveau: "extrapole", dit: "effectif de l’entreprise entière" });
   }
-  if (company) rens.push({ quoi: "Activité", origine: "registre" });
-  if (company?.headcountBand) rens.push({ quoi: "Effectif", origine: "registre" });
   if (website) {
-    const o: Origine = website === p.website ? "registre" : proposed && website === proposed ? "page_citee" : "lieu";
-    rens.push({ quoi: "Site web", origine: o });
+    rens.push(
+      website === p.website || (proposed && website === proposed)
+        ? { quoi: "Site web", niveau: "confirme", dit: "site visité pendant la recherche" }
+        : { quoi: "Site web", niveau: "extrapole", dit: "site donné par la fiche d’établissement" },
+    );
   }
-  if (contact?.name) rens.push({ quoi: "Interlocuteur", origine: named ? "page_citee" : "registre" });
-  if (email) rens.push({ quoi: "E-mail", origine: named && c.email.trim() === email ? "page_citee" : "site_officiel" });
+  if (contact?.name) {
+    rens.push(
+      named
+        ? { quoi: "Interlocuteur", niveau: "confirme", dit: `nommé sur ${hote(named.source)}` }
+        : { quoi: "Interlocuteur", niveau: "extrapole", dit: "dirigeant au registre — fonction peut-être ancienne" },
+    );
+  }
+  if (email) {
+    rens.push(
+      site?.emails[0] === email
+        ? { quoi: "E-mail", niveau: "confirme", dit: "publié sur le site officiel" }
+        : { quoi: "E-mail", niveau: "extrapole", dit: "relevé sur une page consultée" },
+    );
+  }
   if (phone) {
-    const o: Origine = named && c.telephone.trim() === phone ? "page_citee" : site?.phones[0] === phone ? "site_officiel" : "lieu";
-    rens.push({ quoi: "Téléphone", origine: o });
+    rens.push(
+      site?.phones[0] === phone || lieu?.telephone === phone
+        ? { quoi: "Téléphone", niveau: "confirme", dit: site?.phones[0] === phone ? "publié sur le site officiel" : "standard, fiche d’établissement" }
+        : { quoi: "Téléphone", niveau: "extrapole", dit: "relevé sur une page consultée" },
+    );
   }
 
   await saveEnrichment(sb, req.prospectId!, {
