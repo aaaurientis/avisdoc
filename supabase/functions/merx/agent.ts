@@ -34,7 +34,6 @@ import {
 import { readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
-import { duRegistre, fiabilite, type Origine, type Renseignement } from "./fiabilite.ts";
 import { chercherLieu } from "./places.ts";
 import { contactScore, healthScore, isSector, sitesScore, sizeScore, sunScore, total, zoneScore, type Score } from "./scoring.ts";
 
@@ -211,11 +210,6 @@ function versFiches(trouvees: Found[]): LightProspect[] {
       activity: libelleNaf(c.activityCode) || metier.activite || null,
       sector: secteurDe(c.activityCode),
       siren: c.siren,
-      // Fiche courte, mais chaque ligne est tenue par le registre de l'État : elle
-      // mérite dix sur dix. Qu'elle en dise peu se lit ailleurs — « Approfondie ».
-      fiabilite: fiabilite(
-        duRegistre({ siren: c.siren, city: local.city ?? c.headOffice.city, activity: c.activityCode, headcountBand: local.headcountBand ?? c.headcountBand }),
-      ),
       website: null, // le registre ne le donne pas : l'approfondissement ira le chercher
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source],
@@ -407,27 +401,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     zone: zoneScore([company?.headOffice.department ?? null, p.department]),
   };
 
-  // Ce que la fiche avance maintenant, et d'où elle le tient. Le registre et le site
-  // de l'entreprise engagent ; une page consultée est un indice ; le reste ne vaut rien.
-  const rens: Renseignement[] = [{ quoi: "Identité", origine: company?.siren ? "registre" : "sans_source" }];
-  if (company?.headOffice.city || lieu?.adresse) {
-    rens.push({ quoi: "Implantation", origine: company?.headOffice.city ? "registre" : "lieu" });
-  }
-  if (company) rens.push({ quoi: "Activité", origine: "registre" });
-  if (company?.headcountBand) rens.push({ quoi: "Effectif", origine: "registre" });
-  if (website) {
-    const o: Origine = website === p.website ? "registre" : proposed && website === proposed ? "page_citee" : "lieu";
-    rens.push({ quoi: "Site web", origine: o });
-  }
-  if (contact?.name) rens.push({ quoi: "Interlocuteur", origine: named ? "page_citee" : "registre" });
-  if (email) rens.push({ quoi: "E-mail", origine: named && c.email.trim() === email ? "page_citee" : "site_officiel" });
-  if (phone) {
-    const o: Origine = named && c.telephone.trim() === phone ? "page_citee" : site?.phones[0] === phone ? "site_officiel" : "lieu";
-    rens.push({ quoi: "Téléphone", origine: o });
-  }
-
   await saveEnrichment(sb, req.prospectId!, {
-    fiabilite: fiabilite(rens),
     siren: company?.siren ?? null,
     legalName: company?.name ?? null,
     headcountBand: company?.headcountBand ?? null,
