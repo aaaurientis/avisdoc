@@ -239,6 +239,58 @@ export function surPreuve(
   return { points: Math.max(0, Math.min(max, Math.round(niveau))), justification, source };
 }
 
+/**
+ * Ce que l'État publie déjà des démarches de l'entreprise.
+ *
+ * Un bilan gaz à effet de serre déposé, un label RGE, une aide de l'ADEME, un index
+ * d'égalité professionnelle publié : ce ne sont pas des politiques santé-sécurité, et
+ * il serait malhonnête de les compter comme telles. Mais une entreprise qui mesure,
+ * déclare et se fait certifier a les habitudes et les fonctions pour porter une action
+ * de prévention de plus. C'est un indice sérieux, pas une preuve : il plafonne à
+ * quatre points sur dix, et l'approfondissement va chercher la vraie politique QHSE.
+ */
+export function signauxOfficiels(s: {
+  ges: boolean; rge: boolean; ademe: boolean; achatsResponsables: boolean;
+}): CriterionScore {
+  const trouves = [
+    s.ges && "bilan gaz à effet de serre publié",
+    s.rge && "label RGE",
+    s.ademe && "aide de l’ADEME",
+    s.achatsResponsables && "engagement d’achats responsables",
+  ].filter(Boolean) as string[];
+  if (trouves.length === 0) {
+    return { points: null, justification: "Aucune démarche publiée aux registres officiels — à vérifier sur leur site.", source: null };
+  }
+  return {
+    points: Math.min(4, 1 + trouves.length),
+    justification: `${trouves.join(", ")} — l’entreprise mesure et déclare, elle a les habitudes pour porter une action de prévention. Reste à vérifier sa politique santé-sécurité.`,
+    source: null,
+  };
+}
+
+/** L'index d'égalité professionnelle : une fonction RH qui suit et publie ses indicateurs. */
+export function indexEgalite(publie: boolean): CriterionScore {
+  return publie
+    ? { points: 2, justification: "Index d’égalité professionnelle publié : une fonction RH structurée, qui suit ses indicateurs.", source: null }
+    : { points: null, justification: "Relais internes non identifiés — à chercher sur leur site.", source: null };
+}
+
+/**
+ * L'interlocuteur tiré du registre : un dirigeant nommé, avec sa fonction.
+ *
+ * Il vaut moins qu'un responsable QHSE trouvé sur le site — il décide, mais il faudra
+ * qu'il transmette. Il vaut infiniment mieux que rien : sur cent entreprises de travaux
+ * publics, quatre-vingt-une en ont un, et nous ne l'affichions pas.
+ */
+export function dirigeantScore(leader: { name: string; role: string | null } | null): CriterionScore {
+  if (!leader) return { points: null, justification: "Aucun dirigeant publié au registre.", source: null };
+  return {
+    points: 3,
+    justification: `${leader.name}${leader.role ? `, ${leader.role}` : ""} — dirigeant au registre officiel. Il décide, mais il faudra qu’il transmette au bon service.`,
+    source: null,
+  };
+}
+
 // ── Les secteurs, pour ranger les fiches ─────────────────────────────────
 export const SECTORS = [
   { id: "btp", label: "Travaux publics et BTP" },

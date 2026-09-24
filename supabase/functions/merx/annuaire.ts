@@ -62,6 +62,30 @@ export interface Company {
   openEstablishments: number | null;
   headOffice: Establishment;
   leaders: { name: string; role: string | null }[]; // nom et qualité seulement (minimisation RGPD)
+  /**
+   * Ce que l'État publie déjà sur les démarches de l'entreprise.
+   *
+   * Ces indicateurs arrivent dans la même réponse que tout le reste, gratuitement, et
+   * nous les jetions : sur cent entreprises de travaux publics en Gironde, soixante-
+   * quatre en portent au moins un. Les faire chercher par un modèle à douze centimes
+   * la fiche revenait à payer pour ce qu'on avait déjà.
+   */
+  signals: {
+    /** Bilan gaz à effet de serre publié — l'entreprise mesure et déclare. */
+    ges: boolean;
+    /** Reconnu Garant de l'Environnement. */
+    rge: boolean;
+    /** A reçu une aide de l'ADEME. */
+    ademe: boolean;
+    /** Index d'égalité professionnelle publié — une fonction RH qui suit ses indicateurs. */
+    egalite: boolean;
+    /** Engagement d'achats responsables. */
+    achatsResponsables: boolean;
+    /** Économie sociale et solidaire. */
+    ess: boolean;
+    /** Convention collective renseignée : elle dit le métier réel des salariés. */
+    conventionConnue: boolean;
+  };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -101,6 +125,15 @@ export function toCompany(r: any): Company {
       .filter((d: any) => !/commissaire aux comptes/i.test(d.qualite ?? ""))
       .map((d: any) => ({ name: (d.denomination ?? [d.prenoms, d.nom].filter(Boolean).join(" ")).trim(), role: d.qualite ?? null }))
       .filter((d: any) => d.name),
+    signals: {
+      ges: Boolean(r.complements?.bilan_ges_renseigne),
+      rge: Boolean(r.complements?.est_rge),
+      ademe: Boolean(r.complements?.a_aide_ademe),
+      egalite: Boolean(r.complements?.egapro_renseignee),
+      achatsResponsables: Boolean(r.complements?.est_achats_responsables),
+      ess: Boolean(r.complements?.est_ess),
+      conventionConnue: Boolean(r.complements?.convention_collective_renseignee),
+    },
   };
 }
 
