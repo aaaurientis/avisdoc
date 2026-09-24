@@ -26,8 +26,26 @@ const DEHORS: Pick<Metier, "soleil" | "affinite"> = { soleil: "majorite_dehors",
 const PARTIE_DEHORS: Pick<Metier, "soleil" | "affinite"> = { soleil: "partie_dehors", affinite: "aucune" };
 const PEAU: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "metier_de_la_peau" };
 const SANTE: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "secteur_sante" };
-/** À l'abri, et sans lien particulier avec le sujet : évalué, et évalué à zéro. */
+/**
+ * À l'abri, et sans lien particulier avec le sujet : évalué, et évalué à zéro.
+ * Réservé aux métiers dont on est SÛR — une banque, un cabinet comptable, un éditeur
+ * de logiciels : personne n'y travaille dehors, et zéro est un jugement, pas un aveu.
+ */
 const INTERIEUR: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "aucune" };
+
+/**
+ * On ne sait pas, et on le dit.
+ *
+ * Certaines divisions mêlent des métiers trop différents pour qu'on tranche : le
+ * commerce de gros va du négoce de matériaux, avec ses cours et ses parcs extérieurs,
+ * au grossiste en bureautique ; l'hébergement va de l'hôtel au camping. Leur mettre
+ * zéro reviendrait à affirmer que personne n'y travaille dehors — c'est faux, et la
+ * fiche partirait au fond du vivier sur une affirmation que nous n'avons pas vérifiée.
+ *
+ * « Non évalué » ne rapporte aucun point, mais ne se compte pas non plus dans le total
+ * possible : la fiche se juge sur ce qu'on a su établir, et l'approfondissement tranche.
+ */
+const A_QUALIFIER: Pick<Metier, "soleil" | "affinite"> = { soleil: "non_evalue", affinite: "non_evalue" };
 
 /** Préfixe de code NAF → métier. L'ordre importe peu : on retient le préfixe le plus long qui colle. */
 const TABLE: Record<string, Metier> = {
@@ -160,7 +178,7 @@ const DIVISIONS: Record<string, Metier> = {
   "96": { secteur: "sante_beaute", ...PEAU, activite: "", pourquoi: "Services à la personne tournés vers le soin du corps et de la peau." },
 
   // À l'abri, sans lien particulier avec le sujet
-  "10": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "10": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Industries alimentaires : des ateliers clos aux coopératives et abattoirs, les situations diffèrent." },
   "12": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "13": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "14": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
@@ -177,10 +195,10 @@ const DIVISIONS: Record<string, Metier> = {
   "30": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "31": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "32": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "46": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "47": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "55": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "56": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "46": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Le commerce de gros va du négoce de matériaux, avec ses parcs extérieurs, au grossiste en bureautique." },
+  "47": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Le commerce de détail va de la jardinerie et du négoce de matériaux à la boutique de centre-ville." },
+  "55": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "L’hébergement va de l’hôtel au camping et au village de vacances." },
+  "56": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "La restauration va de la cuisine close au service en terrasse toute la saison." },
   "58": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "59": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "60": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
@@ -189,22 +207,22 @@ const DIVISIONS: Record<string, Metier> = {
   "64": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "65": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "66": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "68": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "68": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "L’immobilier mêle bureaux, visites et suivi de chantiers." },
   "69": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "70": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "72": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
   "73": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "74": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "74": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Activités trop variées pour trancher : photographes, traducteurs, designers, prestataires de terrain." },
   "79": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "82": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "90": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "82": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Soutien aux entreprises : centres d’appels, accueil, conditionnement, services de terrain." },
+  "90": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Spectacle : plateaux clos, mais aussi festivals et tournages en extérieur." },
   "91": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "92": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "94": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "95": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "97": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "98": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
-  "99": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "92": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Jeux et paris : points de vente, mais aussi hippodromes et sites de plein air." },
+  "94": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Organisations associatives : des fédérations de bureau aux syndicats agricoles." },
+  "95": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Réparation de biens : atelier, mais aussi interventions à domicile." },
+  "97": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Emplois familiaux : ménage, garde d’enfants, mais aussi jardinage et entretien extérieur." },
+  "98": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Production des ménages pour usage propre : rien ne permet de trancher." },
+  "99": { secteur: "autre", ...A_QUALIFIER, activite: "", pourquoi: "Organismes extraterritoriaux : rien ne permet de trancher." },
 };
 
 /**

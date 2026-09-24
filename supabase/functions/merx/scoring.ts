@@ -119,9 +119,16 @@ export const DECISIONS: { min: number; libelle: string; action: string }[] = [
 export const decision = (t: number, sur = 100) =>
   DECISIONS.find((d) => (sur > 0 ? (100 * t) / sur : 0) >= d.min)!;
 
-/** Les points maximum atteignables avec ce qui a été évalué. */
+/**
+ * Les points maximum atteignables avec ce qui a été ÉVALUÉ.
+ *
+ * Un critère non qualifié — « on ne sait pas » — ne compte ni au numérateur ni au
+ * dénominateur. Sans cela il pénaliserait comme un zéro, et une entreprise dont le
+ * métier recouvre des situations trop variées pour qu'on tranche serait punie de notre
+ * propre ignorance.
+ */
 export const maxEvalue = (s: Score): number =>
-  (Object.keys(s) as CriterionId[]).reduce((t, id) => t + (s[id] ? CRITERIA[id].max : 0), 0);
+  (Object.keys(s) as CriterionId[]).reduce((t, id) => t + (s[id]?.points !== null && s[id] ? CRITERIA[id].max : 0), 0);
 
 // ── Étape 2 : la pertinence, ce que le registre suffit à établir ─────────
 
@@ -144,13 +151,23 @@ const PEAU: Record<AffinityLevel, number | null> = {
 export function expositionScore(niveau: SunLevel, justification: string, source: string | null): CriterionScore {
   return {
     points: EXPOSITION[niveau],
-    justification: justification || "Exposition non évaluée.",
+    justification:
+      justification ||
+      (niveau === "non_evalue"
+        ? "Exposition non qualifiée : ce métier recouvre des situations trop différentes pour trancher sans approfondir."
+        : "Aucun salarié ne travaille en extérieur."),
     source,
   };
 }
 
 export function peauScore(niveau: AffinityLevel, justification: string, source: string | null): CriterionScore {
-  return { points: PEAU[niveau], justification: justification || "Aucun lien direct avec la peau.", source };
+  return {
+    points: PEAU[niveau],
+    justification:
+      justification ||
+      (niveau === "non_evalue" ? "Lien avec la peau non qualifié : à trancher à l’approfondissement." : "Aucun lien direct avec la peau."),
+    source,
+  };
 }
 
 /**

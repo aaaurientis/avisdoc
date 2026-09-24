@@ -69,7 +69,12 @@ export const DECISIONS: { min: number; libelle: string; action: string; ton: str
  * sur dix. On ramène donc la note à l'échelle de ce qui était mesurable.
  */
 export const maxEvalue = (score: Partial<Record<CritereId, NoteCritere>>): number =>
-  (Object.keys(score) as CritereId[]).reduce((t, id) => t + (score[id] && CRITERES[id] ? CRITERES[id].max : 0), 0);
+  (Object.keys(score) as CritereId[]).reduce(
+    // Un critère non qualifié ne compte ni au numérateur ni au dénominateur : sans
+    // cela il pénaliserait comme un zéro, et la fiche serait punie de notre ignorance.
+    (t, id) => t + (score[id] && score[id]!.points !== null && CRITERES[id] ? CRITERES[id].max : 0),
+    0,
+  );
 
 export const decision = (total: number | null, sur: number) =>
   total === null || sur <= 0 ? null : DECISIONS.find((d) => (100 * total) / sur >= d.min)!;
