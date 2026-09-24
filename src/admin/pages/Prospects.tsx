@@ -2,7 +2,7 @@
 // Les fiches sont communes à l’équipe (comme le fichier CRM) ; une fiche supprimée part à la corbeille
 // sans jamais être supprimée.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { ArrowUpDown, Check, Loader2, Mail, Pencil, Phone, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseAdmin } from "../data/supabaseAdmin";
@@ -292,6 +292,49 @@ export default function Prospects() {
 
   /** Toutes les fiches visibles sont-elles cochées ? */
   const toutesCochees = visibles.length > 0 && visibles.every((p) => coches.has(p.id));
+
+  /**
+   * Compléter les fiches en retard, toutes seules.
+   *
+   * Les fiches créées avant que la recherche n'aille chercher le site, le téléphone et
+   * l'adresse électronique sont vides. Le commercial ne doit pas les reprendre une à
+   * une : dès que la liste s'affiche, celles qui n'ont pas de numéro sont complétées en
+   * arrière-plan, sans rien bloquer.
+   *
+   * Par petits paquets, les mieux notées d'abord, et jamais deux fois la même.
+   */
+  const dejaTentees = useRef(new Set<string>());
+  useEffect(() => {
+    let vivant = true;
+    const enRetard = prospects
+      .filter((p) => !p.converted_client_id && !p.contact_phone && !p.website && !dejaTentees.current.has(p.id))
+      .sort((a, b) => (b.score_total ?? -1) - (a.score_total ?? -1))
+      .slice(0, 12);
+    if (enRetard.length === 0) return;
+
+    (async () => {
+      let change = false;
+      for (let i = 0; i < enRetard.length; i += 4) {
+        if (!vivant) return;
+        const paquet = enRetard.slice(i, i + 4);
+        paquet.forEach((p) => dejaTentees.current.add(p.id));
+        const faits = await Promise.all(
+          paquet.map((p) =>
+            supabaseAdmin.functions
+              .invoke("merx", { body: { action: "completer", prospectId: p.id } })
+              .then((r) => !r.error)
+              .catch(() => false),
+          ),
+        );
+        if (faits.some(Boolean)) change = true;
+      }
+      if (vivant && change) await charger();
+    })();
+
+    return () => {
+      vivant = false;
+    };
+  }, [prospects, charger]);
 
   /** Une fiche jamais ouverte porte la pastille « Nouveau ». */
   const nouvelles = useMemo(() => prospects.filter((p) => !p.converted_client_id && !p.opened_at).length, [prospects]);
