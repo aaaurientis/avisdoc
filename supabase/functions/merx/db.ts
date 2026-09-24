@@ -37,6 +37,8 @@ export interface LightProspect {
   contactSource?: string | null;
   headOffice?: unknown;
   leaders?: unknown;
+  /** Tout ce que le registre publie, conservé tel quel — on ne jette plus rien. */
+  registre?: unknown;
   headcountBand?: string | null;
   headcountYear?: number | null;
   openEstablishments?: number | null;
@@ -177,12 +179,22 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       contact_source: p.contactSource ?? null,
       head_office: p.headOffice ?? null,
       leaders: p.leaders ?? null,
+      registre: p.registre ?? null,
       headcount_band: p.headcountBand ?? null,
       headcount_year: p.headcountYear ?? null,
       open_establishments: p.openEstablishments ?? null,
     });
 
     let { error } = await sb.from("admin_prospects").insert(ligne(secteurSur(p.sector)));
+
+    // Tant que la migration 0047 n'est pas collée, la colonne « registre » n'existe
+    // pas et la base refuse toute la ligne. Une fiche sans ce complément vaut mieux
+    // qu'une recherche qui ne rend rien.
+    if (error && /registre/i.test(error.message)) {
+      const sansRegistre = ligne(secteurSur(p.sector)) as Record<string, unknown>;
+      delete sansRegistre.registre;
+      ({ error } = await sb.from("admin_prospects").insert(sansRegistre));
+    }
 
 
     // Tant que la migration 0041 n'est pas collée, la base refuse tout métier qui

@@ -231,6 +231,8 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       contactSource: lieu?.source ?? null,
       headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
       leaders: c.leaders,
+      // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
+      registre: c.registre,
       headcountBand: local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : c.headcountBand,
       headcountYear: local.headcountYear ?? c.headcountYear,
       openEstablishments: c.openEstablishments,
