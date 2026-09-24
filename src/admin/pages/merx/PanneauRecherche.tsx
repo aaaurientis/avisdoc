@@ -351,18 +351,26 @@ export default function PanneauRecherche({
             const actif = marqueurs.has(m.id);
             const perso = m.id.startsWith("perso-");
             return (
-              <span key={m.id} className="inline-flex items-center">
+              // Une seule capsule porte la bordure et l'arrondi : deux boutons accolés
+              // se séparaient dès que l'anneau de focus arrondissait le premier, et le
+              // marqueur qu'on venait de créer s'affichait cassé, croix flottante.
+              <span
+                key={m.id}
+                className={cn(
+                  "inline-flex items-center rounded-full border text-[11.5px] font-bold transition-colors",
+                  // L'anneau de focus épouse la capsule entière : posé sur le bouton du
+                  // libellé, il l'arrondissait à droite et détachait la croix.
+                  "focus-within:ring-2 focus-within:ring-avisdoc-teal/40",
+                  actif
+                    ? "border-avisdoc-teal bg-avisdoc-teal text-white"
+                    : "border-border text-muted-foreground hover:border-avisdoc-teal hover:text-avisdoc-ink",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => basculer(m.id)}
                   aria-pressed={actif}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-[11.5px] font-bold transition-colors",
-                    actif
-                      ? "border-avisdoc-teal bg-avisdoc-teal text-white"
-                      : "border-border text-muted-foreground hover:border-avisdoc-teal hover:text-avisdoc-ink",
-                    perso && "rounded-r-none border-r-0",
-                  )}
+                  className={cn("rounded-full py-1.5 pl-3 outline-none", perso ? "pr-1.5" : "pr-3")}
                 >
                   {m.label}
                 </button>
@@ -373,10 +381,8 @@ export default function PanneauRecherche({
                     aria-label={`Retirer « ${m.label} »`}
                     title="Retirer ce bouton"
                     className={cn(
-                      "rounded-full rounded-l-none border border-l-0 py-1.5 pl-1 pr-2.5 transition-colors",
-                      actif
-                        ? "border-avisdoc-teal bg-avisdoc-teal text-white/80 hover:text-white"
-                        : "border-border text-muted-foreground hover:text-rose-600",
+                      "rounded-full py-1.5 pl-0.5 pr-2.5 outline-none transition-colors",
+                      actif ? "text-white/70 hover:text-white" : "hover:text-rose-600",
                     )}
                   >
                     <X className="size-3" />
