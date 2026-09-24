@@ -39,6 +39,7 @@ import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
 import { chercherPappersEnLot, echecPappers } from "./pappers.ts";
+import { deLaRecherche, fiabilite } from "./fiabilite.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
 /** Ce que le commercial lit quand ça échoue : jamais un message technique en anglais. */
@@ -255,6 +256,25 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
       openEstablishments: c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source, lieu?.source, pap?.source].filter(Boolean) as string[],
+      // La note de fiabilité n'a de sens que depuis que la fiche est remplie : le
+      // registre, Pappers et Google se recoupent, et c'est ce recoupement qu'elle
+      // mesure. Une fiche sans rien d'établi n'obtient pas une mauvaise note : aucune.
+      fiabilite: fiabilite(
+        deLaRecherche({
+          siren: c.siren,
+          villeConfirmee: c.localSites.length > 0,
+          activite: c.activityCode,
+          effectifDuSite: Boolean(local.headcountBand && local.headcountBand !== "NN"),
+          effectif: local.headcountBand ?? c.headcountBand,
+          site,
+          siteRecoupe: Boolean(pap?.site && lieu?.site),
+          dirigeant: dirigeant?.name ?? null,
+          dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
+          email: pap?.email ?? null,
+          telephone,
+          telephoneRecoupe: Boolean(pap?.telephone && lieu?.telephone),
+        }),
+      ),
       score,
       // Pas de note sur une fiche qu'on ne peut pas juger. Sans savoir ce que fait
       // l'entreprise ni combien de personnes y travaillent, toute note serait inventée.

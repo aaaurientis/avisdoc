@@ -179,6 +179,8 @@ export interface Prospect {
    * fiches à dix sur dix. La colonne reste en place — elle dit ce qui manque.
    */
   reliability: number | null;
+  /** Le détail : d'où vient chaque information de la fiche, ou pourquoi elle manque. */
+  reliability_detail: { quoi: string; sur: number; dit: string }[] | null;
   siren: string | null;
   legal_name: string | null;
   headcount_band: string | null;

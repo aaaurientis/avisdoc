@@ -40,6 +40,8 @@ export interface LightProspect {
   leaders?: unknown;
   /** Tout ce que le registre publie, conservé tel quel — on ne jette plus rien. */
   registre?: unknown;
+  /** Peut-on croire ce que la fiche avance ? Null quand il n'y a rien à noter. */
+  fiabilite?: { note: number; details: unknown } | null;
   headcountBand?: string | null;
   headcountYear?: number | null;
   openEstablishments?: number | null;
@@ -182,6 +184,8 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
       head_office: p.headOffice ?? null,
       leaders: p.leaders ?? null,
       registre: p.registre ?? null,
+      reliability: p.fiabilite?.note ?? null,
+      reliability_detail: p.fiabilite?.details ?? null,
       headcount_band: p.headcountBand ?? null,
       headcount_year: p.headcountYear ?? null,
       open_establishments: p.openEstablishments ?? null,
@@ -192,9 +196,11 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
     // Tant que la migration 0047 n'est pas collée, la colonne « registre » n'existe
     // pas et la base refuse toute la ligne. Une fiche sans ce complément vaut mieux
     // qu'une recherche qui ne rend rien.
-    if (error && /registre/i.test(error.message)) {
+    if (error && /registre|reliability/i.test(error.message)) {
       const sansRegistre = ligne(secteurSur(p.sector)) as Record<string, unknown>;
       delete sansRegistre.registre;
+      delete sansRegistre.reliability;
+      delete sansRegistre.reliability_detail;
       ({ error } = await sb.from("admin_prospects").insert(sansRegistre));
     }
 
