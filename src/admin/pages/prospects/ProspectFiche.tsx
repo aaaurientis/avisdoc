@@ -332,6 +332,24 @@ export default function ProspectFiche({
                 {p.registre?.tva && <Ligne label="Numéro de TVA">{p.registre.tva}</Ligne>}
                 {p.approach && <Ligne label="Angle d’approche">{p.approach}</Ligne>}
                 {demandeOrigine && <Ligne label="Demande">« {demandeOrigine} »</Ligne>}
+                {p.reliability !== null && p.reliability_detail?.length ? (
+                  <Ligne label={`Fiabilité ${p.reliability}/10`}>
+                    <span className="block space-y-0.5">
+                      {p.reliability_detail.map((d) => (
+                        <span key={d.quoi} className="flex items-baseline justify-between gap-3">
+                          <span className={d.sur === 0 ? "text-muted-foreground" : ""}>{d.quoi}</span>
+                          <span
+                            className={
+                              d.sur === 2 ? "text-right text-emerald-700" : d.sur === 1 ? "text-right text-amber-700" : "text-right text-muted-foreground"
+                            }
+                          >
+                            {d.dit}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                  </Ligne>
+                ) : null}
                 {!p.enriched_at && (
                   <div className="py-3 text-[13px] text-muted-foreground">
                     Ce qui manque encore — l’interlocuteur du service concerné, son e-mail, la politique santé-sécurité —
