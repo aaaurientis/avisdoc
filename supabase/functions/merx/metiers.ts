@@ -26,6 +26,8 @@ const DEHORS: Pick<Metier, "soleil" | "affinite"> = { soleil: "majorite_dehors",
 const PARTIE_DEHORS: Pick<Metier, "soleil" | "affinite"> = { soleil: "partie_dehors", affinite: "aucune" };
 const PEAU: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "metier_de_la_peau" };
 const SANTE: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "secteur_sante" };
+/** À l'abri, et sans lien particulier avec le sujet : évalué, et évalué à zéro. */
+const INTERIEUR: Pick<Metier, "soleil" | "affinite"> = { soleil: "interieur", affinite: "aucune" };
 
 /** Préfixe de code NAF → métier. L'ordre importe peu : on retient le préfixe le plus long qui colle. */
 const TABLE: Record<string, Metier> = {
@@ -88,14 +90,135 @@ const TABLE: Record<string, Metier> = {
   "47.78A": { secteur: "sante_beaute", ...SANTE, activite: "Optique", pourquoi: "Santé visuelle : même logique de dépistage en proximité, clientèle réceptive." },
 };
 
-/** Le métier correspondant à un code NAF, ou rien si on ne le connaît pas. */
+
+// ── Le repli par division : aucun métier ne sort à zéro faute de savoir ──
+//
+// La table ci-dessus dit finement ce qu'elle sait. Elle ne couvrait que dix-sept pour
+// cent de la nomenclature : six cent dix métiers sur sept cent trente-deux obtenaient
+// zéro point d'exposition — le critère le plus lourd de la grille — non parce qu'ils
+// travaillent à l'abri, mais parce que personne n'avait répondu pour eux. Une carrière
+// de pierres, une sablière, un distributeur d'électricité dont les lignards sont sur les
+// pylônes toute l'année se retrouvaient au fond du vivier.
+//
+// Ce n'était pas une restriction : ces entreprises apparaissaient bien dans les
+// résultats. C'était pire, d'une certaine façon — elles y étaient, mal notées, et
+// personne n'allait les voir.
+//
+// Les quatre-vingt-huit divisions de la nomenclature sont donc toutes renseignées. Le
+// préfixe le plus précis l'emporte : « 43.91 » avant « 43 ». Quand une division mêle des
+// métiers très différents, on retient ce qui vaut pour le plus grand nombre de ses
+// salariés, et l'approfondissement affine ensuite.
+
+const DIVISIONS: Record<string, Metier> = {
+  // Dehors toute l'année
+  "01": { secteur: "agriculture", ...DEHORS, activite: "", pourquoi: "Travail aux champs et aux bâtiments d’élevage, du printemps à l’automne." },
+  "02": { secteur: "agriculture", ...DEHORS, activite: "", pourquoi: "Bûcheronnage et travaux forestiers en plein air toute l’année." },
+  "03": { secteur: "agriculture", ...DEHORS, activite: "", pourquoi: "Pont, bassins et estran : plein air, avec la réverbération de l’eau." },
+  "07": { secteur: "autre", ...DEHORS, activite: "", pourquoi: "Exploitation minière : l’essentiel des équipes travaille à ciel ouvert." },
+  "08": { secteur: "autre", ...DEHORS, activite: "", pourquoi: "Carrières, gravières et sablières : à ciel ouvert, sur surfaces réfléchissantes." },
+  "09": { secteur: "autre", ...DEHORS, activite: "", pourquoi: "Prestataires de sites d’extraction : ils suivent les chantiers, dehors." },
+  "38": { secteur: "collectivites", ...DEHORS, activite: "", pourquoi: "Collecte et tri : les équipes sont sur la voie publique ou en plate-forme ouverte." },
+  "39": { secteur: "collectivites", ...DEHORS, activite: "", pourquoi: "Dépollution et assainissement de sites : interventions en extérieur." },
+  "41": { secteur: "btp", ...DEHORS, activite: "", pourquoi: "Chantiers de bâtiment : les équipes y passent leurs journées." },
+  "42": { secteur: "btp", ...DEHORS, activite: "", pourquoi: "Génie civil à ciel ouvert, sans ombre et sur revêtement réfléchissant." },
+  "43": { secteur: "btp", ...DEHORS, activite: "", pourquoi: "Travaux spécialisés du bâtiment, l’essentiel du temps en extérieur." },
+  "50": { secteur: "autre", ...DEHORS, activite: "", pourquoi: "Ponts et quais : plein air permanent, avec la réverbération de l’eau." },
+  "53": { secteur: "autre", ...DEHORS, activite: "", pourquoi: "Distribution du courrier et des colis : les tournées se font dehors." },
+  "81": { secteur: "espaces_verts", ...DEHORS, activite: "", pourquoi: "Aménagement paysager et entretien extérieur : dehors toute la saison." },
+
+  // Une partie du temps dehors
+  "05": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Découvertes et installations de surface exposent une partie des équipes." },
+  "06": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Installations de surface et maintenance extérieure." },
+  "11": { secteur: "agriculture", ...PARTIE_DEHORS, activite: "", pourquoi: "Cave et vignoble : une partie des équipes suit les parcelles." },
+  "16": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Parcs à grumes et scieries ouvertes : une partie du travail est en extérieur." },
+  "19": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Unités de raffinage à l’air libre : rondes et maintenance en extérieur." },
+  "20": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Sites industriels étendus : techniciens et maintenance circulent dehors." },
+  "23": { secteur: "btp", ...PARTIE_DEHORS, activite: "", pourquoi: "Centrales à béton et carrières : une partie des équipes est en extérieur." },
+  "33": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Interventions chez le client : chantiers, toitures, sites industriels ouverts." },
+  "35": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Réseaux, postes et lignes : les équipes d’exploitation sont en extérieur." },
+  "36": { secteur: "collectivites", ...PARTIE_DEHORS, activite: "", pourquoi: "Réseaux d’eau et captages : interventions sur la voie publique." },
+  "37": { secteur: "collectivites", ...PARTIE_DEHORS, activite: "", pourquoi: "Réseaux d’assainissement : interventions en extérieur." },
+  "45": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Dépannage, convoyage et essais exposent une partie des équipes." },
+  "49": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Chargement, bâchage et attente sur quai exposent les conducteurs." },
+  "51": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Pistes et aires de trafic : les équipes au sol y passent leurs journées." },
+  "52": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Quais, docks et aires de manutention, à ciel ouvert." },
+  "61": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Techniciens réseau : pylônes, façades et tranchées." },
+  "71": { secteur: "btp", ...PARTIE_DEHORS, activite: "", pourquoi: "Géomètres et conducteurs de travaux passent une part de leur temps sur les chantiers." },
+  "77": { secteur: "btp", ...PARTIE_DEHORS, activite: "", pourquoi: "Livraison et maintenance de matériel sur les chantiers." },
+  "78": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Les intérimaires placés travaillent souvent sur des chantiers ou en extérieur." },
+  "80": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Rondes et surveillance de sites se font en extérieur." },
+  "84": { secteur: "collectivites", ...PARTIE_DEHORS, activite: "", pourquoi: "Services techniques, voirie et espaces verts travaillent en extérieur." },
+  "85": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Surveillance des cours, éducation physique et sorties : une partie du temps dehors." },
+  "93": { secteur: "autre", ...PARTIE_DEHORS, activite: "", pourquoi: "Moniteurs et équipes d’installations sportives de plein air." },
+
+  // À l'abri, mais le sujet touche leur métier
+  "21": { secteur: "sante_beaute", ...SANTE, activite: "", pourquoi: "Secteur de la santé : le sujet est cohérent avec leur métier et leur image." },
+  "75": { secteur: "sante_beaute", ...SANTE, activite: "", pourquoi: "Professionnels de santé animale, en partie en extérieur, sensibles à la prévention." },
+  "86": { secteur: "sante_beaute", ...SANTE, activite: "", pourquoi: "Professionnels de santé : le dépistage leur parle, et ils orientent leurs patients." },
+  "87": { secteur: "sante_beaute", ...SANTE, activite: "", pourquoi: "Établissements de soin : sujet entendu, personnel nombreux." },
+  "88": { secteur: "sante_beaute", ...SANTE, activite: "", pourquoi: "Action sociale : public suivi et personnel sensible aux sujets de santé." },
+  "96": { secteur: "sante_beaute", ...PEAU, activite: "", pourquoi: "Services à la personne tournés vers le soin du corps et de la peau." },
+
+  // À l'abri, sans lien particulier avec le sujet
+  "10": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "12": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "13": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "14": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "15": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "17": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "18": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "22": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "24": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "25": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "26": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "27": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "28": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "29": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "30": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "31": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "32": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "46": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "47": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "55": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "56": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "58": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "59": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "60": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "62": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "63": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "64": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "65": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "66": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "68": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "69": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "70": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "72": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "73": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "74": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "79": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "82": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "90": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "91": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "92": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "94": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "95": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "97": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "98": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+  "99": { secteur: "autre", ...INTERIEUR, activite: "", pourquoi: "" },
+};
+
+/**
+ * Le métier correspondant à un code d'activité. Toujours renseigné dès que le code
+ * l'est : la table fine d'abord, la division ensuite. On ne rend « rien » que pour un
+ * code vide ou hors nomenclature.
+ */
 export function metierDe(naf: string | null): Metier | null {
   if (!naf) return null;
   const code = naf.trim().toUpperCase();
   // Du préfixe le plus long au plus court : « 43.91 » avant « 43.9 » avant « 43. ».
   const prefixes = Object.keys(TABLE).sort((a, b) => b.length - a.length);
   for (const p of prefixes) if (code.startsWith(p)) return TABLE[p];
-  return null;
+  return DIVISIONS[code.slice(0, 2)] ?? null;
 }
 
 // ── Le secteur : la famille, au-dessus du métier ─────────────────────────
