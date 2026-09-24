@@ -29,6 +29,8 @@ import {
   LIST_SCHEMA,
   LIST_SYSTEM,
   type EnrichOut,
+  suitePrompt,
+  SUITE_SYSTEM,
   type ListOut,
   type Preuve,
 } from "./prompts.ts";
@@ -247,6 +249,45 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
   return fiches;
 }
 
+/**
+ * Ce que Merx dit au commercial une fois la liste rendue.
+ *
+ * Il nomme les meilleures, signale ce qui saute aux yeux, et propose deux ou trois
+ * suites concrètes. Sans cela, la conversation s'arrête sur un compteur et le
+ * commercial reste devant deux cents lignes sans savoir par où commencer.
+ *
+ * L'appel est court et son échec est sans conséquence : la liste est déjà enregistrée.
+ */
+async function accompagner(
+  demande: string,
+  fiches: LightProspect[],
+  ecartees: number,
+  onUsage: (u: LlmUsage) => void,
+): Promise<string | null> {
+  try {
+    const meilleures = [...fiches]
+      .sort((a, b) => (b.scoreTotal ?? -1) - (a.scoreTotal ?? -1))
+      .slice(0, 12)
+      .map((f) => ({
+        nom: f.name,
+        ville: f.city,
+        activite: f.activity,
+        effectif: headcountLabel(f.headcountBand ?? null),
+        note: f.scoreTotal,
+        dirigeant: f.contactName ? `${f.contactName}${f.contactRole ? `, ${f.contactRole}` : ""}` : null,
+      }));
+    const sansEffectif = fiches.filter((f) => !f.headcountBand || f.headcountBand === "NN").length;
+    const out = await complete<{ suite: string }>(
+      suitePrompt(demande, { total: fiches.length, ecartees, sansEffectif }, meilleures),
+      { type: "object", additionalProperties: false, required: ["suite"], properties: { suite: { type: "string" } } },
+      { system: SUITE_SYSTEM, usage: "chat", onUsage, timeoutMs: 30_000 },
+    );
+    return out.suite.trim() || null;
+  } catch {
+    return null; // la liste est enregistrée : un mot d'accompagnement manquant n'est pas une panne
+  }
+}
+
 async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage) => void) {
   const started = Date.now();
   let urls: string[] = [];
@@ -278,9 +319,9 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
       const deja = fiches.length - inserted;
-      return {
-        found: inserted,
-        message: [
+
+      const compte = [
+        `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
           `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
           deja > 0 ? `${deja} déjà dans vos fiches` : null,
           trouvees.length > fiches.length ? `${trouvees.length - fiches.length} d’une activité non reconnue` : null,
@@ -290,8 +331,19 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
           // Si le standard n'a pas pu être cherché, on le dit : une fiche sans numéro
           // n'est pas une fatalité, c'est une panne qu'il faut pouvoir réparer.
           echecPlaces() ? `sans téléphone — ${echecPlaces()}` : null,
-        ].filter(Boolean).join(" · ") + ".",
-      };
+      ].filter(Boolean).join(" · ") + ".";
+
+      // Un compteur n'est pas un accompagnement. Merx nomme les meilleures, dit ce qui
+      // saute aux yeux, et propose ce que le commercial peut demander ensuite — un
+      // effectif, un métier voisin, un autre département. Un appel court, quelques
+      // centimes, et le commercial sait par où commencer.
+      const suite = await accompagner(req.request, fiches, ignores, (u) => {
+        spent.inputTokens += u.inputTokens;
+        spent.outputTokens += u.outputTokens;
+        onUsage({ ...spent });
+      });
+
+      return { found: inserted, message: suite ? `${compte}\n\n${suite}` : compte };
     }
   }
 
