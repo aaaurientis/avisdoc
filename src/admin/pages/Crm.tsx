@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Columns3, Plus, Search } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
+import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
 import { toast } from "sonner";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
+import { nomLisible } from "../lib/membres";
 import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
 import FiltresPipeline, {
   FILTRES_CRM_VIDES,
@@ -25,10 +27,16 @@ export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const { clients, stages, setClientStage, rafraichir } = useAdminData();
+  const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
+  /** Les commerciaux qui suivent réellement une affaire : pas de menu qui ne rend rien. */
+  const commerciaux = useMemo(
+    () => [...new Set(clients.map((c) => c.referent).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "fr")),
+    [clients],
+  );
   const [coches, setCoches] = useState<Set<string>>(new Set());
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
 
@@ -153,6 +161,25 @@ export default function Crm() {
 
       {!selected && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
+          {/* Le premier découpage demandé : chacun son pipeline. Il passe devant la
+              recherche et les filtres — on choisit de qui l'on parle avant de chercher. */}
+          <select
+            value={filtres.referent}
+            onChange={(e) => setFiltres({ ...filtres, referent: e.target.value })}
+            aria-label="Pipeline de quel commercial"
+            className="ad-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-bold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal"
+          >
+            <option value="">Tout le Pipeline</option>
+            {user?.email && <option value={user.email}>Mon pipeline</option>}
+            {commerciaux
+              .filter((c) => c !== user?.email)
+              .map((c) => (
+                <option key={c} value={c}>
+                  {nomLisible(c)}
+                </option>
+              ))}
+            <option value="(aucun)">Sans référent</option>
+          </select>
           <div className="relative min-w-[240px] max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
