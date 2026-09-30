@@ -4,7 +4,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
-import { colonnesDe } from "../../lib/ui-tokens";
+import ChoixPipeline from "./ChoixPipeline";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Card, SectionLabel } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
@@ -71,7 +71,7 @@ export default function ProspectFiche({
   brouillons: Brouillon[];
   onRouvrirBrouillon: (b: Brouillon) => void;
 }) {
-  const { stages, clients, addClient, addProjectContact } = useAdminData();
+  const { stages, pipelines, clients, addClient, addProjectContact } = useAdminData();
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | "pipeline" | "email" | null>(null);
   const [choixEtape, setChoixEtape] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -137,14 +137,14 @@ export default function ProspectFiche({
   const effectif = effectifLabel(p.headcount_band);
 
   /** Le prospect devient une affaire : on reprend ce que Merx a trouvé, sans rien réinventer. */
-  const versLePipeline = async (etape: string) => {
+  const versLePipeline = async (etape: string, pipelineId: string) => {
     if (enCours) return;
     setEnCours("pipeline");
     setChoixEtape(false);
     try {
       const existante = dejaAuPipeline(p, clients);
       if (existante) throw new Error(`${existante.company} est déjà dans le Pipeline, à l’étape « ${existante.stage} ».`);
-      const client = clientDepuisProspect(p, etape);
+      const client = clientDepuisProspect(p, etape, pipelineId);
       const id = client.id;
       // On attend que l'affaire existe vraiment : le prospect va pointer dessus.
       if (!(await addClient(client))) throw new Error("L’affaire n’a pas pu être créée dans le Pipeline.");
@@ -234,26 +234,12 @@ export default function ProspectFiche({
                   <Check className="size-4" /> Dans le Pipeline
                 </span>
               ) : choixEtape ? (
-                <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border p-2.5">
-                  <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
-                  {colonnesDe(stages).map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => void versLePipeline(s.label)}
-                      className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setChoixEtape(false)}
-                    className="text-[12.5px] font-semibold text-muted-foreground hover:text-avisdoc-ink"
-                  >
-                    Annuler
-                  </button>
-                </div>
+                <ChoixPipeline
+                  pipelines={pipelines}
+                  stages={stages}
+                  onValider={(etape, pid) => void versLePipeline(etape, pid)}
+                  onAnnuler={() => setChoixEtape(false)}
+                />
               ) : (
                 <button
                   type="button"

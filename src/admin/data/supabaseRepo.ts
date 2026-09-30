@@ -480,7 +480,13 @@ export class SupabaseRepo implements AdminRepo {
     const { error: e2 } = await sb.from("admin_pipeline_stages").insert(
       colonnes.map((c) => ({ id: c.id, label: c.label, position: c.position, tone: c.tone, pipeline_id: p.id })),
     );
-    this.assert(e2);
+    // Un tableau sans colonne n'affiche rien et ne se répare pas tout seul : si ses
+    // colonnes sont refusées, le pipeline ne doit pas rester. C'est arrivé une fois,
+    // sur un UNIQUE (label) qui datait du tableau unique (migration 0051).
+    if (e2) {
+      await sb.from("admin_pipelines").delete().eq("id", p.id);
+      this.assert(e2);
+    }
   }
 
   async updatePipeline(id: string, champs: Partial<Pipeline>): Promise<void> {
