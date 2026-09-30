@@ -159,7 +159,7 @@ export default function Crm() {
         }
       />
 
-      {!selected && <BarrePipelines filtres={filtres} onAppliquer={setFiltres} />}
+      {!selected && <BarrePipelines filtres={filtres} onAppliquer={setFiltres} departements={departements} commerciaux={commerciaux} />}
 
       {!selected && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
