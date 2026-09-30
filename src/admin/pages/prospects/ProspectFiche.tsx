@@ -4,6 +4,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ArrowRightCircle, Check, ExternalLink, Loader2, Mail, PenLine, Phone, Search, X } from "lucide-react";
 import type { Client } from "../../types";
+import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Card, SectionLabel } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
@@ -235,7 +236,7 @@ export default function ProspectFiche({
               ) : choixEtape ? (
                 <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border p-2.5">
                   <span className="text-[12.5px] font-semibold text-avisdoc-ink">À quelle étape ?</span>
-                  {stages.map((s) => (
+                  {colonnesDe(stages).map((s) => (
                     <button
                       key={s.id}
                       type="button"

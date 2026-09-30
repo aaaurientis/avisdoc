@@ -37,8 +37,18 @@ function Teintes({ valeur, onChoisir }: { valeur: StageTone; onChoisir: (t: Stag
   );
 }
 
-export default function ColonnesModal({ clients, onClose }: { clients: Client[]; onClose: () => void }) {
-  const { stages, addStage, renameStage, setStageTone, deleteStage, moveStage } = useAdminData();
+export default function ColonnesModal({
+  clients,
+  onClose,
+  pipelineId,
+}: {
+  clients: Client[];
+  onClose: () => void;
+  /** Le tableau dont on règle les colonnes : chacun a les siennes (migration 0050). */
+  pipelineId: string;
+}) {
+  const { stages: toutes, addStage, renameStage, setStageTone, deleteStage, moveStage } = useAdminData();
+  const stages = toutes.filter((s) => s.pipelineId === pipelineId);
   const [nouveau, setNouveau] = useState("");
   const [teinteNouveau, setTeinteNouveau] = useState<StageTone>("slate");
   const [aSupprimer, setASupprimer] = useState<PipelineStage | null>(null);
@@ -165,7 +175,7 @@ export default function ColonnesModal({ clients, onClose }: { clients: Client[];
                 onChange={(e) => setNouveau(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && nouveau.trim()) {
-                    addStage(nouveau, teinteNouveau);
+                    addStage(nouveau, teinteNouveau, pipelineId);
                     setNouveau("");
                   }
                 }}
@@ -176,7 +186,7 @@ export default function ColonnesModal({ clients, onClose }: { clients: Client[];
                 type="button"
                 disabled={!nouveau.trim()}
                 onClick={() => {
-                  addStage(nouveau, teinteNouveau);
+                  addStage(nouveau, teinteNouveau, pipelineId);
                   setNouveau("");
                 }}
                 className="ad-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"

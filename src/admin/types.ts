@@ -59,12 +59,22 @@ export interface ActiviteContact {
  *  Libre depuis la migration 0023 — l'équipe ajoute et renomme ses colonnes. */
 export type Stage = string;
 
+/** Un pipeline : un tableau à lui, avec son nom, son assigné et ses colonnes. */
+export interface Pipeline {
+  id: string;
+  nom: string;
+  /** Le commercial responsable. Une étiquette : tout le monde voit tous les pipelines. */
+  assigneA: string | null;
+}
+
 /** Une colonne du pipeline, telle que l'équipe l'a définie. */
 export interface PipelineStage {
   id: string;
   label: string;
   position: number;
   tone: StageTone;
+  /** Le tableau auquel cette colonne appartient (migration 0050). */
+  pipelineId: string;
 }
 
 export type StageTone = "slate" | "teal" | "coral" | "emerald" | "violet" | "rose";
@@ -112,7 +122,9 @@ export interface Client {
   ville?: string;
   effectif: string;
   stage: Stage;
-  /** Le commercial qui suit l'affaire. C'est lui qui découpe le Pipeline. */
+  /** Le tableau où l'affaire est rangée (migration 0050). */
+  pipelineId: string;
+  /** Le commercial qui suit l'affaire. */
   referent?: string | null;
   /** La fiche du fichier client a déjà été créée : ne pas la recréer. */
   ficheClientCreee?: boolean;

@@ -9,7 +9,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { decision, effectifLabel, EXPLICATION_CONSIGNE, EXPLICATION_FIABILITE, EXPLICATION_NOTE, maxEvalue, secteurLisible, tonNote, type Prospect } from "../lib/merx";
-import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
+import { COLONNE_KANBAN, colonnesDe, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
 import BulleAide from "../components/BulleAide";
 import { completerStandard } from "../lib/standard";
@@ -816,7 +816,7 @@ export default function Prospects() {
           destinataire={brouillon.destinataire}
           onClose={() => setBrouillon(null)}
           // Une fiche déjà partie au Pipeline ne se repropose pas.
-          stages={brouillon.prospect.converted_client_id ? undefined : stages}
+          stages={brouillon.prospect.converted_client_id ? undefined : colonnesDe(stages)}
           onMettreAuPipeline={
             brouillon.prospect.converted_client_id
               ? undefined

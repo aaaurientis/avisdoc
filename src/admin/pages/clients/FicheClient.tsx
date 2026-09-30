@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Pencil, Sparkles, Undo2, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
+import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal, SectionLabel } from "../../components/ui";
@@ -96,8 +97,9 @@ export default function FicheClient({
     if (!fiche?.clientId || !affaire || enCours) return;
     // On recule d'une seule étape : une affaire signée par erreur repart en
     // négociation, pas au tout début — le travail déjà fait reste visible.
-    const i = stages.findIndex((e) => e.label === affaire.stage);
-    const cible = i > 0 ? stages[i - 1].label : stages[0]?.label;
+    const colonnes = colonnesDe(stages, affaire.pipelineId);
+    const i = colonnes.findIndex((e) => e.label === affaire.stage);
+    const cible = i > 0 ? colonnes[i - 1].label : colonnes[0]?.label;
     if (!cible || cible === affaire.stage) return;
     if (
       !(await confirmer({

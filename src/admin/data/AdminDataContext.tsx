@@ -25,6 +25,7 @@ import type {
   DocItem,
   FieldType,
   NetworkContact,
+  Pipeline,
   PipelineStage,
   Stage,
   StageTone,
@@ -102,7 +103,12 @@ interface DataValue {
 
   // Colonnes du pipeline (migration 0023)
   stages: PipelineStage[];
-  addStage: (label: string, tone: StageTone) => void;
+  /** Les tableaux, dans l'ordre où ils ont été créés (migration 0050). */
+  pipelines: Pipeline[];
+  createPipeline: (p: Pipeline, colonnes: PipelineStage[]) => void;
+  updatePipeline: (id: string, champs: Partial<Pipeline>) => void;
+  deletePipeline: (id: string) => void;
+  addStage: (label: string, tone: StageTone, pipelineId: string) => void;
   renameStage: (id: string, nouveau: string) => void;
   setStageTone: (id: string, tone: StageTone) => void;
   /** Supprime une colonne ; ses fiches partent vers `versLabel` (obligatoire si elle n'est pas vide). */
@@ -142,6 +148,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountFields, setAccountFields] = useState<AccountField[]>([]);
 
@@ -152,6 +159,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setDocTypes(snap.docTypes);
     setActivity(snap.activity);
     setStages(snap.stages);
+    setPipelines(snap.pipelines);
     setAccounts(snap.accounts);
     setAccountFields(snap.accountFields);
   }, []);
@@ -562,23 +570,56 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   );
 
 
+  // ── Les pipelines eux-mêmes ─────────────────────────────────────────────
+
+  /** Un pipeline naît avec ses colonnes : un tableau sans colonne n'affiche rien. */
+  const createPipeline: DataValue["createPipeline"] = useCallback(
+    (p, colonnes) => {
+      setPipelines((prev) => [...prev, p]);
+      setStages((prev) => [...prev, ...colonnes]);
+      persist(() => repo.createPipeline(p, colonnes));
+    },
+    [persist, repo],
+  );
+
+  const updatePipeline: DataValue["updatePipeline"] = useCallback(
+    (id, champs) => {
+      setPipelines((prev) => prev.map((p) => (p.id === id ? { ...p, ...champs } : p)));
+      persist(() => repo.updatePipeline(id, champs));
+    },
+    [persist, repo],
+  );
+
+  /** L'écran a déjà refusé de supprimer un pipeline qui porte des affaires. */
+  const deletePipeline: DataValue["deletePipeline"] = useCallback(
+    (id) => {
+      setPipelines((prev) => prev.filter((p) => p.id !== id));
+      setStages((prev) => prev.filter((s) => s.pipelineId !== id));
+      persist(() => repo.deletePipeline(id));
+    },
+    [persist, repo],
+  );
+
   // ── Colonnes du pipeline ────────────────────────────────────────────────
   // L'état applicatif change tout de suite (mutation optimiste), le repository suit.
 
   const addStage: DataValue["addStage"] = useCallback(
-    (label, tone) => {
+    (label, tone, pipelineId) => {
       const propre = label.trim();
       if (!propre) return;
       setStages((prev) => {
-        if (prev.some((s) => s.label.toLowerCase() === propre.toLowerCase())) {
-          toast.error("Une colonne porte déjà ce nom.");
+        // L'unicité vaut DANS un tableau : deux pipelines peuvent avoir leur « Signé ».
+        const duTableau = prev.filter((s) => s.pipelineId === pipelineId);
+        if (duTableau.some((s) => s.label.toLowerCase() === propre.toLowerCase())) {
+          toast.error("Une colonne porte déjà ce nom dans ce pipeline.");
           return prev;
         }
         const stage: PipelineStage = {
           id: crypto.randomUUID(),
           label: propre,
-          position: (prev.at(-1)?.position ?? 0) + 1,
+          position: (duTableau.at(-1)?.position ?? 0) + 1,
           tone,
+          pipelineId,
         };
         persist(() => repo.createStage(stage));
         return [...prev, stage];
@@ -595,13 +636,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         const stage = prev.find((s) => s.id === id);
         if (!stage || stage.label === propre) return prev;
         if (prev.some((s) => s.id !== id && s.label.toLowerCase() === propre.toLowerCase())) {
-          toast.error("Une colonne porte déjà ce nom.");
+          toast.error("Une colonne porte déjà ce nom dans ce pipeline.");
           return prev;
         }
         const ancien = stage.label;
         // Les fiches suivent le renommage, sinon elles n'auraient plus de colonne.
-        setClients((cs) => cs.map((c) => (c.stage === ancien ? { ...c, stage: propre } : c)));
-        persist(() => repo.renameStage(id, ancien, propre));
+        setClients((cs) =>
+          cs.map((c) => (c.stage === ancien && c.pipelineId === stage.pipelineId ? { ...c, stage: propre } : c)),
+        );
+        persist(() => repo.renameStage(id, ancien, propre, stage.pipelineId));
         return prev.map((s) => (s.id === id ? { ...s, label: propre } : s));
       });
     },
@@ -621,12 +664,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setStages((prev) => {
         const stage = prev.find((s) => s.id === id);
         if (!stage) return prev;
-        if (prev.length <= 1) {
-          toast.error("Le pipeline garde au moins une colonne.");
+        if (prev.filter((s) => s.pipelineId === stage.pipelineId).length <= 1) {
+          toast.error("Un pipeline garde au moins une colonne.");
           return prev;
         }
-        setClients((cs) => (versLabel ? cs.map((c) => (c.stage === stage.label ? { ...c, stage: versLabel } : c)) : cs));
-        persist(() => repo.deleteStage(id, stage.label, versLabel));
+        setClients((cs) =>
+          versLabel
+            ? cs.map((c) => (c.stage === stage.label && c.pipelineId === stage.pipelineId ? { ...c, stage: versLabel } : c))
+            : cs,
+        );
+        persist(() => repo.deleteStage(id, stage.label, versLabel, stage.pipelineId));
         return prev.filter((s) => s.id !== id);
       });
     },
@@ -929,6 +976,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addClient,
       updateClientFields,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      pipelines, createPipeline, updatePipeline, deletePipeline,
       accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
       rafraichir: reload,
       addField, renameField, moveField, deleteField,
@@ -953,6 +1001,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       loading, contacts, clients, docs, docTypes, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
+      pipelines, createPipeline, updatePipeline, deletePipeline,
       accounts, accountFields, addAccount, addManyAccounts, setAccountCell, saveAccount, deleteAccount, setClientStage, addFields,
       reload,
       addField, renameField, moveField, deleteField,

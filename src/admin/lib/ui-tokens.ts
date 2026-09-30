@@ -70,11 +70,23 @@ export function etapeQuiSigne(stages: PipelineStage[]): string | null {
 
 /** Colonnes de départ — servent au mode démonstration et de repli si la table est vide. */
 export const STAGES_DEFAUT: PipelineStage[] = [
-  { id: "s1", label: "Nouveau", position: 1, tone: "slate" },
-  { id: "s2", label: "Qualifié", position: 2, tone: "teal" },
-  { id: "s3", label: "Proposition", position: 3, tone: "coral" },
-  { id: "s4", label: "Signé", position: 4, tone: "emerald" },
+  { id: "s1", label: "Nouveau", position: 1, tone: "slate", pipelineId: "" },
+  { id: "s2", label: "Qualifié", position: 2, tone: "teal", pipelineId: "" },
+  { id: "s3", label: "Proposition", position: 3, tone: "coral", pipelineId: "" },
+  { id: "s4", label: "Signé", position: 4, tone: "emerald", pipelineId: "" },
 ];
+
+/**
+ * Les colonnes d'un tableau donné (migration 0050).
+ *
+ * Depuis qu'il y a plusieurs pipelines, `stages` les contient TOUS : un écran qui
+ * les affiche sans filtrer montrerait les colonnes des autres tableaux. Sans
+ * pipeline indiqué, on rend celles du premier — le tableau de tout le monde.
+ */
+export function colonnesDe(stages: PipelineStage[], pipelineId?: string | null): PipelineStage[] {
+  const cible = pipelineId || stages[0]?.pipelineId;
+  return stages.filter((s) => s.pipelineId === cible);
+}
 
 /** Teintes d'une étape, à partir des colonnes de l'équipe. Une étape inconnue reste neutre. */
 export function stageMeta(name: Stage, stages: PipelineStage[] = STAGES_DEFAUT) {

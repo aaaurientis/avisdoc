@@ -26,7 +26,19 @@ import FiltresRepliables from "../components/FiltresRepliables";
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients, stages, setClientStage, rafraichir } = useAdminData();
+  const { clients: toutes, stages: toutesColonnes, pipelines, setClientStage, rafraichir } = useAdminData();
+  /** Le pipeline ouvert. Au premier affichage : le plus ancien, celui de tout le monde. */
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0] ?? null;
+  /* Un pipeline est un tableau : ses colonnes et ses affaires n'appartiennent qu'à lui. */
+  const clients = useMemo(
+    () => (pipeline ? toutes.filter((c) => c.pipelineId === pipeline.id) : toutes),
+    [toutes, pipeline],
+  );
+  const stages = useMemo(
+    () => (pipeline ? toutesColonnes.filter((s) => s.pipelineId === pipeline.id) : toutesColonnes),
+    [toutesColonnes, pipeline],
+  );
   const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
@@ -34,8 +46,8 @@ export default function Crm() {
   const [recherche, setRecherche] = useState("");
   /** Les commerciaux qui suivent réellement une affaire : pas de menu qui ne rend rien. */
   const commerciaux = useMemo(
-    () => [...new Set(clients.map((c) => c.referent).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "fr")),
-    [clients],
+    () => [...new Set(toutes.map((c) => c.referent).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "fr")),
+    [toutes],
   );
   const [coches, setCoches] = useState<Set<string>>(new Set());
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
@@ -159,7 +171,9 @@ export default function Crm() {
         }
       />
 
-      {!selected && <BarrePipelines filtres={filtres} onAppliquer={setFiltres} departements={departements} commerciaux={commerciaux} />}
+      {!selected && (
+        <BarrePipelines actif={pipeline} onChoisir={(p) => setPipelineId(p.id)} commerciaux={commerciaux} />
+      )}
 
       {!selected && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -209,11 +223,13 @@ export default function Crm() {
         />
       )}
 
-      {showColonnes && <ColonnesModal clients={clients} onClose={() => setShowColonnes(false)} />}
+      {showColonnes && <ColonnesModal clients={clients} onClose={() => setShowColonnes(false)} pipelineId={pipeline?.id ?? ""} />}
 
       {showModal && (
         <NewClientModal
           onClose={() => setShowModal(false)}
+          pipelineId={pipeline?.id ?? ""}
+          etapeDepart={stages[0]?.label ?? "Nouveau"}
           onCreated={(id) => {
             setShowModal(false);
             navigate(`/crm/${id}`);

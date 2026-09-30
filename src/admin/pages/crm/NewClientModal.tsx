@@ -24,9 +24,15 @@ interface ClientQonto {
 export default function NewClientModal({
   onClose,
   onCreated,
+  pipelineId,
+  etapeDepart,
 }: {
   onClose: () => void;
   onCreated: (id: string) => void;
+  /** Le tableau ouvert : l'affaire y entre, pas ailleurs. */
+  pipelineId: string;
+  /** Sa première colonne — « Nouveau » n'existe pas forcément dans tous les pipelines. */
+  etapeDepart: string;
 }) {
   const { addClient, clients: crmClients } = useAdminData();
   const [query, setQuery] = useState("");
@@ -89,7 +95,8 @@ export default function NewClientModal({
         codePostal: qontoPick.code_postal ?? "",
         ville: qontoPick.ville ?? "",
         effectif: "—",
-        stage: "Nouveau",
+        stage: etapeDepart,
+        pipelineId,
         jours: jours || 1,
         tarif: tarif || 0,
         depistes: 0,
@@ -114,7 +121,8 @@ export default function NewClientModal({
         codePostal: adr.cp,
         ville: adr.ville,
         effectif: result.effectif,
-        stage: "Nouveau",
+        stage: etapeDepart,
+        pipelineId,
         jours: jours || 1,
         tarif: tarif || 0,
         depistes: 0,
@@ -139,7 +147,8 @@ export default function NewClientModal({
         codePostal: "",
         ville: "",
         effectif: "—",
-        stage: "Nouveau",
+        stage: etapeDepart,
+        pipelineId,
         jours: jours || 1,
         tarif: tarif || 0,
         depistes: 0,
