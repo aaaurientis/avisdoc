@@ -62,6 +62,15 @@ function quandArrivee(iso: string): { date: string; heure: string } {
   };
 }
 
+/**
+ * A-t-on déjà regardé la fiche DEPUIS son approfondissement ?
+ *
+ * Ouvrir une fiche pose `opened_at`. Un approfondissement qui se termine après
+ * cette date apporte du neuf que personne n'a vu : c'est ce qui allume la pastille.
+ */
+const vue = (p: Prospect): boolean =>
+  Boolean(p.opened_at && p.enriched_at && Date.parse(p.opened_at) >= Date.parse(p.enriched_at));
+
 /** Les colonnes sur lesquelles on peut trier. */
 type Colonne = "creee" | "nom" | "secteur" | "activite" | "ville" | "interlocuteur" | "salaries" | "note" | "consigne" | "fiabilite" | "approfondie";
 
@@ -117,6 +126,8 @@ export default function Prospects() {
   const [chargement, setChargement] = useState(true);
   /** Une recherche de Merx est en route : les fiches vont arriver. */
   const [enRecherche, setEnRecherche] = useState(false);
+  /** Les fiches dont l'approfondissement tourne en ce moment, côté serveur. */
+  const [approfondissements, setApprofondissements] = useState<Set<string>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
@@ -200,12 +211,18 @@ export default function Prospects() {
 
   const charger = useCallback(async () => {
     setErreur(null);
-    // Une demande encore en route : on repassera voir.
-    const { count } = await supabaseAdmin
+    // Une demande encore en route : on repassera voir. On retient aussi SUR QUELLE
+    // fiche, pour que la ligne le dise — sans cela, on quitte l'écran, le serveur
+    // travaille toujours, et rien à l'écran ne l'indique : on croit que ça s'est arrêté.
+    const { data: enRoute } = await supabaseAdmin
       .from("admin_merx_demandes")
-      .select("id", { count: "exact", head: true })
+      .select("kind, prospect_id")
       .in("status", ["en_attente", "en_cours"]);
-    setEnRecherche((count ?? 0) > 0);
+    const enCours = (enRoute ?? []) as { kind: string; prospect_id: string | null }[];
+    setEnRecherche(enCours.length > 0);
+    setApprofondissements(
+      new Set(enCours.filter((d) => d.kind === "approfondissement" && d.prospect_id).map((d) => d.prospect_id as string)),
+    );
     const { data, error } = await supabaseAdmin
       .from("admin_prospects")
       .select("*")
@@ -699,7 +716,19 @@ export default function Prospects() {
                   <td className="whitespace-nowrap px-4 py-2.5">
                     {/* Une fiche non approfondie n'a ni dossier commercial ni effectif :
                         c'est ce qu'on regarde avant de décider par où commencer. */}
-                    {p.enriched_at ? (
+                    {approfondissements.has(p.id) ? (
+                      <span className="inline-flex animate-pulse items-center gap-1 rounded-full bg-avisdoc-teal/10 px-2 py-0.5 text-[11.5px] font-bold text-avisdoc-teal">
+                        <Loader2 className="size-3 animate-spin" />
+                        En cours…
+                      </span>
+                    ) : p.enriched_at && !vue(p) ? (
+                      /* Fini, et personne ne l'a encore regardée : ça doit sauter aux yeux.
+                         La pastille s'éteint quand on ouvre la fiche, comme « Nouveau ». */
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-2 py-0.5 text-[11.5px] font-bold text-white">
+                        <Check className="size-3" />
+                        Terminé
+                      </span>
+                    ) : p.enriched_at ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11.5px] font-bold text-emerald-700">
                         <Check className="size-3" />
                         {new Date(p.enriched_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}

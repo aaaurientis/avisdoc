@@ -5,13 +5,14 @@
 // département, et le fait qu'on ait ou non un interlocuteur.
 
 import type { Client } from "../../types";
+import { nomLisible } from "../../lib/membres";
 
 export interface FiltresCrm {
   /**
    * Le commercial qui suit l'affaire.
    *
-   * C'est le premier découpage demandé : chacun veut son pipeline, pas celui de
-   * l'équipe. « À moi » suit la personne connectée, sans qu'elle ait à se nommer.
+   * C'est le premier critère demandé pour découper le Pipeline. « Mes affaires »
+   * suit la personne connectée, sans qu'elle ait à se nommer.
    */
   referent: string;
   journees: string;
@@ -83,16 +84,34 @@ export default function FiltresPipeline({
   filtres,
   onChange,
   departements,
+  commerciaux,
+  moi,
 }: {
   filtres: FiltresCrm;
   onChange: (f: FiltresCrm) => void;
   /** Les départements réellement présents : on ne propose pas un filtre qui ne rendrait rien. */
   departements: string[];
+  /** Ceux qui suivent réellement une affaire : pas de menu qui ne rendrait rien. */
+  commerciaux: string[];
+  moi: string | null;
 }) {
   const set = (cle: keyof FiltresCrm) => (e: React.ChangeEvent<HTMLSelectElement>) => onChange({ ...filtres, [cle]: e.target.value });
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <select value={filtres.referent} onChange={set("referent")} className={selectCls} aria-label="Commercial qui suit l’affaire">
+        <option value="">Commercial</option>
+        {moi && <option value={moi}>Mes affaires</option>}
+        {commerciaux
+          .filter((c) => c !== moi)
+          .map((c) => (
+            <option key={c} value={c}>
+              {nomLisible(c)}
+            </option>
+          ))}
+        <option value="(aucun)">Sans référent</option>
+      </select>
+
       <select value={filtres.journees} onChange={set("journees")} className={selectCls} aria-label="Nombre de journées">
         <option value="">Journées</option>
         {JOURNEES.map((j) => (
