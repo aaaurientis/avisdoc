@@ -13,6 +13,7 @@ import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
 import BulleAide from "../components/BulleAide";
 import { completerStandard } from "../lib/standard";
+import { attendreDemande } from "../lib/merx-appels";
 import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
@@ -413,7 +414,14 @@ export default function Prospects() {
     async (p: Prospect) => {
       const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "approfondir", prospectId: p.id } });
       if (error) throw new Error(error.message);
-      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const r = data as { error?: string; demandeId?: string };
+      if (r?.error) throw new Error(r.error);
+      // Le serveur travaille de son côté : on suit l'avancement dans la table. Fermer
+      // l'onglet n'interrompt plus rien, on retrouve la fiche complétée en revenant.
+      if (r?.demandeId) {
+        const issue = await attendreDemande(r.demandeId);
+        if (issue === "echec") throw new Error("L’approfondissement a échoué — relancez-le depuis la fiche.");
+      }
       await charger();
     },
     [charger],
@@ -457,7 +465,9 @@ export default function Prospects() {
     for (const [i, p] of aFaire.entries()) {
       try {
         const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "approfondir", prospectId: p.id } });
-        if (error || (data as { error?: string })?.error) echecs++;
+        const r = data as { error?: string; demandeId?: string };
+        if (error || r?.error) echecs++;
+        else if (r?.demandeId && (await attendreDemande(r.demandeId)) === "echec") echecs++;
       } catch {
         echecs++;
       }
