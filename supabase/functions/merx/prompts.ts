@@ -375,7 +375,7 @@ export function enrichPrompt(
     lieu?.telephone || lieu?.adresse
       ? `Établissement localisé (source sûre, reprends-la telle quelle) :\n${JSON.stringify(lieu, null, 1)}\nC'est le NUMÉRO DU STANDARD : donne-le au commercial, avec le service à demander.`
       : "Aucun établissement n'a pu être localisé : pas de numéro de standard.",
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 // ── Lire la demande pour interroger le registre ─────────────────────────
@@ -934,12 +934,15 @@ Ne promets rien que tu ne saches faire. N'invente aucun chiffre : tout ce que tu
 
 export function suitePrompt(
   demande: string,
-  resultat: { total: number; ecartees: number; sansEffectif: number },
+  resultat: { total: number; ecartees: number; sansEffectif: number; totalZone?: number; totalQualifiees?: number },
   meilleures: { nom: string; ville: string | null; activite: string | null; effectif: string | null; note: number | null; dirigeant: string | null }[],
 ): string {
   return [
     `Ce que le commercial a demandé : « ${demande} »`,
     `Résultat : ${resultat.total} entreprises retenues, ${resultat.ecartees} écartées faute d'établissement encore ouvert, ${resultat.sansEffectif} dont l'effectif n'est pas publié.`,
+    resultat.totalZone && resultat.totalQualifiees !== undefined && resultat.totalZone > resultat.totalQualifiees * 3
+      ? `IMPORTANT : cette zone et ce métier comptent ${resultat.totalZone} entreprises actives, mais seulement ${resultat.totalQualifiees} publient un effectif correspondant à la demande. L'annuaire de l'État ne renseigne l'effectif que d'une minorité d'entreprises — les autres ne sont pas plus petites, on ne sait pas. Dis-le clairement au commercial, avec les deux chiffres, et propose-lui soit d'en recevoir davantage à qualifier, soit de resserrer sur un autre critère.`
+      : null,
     `Les meilleures de la liste :\n${JSON.stringify(meilleures, null, 1)}`,
   ].join("\n\n");
 }
