@@ -112,6 +112,8 @@ export interface Client {
   ville?: string;
   effectif: string;
   stage: Stage;
+  /** Le commercial qui suit l'affaire. C'est lui qui découpe le Pipeline. */
+  referent?: string | null;
   /** La fiche du fichier client a déjà été créée : ne pas la recréer. */
   ficheClientCreee?: boolean;
   jours: number;

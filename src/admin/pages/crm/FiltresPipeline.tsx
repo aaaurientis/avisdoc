@@ -7,13 +7,20 @@
 import type { Client } from "../../types";
 
 export interface FiltresCrm {
+  /**
+   * Le commercial qui suit l'affaire.
+   *
+   * C'est le premier découpage demandé : chacun veut son pipeline, pas celui de
+   * l'équipe. « À moi » suit la personne connectée, sans qu'elle ait à se nommer.
+   */
+  referent: string;
   journees: string;
   montant: string;
   contact: string;
   departement: string;
 }
 
-export const FILTRES_CRM_VIDES: FiltresCrm = { journees: "", montant: "", contact: "", departement: "" };
+export const FILTRES_CRM_VIDES: FiltresCrm = { referent: "", journees: "", montant: "", contact: "", departement: "" };
 
 const JOURNEES: { valeur: string; label: string; min: number; max: number }[] = [
   { valeur: "5", label: "5 journées et plus", min: 5, max: Infinity },
@@ -35,6 +42,10 @@ export function departementDe(c: Client): string | null {
 
 /** Applique les filtres et la recherche à une affaire. */
 export function retenueCrm(c: Client, f: FiltresCrm, recherche: string): boolean {
+  if (f.referent === "(aucun)") {
+    if (c.referent) return false;
+  } else if (f.referent && c.referent !== f.referent) return false;
+
   if (f.journees) {
     const palier = JOURNEES.find((j) => j.valeur === f.journees);
     if (palier && (c.jours < palier.min || c.jours > palier.max)) return false;

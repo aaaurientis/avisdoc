@@ -210,8 +210,8 @@ export default function Prospects() {
       .from("admin_prospects")
       .select("*")
       .is("deleted_at", null)
-      .order("score_total", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .order("score_total", { ascending: false, nullsFirst: false });
     if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
     const { data: passees } = await supabaseAdmin
@@ -236,7 +236,9 @@ export default function Prospects() {
   );
 
   /** Le tri de la liste : une colonne, un sens. Par défaut les meilleures notes d'abord. */
-  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "note", sens: "desc" });
+  // À l'arrivée, les dernières trouvées en tête : après une recherche qui en rend
+  // deux cents, c'est celles-là qu'on vient voir. Le tri par note reste à un clic.
+  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "creee", sens: "desc" });
 
   const visibles = useMemo(() => {
     const retenues = duVivier.filter((p) => retenue(p, filtres, recherche));

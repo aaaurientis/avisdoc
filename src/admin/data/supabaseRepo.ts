@@ -151,6 +151,7 @@ export class SupabaseRepo implements AdminRepo {
       ville: r.ville ?? "",
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
+      referent: r.referent ?? null,
       ficheClientCreee: r.fiche_client_creee ?? false,
       jours: r.jours ?? 1,
       tarif: r.tarif ?? 0,
