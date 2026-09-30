@@ -9,11 +9,15 @@
 // fait que retenir un réglage de filtres : deux pipelines peuvent très bien montrer
 // la même affaire.
 //
+// Les critères se choisissent DANS le dialogue. La première version enregistrait les
+// filtres posés avant d'ouvrir la fenêtre : on nommait un pipeline sans rien lui
+// donner, on cliquait dessus, et rien ne bougeait — parce qu'il ne retenait rien.
+//
 // Aucun n'est privé, et c'est voulu : « si le commercial se barre, on ne récupère pas
 // son pipeline ». Tout le monde les voit, tout le monde peut les reprendre.
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { useAuth } from "../../auth/AuthContext";
@@ -21,7 +25,7 @@ import { Modal, SectionLabel } from "../../components/ui";
 import { confirmer } from "../../components/Confirmation";
 import { nomLisible } from "../../lib/membres";
 import { cn } from "@/lib/utils";
-import { FILTRES_CRM_VIDES, type FiltresCrm } from "./FiltresPipeline";
+import FiltresPipeline, { FILTRES_CRM_VIDES, type FiltresCrm } from "./FiltresPipeline";
 
 export interface Pipeline {
   id: string;
@@ -46,15 +50,19 @@ function enClair(f: FiltresCrm, moi?: string | null): string {
 export default function BarrePipelines({
   filtres,
   onAppliquer,
+  departements,
+  commerciaux,
 }: {
-  /** Les filtres en cours : c'est eux qu'« Ajouter un pipeline » enregistre. */
+  /** Les filtres en cours : ils disent quel onglet est allumé. */
   filtres: FiltresCrm;
   onAppliquer: (f: FiltresCrm) => void;
+  departements: string[];
+  commerciaux: string[];
 }) {
   const { user } = useAuth();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [creation, setCreation] = useState(false);
-  const [nom, setNom] = useState("");
+  /** Le pipeline en cours d'écriture : « nouveau », ou celui qu'on modifie. */
+  const [brouillon, setBrouillon] = useState<{ id: string | null; nom: string; filtres: FiltresCrm } | null>(null);
 
   const charger = useCallback(async () => {
     const { data } = await supabaseAdmin.from("admin_pipelines").select("*").order("created_at");
@@ -76,20 +84,22 @@ export default function BarrePipelines({
   const actif = pipelines.find((p) => JSON.stringify(p.filtres) === JSON.stringify(filtres));
   const aucunFiltre = JSON.stringify(filtres) === JSON.stringify(FILTRES_CRM_VIDES);
 
-  const creer = async () => {
-    const propre = nom.trim();
+  const enregistrer = async () => {
+    if (!brouillon) return;
+    const propre = brouillon.nom.trim();
     if (!propre) return;
-    const { error } = await supabaseAdmin
-      .from("admin_pipelines")
-      .insert({ nom: propre, filtres, cree_par: user?.email ?? null });
+    const { error } = brouillon.id
+      ? await supabaseAdmin.from("admin_pipelines").update({ nom: propre, filtres: brouillon.filtres }).eq("id", brouillon.id)
+      : await supabaseAdmin.from("admin_pipelines").insert({ nom: propre, filtres: brouillon.filtres, cree_par: user?.email ?? null });
     if (error) {
-      toast.error(`Le pipeline n’a pas pu être créé — ${error.message}`);
+      toast.error(`Le pipeline n’a pas pu être enregistré — ${error.message}`);
       return;
     }
-    setNom("");
-    setCreation(false);
+    // On l'applique aussitôt : on doit VOIR le pipeline qu'on vient de faire.
+    onAppliquer(brouillon.filtres);
+    setBrouillon(null);
     await charger();
-    toast.success(`Pipeline « ${propre} » créé`);
+    toast.success(`Pipeline « ${propre} » ${brouillon.id ? "modifié" : "créé"}`);
   };
 
   const supprimer = async (p: Pipeline) => {
@@ -137,6 +147,17 @@ export default function BarrePipelines({
             {actif?.id === p.id && (
               <button
                 type="button"
+                onClick={() => setBrouillon({ id: p.id, nom: p.nom, filtres: p.filtres })}
+                aria-label={`Modifier le pipeline ${p.nom}`}
+                title="Modifier ce pipeline"
+                className="pr-2 opacity-70 transition-opacity hover:opacity-100"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+            {actif?.id === p.id && (
+              <button
+                type="button"
                 onClick={() => void supprimer(p)}
                 aria-label={`Supprimer le pipeline ${p.nom}`}
                 title="Supprimer ce pipeline"
@@ -150,24 +171,24 @@ export default function BarrePipelines({
 
         <button
           type="button"
-          onClick={() => setCreation(true)}
+          onClick={() => setBrouillon({ id: null, nom: "", filtres: FILTRES_CRM_VIDES })}
           className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-4 py-2 text-[13px] font-bold text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
         >
           <Plus className="size-4" /> Ajouter un pipeline
         </button>
       </div>
 
-      {creation && (
-        <Modal onClose={() => setCreation(false)}>
+      {brouillon && (
+        <Modal onClose={() => setBrouillon(null)} width={620}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <SectionLabel>Nouveau pipeline</SectionLabel>
+              <SectionLabel>{brouillon.id ? "Modifier le pipeline" : "Nouveau pipeline"}</SectionLabel>
               <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                Un pipeline enregistre les filtres tels qu’ils sont en ce moment. Les affaires ne bougent pas :
-                c’est une façon de regarder le même Kanban. Tous les pipelines sont visibles par l’équipe.
+                Donnez-lui un nom et choisissez ce qu’il retient. Les affaires ne bougent pas : c’est une
+                façon de regarder le même Kanban. Tous les pipelines sont visibles par l’équipe.
               </p>
             </div>
-            <button type="button" onClick={() => setCreation(false)} aria-label="Fermer" className="text-muted-foreground hover:text-avisdoc-ink">
+            <button type="button" onClick={() => setBrouillon(null)} aria-label="Fermer" className="text-muted-foreground hover:text-avisdoc-ink">
               <X className="size-5" />
             </button>
           </div>
@@ -175,39 +196,54 @@ export default function BarrePipelines({
           <label className="mt-4 block">
             <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Nom</span>
             <input
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void creer()}
+              value={brouillon.nom}
+              onChange={(e) => setBrouillon({ ...brouillon, nom: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && void enregistrer()}
               autoFocus
               placeholder="Mes grands comptes, Alsace, Pipeline de Stéphane…"
               className="ad-input mt-1 w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
             />
           </label>
 
+          <div className="mt-4">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Ce qu’il retient</span>
+            {/* Les mêmes menus que la barre de filtres : rien de nouveau à apprendre. */}
+            <div className="mt-2">
+              <FiltresPipeline
+                filtres={brouillon.filtres}
+                onChange={(f) => setBrouillon({ ...brouillon, filtres: f })}
+                departements={departements}
+                commerciaux={commerciaux}
+                moi={user?.email ?? null}
+              />
+            </div>
+          </div>
+
           <div className="mt-3 rounded-xl bg-muted/60 px-3 py-2.5 text-[13px]">
             <span className="font-bold text-avisdoc-ink">Ce pipeline retiendra : </span>
-            {enClair(filtres, user?.email) || (
+            {enClair(brouillon.filtres, user?.email) || (
               <span className="text-muted-foreground">
-                aucun filtre — il montrera toutes les affaires. Fermez, posez vos filtres, puis revenez.
+                rien pour l’instant — il montrerait toutes les affaires, comme « Tout le Pipeline ».
               </span>
             )}
           </div>
 
           <div className="mt-5 flex justify-end gap-2">
-            <button type="button" onClick={() => setCreation(false)} className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink">
+            <button type="button" onClick={() => setBrouillon(null)} className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink">
               Annuler
             </button>
             <button
               type="button"
-              onClick={() => void creer()}
-              disabled={!nom.trim()}
+              onClick={() => void enregistrer()}
+              disabled={!brouillon.nom.trim()}
               className="ad-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
-              Créer
+              {brouillon.id ? "Enregistrer" : "Créer"}
             </button>
           </div>
         </Modal>
       )}
+
     </>
   );
 }
