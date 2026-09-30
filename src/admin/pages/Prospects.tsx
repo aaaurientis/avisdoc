@@ -9,7 +9,7 @@ import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
 import { decision, effectifLabel, EXPLICATION_CONSIGNE, EXPLICATION_FIABILITE, EXPLICATION_NOTE, maxEvalue, secteurLisible, tonNote, type Prospect } from "../lib/merx";
-import { COLONNE_KANBAN, colonnesDe, TONES } from "../lib/ui-tokens";
+import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
 import BulleAide from "../components/BulleAide";
 import { completerStandard } from "../lib/standard";
@@ -121,7 +121,7 @@ function EnTete({
 export default function Prospects() {
   const { user } = useAuth();
   const nomDuCommercial = user?.name ?? user?.email ?? "";
-  const { stages, clients, addClient, addProjectContact } = useAdminData();
+  const { stages, pipelines, clients, addClient, addProjectContact } = useAdminData();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [chargement, setChargement] = useState(true);
   /** Une recherche de Merx est en route : les fiches vont arriver. */
@@ -816,14 +816,15 @@ export default function Prospects() {
           destinataire={brouillon.destinataire}
           onClose={() => setBrouillon(null)}
           // Une fiche déjà partie au Pipeline ne se repropose pas.
-          stages={brouillon.prospect.converted_client_id ? undefined : colonnesDe(stages)}
+          stages={brouillon.prospect.converted_client_id ? undefined : stages}
+          pipelines={pipelines}
           onMettreAuPipeline={
             brouillon.prospect.converted_client_id
               ? undefined
-              : async (etape) => {
+              : async (etape, pipelineId) => {
                   const existante = dejaAuPipeline(brouillon.prospect, clients);
                   if (existante) throw new Error(`${existante.company} est déjà dans le Pipeline, à l’étape « ${existante.stage} ».`);
-                  const client = clientDepuisProspect(brouillon.prospect, etape);
+                  const client = clientDepuisProspect(brouillon.prospect, etape, pipelineId);
                   if (!(await addClient(client))) throw new Error("L’affaire n’a pas pu être créée dans le Pipeline.");
                   const contact = contactDepuisProspect(brouillon.prospect);
                   if (contact) addProjectContact(client.id, contact);

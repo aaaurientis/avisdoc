@@ -3,7 +3,8 @@
 
 import { useState } from "react";
 import { ArrowRightCircle, Check, Copy, Loader2, Mail, X } from "lucide-react";
-import type { PipelineStage } from "../../types";
+import ChoixPipeline from "./ChoixPipeline";
+import type { Pipeline, PipelineStage } from "../../types";
 import { Modal, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export default function BrouillonEmail({
   destinataire,
   onClose,
   stages,
+  pipelines,
   onMettreAuPipeline,
 }: {
   nom: string;
@@ -26,8 +28,9 @@ export default function BrouillonEmail({
   onClose: () => void;
   /** Les colonnes du Pipeline, pour choisir où l'affaire entre. */
   stages?: PipelineStage[];
+  pipelines?: Pipeline[];
   /** Absent quand l'affaire est déjà au Pipeline : on ne repropose rien. */
-  onMettreAuPipeline?: (etape: string) => Promise<void>;
+  onMettreAuPipeline?: (etape: string, pipelineId: string) => Promise<void>;
 }) {
   const [objet, setObjet] = useState(objetInitial);
   const [corps, setCorps] = useState(corpsInitial);
@@ -49,12 +52,12 @@ export default function BrouillonEmail({
     if (onMettreAuPipeline) setProposer(true);
   };
 
-  const versLePipeline = async (etape: string) => {
+  const versLePipeline = async (etape: string, pipelineId: string) => {
     if (!onMettreAuPipeline || envoiPipeline) return;
     setEnvoiPipeline(true);
     setErreurPipeline(null);
     try {
-      await onMettreAuPipeline(etape);
+      await onMettreAuPipeline(etape, pipelineId);
       onClose();
     } catch (e) {
       setErreurPipeline(e instanceof Error ? e.message : "Le passage au Pipeline a échoué.");
@@ -111,26 +114,15 @@ export default function BrouillonEmail({
               </p>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(stages ?? []).map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => void versLePipeline(st.label)}
-                disabled={envoiPipeline}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
-              >
-                {envoiPipeline && <Loader2 className="size-3.5 animate-spin" />}
-                {st.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setProposer(false)}
-              className="text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-ink hover:underline"
-            >
-              Pas maintenant
-            </button>
+          <div className="mt-3">
+            <ChoixPipeline
+              pipelines={pipelines ?? []}
+              stages={stages ?? []}
+              onValider={(etape, pid) => void versLePipeline(etape, pid)}
+              onAnnuler={() => setProposer(false)}
+              libelleAnnuler="Pas maintenant"
+              enCours={envoiPipeline}
+            />
           </div>
           {erreurPipeline && (
             <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreurPipeline}</p>

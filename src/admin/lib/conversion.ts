@@ -19,7 +19,7 @@ export function dejaAuPipeline(p: Prospect, clients: Client[]): Client | undefin
 }
 
 /** L'affaire telle qu'elle entre dans le Pipeline, avec ce que Merx a trouvé. */
-export function clientDepuisProspect(p: Prospect, etape: string): Client {
+export function clientDepuisProspect(p: Prospect, etape: string, pipelineId: string): Client {
   return {
     id: uid(),
     company: p.legal_name || p.name,
@@ -31,8 +31,7 @@ export function clientDepuisProspect(p: Prospect, etape: string): Client {
     ville: p.head_office?.city ?? p.city ?? "",
     effectif: effectifLabel(p.headcount_band) ?? "",
     stage: etape,
-    // Laissé vide : la base range dans le pipeline par défaut (migration 0050).
-    pipelineId: "",
+    pipelineId,
     jours: 1,
     tarif: 0,
     depistes: 0,

@@ -4,7 +4,7 @@ import { Columns3, Plus, Search } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
 import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
-import { PageHeader } from "../components/ui";
+import { PageHeader, SectionLabel } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
 import { toast } from "sonner";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
@@ -194,6 +194,15 @@ export default function Crm() {
 
       {selected ? (
         <ProjectView client={selected} onClose={() => navigate("/crm")} />
+      ) : stages.length === 0 ? (
+        /* Un tableau sans colonne n'affiche rien : il faut le dire, et dire où aller. */
+        <div className="rounded-2xl bg-muted/60 p-8 text-center">
+          <SectionLabel>Ce pipeline n’a pas encore de colonnes</SectionLabel>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            Ajoutez-en avec le bouton <strong className="text-avisdoc-ink">Colonnes</strong>, en haut à droite.
+            Une affaire ne peut entrer ici qu’une fois qu’il y a une colonne pour l’accueillir.
+          </p>
+        </div>
       ) : (
         <Kanban
           clients={visibles}
