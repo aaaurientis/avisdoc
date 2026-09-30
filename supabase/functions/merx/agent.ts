@@ -348,6 +348,7 @@ async function accompagner(
   demande: string,
   fiches: LightProspect[],
   ecartees: number,
+  zone: { totalZone: number; totalQualifiees: number },
   onUsage: (u: LlmUsage) => void,
 ): Promise<string | null> {
   try {
@@ -364,7 +365,7 @@ async function accompagner(
       }));
     const sansEffectif = fiches.filter((f) => !f.headcountBand || f.headcountBand === "NN").length;
     const out = await complete<{ suite: string }>(
-      suitePrompt(demande, { total: fiches.length, ecartees, sansEffectif }, meilleures),
+      suitePrompt(demande, { total: fiches.length, ecartees, sansEffectif, ...zone }, meilleures),
       { type: "object", additionalProperties: false, required: ["suite"], properties: { suite: { type: "string" } } },
       { system: SUITE_SYSTEM, usage: "chat", onUsage, timeoutMs: 30_000 },
     );
@@ -491,7 +492,10 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     onUsage({ ...spent });
   });
   if (criteres) {
-    const { found: trouvees, ignores } = await searchByCriteria(criteres, REGISTRE_MAX);
+    const { found: trouvees, ignores, totalZone, totalQualifiees, sansEffectifPublie } = await searchByCriteria(
+      criteres,
+      REGISTRE_MAX,
+    );
     const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
@@ -501,6 +505,13 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
       const pappersUtile = fiches.some((f) => f.contactPhone || f.contactEmail || f.website);
       const compte = [
         `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
+        // Dire d'où vient l'écart : cinq fiches après deux minutes d'attente ont l'air
+        // d'un échec, alors que la zone en compte mille cinq cents dont on ignore
+        // simplement la taille. Le commercial doit pouvoir l'expliquer à son client.
+        totalQualifiees > 0 && totalZone > totalQualifiees * 3
+          ? `${totalZone} dans cette zone, dont ${totalQualifiees} avec un effectif publié correspondant`
+          : null,
+        sansEffectifPublie > 0 ? `${sansEffectifPublie} sans effectif publié — à qualifier` : null,
           `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
           deja > 0 ? `${deja} déjà dans vos fiches` : null,
           trouvees.length > fiches.length ? `${trouvees.length - fiches.length} d’une activité non reconnue` : null,
@@ -524,7 +535,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
       // saute aux yeux, et propose ce que le commercial peut demander ensuite — un
       // effectif, un métier voisin, un autre département. Un appel court, quelques
       // centimes, et le commercial sait par où commencer.
-      const suite = await accompagner(req.request, fiches, ignores, (u) => {
+      const suite = await accompagner(req.request, fiches, ignores, { totalZone, totalQualifiees }, (u) => {
         spent.inputTokens += u.inputTokens;
         spent.outputTokens += u.outputTokens;
         onUsage({ ...spent });

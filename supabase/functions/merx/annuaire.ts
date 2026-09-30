@@ -231,6 +231,21 @@ export interface SearchResult {
   found: Found[];
   /** Entreprises écartées faute d'un établissement encore ouvert dans la zone. */
   ignores: number;
+  /**
+   * Ce que la zone compte vraiment, et ce que le filtre d'effectif en laisse passer.
+   *
+   * L'annuaire ne publie l'effectif que d'une entreprise sur cinq cents dans la
+   * viticulture, une sur cent dans la beauté. Demander « plus de dix salariés »
+   * écartait donc mille cinq cent soixante-quinze domaines alsaciens sur mille cinq
+   * cent soixante-dix-huit — non parce qu'ils sont petits, mais parce qu'on ne sait
+   * pas. Merx doit pouvoir le dire au commercial plutôt que de rendre cinq fiches
+   * après deux minutes d'attente.
+   */
+  totalZone: number;
+  /** Combien répondent au critère d'effectif tel qu'il a été demandé. */
+  totalQualifiees: number;
+  /** Combien de fiches rendues n'ont pas d'effectif publié. */
+  sansEffectifPublie: number;
 }
 
 /** Une entreprise trouvée par le registre, avec ses établissements OUVERTS dans la zone. */
@@ -250,53 +265,85 @@ const PER_PAGE = 25; // maximum autorisé par l'annuaire
 export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchResult> {
   const found: Found[] = [];
   let ignores = 0;
-  const pages = Math.ceil(max / PER_PAGE);
+  let totalZone = 0;
+  let totalQualifiees = 0;
 
-  for (let page = 1; page <= pages; page++) {
-    const params = new URLSearchParams({
-      etat_administratif: "A",
-      per_page: String(PER_PAGE),
-      page: String(page),
-    });
-    if (c.nafCodes?.length) params.set("activite_principale", c.nafCodes.join(","));
-    else if (c.section) params.set("section_activite_principale", c.section);
-    if (c.departments.length) params.set("departement", c.departments.join(","));
-    if (c.minHeadcount) {
+  /** Les paramètres de l'annuaire, avec ou sans le filtre d'effectif. */
+  const params = (page: number, avecEffectif: boolean) => {
+    const p = new URLSearchParams({ etat_administratif: "A", per_page: String(PER_PAGE), page: String(page) });
+    if (c.nafCodes?.length) p.set("activite_principale", c.nafCodes.join(","));
+    else if (c.section) p.set("section_activite_principale", c.section);
+    if (c.departments.length) p.set("departement", c.departments.join(","));
+    if (avecEffectif && c.minHeadcount) {
       const bands = bandsFrom(c.minHeadcount);
-      if (bands.length) params.set("tranche_effectif_salarie", bands.join(","));
+      if (bands.length) p.set("tranche_effectif_salarie", bands.join(","));
     }
+    return p;
+  };
 
-    let data: any = null;
+  const interroger = async (p: URLSearchParams): Promise<any> => {
     for (let attempt = 0; ; attempt++) {
       try {
-        const res = await fetch(`${BASE}/search?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        const res = await fetch(`${BASE}/search?${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         if (res.status === 429 && attempt < RETRIES_429) {
           await new Promise((r) => setTimeout(r, 1_100));
           continue;
         }
-        if (!res.ok) break;
-        data = await res.json();
-        break;
+        if (!res.ok) return null;
+        return await res.json();
       } catch {
-        break;
+        return null;
       }
     }
-    if (!data?.results?.length) break;
+  };
 
-    for (const r of data.results) {
+  const vus = new Set<string>();
+  /** Retenir une page de résultats. Rend false quand le quota est atteint. */
+  const retenir = (results: any[]): boolean => {
+    for (const r of results) {
+      if (vus.has(r.siren)) continue;
+      vus.add(r.siren);
       const company = toCompany(r);
       const tous = ((r.matching_etablissements ?? []) as any[]).map(toEstablishment);
       const ouverts = tous.filter((e) => e.active);
-      // Une zone demandée sans un seul établissement ouvert dedans : l'entreprise
-      // n'y est plus. La retenir, c'était envoyer le commercial à une adresse fermée.
       if (c.departments.length && tous.length > 0 && ouverts.length === 0) {
         ignores++;
         continue;
       }
       found.push({ ...company, localSites: ouverts });
-      if (found.length >= max) return { found, ignores };
+      if (found.length >= max) return false;
     }
+    return true;
+  };
+
+  // D'abord celles qui répondent strictement à la demande.
+  for (let page = 1; page <= Math.ceil(max / PER_PAGE); page++) {
+    const data = await interroger(params(page, true));
+    if (page === 1) totalQualifiees = data?.total_results ?? 0;
+    if (!data?.results?.length) break;
+    if (!retenir(data.results)) break;
     if (page >= (data.total_pages ?? 1)) break;
   }
-  return { found, ignores };
+
+  // Puis, si le filtre d'effectif a presque tout écarté, celles dont on ignore la
+  // taille. Elles ne sont pas plus petites : l'annuaire ne les renseigne pas. Le
+  // commercial préfère cinq cents fiches à qualifier que cinq fiches et deux minutes
+  // d'attente — et il saura d'où vient la différence.
+  if (c.minHeadcount && found.length < max) {
+    for (let page = 1; page <= Math.ceil(max / PER_PAGE); page++) {
+      const data = await interroger(params(page, false));
+      if (page === 1) totalZone = data?.total_results ?? 0;
+      if (!data?.results?.length) break;
+      if (!retenir(data.results)) break;
+      if (page >= (data.total_pages ?? 1)) break;
+    }
+  } else {
+    totalZone = totalQualifiees;
+  }
+
+  const sansEffectifPublie = found.filter((f) => !f.headcountBand || f.headcountBand === "NN").length;
+  return { found, ignores, totalZone: Math.max(totalZone, totalQualifiees), totalQualifiees, sansEffectifPublie };
+}
+
+function __inutilise() {  return { found, ignores };
 }
