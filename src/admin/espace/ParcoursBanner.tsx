@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import type { Stage } from "../types";
-import { TONES } from "../lib/ui-tokens";
+import { colonnesDe, TONES } from "../lib/ui-tokens";
 import { useAdminData } from "../data/AdminDataContext";
 import { stageRepo, type StageEvent } from "./stageRepo";
 import { Card } from "../components/ui";
@@ -41,7 +41,9 @@ export default function ParcoursBanner({
   /** Si fourni, cliquer une étape y fait passer l'affaire. */
   onEtape?: (stage: Stage) => void;
 }) {
-  const { stages } = useAdminData();
+  const { stages: toutes, clients } = useAdminData();
+  // Les colonnes du tableau où vit cette affaire, pas celles des autres.
+  const stages = colonnesDe(toutes, clients.find((c) => c.id === clientId)?.pipelineId);
   const [hist, setHist] = useState<StageEvent[]>([]);
 
   useEffect(() => {

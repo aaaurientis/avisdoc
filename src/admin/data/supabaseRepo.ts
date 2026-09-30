@@ -9,6 +9,7 @@ import type {
   Client,
   DocItem,
   NetworkContact,
+  Pipeline,
   PipelineStage,
   ProjectContact,
   ProjectDoc,
@@ -107,7 +108,7 @@ const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
-    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes] =
+    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes, pipesRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
         sb.from("admin_clients").select("*").is("deleted_at", null).order("created_at", { ascending: true }),
@@ -120,6 +121,7 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
         sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
         sb.from("admin_accounts").select("*").is("deleted_at", null).order("name", { ascending: true }),
+        sb.from("admin_pipelines").select("*").order("created_at", { ascending: true }),
       ]);
 
     const firstError =
@@ -151,6 +153,7 @@ export class SupabaseRepo implements AdminRepo {
       ville: r.ville ?? "",
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
+      pipelineId: r.pipeline_id ?? "",
       referent: r.referent ?? null,
       ficheClientCreee: r.fiche_client_creee ?? false,
       jours: r.jours ?? 1,
@@ -175,7 +178,14 @@ export class SupabaseRepo implements AdminRepo {
       // Tant que la migration 0023 n'est pas appliquée, on affiche les colonnes de départ.
       stages: stagesRes.error || !stagesRes.data?.length
         ? structuredClone(STAGES_DEFAUT)
-        : stagesRes.data.map((r: any): PipelineStage => ({ id: r.id, label: r.label, position: r.position, tone: r.tone })),
+        : stagesRes.data.map((r: any): PipelineStage => ({
+            id: r.id, label: r.label, position: r.position, tone: r.tone, pipelineId: r.pipeline_id ?? "",
+          })),
+      // La migration 0050 peut ne pas être appliquée : il n'y a alors aucun pipeline,
+      // et l'écran retombe sur le tableau unique d'avant.
+      pipelines: pipesRes.error
+        ? []
+        : (pipesRes.data ?? []).map((r: any): Pipeline => ({ id: r.id, nom: r.nom, assigneA: r.assigne_a ?? null })),
       // La migration 0024 peut ne pas être appliquée : le fichier client est alors vide.
       accountFields: fieldsRes.error
         ? []
@@ -231,7 +241,7 @@ export class SupabaseRepo implements AdminRepo {
       id: c.id, company: c.company, siren: c.siren, siret: c.siret || null,
       naf: c.naf, adresse: c.adresse,
       code_postal: c.codePostal || null, ville: c.ville || null,
-      effectif: c.effectif, stage: c.stage, jours: c.jours, tarif: c.tarif,
+      effectif: c.effectif, stage: c.stage, pipeline_id: c.pipelineId || undefined, jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,
     });
     this.assert(error);
@@ -431,15 +441,17 @@ export class SupabaseRepo implements AdminRepo {
   async createStage(stage: PipelineStage): Promise<void> {
     const { error } = await sb
       .from("admin_pipeline_stages")
-      .insert({ id: stage.id, label: stage.label, position: stage.position, tone: stage.tone });
+      .insert({ id: stage.id, label: stage.label, position: stage.position, tone: stage.tone, pipeline_id: stage.pipelineId });
     this.assert(error);
   }
 
   /** Renommer une colonne renomme aussi l'étape des fiches qui la citent. */
-  async renameStage(id: string, ancien: string, nouveau: string): Promise<void> {
+  async renameStage(id: string, ancien: string, nouveau: string, pipelineId: string): Promise<void> {
     const { error } = await sb.from("admin_pipeline_stages").update({ label: nouveau }).eq("id", id);
     this.assert(error);
-    const { error: e2 } = await sb.from("admin_clients").update({ stage: nouveau }).eq("stage", ancien);
+    // Bornée au tableau : deux pipelines peuvent avoir chacun leur « Proposition ».
+    const { error: e2 } = await sb
+      .from("admin_clients").update({ stage: nouveau }).eq("stage", ancien).eq("pipeline_id", pipelineId);
     this.assert(e2);
   }
 
@@ -449,12 +461,40 @@ export class SupabaseRepo implements AdminRepo {
   }
 
   /** Les fiches sont déplacées AVANT la suppression : aucune ne reste sans colonne. */
-  async deleteStage(id: string, label: string, versLabel: string | null): Promise<void> {
+  async deleteStage(id: string, label: string, versLabel: string | null, pipelineId: string): Promise<void> {
     if (versLabel) {
-      const { error } = await sb.from("admin_clients").update({ stage: versLabel }).eq("stage", label);
+      const { error } = await sb
+        .from("admin_clients").update({ stage: versLabel }).eq("stage", label).eq("pipeline_id", pipelineId);
       this.assert(error);
     }
     const { error } = await sb.from("admin_pipeline_stages").delete().eq("id", id);
+    this.assert(error);
+  }
+
+  // ── Les pipelines (migration 0050) ───────────────────────────────────
+  /** Un pipeline naît avec ses colonnes : un tableau sans colonne n'affiche rien. */
+  async createPipeline(p: Pipeline, colonnes: PipelineStage[]): Promise<void> {
+    const { error } = await sb.from("admin_pipelines").insert({ id: p.id, nom: p.nom, assigne_a: p.assigneA });
+    this.assert(error);
+    if (colonnes.length === 0) return;
+    const { error: e2 } = await sb.from("admin_pipeline_stages").insert(
+      colonnes.map((c) => ({ id: c.id, label: c.label, position: c.position, tone: c.tone, pipeline_id: p.id })),
+    );
+    this.assert(e2);
+  }
+
+  async updatePipeline(id: string, champs: Partial<Pipeline>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (champs.nom !== undefined) row.nom = champs.nom;
+    if (champs.assigneA !== undefined) row.assigne_a = champs.assigneA;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await sb.from("admin_pipelines").update(row).eq("id", id);
+    this.assert(error);
+  }
+
+  /** Les colonnes partent avec (cascade). Les affaires, elles, sont déplacées avant. */
+  async deletePipeline(id: string): Promise<void> {
+    const { error } = await sb.from("admin_pipelines").delete().eq("id", id);
     this.assert(error);
   }
 

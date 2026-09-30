@@ -11,6 +11,7 @@ import type {
   Client,
   DocItem,
   NetworkContact,
+  Pipeline,
   PipelineStage,
   ProjectContact,
   ProjectDoc,
@@ -35,6 +36,7 @@ export interface AdminSnapshot {
   activity: ActivityItem[];
   /** Colonnes du pipeline, dans l'ordre (migration 0023). */
   stages: PipelineStage[];
+  pipelines: Pipeline[];
   /** Fichier client : ses colonnes et ses fiches (migration 0024). */
   accountFields: AccountField[];
   accounts: Account[];
@@ -73,10 +75,15 @@ export interface AdminRepo {
   // Colonnes du pipeline
   createStage(stage: PipelineStage): Promise<void>;
   /** Renomme la colonne ET les fiches qui la citent : aucune fiche ne reste orpheline. */
-  renameStage(id: string, ancien: string, nouveau: string): Promise<void>;
+  renameStage(id: string, ancien: string, nouveau: string, pipelineId: string): Promise<void>;
   setStageTone(id: string, tone: PipelineStage["tone"]): Promise<void>;
   /** Supprime la colonne après avoir déplacé ses fiches vers `versLabel`. */
-  deleteStage(id: string, label: string, versLabel: string | null): Promise<void>;
+  deleteStage(id: string, label: string, versLabel: string | null, pipelineId: string): Promise<void>;
+
+  // ── Les pipelines eux-mêmes (migration 0050) ────────────────────────────
+  createPipeline(p: Pipeline, colonnes: PipelineStage[]): Promise<void>;
+  updatePipeline(id: string, champs: Partial<Pipeline>): Promise<void>;
+  deletePipeline(id: string): Promise<void>;
   reorderStages(ordre: { id: string; position: number }[]): Promise<void>;
 
   // Fichier client
@@ -111,6 +118,7 @@ export class MockRepo implements AdminRepo {
       docTypes: [...SEED_DOC_TYPES],
       activity: structuredClone(SEED_ACTIVITY),
       stages: structuredClone(STAGES_DEFAUT),
+      pipelines: [],
       accountFields: structuredClone(SEED_ACCOUNT_FIELDS),
       accounts: structuredClone(SEED_ACCOUNTS),
     };
@@ -144,6 +152,9 @@ export class MockRepo implements AdminRepo {
   async renameStage(): Promise<void> {}
   async setStageTone(): Promise<void> {}
   async deleteStage(): Promise<void> {}
+  async createPipeline(): Promise<void> {}
+  async updatePipeline(): Promise<void> {}
+  async deletePipeline(): Promise<void> {}
   async reorderStages(): Promise<void> {}
   async createDoc(): Promise<void> {}
   async newDocVersion(): Promise<void> {}

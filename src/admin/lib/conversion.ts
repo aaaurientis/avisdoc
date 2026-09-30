@@ -31,6 +31,8 @@ export function clientDepuisProspect(p: Prospect, etape: string): Client {
     ville: p.head_office?.city ?? p.city ?? "",
     effectif: effectifLabel(p.headcount_band) ?? "",
     stage: etape,
+    // Laissé vide : la base range dans le pipeline par défaut (migration 0050).
+    pipelineId: "",
     jours: 1,
     tarif: 0,
     depistes: 0,
