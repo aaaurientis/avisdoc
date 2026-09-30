@@ -34,6 +34,20 @@ import {
   type EmailOut,
 } from "./prompts.ts";
 
+/**
+ * Poursuivre un traitement après avoir répondu au navigateur.
+ *
+ * Supabase offre « EdgeRuntime.waitUntil » pour cela ; là où il n'existe pas, on se
+ * contente de laisser la promesse vivre sa vie — l'essentiel est de ne pas la faire
+ * attendre par la réponse HTTP.
+ */
+function enTacheDeFond(travail: Promise<unknown>): void {
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(travail.catch(() => {}));
+  else void travail.catch(() => {});
+}
+
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -89,8 +103,12 @@ Deno.serve(async (req: Request) => {
         .select("id")
         .single();
       if (error) return json({ error: error.message }, 500);
-      await runAgentTick(sb, demande.id);
-      return json({ demandeId: demande.id });
+      // On répond tout de suite et le travail se poursuit côté serveur : un
+      // approfondissement dure une à deux minutes, et le commercial change d'écran
+      // entre-temps. Tant que la fonction attendait la fin pour répondre, quitter la
+      // page coupait la connexion — et le travail avec.
+      enTacheDeFond(runAgentTick(sb, demande.id));
+      return json({ demandeId: demande.id, enCours: true });
     }
 
     // ── Compléter une fiche sans modèle ──────────────────────────────────
@@ -108,8 +126,8 @@ Deno.serve(async (req: Request) => {
         .select("id")
         .single();
       if (error) return json({ error: error.message }, 500);
-      await runAgentTick(sb, demande.id);
-      return json({ demandeId: demande.id });
+      enTacheDeFond(runAgentTick(sb, demande.id));
+      return json({ demandeId: demande.id, enCours: true });
     }
 
     // ── Rédiger l'e-mail de premier contact ──────────────────────────────
