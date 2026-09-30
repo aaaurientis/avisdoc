@@ -944,5 +944,7 @@ export function suitePrompt(
       ? `IMPORTANT : cette zone et ce métier comptent ${resultat.totalZone} entreprises actives, mais seulement ${resultat.totalQualifiees} publient un effectif correspondant à la demande. L'annuaire de l'État ne renseigne l'effectif que d'une minorité d'entreprises — les autres ne sont pas plus petites, on ne sait pas. Dis-le clairement au commercial, avec les deux chiffres, et propose-lui soit d'en recevoir davantage à qualifier, soit de resserrer sur un autre critère.`
       : null,
     `Les meilleures de la liste :\n${JSON.stringify(meilleures, null, 1)}`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
