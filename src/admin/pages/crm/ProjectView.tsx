@@ -174,7 +174,7 @@ export default function ProjectView({
   // « ?modifier=1 » : le crayon d'une carte ouvre la fiche prête à être corrigée.
   const [chercheur] = useSearchParams();
   const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
-  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "" });
+  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "", referent: "" });
   const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
   const [ns, setNs] = useState({ text: "", deadline: "" });
@@ -329,6 +329,7 @@ export default function ProjectView({
       company: client.company, siren: client.siren, naf: client.naf,
       rue: p.rue, cp: client.codePostal || p.cp, ville: client.ville || p.ville,
       pipelineId: client.pipelineId, stage: client.stage, secteur: client.secteur ?? "",
+      referent: client.referent ?? "",
     });
     setEditing(true);
   };
@@ -341,6 +342,7 @@ export default function ProjectView({
       // n'existent pas dans l'autre. Le menu ci-dessous ne propose jamais une
       // colonne qui n'appartient pas au pipeline retenu.
       pipelineId: draft.pipelineId, stage: draft.stage, secteur: draft.secteur || null,
+      referent: draft.referent || null,
     });
     setEditing(false);
   };
@@ -348,9 +350,21 @@ export default function ProjectView({
   /** Les colonnes du pipeline en cours de sélection dans le formulaire. */
   const colonnesDuBrouillon = colonnesDe(toutesColonnes, draft.pipelineId);
 
-  /** Changer de pipeline repose l'affaire sur la première colonne du nouveau. */
-  const choisirPipeline = (id: string) =>
-    setDraft({ ...draft, pipelineId: id, stage: colonnesDe(toutesColonnes, id)[0]?.label ?? draft.stage });
+  /**
+   * Changer de pipeline repose l'affaire sur la première colonne du nouveau.
+   *
+   * Et si ce pipeline est assigné à quelqu'un, l'affaire lui revient : avoir à le
+   * redire dans un second menu, c'était deux fois la même information.
+   */
+  const choisirPipeline = (id: string) => {
+    const cible = pipelines.find((pl) => pl.id === id);
+    setDraft({
+      ...draft,
+      pipelineId: id,
+      stage: colonnesDe(toutesColonnes, id)[0]?.label ?? draft.stage,
+      referent: cible?.assigneA ?? draft.referent,
+    });
+  };
 
   const submitContact = () => {
     if (!nc.prenom.trim() && !nc.nom.trim()) return;

@@ -148,7 +148,7 @@ export default function BarrePipelines({
             actif === null ? "bg-avisdoc-ink text-white" : "border border-border bg-card text-avisdoc-ink hover:border-avisdoc-teal",
           )}
         >
-          Toutes
+          Tous
           <span className={cn("ml-1.5 text-[11.5px] font-semibold", actif === null ? "opacity-80" : "text-muted-foreground")}>
             {clients.length}
           </span>

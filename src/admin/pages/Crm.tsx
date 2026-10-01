@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Columns3, Plus, Search } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
-import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader, SectionLabel } from "../components/ui";
 import BarreSelection from "../components/BarreSelection";
@@ -21,6 +20,7 @@ import Kanban from "./crm/Kanban";
 import ProjectView from "./crm/ProjectView";
 import NewClientModal from "./crm/NewClientModal";
 import ColonnesModal from "./crm/ColonnesModal";
+import { chargerMembres, nomLisible } from "../lib/membres";
 import { confirmer } from "../components/Confirmation";
 import FiltresRepliables from "../components/FiltresRepliables";
 
@@ -50,15 +50,27 @@ export default function Crm() {
     () => (pipeline ? toutesColonnes.filter((s) => s.pipelineId === pipeline.id) : toutesColonnes),
     [toutesColonnes, pipeline],
   );
-  const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
-  /** Les commerciaux qui suivent réellement une affaire : pas de menu qui ne rend rien. */
+  /**
+   * Toute l'équipe, plus les référents déjà posés sur des affaires.
+   *
+   * Se limiter à ceux qui suivent déjà une affaire empêchait de chercher celles d'un
+   * collègue qui vient d'arriver, et de lui assigner un pipeline.
+   */
+  const [equipe, setEquipe] = useState<string[]>([]);
+  useEffect(() => {
+    let vivant = true;
+    void chargerMembres().then((m) => vivant && setEquipe(m));
+    return () => { vivant = false; };
+  }, []);
   const commerciaux = useMemo(
-    () => [...new Set(toutesAffaires.map((c) => c.referent).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "fr")),
-    [toutesAffaires],
+    () =>
+      [...new Set([...equipe, ...(toutesAffaires.map((c) => c.referent).filter(Boolean) as string[])])]
+        .sort((a, b) => nomLisible(a).localeCompare(nomLisible(b), "fr")),
+    [equipe, toutesAffaires],
   );
   /** Le tri de la vue « Toutes » : un Kanban n'a pas de tri, une liste en a besoin. */
   const [triListe, setTriListe] = useState<{ colonne: ColonneListe; sens: "asc" | "desc" }>({
@@ -231,7 +243,7 @@ export default function Crm() {
             />
           </div>
           <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
-            <FiltresPipeline filtres={filtres} onChange={setFiltres} departements={departements} commerciaux={commerciaux} moi={user?.email ?? null} />
+            <FiltresPipeline filtres={filtres} onChange={setFiltres} departements={departements} commerciaux={commerciaux} />
           </FiltresRepliables>
         </div>
       )}
