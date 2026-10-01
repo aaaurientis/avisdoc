@@ -150,6 +150,8 @@ export interface NoteCritere {
 
 /** Le dossier commercial monté par Merx : de quoi décrocher son téléphone. */
 export interface Dossier {
+  /** Les quatre lignes qui suffisent à passer l'appel : elles passent avant tout. */
+  fiche_appel?: { numero?: string; qui_demander?: string; format_email?: string; si_on_insiste?: string };
   a_retenir?: string[];
   qui_aborder?: string;
   accroche?: string;

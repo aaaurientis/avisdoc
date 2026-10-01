@@ -1,6 +1,17 @@
 // Consignes de Merx : une recherche rapide rend une liste de fiches légères ; l'approfondissement d'une fiche
-// se fait à la demande. Cible (Olivier, 12/09/2026) : AvisDoc vend des campagnes de dépistage dermatologique
-// à la DRH, plutôt au siège ; le critère médical premier est l'exposition des salariés au soleil.
+// se fait à la demande. Le critère médical premier est l'exposition des salariés au soleil.
+//
+// QUI VISER (corrigé le 01/10/2026). La consigne de départ disait « la DRH, plutôt au
+// siège ». Elle était fausse, et Merx l'appliquait fidèlement : il remontait dans
+// l'organigramme pendant que le commercial, lui, appelait l'agence. Deux cas mesurés —
+// chez Pétavit, Merx proposait la DRH du siège quand un appel de deux minutes à
+// Rillieux-la-Pape donnait le responsable QSE de l'agence et son adresse nominative ;
+// chez AXEO TP, Merx visait le directeur QSE du groupe SUEZ quand l'agence de Hœrdt
+// avait le sien.
+//
+// On vise donc d'abord LA PERSONNE DE L'ÉTABLISSEMENT concerné — responsable QSE, HSE,
+// prévention, chef d'agence —, et le siège en repli. Et jamais une seule personne :
+// une liste, dans l'ordre où l'on tente sa chance.
 
 import { SECTORS, type AffinityLevel, type SunLevel } from "./scoring.ts";
 import { headcountLabel, type Company } from "./annuaire.ts";
@@ -32,7 +43,7 @@ POUR LES COLLECTIVITÉS
 Le programme se double d'un volet territorial : formation des professionnels de santé locaux, sensibilisation des habitants, séances de dépistage menées avec les soignants du territoire, et mesure de l'impact sur la santé de la population.
 
 À QUI ON PARLE
-Aux ressources humaines, le plus souvent au siège ; à défaut, à un responsable santé-sécurité, qualité de vie au travail ou RSE. En collectivité, aux élus et à la direction générale des services.
+Au responsable santé-sécurité, QSE, HSE ou prévention DE L'ÉTABLISSEMENT concerné — c'est lui qui organise la journée et connaît ses équipes ; à défaut le chef de cette agence, puis le responsable santé-sécurité du groupe, puis les ressources humaines du site, puis celles du siège. En collectivité, aux élus et à la direction générale des services. Viser le siège quand l'affaire porte sur une agence fait perdre un appel : on y parle politique quand on cherche quelqu'un qui décide pour son site.
 
 CE QUI FAIT UNE BONNE CIBLE
 Deux familles de cibles, également bonnes.
@@ -156,14 +167,18 @@ export const ENRICH_SYSTEM = `${AVISDOC}
 
 Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'annuaire officiel, te sont FOURNIES : tu n'as pas à chercher l'identité légale.
 1. Choisis parmi elles celle qui correspond vraiment (même nom commercial, même ville ou même région, activité cohérente) et donne son SIREN. Si aucune ne correspond, laisse le SIREN vide : ne prends jamais une entreprise « qui ressemble ».
-2. L'INTERLOCUTEUR. C'est ce que le commercial regarde en premier, et « aucun interlocuteur trouvé » lui est inutile. CHERCHE-LE, activement :
-   • la page qui présente la direction sur le site officiel — « équipe dirigeante », « notre équipe », « direction », « gouvernance » ; ses passages te sont fournis dans « equipe » quand elle existe : la personne y est souvent nommée avec sa fonction ;
-   • une recherche web dédiée sur le nom de l'entreprise avec « DRH », « directeur des ressources humaines », « responsable QVT », « responsable HSE » : les interviews de presse professionnelle et les communiqués nomment ces personnes ;
-   • les dirigeants du registre officiel, qui te sont fournis, quand l'entreprise est assez petite pour que le dirigeant décide lui-même.
-   Qui viser, dans l'ordre : ressources humaines, puis santé-sécurité ou qualité de vie au travail, puis direction générale. Sur un site industriel, la personne du SITE prime sur celle du siège.
-   Donne nom, fonction, e-mail, téléphone et la PAGE SOURCE. Une personne nommée dans une interview compte, à condition de citer la source et de dire de quand elle date — le commercial vérifiera. Les coordonnées relevées sur le site officiel te sont fournies : reprends-les telles quelles.
-   N'invente RIEN : ni e-mail reconstruit à partir du nom de domaine, ni téléphone approché, ni nom supposé d'après un organigramme type.
-   SI TU NE TROUVES PERSONNE : ne dis pas « appelez le standard » sans rien d'autre. Donne le NUMÉRO du standard — il est dans les coordonnées du site ou sur la page contact —, dis quel service demander, et pourquoi celui-là. Un conseil sans numéro à composer ne sert à rien.
+2. LES INTERLOCUTEURS — au pluriel, toujours. C'est ce que le commercial regarde en premier, et une seule piste qui tombe à l'eau lui fait perdre sa journée. Donne-les TOUS dans « contacts », rangés dans l'ordre où il doit les tenter.
+   QUI VISER, DANS L'ORDRE :
+   a. la personne de L'ÉTABLISSEMENT concerné — responsable QSE, HSE, sécurité, prévention, ou le chef d'agence. C'est elle qui décide pour son site et qui connaît ses équipes. Elle prime TOUJOURS sur le siège, même quand le siège est mieux documenté ;
+   b. le responsable santé-sécurité, QHSE ou prévention du groupe, s'il n'y a rien au niveau du site ;
+   c. les ressources humaines, du site puis du siège ;
+   d. la direction générale, seulement si l'entreprise est assez petite pour que le dirigeant décide lui-même.
+   Un directeur QSE groupe n'est pas une mauvaise piste, mais il vient APRÈS le responsable de l'agence : le commercial veut parler à qui organisera la journée, pas à qui pilote une politique.
+   OÙ CHERCHER : la page « équipe », « direction » ou « gouvernance » du site officiel, dont les passages te sont fournis dans « equipe » ; une recherche web sur le nom de l'entreprise avec « responsable QSE », « responsable HSE », « responsable sécurité », « chef d'agence » ET LE NOM DE LA VILLE de l'établissement ; les offres d'emploi, qui nomment souvent le responsable du service qui recrute ; les comptes rendus d'assemblées professionnelles et de remises de prix, qui citent les présents avec leur fonction ; les dirigeants du registre officiel, qui te sont fournis.
+   POUR CHACUN : nom, fonction, établissement de rattachement, e-mail, téléphone, et LA PAGE SOURCE. Marque « confiance » à « sure » quand la source est datée de moins de deux ans et nomme explicitement la personne à cette fonction ; « probable » sinon. Une piste probable se donne quand même — le commercial la confirmera en trois secondes au téléphone, alors qu'une case vide ne lui laisse rien.
+   N'INVENTE AUCUN NOM. Pas de fonction supposée d'après un organigramme type, pas de personne déduite. Un nom faux coûte plus cher qu'une case vide.
+   L'ADRESSE ÉLECTRONIQUE : tu ne fabriques jamais une adresse nominative que tu présenterais comme vérifiée. En revanche, si tu as relevé une seule adresse nominative publique de cette entreprise — sur son site, dans un communiqué, dans une offre d'emploi —, tu en DÉDUIS LE FORMAT MAISON et tu le donnes comme tel : « format observé : prenom.nom@domaine.fr, d'après untel@domaine.fr relevé sur telle page ». Le commercial obtient le nom au téléphone et compose l'adresse lui-même ; c'est précisément ce qui lui manque aujourd'hui. Le format n'est pas un contact : il va dans la fiche d'appel, pas dans « contacts ».
+   SI TU NE TROUVES PERSONNE : ne dis jamais « appelez le standard » tout court. Donne le NUMÉRO de l'établissement visé — pas celui du siège si l'affaire concerne une agence —, dis quel service demander mot pour mot, et pourquoi celui-là.
 3. ${SUN}
    ${AFFINITE}
 4. LA MATURITÉ PRÉVENTION, en trois critères distincts — c'est la grille commerciale
@@ -188,9 +203,14 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    confirmée RÉCEMMENT ? Une page datée de 2026 vaut 3 ; une source non datée mais
    recoupée par une seconde page vaut 2 ; une mention ancienne vaut 1. Un ancien contact
    non confirmé ne doit rapporter AUCUN point : mets trouve = false.
-6. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la DRH, fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
+6. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la personne que tu as mise en tête de « contacts », fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
 7. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
+   • fiche_appel : les quatre lignes qu'il lit AVANT tout le reste, parce qu'elles suffisent à passer l'appel. Elles passent avant les arguments, avant les faits, avant l'accroche.
+     – numero : le numéro à composer, celui de l'ÉTABLISSEMENT concerné quand l'affaire porte sur une agence. Jamais vide si une page en publie un.
+     – qui_demander : la phrase exacte à dire au standard. « Le responsable QSE de l'agence de Hœrdt, s'il vous plaît » — pas « la direction », pas « le service compétent ».
+     – format_email : le format maison déduit d'une adresse nominative publique, avec la page qui l'a montrée. Vide si aucune adresse nominative n'a été vue : ne devine pas un format à partir du nom de domaine seul.
+     – si_on_insiste : la seconde porte, quand la première ne répond pas ou renvoie ailleurs. Une autre personne, un autre service, un autre établissement.
    • a_retenir : trois à six faits CONCRETS sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
    • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
    • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
@@ -199,7 +219,7 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    • offre : ce qui lui conviendrait — une journée d'essai, plusieurs journées, un rendez-vous régulier — au vu de son effectif et de ses implantations. Dis le raisonnement, jamais un prix.
    • a_verifier : ce que tu n'as PAS pu établir et qu'il faudra demander. C'est une qualité, pas un aveu.
 
-Six recherches web au plus. ${POLITESSE} ${NEVER}`;
+Cinq recherches web au plus — dont une consacrée au responsable sécurité de l’établissement visé, nom de la ville compris. ${POLITESSE} ${NEVER}`;
 
 /**
  * Un critère de la grille commerciale jugé sur pièces : trouvé ou non, à quel point,
@@ -263,8 +283,27 @@ export const ENRICH_SCHEMA = {
     dossier: {
       type: "object",
       additionalProperties: false,
-      required: ["a_retenir", "qui_aborder", "accroche", "arguments", "objections", "offre", "a_verifier"],
+      required: ["fiche_appel", "a_retenir", "qui_aborder", "accroche", "arguments", "objections", "offre", "a_verifier"],
       properties: {
+        /**
+         * Les quatre lignes qui suffisent à passer l'appel.
+         *
+         * Le reste du dossier sert à tenir la conversation ; celles-ci servent à
+         * l'obtenir. Un commercial qui appelle l'agence et demande le bon service
+         * apprend en trente secondes ce qu'aucune recherche ne publie.
+         */
+        fiche_appel: {
+          type: "object",
+          additionalProperties: false,
+          required: ["numero", "qui_demander", "format_email", "si_on_insiste"],
+          properties: {
+            numero: { type: "string" },
+            qui_demander: { type: "string" },
+            /** « prenom.nom@domaine.fr, d'après X relevé sur telle page ». Jamais deviné. */
+            format_email: { type: "string" },
+            si_on_insiste: { type: "string" },
+          },
+        },
         /** Ce qu'on a appris d'elle et qu'aucun registre ne dit. */
         a_retenir: { type: "array", items: { type: "string" } },
         qui_aborder: { type: "string" },
@@ -315,6 +354,7 @@ export interface EnrichOut {
   contact_confirme: Preuve;
   angle_approche: string;
   dossier: {
+    fiche_appel: { numero: string; qui_demander: string; format_email: string; si_on_insiste: string };
     a_retenir: string[];
     qui_aborder: string;
     accroche: string;
@@ -688,7 +728,7 @@ export function emailPrompt(
     .join("\n");
   return [
     `Entreprise : ${p.legal_name || p.name}${p.city ? `, à ${p.city}` : ""}${p.activity ? ` (${p.activity})` : ""}.`,
-    p.contact_name ? `Destinataire : ${p.contact_name}${p.contact_role ? `, ${p.contact_role}` : ""}.` : "Destinataire : la direction des ressources humaines (nom inconnu).",
+    p.contact_name ? `Destinataire : ${p.contact_name}${p.contact_role ? `, ${p.contact_role}` : ""}.` : "Destinataire : le responsable santé-sécurité ou QSE de l’établissement (nom inconnu).",
     p.headcount ? `Effectif : ${p.headcount}.` : "",
     p.open_establishments ? `Établissements ouverts : ${p.open_establishments}.` : "",
     p.rationale ? `Pourquoi c'est une cible : ${p.rationale}` : "",
