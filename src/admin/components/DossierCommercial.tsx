@@ -5,7 +5,7 @@
 // ensuite à qui on la dit, puis de quoi on la nourrit. Ce qui manque est annoncé en
 // dernier, parce que savoir ce qu'on ignore fait partie du travail.
 
-import { AlertCircle, Check, MessageSquareQuote, Phone, ShieldQuestion, Target, User } from "lucide-react";
+import { AlertCircle, Check, MessageSquareQuote, Phone, PhoneCall, ShieldQuestion, Target, User } from "lucide-react";
 import { SectionLabel } from "./ui";
 import type { Dossier } from "../lib/merx";
 
@@ -13,7 +13,9 @@ import type { Dossier } from "../lib/merx";
 export function dossierRempli(d: Dossier | null | undefined): d is Dossier {
   if (!d) return false;
   return Boolean(
-    d.accroche?.trim() ||
+    d.fiche_appel?.numero?.trim() ||
+      d.fiche_appel?.qui_demander?.trim() ||
+      d.accroche?.trim() ||
       d.qui_aborder?.trim() ||
       d.offre?.trim() ||
       d.a_retenir?.length ||
@@ -43,11 +45,36 @@ function Bloc({
 }
 
 export default function DossierCommercial({ dossier }: { dossier: Dossier }) {
-  const { accroche, qui_aborder, a_retenir, arguments: args, objections, offre, a_verifier } = dossier;
+  const { fiche_appel, accroche, qui_aborder, a_retenir, arguments: args, objections, offre, a_verifier } = dossier;
+  const fiche = [
+    { cle: "Appeler", valeur: fiche_appel?.numero },
+    { cle: "Demander", valeur: fiche_appel?.qui_demander },
+    { cle: "Format e-mail", valeur: fiche_appel?.format_email },
+    { cle: "Si on insiste", valeur: fiche_appel?.si_on_insiste },
+  ].filter((l) => l.valeur?.trim());
 
   return (
     <div className="mb-5 rounded-2xl border border-l-4 border-border border-l-avisdoc-coral p-4">
       <SectionLabel className="text-avisdoc-coral">Ce qu’il faut savoir avant d’appeler</SectionLabel>
+
+      {/* Quatre lignes, avant tout le reste. Le dossier sert à tenir la conversation ;
+          celles-ci servent à l'obtenir — et c'est au téléphone qu'on apprend le nom du
+          responsable d'une agence, qu'aucune page ne publie. */}
+      {fiche.length > 0 && (
+        <div className="mt-2 rounded-xl border border-avisdoc-teal/30 bg-avisdoc-teal/5 px-4 py-3">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-avisdoc-teal">
+            <PhoneCall className="size-3.5" /> L’appel, en quatre lignes
+          </div>
+          <dl className="mt-2 grid gap-1.5">
+            {fiche.map((l) => (
+              <div key={l.cle} className="flex flex-wrap gap-x-2 text-[13.5px] leading-snug">
+                <dt className="shrink-0 font-bold text-avisdoc-ink">{l.cle} :</dt>
+                <dd className="min-w-0 flex-1 text-avisdoc-ink">{l.valeur}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
 
       {/* La première phrase : celle qui fait qu'on ne raccroche pas. Elle se lit avant tout le reste. */}
       {accroche?.trim() && (
