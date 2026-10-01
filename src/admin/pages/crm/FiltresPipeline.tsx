@@ -90,7 +90,6 @@ export default function FiltresPipeline({
   onChange,
   departements,
   commerciaux,
-  moi,
 }: {
   filtres: FiltresCrm;
   onChange: (f: FiltresCrm) => void;
@@ -98,25 +97,22 @@ export default function FiltresPipeline({
   departements: string[];
   /** Ceux qui suivent réellement une affaire : pas de menu qui ne rendrait rien. */
   commerciaux: string[];
-  moi: string | null;
 }) {
   const set = (cle: keyof FiltresCrm) => (e: React.ChangeEvent<HTMLSelectElement>) => onChange({ ...filtres, [cle]: e.target.value });
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* « Référent » et non « Commercial » : un pipeline a un assigné, une affaire a
-          un référent, et les deux se confondaient dans la tête de tout le monde. */}
-      <select value={filtres.referent} onChange={set("referent")} className={selectCls} aria-label="Référent de l’affaire">
-        <option value="">Référent</option>
-        {moi && <option value={moi}>Mes affaires</option>}
-        {commerciaux
-          .filter((c) => c !== moi)
-          .map((c) => (
-            <option key={c} value={c}>
-              {nomLisible(c)}
-            </option>
-          ))}
-        <option value="(aucun)">Sans référent</option>
+      {/* Un seul menu pour « à qui », et des prénoms : « Tous, Olivier, Stéphane,
+          Arthur ». Toute l'équipe y figure, pas seulement ceux qui ont déjà une
+          affaire — sinon on ne peut pas chercher celles d'un collègue qui débute. */}
+      <select value={filtres.referent} onChange={set("referent")} className={selectCls} aria-label="Commercial">
+        <option value="">Tous</option>
+        {commerciaux.map((c) => (
+          <option key={c} value={c}>
+            {nomLisible(c)}
+          </option>
+        ))}
+        <option value="(aucun)">Sans commercial</option>
       </select>
 
       <select value={filtres.secteur} onChange={set("secteur")} className={selectCls} aria-label="Secteur de l’affaire">
