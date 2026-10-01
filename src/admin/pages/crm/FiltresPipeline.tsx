@@ -104,8 +104,10 @@ export default function FiltresPipeline({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select value={filtres.referent} onChange={set("referent")} className={selectCls} aria-label="Commercial qui suit l’affaire">
-        <option value="">Commercial</option>
+      {/* « Référent » et non « Commercial » : un pipeline a un assigné, une affaire a
+          un référent, et les deux se confondaient dans la tête de tout le monde. */}
+      <select value={filtres.referent} onChange={set("referent")} className={selectCls} aria-label="Référent de l’affaire">
+        <option value="">Référent</option>
         {moi && <option value={moi}>Mes affaires</option>}
         {commerciaux
           .filter((c) => c !== moi)
