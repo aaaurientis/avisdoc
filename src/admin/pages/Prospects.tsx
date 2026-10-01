@@ -231,10 +231,14 @@ export default function Prospects() {
       .order("score_total", { ascending: false, nullsFirst: false });
     if (error) setErreur(messageErreur(error.message));
     else setProspects((data ?? []) as Prospect[]);
+    // Les complétions sont exclues : elles n'ont ni objet ni corps, ne servent à
+    // aucun des usages ci-dessous, et il y en a des milliers — les charger à chaque
+    // affichage ne faisait que ralentir l'écran.
     const { data: passees } = await supabaseAdmin
       .from("admin_merx_demandes")
       .select("id, kind, request, usage, prospect_id, objet, corps, finished_at")
-      .eq("status", "terminee");
+      .eq("status", "terminee")
+      .neq("kind", "completion");
     setDemandes((passees ?? []) as Demande[]);
     setChargement(false);
   }, []);
@@ -322,12 +326,18 @@ export default function Prospects() {
    * arrière-plan, sans rien bloquer.
    *
    * Par petits paquets, les mieux notées d'abord, et jamais deux fois la même.
+   *
+   * « Jamais deux fois » se lisait dans une variable d'écran : changer de page la
+   * remettait à zéro, et tout repartait. Le 30 septembre, 4 662 complétions pour
+   * 255 fiches — chacune un appel Pappers facturé. La trace est désormais en base
+   * (`completed_at`, migration 0052), et le ref ne sert plus qu'à ne pas relancer
+   * deux fois la même fiche dans la même seconde.
    */
   const dejaTentees = useRef(new Set<string>());
   useEffect(() => {
     let vivant = true;
     const enRetard = prospects
-      .filter((p) => !p.converted_client_id && !p.contact_phone && !p.website && !dejaTentees.current.has(p.id))
+      .filter((p) => !p.converted_client_id && !p.contact_phone && !p.website && !p.completed_at && !dejaTentees.current.has(p.id))
       .sort((a, b) => (b.score_total ?? -1) - (a.score_total ?? -1))
       .slice(0, 12);
     if (enRetard.length === 0) return;

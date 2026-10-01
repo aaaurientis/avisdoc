@@ -154,6 +154,7 @@ export class SupabaseRepo implements AdminRepo {
       effectif: r.effectif ?? "",
       stage: r.stage as Stage,
       pipelineId: r.pipeline_id ?? "",
+      secteur: r.secteur ?? null,
       referent: r.referent ?? null,
       ficheClientCreee: r.fiche_client_creee ?? false,
       jours: r.jours ?? 1,
@@ -241,7 +242,8 @@ export class SupabaseRepo implements AdminRepo {
       id: c.id, company: c.company, siren: c.siren, siret: c.siret || null,
       naf: c.naf, adresse: c.adresse,
       code_postal: c.codePostal || null, ville: c.ville || null,
-      effectif: c.effectif, stage: c.stage, pipeline_id: c.pipelineId || undefined, jours: c.jours, tarif: c.tarif,
+      effectif: c.effectif, stage: c.stage, pipeline_id: c.pipelineId || undefined,
+      secteur: c.secteur ?? null, jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,
     });
     this.assert(error);
@@ -252,7 +254,7 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateClientFields(id: string, fields: Partial<Client>): Promise<void> {
     const row: Record<string, unknown> = {};
-    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee" };
+    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee", pipelineId: "pipeline_id" };
     for (const [k, v] of Object.entries(fields)) {
       if (["contacts", "docs", "suivis"].includes(k)) continue;
       row[map[k] ?? k] = v;

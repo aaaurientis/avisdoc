@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, Plus, Search, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
-import { DOC_EXT, PROPO_STATUTS, TONES, stageMeta, stageRank } from "../../lib/ui-tokens";
+import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Avatar, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
@@ -21,6 +21,7 @@ import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
 import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
 import type { Jalon } from "../../lib/echanges";
+import { SECTEURS } from "../../lib/merx";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
 import Onglets from "../../components/Onglets";
@@ -160,17 +161,20 @@ export default function ProjectView({
     addSuivi,
     toggleSuivi,
     removeSuivi,
-    stages,
+    stages: toutesColonnes,
+    pipelines,
     accounts,
     addAccount,
     setClientStage,
   } = useAdminData();
   const { user } = useAuth();
+  // Les colonnes du tableau où vit l'affaire : celles des autres ne la concernent pas.
+  const stages = colonnesDe(toutesColonnes, client.pipelineId);
 
   // « ?modifier=1 » : le crayon d'une carte ouvre la fiche prête à être corrigée.
   const [chercheur] = useSearchParams();
   const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
-  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "" });
+  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "" });
   const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
   const [ns, setNs] = useState({ text: "", deadline: "" });
@@ -324,6 +328,7 @@ export default function ProjectView({
     setDraft({
       company: client.company, siren: client.siren, naf: client.naf,
       rue: p.rue, cp: client.codePostal || p.cp, ville: client.ville || p.ville,
+      pipelineId: client.pipelineId, stage: client.stage, secteur: client.secteur ?? "",
     });
     setEditing(true);
   };
@@ -332,9 +337,20 @@ export default function ProjectView({
       company: draft.company, siren: draft.siren, naf: draft.naf,
       adresse: joinAdresse(draft.rue, draft.cp, draft.ville),
       codePostal: draft.cp.trim(), ville: draft.ville.trim(),
+      // Changer de tableau, c'est aussi changer de colonne : celles d'un pipeline
+      // n'existent pas dans l'autre. Le menu ci-dessous ne propose jamais une
+      // colonne qui n'appartient pas au pipeline retenu.
+      pipelineId: draft.pipelineId, stage: draft.stage, secteur: draft.secteur || null,
     });
     setEditing(false);
   };
+
+  /** Les colonnes du pipeline en cours de sélection dans le formulaire. */
+  const colonnesDuBrouillon = colonnesDe(toutesColonnes, draft.pipelineId);
+
+  /** Changer de pipeline repose l'affaire sur la première colonne du nouveau. */
+  const choisirPipeline = (id: string) =>
+    setDraft({ ...draft, pipelineId: id, stage: colonnesDe(toutesColonnes, id)[0]?.label ?? draft.stage });
 
   const submitContact = () => {
     if (!nc.prenom.trim() && !nc.nom.trim()) return;
@@ -423,6 +439,21 @@ export default function ProjectView({
                   onChange={(e) => setDraft({ ...draft, naf: e.target.value })}
                 />
               </div>
+              {/* Le secteur sert à filtrer le Pipeline en travers des commerciaux.
+                  Repris du prospect quand l'affaire en vient, corrigeable ici. */}
+              <select
+                value={draft.secteur}
+                onChange={(e) => setDraft({ ...draft, secteur: e.target.value })}
+                aria-label="Secteur de l’affaire"
+                className={inputCls}
+              >
+                <option value="">Secteur — non précisé</option>
+                {SECTEURS.map((sec) => (
+                  <option key={sec.id} value={sec.id}>
+                    {sec.label}
+                  </option>
+                ))}
+              </select>
               <input
                 className={inputCls}
                 placeholder="Adresse (n° et voie)"
@@ -442,6 +473,42 @@ export default function ProjectView({
                   value={draft.ville}
                   onChange={(e) => setDraft({ ...draft, ville: e.target.value })}
                 />
+              </div>
+
+              {/* Déplacer l'affaire. Une affaire n'est que dans un seul tableau : la
+                  sortir d'ici, c'est la poser ailleurs, sur une colonne de là-bas. */}
+              <div className="mt-1 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</span>
+                <select
+                  value={draft.pipelineId}
+                  onChange={(e) => choisirPipeline(e.target.value)}
+                  aria-label="Pipeline de l’affaire"
+                  className={cn(inputCls, "w-auto font-semibold")}
+                >
+                  {pipelines.map((pl) => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.nom}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Colonne</span>
+                <select
+                  value={draft.stage}
+                  onChange={(e) => setDraft({ ...draft, stage: e.target.value })}
+                  aria-label="Colonne de l’affaire"
+                  className={cn(inputCls, "w-auto font-semibold")}
+                >
+                  {colonnesDuBrouillon.map((st) => (
+                    <option key={st.id} value={st.label}>
+                      {st.label}
+                    </option>
+                  ))}
+                </select>
+                {draft.pipelineId !== client.pipelineId && (
+                  <span className="text-[12px] font-semibold text-avisdoc-teal">
+                    L’affaire quittera « {pipelines.find((pl) => pl.id === client.pipelineId)?.nom ?? "son pipeline"} »
+                  </span>
+                )}
               </div>
             </div>
           ) : (

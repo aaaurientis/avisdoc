@@ -12,6 +12,7 @@ import {
   failRequest,
   finishRequest,
   completeProspect,
+  marquerTentative,
   getProspectForEnrichment,
   loadProspect,
   insertLightProspects,
@@ -389,6 +390,7 @@ async function accompagner(
 async function runCompletion(sb: SupabaseClient, req: Demande) {
   const p = await loadProspect(sb, req.prospectId!);
   if (!p) return { found: 0, message: "Fiche introuvable." };
+  await marquerTentative(sb, req.prospectId!);
 
   // Le SIREN de la fiche, ou celui que son nom permet de retrouver au registre.
   const candidats = p.siren ? await lookup(p.siren) : await lookup([p.name, p.city].filter(Boolean).join(" "));

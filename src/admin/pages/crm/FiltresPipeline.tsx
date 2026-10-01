@@ -6,6 +6,7 @@
 
 import type { Client } from "../../types";
 import { nomLisible } from "../../lib/membres";
+import { SECTEURS } from "../../lib/merx";
 
 export interface FiltresCrm {
   /**
@@ -15,13 +16,15 @@ export interface FiltresCrm {
    * suit la personne connectée, sans qu'elle ait à se nommer.
    */
   referent: string;
+  /** Le secteur de l'affaire. Transversal aux pipelines : c'est un filtre, pas un tableau. */
+  secteur: string;
   journees: string;
   montant: string;
   contact: string;
   departement: string;
 }
 
-export const FILTRES_CRM_VIDES: FiltresCrm = { referent: "", journees: "", montant: "", contact: "", departement: "" };
+export const FILTRES_CRM_VIDES: FiltresCrm = { referent: "", secteur: "", journees: "", montant: "", contact: "", departement: "" };
 
 const JOURNEES: { valeur: string; label: string; min: number; max: number }[] = [
   { valeur: "5", label: "5 journées et plus", min: 5, max: Infinity },
@@ -46,6 +49,8 @@ export function retenueCrm(c: Client, f: FiltresCrm, recherche: string): boolean
   if (f.referent === "(aucun)") {
     if (c.referent) return false;
   } else if (f.referent && c.referent !== f.referent) return false;
+
+  if (f.secteur && (c.secteur || "autre") !== f.secteur) return false;
 
   if (f.journees) {
     const palier = JOURNEES.find((j) => j.valeur === f.journees);
@@ -110,6 +115,15 @@ export default function FiltresPipeline({
             </option>
           ))}
         <option value="(aucun)">Sans référent</option>
+      </select>
+
+      <select value={filtres.secteur} onChange={set("secteur")} className={selectCls} aria-label="Secteur de l’affaire">
+        <option value="">Secteur</option>
+        {SECTEURS.map((sec) => (
+          <option key={sec.id} value={sec.id}>
+            {sec.label}
+          </option>
+        ))}
       </select>
 
       <select value={filtres.journees} onChange={set("journees")} className={selectCls} aria-label="Nombre de journées">
