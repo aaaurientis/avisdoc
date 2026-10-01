@@ -32,6 +32,8 @@ export function clientDepuisProspect(p: Prospect, etape: string, pipelineId: str
     effectif: effectifLabel(p.headcount_band) ?? "",
     stage: etape,
     pipelineId,
+    // Merx a déjà classé ce prospect : le secteur le suit, personne ne le ressaisit.
+    secteur: p.sector ?? null,
     jours: 1,
     tarif: 0,
     depistes: 0,

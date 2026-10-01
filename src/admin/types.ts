@@ -124,6 +124,8 @@ export interface Client {
   stage: Stage;
   /** Le tableau où l'affaire est rangée (migration 0050). */
   pipelineId: string;
+  /** Son secteur, repris du prospect d'origine ou posé à la main (migration 0053). */
+  secteur?: string | null;
   /** Le commercial qui suit l'affaire. */
   referent?: string | null;
   /** La fiche du fichier client a déjà été créée : ne pas la recréer. */

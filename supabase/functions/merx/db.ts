@@ -320,6 +320,18 @@ export interface Enrichment {
  * l'ancienne, mais Supabase n'en offre pas l'équivalent — on ne transmet donc que les
  * champs réellement trouvés, et l'appelant décide de ce qu'il envoie.
  */
+/**
+ * Noter qu'on a tenté de compléter cette fiche.
+ *
+ * Posé AVANT le travail, pas après : le chemin qui rebouclait le plus était celui
+ * où le registre ne reconnaît pas l'entreprise — il sortait sans rien écrire, donc
+ * sans rien retenir, et repartait au prochain affichage de l'écran. Une tentative
+ * dépensée est une tentative marquée, même si elle échoue (migration 0052).
+ */
+export async function marquerTentative(sb: SupabaseClient, id: string): Promise<void> {
+  await sb.from("admin_prospects").update({ completed_at: new Date().toISOString() }).eq("id", id);
+}
+
 export async function completeProspect(
   sb: SupabaseClient,
   id: string,
@@ -363,6 +375,11 @@ export async function completeProspect(
     reliability_detail: e.reliabilityDetail,
   };
   for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
+  // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
+  // rien trouvé n'en trouvera pas davantage la fois suivante, et c'est elle qui
+  // repartait indéfiniment — 4 662 appels pour 255 fiches le 30 septembre
+  // (migration 0052).
+  patch.completed_at = new Date().toISOString();
   const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -427,6 +444,11 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     enriched_at: new Date().toISOString(),
   };
   for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
+  // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
+  // rien trouvé n'en trouvera pas davantage la fois suivante, et c'est elle qui
+  // repartait indéfiniment — 4 662 appels pour 255 fiches le 30 septembre
+  // (migration 0052).
+  patch.completed_at = new Date().toISOString();
   const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }

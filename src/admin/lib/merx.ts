@@ -227,6 +227,8 @@ export interface Prospect {
   /** Le dossier commercial monté par Merx à l'approfondissement (migration 0033). */
   dossier: Dossier | null;
   enriched_at: string | null;
+  /** Quand la complétion automatique a traité cette fiche — même sans rien trouver. */
+  completed_at: string | null;
   /** Première ouverture de la fiche : tant qu'elle est vide, la fiche est « nouvelle ». */
   opened_at: string | null;
   /** La demande de recherche qui a trouvé cette fiche. */
