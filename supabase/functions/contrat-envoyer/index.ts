@@ -30,7 +30,7 @@ const EMAIL_FROM = Deno.env.get("REQ_EMAIL_FROM") ?? "AvisDoc <noreply@avisdoc.f
 // Contrat standardisé : si un template Yousign est configuré, on l'utilise ;
 // sinon repli sur le PDF généré (gabarit interne).
 const YOUSIGN_TEMPLATE_ID = (Deno.env.get("YOUSIGN_TEMPLATE_ID") ?? "").trim();
-const YOUSIGN_SIGNER_LABEL = (Deno.env.get("YOUSIGN_SIGNER_LABEL") ?? "signataire").trim();
+const YOUSIGN_SIGNER_LABEL = (Deno.env.get("YOUSIGN_SIGNER_LABEL") ?? "Requérant").trim();
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
