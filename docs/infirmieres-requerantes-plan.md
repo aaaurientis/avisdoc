@@ -59,7 +59,9 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
   « Contacts médicaux » en groupe (Vue d'ensemble / Requérants → parcours / Requis
   / Réseau d'aval) ; page tableau de bord (3 tuiles + carte) ; annuaire piloté par
   type (`/contacts/requis`, `/contacts/reseau`).
-- **7b (à venir)** : requérants géolocalisés sur la carte via géocodage RPPS.
+- **7b (fait)** : requérants géolocalisés sur la carte — adresse d'exercice résolue
+  depuis le RPPS (Annuaire Santé), géocodée (BAN) et mise en cache sur l'inscription
+  (migration 0062 : adresse/ville/CP/lat/lng/geocode_le).
 - **7c** : recette & prod (checklist §6).
 
 ## Demandes complémentaires (à planifier)
@@ -108,6 +110,6 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
   (expiration RCP/URSSAF → suspension, rappels e-mail uniques ≤ 30 j), purge
   identité J+30 (RI-03, fonction SQL + pg_cron), vue `req_eligibilite` (RI-01),
   réactivation admin après renouvellement
-- [~] Lot 7 — refonte menu Contacts médicaux : **7a fait** (rename Expert→Requis,
-  groupe + sous-menus, tableau de bord, annuaire par type) ; **7b** (requérants sur
-  la carte via RPPS) et **7c** (recette & prod) à venir
+- [~] Lot 7 — refonte menu Contacts médicaux : **7a + 7b faits** (rename
+  Expert→Requis, groupe + sous-menus, tableau de bord, annuaire par type,
+  requérants géolocalisés via RPPS) ; **7c** (recette & prod) à venir

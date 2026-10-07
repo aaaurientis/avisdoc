@@ -45,6 +45,12 @@ export interface ReqInscription {
   updatedAt: string;
   /** Échéance utile la plus proche (calculée) : ISO date ou null. */
   prochaineEcheance?: string | null;
+  // Localisation (adresse d'exercice résolue depuis le RPPS, géocodée — Lot 7b).
+  adresse?: string | null;
+  codePostal?: string | null;
+  ville?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface ReqPiece {
