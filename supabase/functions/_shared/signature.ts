@@ -45,8 +45,8 @@ export interface ServiceSignature {
   envoyer(d: DemandeSignature): Promise<ResultatSignature>;
   /** Télécharge le document signé (une fois la signature terminée). */
   telechargerSigne(requestId: string): Promise<DocumentSigne>;
-  /** Télécharge le dossier de preuve (audit trail), si disponible. */
-  telechargerPreuve(requestId: string): Promise<DocumentSigne | null>;
+  /** Télécharge le dossier de preuve (audit trail) d'un signataire, si disponible. */
+  telechargerPreuve(requestId: string, signerId: string): Promise<DocumentSigne | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,16 +113,19 @@ export function creerYousign(): ServiceSignature {
     },
 
     async telechargerSigne(requestId) {
-      // Archive ZIP de tous les documents signés de la demande.
-      const res = await fetch(`${BASE}/signature_requests/${requestId}/documents/download?archive=true`, { headers: auth });
+      // Premier document signable de la demande, téléchargé en PDF.
+      const list = await callJson(`/signature_requests/${requestId}/documents`);
+      const docs: any[] = Array.isArray(list) ? list : (list?.data ?? list?.documents ?? []);
+      const docId = docs[0]?.id;
+      if (!docId) throw new Error("Aucun document signé à télécharger.");
+      const res = await fetch(`${BASE}/signature_requests/${requestId}/documents/${docId}/download`, { headers: auth });
       if (!res.ok) throw new Error(`Yousign download → ${res.status} ${await res.text().catch(() => "")}`);
-      const buf = new Uint8Array(await res.arrayBuffer());
-      const ext = (res.headers.get("content-type") ?? "").includes("zip") ? "zip" : "pdf";
-      return { nomFichier: `contrat-signe.${ext}`, contenu: buf };
+      return { nomFichier: "contrat-signe.pdf", contenu: new Uint8Array(await res.arrayBuffer()) };
     },
 
-    async telechargerPreuve(requestId) {
-      const res = await fetch(`${BASE}/signature_requests/${requestId}/audit_trails/download`, { headers: auth });
+    async telechargerPreuve(requestId, signerId) {
+      // Dossier de preuve (audit trail) du signataire.
+      const res = await fetch(`${BASE}/signature_requests/${requestId}/signers/${signerId}/audit_trails/download`, { headers: auth });
       if (!res.ok) return null;
       return { nomFichier: "preuve.pdf", contenu: new Uint8Array(await res.arrayBuffer()) };
     },
