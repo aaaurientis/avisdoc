@@ -66,15 +66,27 @@ serve(async (req) => {
   // profession, address, RPPS, birth_date, birth_place.
   const frDate = (iso: string) => { const [y, m, d] = String(iso).slice(0, 10).split("-"); return d && m && y ? `${d}/${m}/${y}` : ""; };
   const adresseComplete = [ins.adresse, [ins.code_postal, ins.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const civ = ins.civilite ?? "";
+  const prenom = ins.prenom ?? "";
+  const nom = ins.nom ?? "";
+  const prof = ins.profession ?? "";
+  const rppsVal = ins.rpps ?? "";
+  const bdate = ins.date_naissance ? frDate(ins.date_naissance) : "";
+  const bplace = ins.lieu_naissance ?? "";
   const champs = [
-    { label: "civilite", text: ins.civilite ?? "" },
-    { label: "name", text: ins.prenom ?? "" },
-    { label: "surname", text: ins.nom ?? "" },
-    { label: "profession", text: ins.profession ?? "" },
+    { label: "civilite", text: civ },
+    { label: "name", text: prenom },
+    { label: "surname", text: nom },
+    { label: "profession", text: prof },
     { label: "address", text: adresseComplete },
-    { label: "RPPS", text: ins.rpps ?? "" },
-    { label: "birth_date", text: ins.date_naissance ? frDate(ins.date_naissance) : "" },
-    { label: "birth_place", text: ins.lieu_naissance ?? "" },
+    { label: "RPPS", text: rppsVal },
+    { label: "birth_date", text: bdate },
+    { label: "birth_place", text: bplace },
+    // Doublons présents dans le document (mêmes valeurs que les champs ci-dessus).
+    { label: "civilite_1", text: civ },
+    { label: "name_1", text: prenom },
+    { label: "surname_1", text: nom },
+    { label: "address_1", text: adresseComplete },
   ];
 
   // Garde-fou : avec un template, Yousign exige que tous les champs lecture seule
