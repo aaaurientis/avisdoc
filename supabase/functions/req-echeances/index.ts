@@ -40,7 +40,7 @@ async function rappel(email: string, prenom: string, type: string, dateFin: stri
   const html =
     `<p>Bonjour ${escapeHtml(prenom)},</p>` +
     `<p>Votre ${LABEL[type] ?? type} arrive à échéance le <strong>${frDate(dateFin)}</strong>. ` +
-    `Pour continuer à exercer comme infirmière requérante AvisDoc, merci de déposer une ` +
+    `Pour continuer à exercer comme requérant AvisDoc, merci de déposer une ` +
     `attestation à jour depuis votre espace :</p>` +
     `<p><a href="${APP_URL}">Mettre à jour mon attestation</a></p>`;
   try {

@@ -55,7 +55,7 @@ serve(async (req) => {
       .eq("id", ins.id);
     if (error) return json({ error: error.message }, 500);
     await admin.from("req_historique").insert({
-      inscription_id: ins.id, acteur: "infirmiere", action: "compte_rattache",
+      inscription_id: ins.id, acteur: "requerant", action: "compte_rattache",
     });
   }
 

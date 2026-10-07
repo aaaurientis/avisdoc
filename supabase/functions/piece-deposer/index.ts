@@ -60,7 +60,7 @@ serve(async (req) => {
     }).eq("id", ins.id);
   }
   await admin.from("req_historique").insert({
-    inscription_id: ins.id, acteur: "infirmiere", action: "piece_deposee", piece_id: pieceRow.id, detail: { type },
+    inscription_id: ins.id, acteur: "requerant", action: "piece_deposee", piece_id: pieceRow.id, detail: { type },
   });
 
   const { data: signed, error: sErr } = await admin.storage.from("req-pieces").createSignedUploadUrl(path);

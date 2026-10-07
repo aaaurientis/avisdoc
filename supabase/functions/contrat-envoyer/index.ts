@@ -70,7 +70,7 @@ serve(async (req) => {
     { label: "civilite", text: ins.civilite ?? "" },
     { label: "name", text: ins.prenom ?? "" },
     { label: "surname", text: ins.nom ?? "" },
-    { label: "profession", text: ins.profession ?? "Infirmier(ère)" },
+    { label: "profession", text: ins.profession ?? "" },
     { label: "address", text: adresseComplete },
     { label: "RPPS", text: ins.rpps ?? "" },
     { label: "birth_date", text: ins.date_naissance ? frDate(ins.date_naissance) : "" },
@@ -80,7 +80,7 @@ serve(async (req) => {
   // Garde-fou : avec un template, Yousign exige que tous les champs lecture seule
   // soient remplis. On refuse si les informations du requérant sont incomplètes.
   if (YOUSIGN_TEMPLATE_ID && champs.some((c) => !c.text.trim())) {
-    return json({ error: "Informations du requérant incomplètes (civilité, naissance, adresse…). À compléter côté infirmière avant l'envoi." }, 409);
+    return json({ error: "Informations du requérant incomplètes (civilité, naissance, adresse…). À compléter côté requérant avant l'envoi." }, 409);
   }
 
   // 1. Envoie pour signature (Yousign, derrière l'interface).
@@ -133,7 +133,7 @@ serve(async (req) => {
   if (RESEND_API_KEY && resultat.signUrl) {
     const html =
       `<p>Bonjour ${escapeHtml(ins.prenom)},</p>` +
-      `<p>Votre dossier d'infirmière requérante AvisDoc est complet. Il ne reste qu'à signer ` +
+      `<p>Votre dossier de requérant AvisDoc est complet. Il ne reste qu'à signer ` +
       `votre convention de partenariat :</p>` +
       `<p><a href="${resultat.signUrl}">Signer ma convention</a></p>` +
       `<p>Vous pouvez aussi la signer depuis votre espace de suivi.</p>`;

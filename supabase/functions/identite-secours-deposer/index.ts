@@ -61,7 +61,7 @@ serve(async (req) => {
     derniere_action_le: new Date().toISOString(),
   }).eq("id", ins.id);
   await admin.from("req_historique").insert({
-    inscription_id: ins.id, acteur: "infirmiere", action: "identite_deposee", piece_id: pieceRow.id,
+    inscription_id: ins.id, acteur: "requerant", action: "identite_deposee", piece_id: pieceRow.id,
   });
 
   const { data: signed, error: sErr } = await admin.storage.from("req-identite").createSignedUploadUrl(path);

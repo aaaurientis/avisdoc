@@ -29,7 +29,7 @@ function toPoint(r: ReqInscription): NetworkContact {
   return {
     id: `req-${r.id}`,
     name: `${r.prenom} ${r.nom}`.trim(),
-    role: "Infirmière requérante",
+    role: "Requérant",
     type: "Requérant",
     types: ["Requérant"],
     statut: "Accepté",
