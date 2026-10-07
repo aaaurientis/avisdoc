@@ -98,6 +98,7 @@ function toDoc(r: any): DocItem {
     ext: r.ext,
     catParent: r.cat_parent ?? "",
     cat: r.cat ?? "",
+    tags: r.tags ?? [],
     size: r.size ?? "",
     date: r.date_label ?? "",
     owner: r.owner ?? "",
@@ -110,7 +111,7 @@ const DOCS_BUCKET = "admin-documents";
 
 export class SupabaseRepo implements AdminRepo {
   async load(): Promise<AdminSnapshot> {
-    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes, pipesRes] =
+    const [contactsRes, clientsRes, pcRes, pdRes, suiviRes, docsRes, typesRes, actRes, stagesRes, fieldsRes, accountsRes, pipesRes, tagsRes] =
       await Promise.all([
         sb.from("admin_network_contacts").select("*").order("created_at", { ascending: false }),
         sb.from("admin_clients").select("*").is("deleted_at", null).order("created_at", { ascending: true }),
@@ -126,6 +127,7 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
         sb.from("admin_accounts").select("*").is("deleted_at", null).order("name", { ascending: true }),
         sb.from("admin_pipelines").select("*").order("created_at", { ascending: true }),
+        sb.from("admin_doc_tags").select("name").order("name", { ascending: true }),
       ]);
 
     const firstError =
@@ -182,11 +184,15 @@ export class SupabaseRepo implements AdminRepo {
         subs: typeRows.filter((r) => r.parent === c.name).map((r) => r.name),
       }));
 
+    // Tags standardisés (tolérant tant que la migration 0055 n'est pas appliquée).
+    const docTags: string[] = tagsRes.error ? [] : (tagsRes.data ?? []).map((r: any) => r.name);
+
     return {
       contacts: (contactsRes.data ?? []).map(toContact),
       clients,
       docs: (docsRes.data ?? []).map(toDoc),
       docTree,
+      docTags,
       activity: (actRes.data ?? []).map(
         (r: any): ActivityItem => ({ id: r.id, dot: r.dot, text: r.text, when: r.when_label ?? "" }),
       ),
@@ -333,6 +339,7 @@ export class SupabaseRepo implements AdminRepo {
       ext: doc.ext,
       cat: doc.cat,
       cat_parent: doc.catParent,
+      tags: doc.tags,
       size: doc.size,
       date_label: doc.date,
       owner: doc.owner,
@@ -555,6 +562,23 @@ export class SupabaseRepo implements AdminRepo {
       .delete()
       .eq("parent", parent)
       .eq("name", name);
+    this.assert(error);
+  }
+
+  async setDocTags(id: string, tags: string[]): Promise<void> {
+    const { error } = await sb.from("admin_documents").update({ tags }).eq("id", id);
+    this.assert(error);
+  }
+
+  async addTag(name: string): Promise<void> {
+    const { error } = await sb.from("admin_doc_tags").insert({ name });
+    this.assert(error);
+  }
+
+  async removeTag(name: string): Promise<void> {
+    // Retire le tag des documents qui le portaient PUIS de la liste gérée
+    // (fonction SQL atomique — voir migration 0055).
+    const { error } = await sb.rpc("retirer_doc_tag", { p_name: name });
     this.assert(error);
   }
 }

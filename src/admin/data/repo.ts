@@ -26,6 +26,7 @@ import {
   SEED_CLIENTS,
   SEED_CONTACTS,
   SEED_DOCS,
+  SEED_DOC_TAGS,
   SEED_DOC_TREE,
 } from "./seed";
 
@@ -34,6 +35,7 @@ export interface AdminSnapshot {
   clients: Client[];
   docs: DocItem[];
   docTree: DocCategory[];
+  docTags: string[];
   activity: ActivityItem[];
   /** Colonnes du pipeline, dans l'ordre (migration 0023). */
   stages: PipelineStage[];
@@ -109,6 +111,12 @@ export interface AdminRepo {
   removeCategory(name: string): Promise<void>;
   addSubType(parent: string, name: string): Promise<void>;
   removeSubType(parent: string, name: string): Promise<void>;
+
+  // Tags standardisés
+  /** Remplace l'ensemble des tags d'un document. */
+  setDocTags(id: string, tags: string[]): Promise<void>;
+  addTag(name: string): Promise<void>;
+  removeTag(name: string): Promise<void>;
 }
 
 /** Implémentation en mémoire : sert le jeu de démo, mutations en no-op persistées. */
@@ -120,6 +128,7 @@ export class MockRepo implements AdminRepo {
       clients: structuredClone(SEED_CLIENTS),
       docs: structuredClone(SEED_DOCS),
       docTree: structuredClone(SEED_DOC_TREE),
+      docTags: [...SEED_DOC_TAGS],
       activity: structuredClone(SEED_ACTIVITY),
       stages: structuredClone(STAGES_DEFAUT),
       pipelines: [],
@@ -171,4 +180,7 @@ export class MockRepo implements AdminRepo {
   async removeCategory(): Promise<void> {}
   async addSubType(): Promise<void> {}
   async removeSubType(): Promise<void> {}
+  async setDocTags(): Promise<void> {}
+  async addTag(): Promise<void> {}
+  async removeTag(): Promise<void> {}
 }

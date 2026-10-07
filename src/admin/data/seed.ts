@@ -112,15 +112,26 @@ export const SEED_CLIENTS: Client[] = [
 ];
 
 export const SEED_DOCS: DocItem[] = [
-  { id: "dc-1", name: "Convention CHU Grenoble — filière rapide.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", ext: "PDF", size: "1,2 Mo", date: "9 juil. 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-2", name: "Compte-rendu comité médical T2 2026.docx", catParent: "Doc. Interne", cat: "Organisation", ext: "DOC", size: "340 Ko", date: "5 juil. 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-3", name: "Grille tarifaire téléexpertise 2026.xlsx", catParent: "Doc. Interne", cat: "Technique", ext: "XLS", size: "88 Ko", date: "1 juil. 2026", owner: "M. Diallo", version: 1 },
-  { id: "dc-4", name: "Fiche logistique journée dépistage.pdf", catParent: "CR journées", cat: "Fiches logistiques", ext: "PDF", size: "2,1 Mo", date: "24 juin 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-5", name: "Convention Clinique Belledonne — exérèses.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", ext: "PDF", size: "980 Ko", date: "18 juin 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-6", name: "Modèle de consentement patient — 2026.docx", catParent: "CR journées", cat: "Patients", ext: "DOC", size: "120 Ko", date: "12 juin 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-7", name: "Facturation experts — juin 2026.xlsx", catParent: "Contrats signés", cat: "Experts", ext: "XLS", size: "210 Ko", date: "2 juin 2026", owner: "M. Diallo", version: 1 },
-  { id: "dc-8", name: "Charte du réseau d'experts AvisDoc.pdf", catParent: "Equipe Médicale", cat: "Experts", ext: "PDF", size: "640 Ko", date: "20 mai 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-9", name: "Compte-rendu AG annuelle 2026.pdf", catParent: "CR journées", cat: "Journées", ext: "PDF", size: "1,8 Mo", date: "14 mai 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-1", name: "Convention CHU Grenoble — filière rapide.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", tags: ["Signé", "Prioritaire"], ext: "PDF", size: "1,2 Mo", date: "9 juil. 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-2", name: "Compte-rendu comité médical T2 2026.docx", catParent: "Doc. Interne", cat: "Organisation", tags: [], ext: "DOC", size: "340 Ko", date: "5 juil. 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-3", name: "Grille tarifaire téléexpertise 2026.xlsx", catParent: "Doc. Interne", cat: "Technique", tags: ["Confidentiel"], ext: "XLS", size: "88 Ko", date: "1 juil. 2026", owner: "M. Diallo", version: 1 },
+  { id: "dc-4", name: "Fiche logistique journée dépistage.pdf", catParent: "CR journées", cat: "Fiches logistiques", tags: ["À valider"], ext: "PDF", size: "2,1 Mo", date: "24 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-5", name: "Convention Clinique Belledonne — exérèses.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", tags: ["Signé"], ext: "PDF", size: "980 Ko", date: "18 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-6", name: "Modèle de consentement patient — 2026.docx", catParent: "CR journées", cat: "Patients", tags: ["Modèle"], ext: "DOC", size: "120 Ko", date: "12 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-7", name: "Facturation experts — juin 2026.xlsx", catParent: "Contrats signés", cat: "Experts", tags: ["Confidentiel"], ext: "XLS", size: "210 Ko", date: "2 juin 2026", owner: "M. Diallo", version: 1 },
+  { id: "dc-8", name: "Charte du réseau d'experts AvisDoc.pdf", catParent: "Equipe Médicale", cat: "Experts", tags: ["Validé"], ext: "PDF", size: "640 Ko", date: "20 mai 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-9", name: "Compte-rendu AG annuelle 2026.pdf", catParent: "CR journées", cat: "Journées", tags: [], ext: "PDF", size: "1,8 Mo", date: "14 mai 2026", owner: "S. Benali", version: 1 },
+];
+
+// Tags standardisés par défaut (modifiables dans les Réglages).
+export const SEED_DOC_TAGS: string[] = [
+  "À valider",
+  "Validé",
+  "Signé",
+  "Confidentiel",
+  "Modèle",
+  "Prioritaire",
+  "Archivé",
 ];
 
 // Arborescence documentaire à 2 niveaux (catégories → sous-catégories).
