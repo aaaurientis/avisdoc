@@ -22,7 +22,7 @@ Réf. spec : « Spécification : inscription et validation des infirmières requ
 |---|---|---|
 | **0** | Externes à lancer en parallèle : DataPass/ANS (PSC, délai long), compte Yousign, validation juridique des durées de conservation | — |
 | **1** | **Socle** : modèle de données (`req_inscriptions`, `req_pieces`, `req_contrats`, `req_historique`), machine à états, RLS, buckets privés | — |
-| **2** | **Back-office** A1 Inscriptions / A2 Fiche / A3 Contrôle + fonctions `inscription-inviter`, `piece-controler`, `inscription-suspendre/-refuser/-resilier` | 1 |
+| **2** | **Back-office** A1 Inscriptions / A2 Fiche / A3 Contrôle + fonctions `inscription-inviter`, `piece-controler`, `inscription-suspendre/-refuser/-resilier`. Inclut le **pré-remplissage automatique des champs RCP** (assureur / police / date de fin) depuis la pièce déposée, **révisé par l'admin** avant validation (RI-04 reste une validation humaine). | 1 |
 | **3** | **Portail `requerant.avisdoc.fr`** (P1–P5), auth lien magique + fonctions `identite-secours-deposer`, `piece-deposer` | 1 (se marie avec 2) |
 | **4** | **Yousign** : `ServiceSignature`, `contrat-envoyer`, `yousign-webhook` (idempotent, RI-07) | 1 + compte Yousign |
 | **5** | **Pro Santé Connect** : `identite-psc-retour` (RI-02), bascule P1 sur PSC | 1 + raccordement PSC |
@@ -42,6 +42,14 @@ Lot 0 tourne en parallèle dès le début.
 - **Motifs de refus** (RI-06, liste fermée) : illisible, incomplète, mauvais
   document, nom non concordant, période non couverte, exercice libéral absent,
   code URSSAF non vérifiable, autre.
+
+## Points à trancher
+
+- **Extraction automatique RCP (Lot 2)** : méthode à choisir — **sans tiers**
+  (OCR local + règles, fiable sur modèles connus) ou **IA d'extraction** (fiable
+  sur formats variés, mais tiers + RGPD car données personnelles). Dans tous les
+  cas : pré-remplissage + **relecture/correction par l'admin** (champs éditables).
+  Pourrait s'étendre à l'URSSAF (date d'émission).
 
 ## État d'avancement
 
