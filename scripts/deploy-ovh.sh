@@ -44,6 +44,7 @@ fi
 : "${OVH_DIR_ADMIN:=admin}"
 : "${OVH_DIR_CLIENT:=client}"
 : "${OVH_DIR_PRO:=pro}"
+: "${OVH_DIR_REQUERANT:=requerant}"
 
 if ! command -v lftp >/dev/null 2>&1; then
   echo "✗ lftp est requis. macOS → brew install lftp"
@@ -59,7 +60,7 @@ for a in "$@"; do
   cibles+=("$a")
 done
 [[ ${#cibles[@]} -eq 0 ]] && cibles=(admin client)
-if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www pro); fi
+if [[ "${cibles[0]}" == "all" ]]; then cibles=(admin client www pro requerant); fi
 
 # Résout le dossier distant d'une cible.
 dir_distant() {
@@ -68,7 +69,8 @@ dir_distant() {
     admin)  echo "$OVH_DIR_ADMIN" ;;
     client) echo "$OVH_DIR_CLIENT" ;;
     pro)    echo "$OVH_DIR_PRO" ;;
-    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | pro | all)" >&2; exit 1 ;;
+    requerant) echo "$OVH_DIR_REQUERANT" ;;
+    *) echo "✗ Cible inconnue : $1 (attendu : www | admin | client | pro | requerant | all)" >&2; exit 1 ;;
   esac
 }
 
@@ -103,5 +105,6 @@ for cible in "${cibles[@]}"; do
     admin)  echo "  https://admin.avisdoc.fr" ;;
     client) echo "  https://client.avisdoc.fr" ;;
     pro)    echo "  https://pro.avisdoc.fr" ;;
+    requerant) echo "  https://requerant.avisdoc.fr" ;;
   esac
 done

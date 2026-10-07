@@ -30,6 +30,16 @@ function escapeHtml(s: string): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 }
 
+// Lien magique de connexion (crée le compte si besoin) renvoyant au portail avec
+// le token d'invitation. magiclink si le compte existe, invite sinon.
+async function lienMagique(admin: any, email: string, redirectTo: string): Promise<string | null> {
+  for (const type of ["invite", "magiclink"]) {
+    const { data, error } = await admin.auth.admin.generateLink({ type, email, options: { redirectTo } });
+    if (!error && data?.properties?.action_link) return data.properties.action_link as string;
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "méthode non autorisée" }, 405);
@@ -76,25 +86,27 @@ serve(async (req) => {
     detail: { email: cible },
   });
 
-  // E-mail d'invitation (best-effort : l'inscription existe même si l'envoi échoue).
+  // E-mail d'invitation = lien magique (connexion directe), best-effort.
   let email_envoye = false;
   if (RESEND_API_KEY) {
-    const lien = `${REQUERANT_APP_URL}/#/?token=${token}`;
-    const html =
-      `<p>Bonjour ${escapeHtml(prenom)},</p>` +
-      `<p>Vous êtes invitée à finaliser votre inscription comme infirmière requérante AvisDoc. ` +
-      `Ce lien est personnel et valable 7 jours.</p>` +
-      `<p><a href="${lien}">Commencer mon inscription</a></p>`;
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: EMAIL_FROM, to: cible, subject: "Votre inscription AvisDoc", html }),
-      });
-      email_envoye = res.ok;
-      if (!res.ok) console.error("Resend:", res.status, await res.text().catch(() => ""));
-    } catch (e) {
-      console.error(e);
+    const lien = await lienMagique(admin, cible, `${REQUERANT_APP_URL}/?token=${token}`);
+    if (lien) {
+      const html =
+        `<p>Bonjour ${escapeHtml(prenom)},</p>` +
+        `<p>Vous êtes invitée à finaliser votre inscription comme infirmière requérante AvisDoc. ` +
+        `Ce lien de connexion est personnel et valable 7 jours.</p>` +
+        `<p><a href="${lien}">Commencer mon inscription</a></p>`;
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: EMAIL_FROM, to: cible, subject: "Votre inscription AvisDoc", html }),
+        });
+        email_envoye = res.ok;
+        if (!res.ok) console.error("Resend:", res.status, await res.text().catch(() => ""));
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 

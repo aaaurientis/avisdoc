@@ -55,3 +55,11 @@ verify_jwt = true
 # Transition d'inscription (suspendre/refuser/résilier) — admin @avisdoc.fr.
 [functions.inscription-action]
 verify_jwt = true
+
+# Rattachement du compte infirmière à son inscription (token du lien).
+[functions.inscription-accepter]
+verify_jwt = true
+
+# Renvoi public d'un lien de connexion (ne divulgue pas l'existence du dossier).
+[functions.inscription-renvoyer]
+verify_jwt = false

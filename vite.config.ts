@@ -25,6 +25,8 @@ export default defineConfig({
         client: path.resolve(__dirname, "client.html"),
         // Espace professionnel (pro.avisdoc.fr)
         pro: path.resolve(__dirname, "pro.html"),
+        // Portail inscription infirmières (requerant.avisdoc.fr)
+        requerant: path.resolve(__dirname, "requerant.html"),
       },
     },
   },

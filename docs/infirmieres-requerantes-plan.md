@@ -55,7 +55,7 @@ Lot 0 tourne en parallèle dès le début.
 
 - [x] Lot 1 — socle (migration `0057_req_infirmieres.sql`)
 - [x] Lot 2 — back-office (A1 liste, A2 fiche, A3 contrôle, invitation + actions)
-- [ ] Lot 3 — portail
+- [~] Lot 3 — portail : **3a fait** (app `requerant.avisdoc.fr`, auth lien magique, P1 Bienvenue, P3 Suivi) ; **3b à venir** (P2 identité + P4 dépôts)
 - [ ] Lot 4 — Yousign
 - [ ] Lot 5 — Pro Santé Connect
 - [ ] Lot 6 — échéances / conservation
