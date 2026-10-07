@@ -33,3 +33,6 @@ platform/generation-service/paquet/documents/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Supabase CLI (état local lié au projet)
+supabase/.temp/
