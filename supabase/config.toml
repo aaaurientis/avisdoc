@@ -43,3 +43,7 @@ verify_jwt = false
 # depuis le secret GOOGLE_MAPS_KEY côté serveur.
 [functions.maps-cle]
 verify_jwt = true
+
+# Invitation d'une infirmière requérante — admin @avisdoc.fr vérifié dans la fonction.
+[functions.inscription-inviter]
+verify_jwt = true
