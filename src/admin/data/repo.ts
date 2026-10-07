@@ -111,6 +111,14 @@ export interface AdminRepo {
   removeCategory(name: string): Promise<void>;
   addSubType(parent: string, name: string): Promise<void>;
   removeSubType(parent: string, name: string): Promise<void>;
+  /** Renomme une catégorie EN CASCADE (sous-catégories + documents). */
+  renameCategory(oldName: string, newName: string): Promise<void>;
+  /** Renomme une sous-catégorie EN CASCADE (documents du même parent). */
+  renameSubType(parent: string, oldName: string, newName: string): Promise<void>;
+  /** Réordonne les catégories (ordre = liste de noms). */
+  reorderCategories(names: string[]): Promise<void>;
+  /** Réordonne les sous-catégories d'une catégorie. */
+  reorderSubTypes(parent: string, names: string[]): Promise<void>;
 
   // Tags standardisés
   /** Remplace l'ensemble des tags d'un document. */
@@ -180,6 +188,10 @@ export class MockRepo implements AdminRepo {
   async removeCategory(): Promise<void> {}
   async addSubType(): Promise<void> {}
   async removeSubType(): Promise<void> {}
+  async renameCategory(): Promise<void> {}
+  async renameSubType(): Promise<void> {}
+  async reorderCategories(): Promise<void> {}
+  async reorderSubTypes(): Promise<void> {}
   async setDocTags(): Promise<void> {}
   async addTag(): Promise<void> {}
   async removeTag(): Promise<void> {}

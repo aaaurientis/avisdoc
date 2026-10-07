@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowUp, Download, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
@@ -37,6 +38,9 @@ export default function Documents() {
   } = useAdminData();
   const [cat, setCat] = useState(""); // catégorie (niveau 1) sélectionnée
   const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlCat = searchParams.get("cat"); // catégorie demandée via le menu latéral
+  const prevUrlCat = useRef<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]); // filtre par tags (OU)
   const [importDraft, setImportDraft] = useState<ImportDraft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,14 +62,24 @@ export default function Documents() {
 
   const currentCat = useMemo(() => docTree.find((c) => c.name === cat), [docTree, cat]);
 
-  // Une catégorie est toujours sélectionnée : on cale sur la première dès que
-  // l'arborescence est chargée (ou si la catégorie courante n'existe plus).
+  // Une catégorie est toujours sélectionnée. Priorité à la catégorie demandée
+  // via l'URL (menu latéral) quand elle change ; sinon on garantit une
+  // catégorie valide (la première par défaut).
   useEffect(() => {
-    if (docTree.length && !docTree.some((c) => c.name === cat)) {
+    if (!docTree.length) return;
+    if (urlCat !== prevUrlCat.current) {
+      prevUrlCat.current = urlCat;
+      if (urlCat && docTree.some((c) => c.name === urlCat)) {
+        setCat(urlCat);
+        setSub(null);
+        return;
+      }
+    }
+    if (!docTree.some((c) => c.name === cat)) {
       setCat(docTree[0].name);
       setSub(null);
     }
-  }, [docTree, cat]);
+  }, [docTree, urlCat, cat]);
 
   const rows = docs.filter((d) => {
     if (d.catParent !== cat) return false;
@@ -86,6 +100,8 @@ export default function Documents() {
   const selectCat = (name: string) => {
     setCat(name);
     setSub(null);
+    // Reflète la catégorie dans l'URL pour que le menu latéral suive.
+    setSearchParams(name ? { cat: name } : {}, { replace: true });
   };
 
   // À la sélection d'un fichier : on n'importe pas directement, on ouvre la

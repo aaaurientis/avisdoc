@@ -565,6 +565,28 @@ export class SupabaseRepo implements AdminRepo {
     this.assert(error);
   }
 
+  async renameCategory(oldName: string, newName: string): Promise<void> {
+    const { error } = await sb.rpc("renommer_doc_categorie", { p_old: oldName, p_new: newName });
+    this.assert(error);
+  }
+
+  async renameSubType(parent: string, oldName: string, newName: string): Promise<void> {
+    const { error } = await sb.rpc("renommer_doc_sous_categorie", {
+      p_parent: parent, p_old: oldName, p_new: newName,
+    });
+    this.assert(error);
+  }
+
+  async reorderCategories(names: string[]): Promise<void> {
+    const { error } = await sb.rpc("reordonner_doc_types", { p_parent: null, p_names: names });
+    this.assert(error);
+  }
+
+  async reorderSubTypes(parent: string, names: string[]): Promise<void> {
+    const { error } = await sb.rpc("reordonner_doc_types", { p_parent: parent, p_names: names });
+    this.assert(error);
+  }
+
   async setDocTags(id: string, tags: string[]): Promise<void> {
     const { error } = await sb.from("admin_documents").update({ tags }).eq("id", id);
     this.assert(error);
