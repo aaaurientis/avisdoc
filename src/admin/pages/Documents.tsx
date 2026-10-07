@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowUp, Download, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
-import { DOC_EXT } from "../lib/ui-tokens";
+import { DOC_EXT, catPalette } from "../lib/ui-tokens";
 import { useAdminData } from "../data/AdminDataContext";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 
-const COLS = "minmax(180px,2.4fr) 150px 60px 84px minmax(64px,0.8fr) 150px";
+const COLS = "minmax(180px,2.2fr) 210px 60px 84px minmax(64px,0.8fr) 150px";
+// Séparateur interne (caractère de contrôle « unit separator ») pour encoder
+// « catégorie ␟ sous-catégorie » dans la valeur d'un <option>.
+const SEP = "␟";
 
 interface Preview {
   id: string;
@@ -19,10 +22,11 @@ interface Preview {
 
 export default function Documents() {
   const {
-    docs, docTypes, deleteDoc, importDoc, newDocVersion,
+    docs, docTree, deleteDoc, importDoc, newDocVersion,
     downloadDoc, documentUrl, setDocCategory,
   } = useAdminData();
-  const [cat, setCat] = useState("Tous");
+  const [cat, setCat] = useState("Tous"); // catégorie (niveau 1) ou « Tous »
+  const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [renderError, setRenderError] = useState(false);
@@ -40,18 +44,40 @@ export default function Documents() {
   const isOfficeRender = (ext: DocItem["ext"]) =>
     ext === "DOC" || ext === "XLS" || ext === "PPT";
 
-  const tabs = useMemo(() => ["Tous", ...docTypes], [docTypes]);
-  const rows = docs.filter((d) => cat === "Tous" || d.cat === cat);
-  const targetCat = cat !== "Tous" ? cat : docTypes[0] ?? "Autre";
+  const currentCat = useMemo(() => docTree.find((c) => c.name === cat), [docTree, cat]);
+  const rows = docs.filter((d) => {
+    if (cat === "Tous") return true;
+    if (d.catParent !== cat) return false;
+    return sub == null || d.cat === sub;
+  });
+
+  // Sous-catégorie cible d'un import, selon le filtre courant.
+  const target = useMemo(() => {
+    if (cat !== "Tous" && currentCat) {
+      return { parent: cat, sub: sub ?? currentCat.subs[0] ?? "" };
+    }
+    const first = docTree[0];
+    return { parent: first?.name ?? "", sub: first?.subs[0] ?? "" };
+  }, [cat, sub, currentCat, docTree]);
+  const canImport = Boolean(target.parent && target.sub);
+
+  const selectCat = (name: string) => {
+    setCat(name);
+    setSub(null);
+  };
 
   const onPickImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    if (!canImport) {
+      toast.error("Créez d'abord une catégorie et une sous-catégorie (Réglages).");
+      return;
+    }
     setBusy(true);
     try {
-      await importDoc(file, targetCat);
-      toast.success(`« ${file.name} » importé dans « ${targetCat} ».`);
+      await importDoc(file, target.parent, target.sub);
+      toast.success(`« ${file.name} » importé dans « ${target.parent} › ${target.sub} ».`);
     } catch { /* toast géré dans le contexte */ } finally { setBusy(false); }
   };
 
@@ -130,7 +156,7 @@ export default function Documents() {
     <div>
       <PageHeader
         title="Documents"
-        subtitle={`${docs.length} fichiers · conventions, comptes-rendus, juridique`}
+        subtitle={`${docs.length} fichiers · ${docTree.length} catégories`}
         action={
           <button
             type="button"
@@ -146,27 +172,72 @@ export default function Documents() {
       <input ref={importInputRef} type="file" hidden onChange={onPickImport} />
       <input ref={versionInputRef} type="file" hidden onChange={onPickVersion} />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {tabs.map((t) => {
-          const on = cat === t;
+      {/* Niveau 1 : catégories */}
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => selectCat("Tous")}
+          className={cn(
+            "rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors",
+            cat === "Tous"
+              ? "border-avisdoc-ink bg-avisdoc-ink text-white"
+              : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
+          )}
+        >
+          Tous
+        </button>
+        {docTree.map((c, i) => {
+          const on = cat === c.name;
+          const pal = catPalette(i);
           return (
             <button
-              key={t}
+              key={c.name}
               type="button"
-              onClick={() => setCat(t)}
+              onClick={() => selectCat(c.name)}
               className={cn(
-                "rounded-full border px-4.5 py-2 text-[13px] font-semibold transition-colors",
-                on
-                  ? "border-avisdoc-ink bg-avisdoc-ink text-white"
-                  : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
+                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors",
+                on ? pal.active : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
               )}
-              style={{ paddingLeft: 18, paddingRight: 18 }}
             >
-              {t}
+              {!on && <span className={cn("size-2 shrink-0 rounded-full", pal.dot)} />}
+              {c.name}
             </button>
           );
         })}
       </div>
+
+      {/* Niveau 2 : sous-catégories de la catégorie sélectionnée */}
+      {cat !== "Tous" && currentCat && currentCat.subs.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2 border-l-2 border-border pl-3">
+          <button
+            type="button"
+            onClick={() => setSub(null)}
+            className={cn(
+              "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors",
+              sub === null
+                ? "bg-avisdoc-teal text-white"
+                : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+            )}
+          >
+            Toutes
+          </button>
+          {currentCat.subs.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSub(s)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors",
+                sub === s
+                  ? "bg-avisdoc-teal text-white"
+                  : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Card className="overflow-x-auto">
         <div style={{ minWidth: 760 }}>
@@ -183,8 +254,8 @@ export default function Documents() {
           </div>
 
           {rows.map((d) => {
-            // La catégorie courante est toujours proposée, même si retirée des Réglages.
-            const options = Array.from(new Set([...docTypes, d.cat])).filter(Boolean);
+            // La (sous-)catégorie courante reste proposée même si retirée des Réglages.
+            const inTree = docTree.some((c) => c.name === d.catParent && c.subs.includes(d.cat));
             return (
               <div
                 key={d.id}
@@ -216,13 +287,27 @@ export default function Documents() {
                 </div>
                 <div>
                   <select
-                    value={d.cat}
-                    onChange={(e) => setDocCategory(d.id, e.target.value)}
+                    value={`${d.catParent}${SEP}${d.cat}`}
+                    onChange={(e) => {
+                      const [p, s] = e.target.value.split(SEP);
+                      setDocCategory(d.id, p, s);
+                    }}
                     title="Changer la catégorie"
-                    className="ad-input w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[12.5px] text-muted-foreground outline-none transition-colors hover:border-avisdoc-teal focus:border-avisdoc-teal"
+                    className="ad-input w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:border-avisdoc-teal focus:border-avisdoc-teal"
                   >
-                    {options.map((o) => (
-                      <option key={o} value={o}>{o}</option>
+                    {!inTree && (
+                      <option value={`${d.catParent}${SEP}${d.cat}`}>
+                        {d.catParent ? `${d.catParent} › ` : ""}{d.cat || "—"}
+                      </option>
+                    )}
+                    {docTree.map((c) => (
+                      <optgroup key={c.name} label={c.name}>
+                        {c.subs.map((s) => (
+                          <option key={`${c.name}${SEP}${s}`} value={`${c.name}${SEP}${s}`}>
+                            {s}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>

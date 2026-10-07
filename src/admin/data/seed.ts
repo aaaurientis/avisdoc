@@ -7,6 +7,7 @@ import type {
   AccountField,
   ActivityItem,
   Client,
+  DocCategory,
   DocItem,
   NetworkContact,
   PappersResult,
@@ -111,22 +112,26 @@ export const SEED_CLIENTS: Client[] = [
 ];
 
 export const SEED_DOCS: DocItem[] = [
-  { id: "dc-1", name: "Convention CHU Grenoble — filière rapide.pdf", cat: "Conventions", ext: "PDF", size: "1,2 Mo", date: "9 juil. 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-2", name: "Compte-rendu comité médical T2 2026.docx", cat: "Comptes-rendus", ext: "DOC", size: "340 Ko", date: "5 juil. 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-3", name: "Grille tarifaire téléexpertise 2026.xlsx", cat: "Facturation", ext: "XLS", size: "88 Ko", date: "1 juil. 2026", owner: "M. Diallo", version: 1 },
-  { id: "dc-4", name: "Registre des traitements RGPD — v4.pdf", cat: "Juridique", ext: "PDF", size: "2,1 Mo", date: "24 juin 2026", owner: "Cabinet Lexa", version: 1 },
-  { id: "dc-5", name: "Convention Clinique Belledonne — exérèses.pdf", cat: "Conventions", ext: "PDF", size: "980 Ko", date: "18 juin 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-6", name: "Modèle de consentement patient — 2026.docx", cat: "Juridique", ext: "DOC", size: "120 Ko", date: "12 juin 2026", owner: "Cabinet Lexa", version: 1 },
-  { id: "dc-7", name: "Facturation experts — juin 2026.xlsx", cat: "Facturation", ext: "XLS", size: "210 Ko", date: "2 juin 2026", owner: "M. Diallo", version: 1 },
-  { id: "dc-8", name: "Charte du réseau d'experts AvisDoc.pdf", cat: "Conventions", ext: "PDF", size: "640 Ko", date: "20 mai 2026", owner: "S. Benali", version: 1 },
-  { id: "dc-9", name: "Compte-rendu AG annuelle 2026.pdf", cat: "Comptes-rendus", ext: "PDF", size: "1,8 Mo", date: "14 mai 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-1", name: "Convention CHU Grenoble — filière rapide.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", ext: "PDF", size: "1,2 Mo", date: "9 juil. 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-2", name: "Compte-rendu comité médical T2 2026.docx", catParent: "Doc. Interne", cat: "Organisation", ext: "DOC", size: "340 Ko", date: "5 juil. 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-3", name: "Grille tarifaire téléexpertise 2026.xlsx", catParent: "Doc. Interne", cat: "Technique", ext: "XLS", size: "88 Ko", date: "1 juil. 2026", owner: "M. Diallo", version: 1 },
+  { id: "dc-4", name: "Fiche logistique journée dépistage.pdf", catParent: "CR journées", cat: "Fiches logistiques", ext: "PDF", size: "2,1 Mo", date: "24 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-5", name: "Convention Clinique Belledonne — exérèses.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", ext: "PDF", size: "980 Ko", date: "18 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-6", name: "Modèle de consentement patient — 2026.docx", catParent: "CR journées", cat: "Patients", ext: "DOC", size: "120 Ko", date: "12 juin 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-7", name: "Facturation experts — juin 2026.xlsx", catParent: "Contrats signés", cat: "Experts", ext: "XLS", size: "210 Ko", date: "2 juin 2026", owner: "M. Diallo", version: 1 },
+  { id: "dc-8", name: "Charte du réseau d'experts AvisDoc.pdf", catParent: "Equipe Médicale", cat: "Experts", ext: "PDF", size: "640 Ko", date: "20 mai 2026", owner: "S. Benali", version: 1 },
+  { id: "dc-9", name: "Compte-rendu AG annuelle 2026.pdf", catParent: "CR journées", cat: "Journées", ext: "PDF", size: "1,8 Mo", date: "14 mai 2026", owner: "S. Benali", version: 1 },
 ];
 
-export const SEED_DOC_TYPES: string[] = [
-  "Conventions",
-  "Comptes-rendus",
-  "Facturation",
-  "Juridique",
+// Arborescence documentaire à 2 niveaux (catégories → sous-catégories).
+export const SEED_DOC_TREE: DocCategory[] = [
+  { name: "Doc. Profil", subs: ["Prospection Clients", "RH - Contact Client", "Mailing Campagne", "Collaborateur Patient"] },
+  { name: "Equipe Médicale", subs: ["Infirmières", "Experts", "Réseau d'aval"] },
+  { name: "Doc. Interne", subs: ["Planning", "Technique", "Organisation"] },
+  { name: "CR journées", subs: ["Fiches logistiques", "Journées", "Patients", "Experts"] },
+  { name: "Contrats signés", subs: ["Infirmières", "Experts", "Réseau d'aval"] },
+  { name: "Newsletter", subs: ["Infirmière", "Dermo", "Client"] },
+  { name: "Réserve", subs: ["Archives", "Draft"] },
 ];
 
 export const SEED_ACTIVITY: ActivityItem[] = [

@@ -22,6 +22,7 @@ import type {
   ActivityItem,
   Client,
   ContactType,
+  DocCategory,
   DocItem,
   FieldType,
   NetworkContact,
@@ -57,7 +58,7 @@ interface DataValue {
   contacts: NetworkContact[];
   clients: Client[];
   docs: DocItem[];
-  docTypes: string[];
+  docTree: DocCategory[];
   activity: ActivityItem[];
 
   getClient: (id: string) => Client | undefined;
@@ -90,16 +91,13 @@ interface DataValue {
   toggleSuivi: (clientId: string, suiviId: string) => void;
   removeSuivi: (clientId: string, suiviId: string) => void;
 
-  importDoc: (file: File, cat: string) => Promise<void>;
+  importDoc: (file: File, parent: string, sub: string) => Promise<void>;
   newDocVersion: (id: string, file: File) => Promise<void>;
   downloadDoc: (id: string) => Promise<void>;
   /** URL signée d'un document : download=false pour l'aperçu en ligne. */
   documentUrl: (id: string, download?: boolean) => Promise<string | null>;
-  setDocCategory: (id: string, cat: string) => void;
+  setDocCategory: (id: string, parent: string, sub: string) => void;
   deleteDoc: (id: string) => void;
-
-  addDocType: (name: string) => void;
-  removeDocType: (name: string) => void;
 
   // Colonnes du pipeline (migration 0023)
   stages: PipelineStage[];
@@ -132,6 +130,12 @@ interface DataValue {
   renameField: (id: string, label: string) => void;
   moveField: (id: string, sens: -1 | 1) => void;
   deleteField: (id: string) => void;
+
+  // Arborescence documentaire (catégories → sous-catégories)
+  addCategory: (name: string) => void;
+  removeCategory: (name: string) => void;
+  addSubType: (parent: string, name: string) => void;
+  removeSubType: (parent: string, name: string) => void;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -145,7 +149,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [contacts, setContacts] = useState<NetworkContact[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [docs, setDocs] = useState<DocItem[]>([]);
-  const [docTypes, setDocTypes] = useState<string[]>([]);
+  const [docTree, setDocTree] = useState<DocCategory[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -156,7 +160,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setContacts(snap.contacts);
     setClients(snap.clients);
     setDocs(snap.docs);
-    setDocTypes(snap.docTypes);
+    setDocTree(snap.docTree);
     setActivity(snap.activity);
     setStages(snap.stages);
     setPipelines(snap.pipelines);
@@ -445,14 +449,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   /** Import d'un vrai fichier → upload Storage + enregistrement. */
   const importDoc: DataValue["importDoc"] = useCallback(
-    async (file, cat) => {
+    async (file, parent, sub) => {
       const id = uid();
       const version = 1;
       const doc: DocItem = {
         id,
         name: file.name,
         ext: extFromName(file.name),
-        cat,
+        catParent: parent,
+        cat: sub,
         size: humanSize(file.size),
         date: todayLong(),
         owner: user?.name ?? "—",
@@ -516,11 +521,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [repo, docs],
   );
 
-  /** Change la catégorie d'un document sans le ré-uploader. */
+  /** Change la (sous-)catégorie d'un document sans le ré-uploader. */
   const setDocCategory: DataValue["setDocCategory"] = useCallback(
-    (id, cat) => {
-      setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, cat } : d)));
-      persist(() => repo.setDocCat(id, cat));
+    (id, parent, sub) => {
+      setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, catParent: parent, cat: sub } : d)));
+      persist(() => repo.setDocCat(id, parent, sub));
     },
     [persist, repo],
   );
@@ -545,26 +550,53 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [repo, docs],
   );
 
-  // --- Réglages ---
-  const addDocType: DataValue["addDocType"] = useCallback(
+  // --- Réglages : arborescence documentaire ---
+  const addCategory: DataValue["addCategory"] = useCallback(
     (name) => {
       const n = name.trim();
       if (!n) return;
       let added = false;
-      setDocTypes((prev) => {
-        if (prev.includes(n)) return prev;
+      setDocTree((prev) => {
+        if (prev.some((c) => c.name === n)) return prev;
         added = true;
-        return [...prev, n];
+        return [...prev, { name: n, subs: [] }];
       });
-      if (added) persist(() => repo.addDocType(n));
+      if (added) persist(() => repo.addCategory(n));
     },
     [persist, repo],
   );
 
-  const removeDocType: DataValue["removeDocType"] = useCallback(
+  const removeCategory: DataValue["removeCategory"] = useCallback(
     (name) => {
-      setDocTypes((prev) => prev.filter((t) => t !== name));
-      persist(() => repo.removeDocType(name));
+      setDocTree((prev) => prev.filter((c) => c.name !== name));
+      persist(() => repo.removeCategory(name));
+    },
+    [persist, repo],
+  );
+
+  const addSubType: DataValue["addSubType"] = useCallback(
+    (parent, name) => {
+      const n = name.trim();
+      if (!n) return;
+      let added = false;
+      setDocTree((prev) =>
+        prev.map((c) => {
+          if (c.name !== parent || c.subs.includes(n)) return c;
+          added = true;
+          return { ...c, subs: [...c.subs, n] };
+        }),
+      );
+      if (added) persist(() => repo.addSubType(parent, n));
+    },
+    [persist, repo],
+  );
+
+  const removeSubType: DataValue["removeSubType"] = useCallback(
+    (parent, name) => {
+      setDocTree((prev) =>
+        prev.map((c) => (c.name === parent ? { ...c, subs: c.subs.filter((s) => s !== name) } : c)),
+      );
+      persist(() => repo.removeSubType(parent, name));
     },
     [persist, repo],
   );
@@ -966,7 +998,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       contacts,
       clients,
       docs,
-      docTypes,
+      docTree,
       activity,
       getClient,
       addContact,
@@ -994,11 +1026,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       documentUrl,
       setDocCategory,
       deleteDoc,
-      addDocType,
-      removeDocType,
+      addCategory,
+      removeCategory,
+      addSubType,
+      removeSubType,
     }),
     [
-      loading, contacts, clients, docs, docTypes, activity, getClient,
+      loading, contacts, clients, docs, docTree, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       pipelines, createPipeline, updatePipeline, deletePipeline,
@@ -1007,7 +1041,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addField, renameField, moveField, deleteField,
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
-      setDocCategory, deleteDoc, addDocType, removeDocType,
+      setDocCategory, deleteDoc, addCategory, removeCategory, addSubType, removeSubType,
     ],
   );
 

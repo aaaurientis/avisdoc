@@ -81,6 +81,12 @@ export type StageTone = "slate" | "teal" | "coral" | "emerald" | "violet" | "ros
 export type PropoStatut = "Brouillon" | "Envoyée" | "Acceptée" | "Refusée";
 export type DocExt = "PDF" | "DOC" | "XLS" | "PPT";
 
+/** Catégorie documentaire (niveau 1) et ses sous-catégories (niveau 2). */
+export interface DocCategory {
+  name: string;
+  subs: string[];
+}
+
 /** Contact rattaché à un projet CRM. */
 export interface ProjectContact {
   id: string;
@@ -146,6 +152,9 @@ export interface DocItem {
   id: string;
   name: string;
   ext: DocExt;
+  /** Catégorie parente (niveau 1), ex. « Doc. Profil ». */
+  catParent: string;
+  /** Sous-catégorie (niveau 2, feuille), ex. « Prospection Clients ». */
   cat: string;
   size: string;
   date: string;
