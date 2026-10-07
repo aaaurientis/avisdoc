@@ -1,5 +1,5 @@
-// Edge Function : transition d'une inscription avec motif obligatoire
-// (suspendre / refuser / résilier). Réservée aux comptes @avisdoc.fr.
+// Edge Function : transition d'une inscription (suspendre / refuser / résilier,
+// motif obligatoire ; réactiver, sans motif). Réservée aux comptes @avisdoc.fr.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -21,6 +21,7 @@ const CIBLE: Record<string, string> = {
   suspendre: "suspendue",
   refuser: "refusee",
   resilier: "resiliee",
+  reactiver: "active",
 };
 
 serve(async (req) => {
@@ -37,13 +38,21 @@ serve(async (req) => {
 
   const { id, action, motif } = await req.json().catch(() => ({}));
   const etatCible = CIBLE[action];
-  if (!id || !etatCible) return json({ error: "id et action (suspendre|refuser|resilier) requis." }, 400);
-  if (!motif?.trim()) return json({ error: "Motif obligatoire." }, 400);
+  if (!id || !etatCible) {
+    return json({ error: "id et action (suspendre|refuser|resilier|reactiver) requis." }, 400);
+  }
+  // La réactivation ne demande pas de motif (et efface l'ancien) ; les autres si.
+  const reactivation = action === "reactiver";
+  if (!reactivation && !motif?.trim()) return json({ error: "Motif obligatoire." }, 400);
 
   const admin = createClient(SB_URL, SERVICE);
   const { error } = await admin
     .from("req_inscriptions")
-    .update({ etat: etatCible, motif: motif.trim(), derniere_action_le: new Date().toISOString() })
+    .update({
+      etat: etatCible,
+      motif: reactivation ? null : motif.trim(),
+      derniere_action_le: new Date().toISOString(),
+    })
     .eq("id", id);
   if (error) return json({ error: error.message }, 500);
 
@@ -51,7 +60,7 @@ serve(async (req) => {
     inscription_id: id,
     acteur: adminEmail,
     action: `etat_${etatCible}`,
-    detail: { motif: motif.trim() },
+    detail: reactivation ? {} : { motif: motif.trim() },
   });
 
   return json({ etat: etatCible });

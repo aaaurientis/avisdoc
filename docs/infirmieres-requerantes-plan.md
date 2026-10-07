@@ -27,10 +27,36 @@ Réf. spec : « Spécification : inscription et validation des infirmières requ
 | **4** | **Yousign** : `ServiceSignature`, `contrat-envoyer`, `yousign-webhook` (idempotent, RI-07) | 1 + compte Yousign |
 | **5** | **Pro Santé Connect** : `identite-psc-retour` (RI-02), bascule P1 sur PSC | 1 + raccordement PSC |
 | **6** | **Échéances / conservation / éligibilité** : cron `inscription-echeances`, purge identité J+30 (RI-03), `affectation-eligible` (RI-01) | 1-2 |
-| **7** | **Recette & prod** : checklist §6 de la spec | tous |
+| **7** | **Recette & prod** + **refonte du menu Contacts médicaux** (voir ci-dessous) : checklist §6 de la spec | tous |
 
 **Ordre conseillé** : 1 → 2 → 3 → 4 → 6, puis 5 (bloqué par l'externe), puis 7.
 Lot 0 tourne en parallèle dès le début.
+
+## Lot 7 — refonte du menu « Contacts médicaux »
+
+« Contacts médicaux » devient un **groupe déroulant** dont la page d'atterrissage
+est un **tableau de bord** (liste des 3 types + carte). Trois sous-menus :
+
+| Sous-menu | Source | Fonctionnalités |
+|---|---|---|
+| **Requérants** | parcours infirmières (`/infirmieres`, Lots 1-6) | inchangées (inscription → signature → échéances) |
+| **Requis** (ex-« Experts ») | annuaire `NetworkContact` | inchangées (liste / carte / fiche / nouveau) |
+| **Réseau d'aval** | annuaire `NetworkContact` | inchangées |
+
+**Décisions (07/10)** :
+1. « Requérants » = **le parcours infirmières**, renommé et rangé dans le groupe
+   (et non l'annuaire filtré).
+2. L'annuaire **abandonne le type « Requérant »** : il ne garde que *Requis* et
+   *Réseau d'aval*. Les requérants proviennent uniquement du parcours.
+3. **« Expert » → « Requis »** renommé **partout, valeur stockée comprise**
+   (migration de données + seed + `ContactType` + jetons UI).
+
+**Point ouvert à trancher à la construction** : le parcours infirmières
+(`req_inscriptions`) **ne capture pas d'adresse** aujourd'hui (nom, prénom,
+e-mail, RPPS). Pour faire apparaître les requérants **sur la carte** du tableau
+de bord, il faudra une source de localisation — options : (a) saisir une adresse
+à l'inscription (portail P1/P2), (b) géocoder depuis le RPPS via l'Annuaire Santé,
+(c) relier l'inscription à une fiche annuaire. À décider avant de coder le Lot 7.
 
 ## États
 
@@ -61,5 +87,8 @@ Lot 0 tourne en parallèle dès le début.
 - [x] Lot 3 — portail : 3a (app `requerant.avisdoc.fr`, auth lien magique, P1 Bienvenue, P3 Suivi) + 3b (P2 identité voie de secours + P4 dépôts RCP/URSSAF via URL signée)
 - [x] Lot 4 — Yousign : 4a (contrat PDF, adaptateur `ServiceSignature`, `contrat-envoyer`, envoi + lien de signature admin & portail — `pret_a_signer → contrat_envoye`) + 4b (webhook `yousign-webhook` idempotent HMAC, archivage signé + preuve dans `req-contrats`, `contrat_envoye → active` ; refus/expiration → `pret_a_signer`)
 - [ ] Lot 5 — Pro Santé Connect
-- [ ] Lot 6 — échéances / conservation
-- [ ] Lot 7 — recette
+- [x] Lot 6 — échéances / conservation / éligibilité : cron `req-echeances`
+  (expiration RCP/URSSAF → suspension, rappels e-mail uniques ≤ 30 j), purge
+  identité J+30 (RI-03, fonction SQL + pg_cron), vue `req_eligibilite` (RI-01),
+  réactivation admin après renouvellement
+- [ ] Lot 7 — recette & prod + refonte du menu Contacts médicaux (cf. section dédiée)

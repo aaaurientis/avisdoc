@@ -142,7 +142,7 @@ export const reqRepo = {
     if (error) throw error;
   },
 
-  /** Transition d'inscription avec motif obligatoire (suspendre/refuser/résilier). */
+  /** Transition d'inscription avec motif (suspendre/refuser/résilier). */
   async action(
     id: string,
     action: "suspendre" | "refuser" | "resilier",
@@ -150,6 +150,14 @@ export const reqRepo = {
   ): Promise<void> {
     const { error } = await sb.functions.invoke("inscription-action", {
       body: { id, action, motif },
+    });
+    if (error) throw error;
+  },
+
+  /** Réactive une inscription suspendue (sans motif) après renouvellement. */
+  async reactiver(id: string): Promise<void> {
+    const { error } = await sb.functions.invoke("inscription-action", {
+      body: { id, action: "reactiver" },
     });
     if (error) throw error;
   },

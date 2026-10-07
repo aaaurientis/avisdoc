@@ -239,8 +239,8 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
             </div>
           )}
 
-          {/* P4 — Dépôt RCP / URSSAF */}
-          {courante === 1 && (
+          {/* P4 — Dépôt RCP / URSSAF (dont renouvellement si suspendue pour échéance) */}
+          {(courante === 1 || i.etat === "suspendue") && (
             <div className="mt-4 flex flex-col gap-4">
               {(["rcp", "urssaf"] as const).map((t) => {
                 const p = derniere(t);
@@ -249,15 +249,17 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
                 }
                 const refus = p?.etat === "refusee";
                 const enAttente = p?.etat === "deposee";
+                const expiree = p?.etat === "expiree";
                 return (
                   <div key={t} className="flex flex-col gap-1.5">
                     <div className="text-[13.5px] font-semibold text-avisdoc-ink">
                       {PIECE_TYPE_LABEL[t]}
                       {refus && <span className="text-avisdoc-coral"> — refusée, à redéposer</span>}
+                      {expiree && <span className="text-avisdoc-coral"> — expirée, à renouveler</span>}
                       {enAttente && <span className="text-muted-foreground"> — en cours de vérification</span>}
                     </div>
                     {p?.motif && <div className="text-[12px] text-avisdoc-coral">{p.motif}</div>}
-                    <Uploader label={refus || enAttente ? "Redéposer" : "Déposer"} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece(t, f))} />
+                    <Uploader label={refus || enAttente || expiree ? "Redéposer" : "Déposer"} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece(t, f))} />
                   </div>
                 );
               })}
