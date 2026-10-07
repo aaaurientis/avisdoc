@@ -56,6 +56,7 @@ function toContrat(r: any): ReqContrat {
     inscriptionId: r.inscription_id,
     modeleVersion: r.modele_version,
     statut: r.statut,
+    signUrl: r.sign_url ?? null,
     signedPath: r.signed_path ?? null,
     preuvePath: r.preuve_path ?? null,
     envoyeLe: r.envoye_le,
@@ -151,6 +152,19 @@ export const reqRepo = {
       body: { id, action, motif },
     });
     if (error) throw error;
+  },
+
+  /** Envoie le contrat à signer (Yousign) ; passe l'inscription en contrat_envoye. */
+  async envoyerContrat(id: string): Promise<{ signUrl: string | null; emailEnvoye: boolean }> {
+    const { data, error } = await sb.functions.invoke("contrat-envoyer", { body: { id } });
+    if (error) throw error;
+    return { signUrl: data?.signUrl ?? null, emailEnvoye: !!data?.email_envoye };
+  },
+
+  /** URL signée pour télécharger un contrat signé archivé (bucket req-contrats). */
+  async contratUrl(path: string): Promise<string | null> {
+    const { data } = await sb.storage.from("req-contrats").createSignedUrl(path, 3600);
+    return data?.signedUrl ?? null;
   },
 
   /** Crée une inscription (état « invitee ») et envoie le lien (Edge Function). */

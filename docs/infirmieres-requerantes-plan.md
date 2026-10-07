@@ -50,13 +50,16 @@ Lot 0 tourne en parallèle dès le début.
   sur formats variés, mais tiers + RGPD car données personnelles). Dans tous les
   cas : pré-remplissage + **relecture/correction par l'admin** (champs éditables).
   Pourrait s'étendre à l'URSSAF (date d'émission).
+- **Texte de la convention (Lot 4)** : le PDF généré (`_shared/contrat-pdf.ts`,
+  `MODELE_VERSION`) contient un texte synthétique de travail. À valider / remplacer
+  par la version juridique définitive avant la prod (versionner `MODELE_VERSION`).
 
 ## État d'avancement
 
 - [x] Lot 1 — socle (migration `0057_req_infirmieres.sql`)
 - [x] Lot 2 — back-office (A1 liste, A2 fiche, A3 contrôle, invitation + actions)
 - [x] Lot 3 — portail : 3a (app `requerant.avisdoc.fr`, auth lien magique, P1 Bienvenue, P3 Suivi) + 3b (P2 identité voie de secours + P4 dépôts RCP/URSSAF via URL signée)
-- [ ] Lot 4 — Yousign
+- [~] Lot 4 — Yousign : **4a fait** (contrat PDF généré, adaptateur `ServiceSignature`, `contrat-envoyer`, envoi depuis la fiche admin, lien de signature admin + portail — `pret_a_signer → contrat_envoye`) ; **4b à venir** (webhook `yousign-webhook` idempotent, archivage du signé + preuve, `contrat_envoye → active`)
 - [ ] Lot 5 — Pro Santé Connect
 - [ ] Lot 6 — échéances / conservation
 - [ ] Lot 7 — recette

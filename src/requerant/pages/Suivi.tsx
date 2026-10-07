@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, LogOut, Upload } from "lucide-react";
+import { Check, FileSignature, LogOut, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { portalRepo, type MonDossier } from "../lib/repo";
 import type { PieceType, ReqEtat } from "../../admin/req/types";
@@ -140,7 +140,8 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
     );
   }
 
-  const { inscription: i, pieces } = dossier;
+  const { inscription: i, pieces, contrats } = dossier;
+  const contratCourant = contrats.find((c) => c.statut === "envoye") ?? contrats[0];
   const courante = etapeCourante(i.etat);
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
   const derniere = (t: PieceType) => pieces.find((p) => p.type === t); // triées version desc
@@ -215,6 +216,26 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
               <p className="text-[12px] text-muted-foreground">
                 Photo ou PDF (10 Mo max). Conservée le temps du contrôle, puis détruite.
               </p>
+            </div>
+          )}
+
+          {/* P5 — Signature du contrat */}
+          {i.etat === "contrat_envoye" && (
+            <div className="mt-4">
+              {contratCourant?.signUrl ? (
+                <a
+                  href={contratCourant.signUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-[14px] font-bold text-white transition-colors"
+                >
+                  <FileSignature className="size-4" /> Signer ma convention
+                </a>
+              ) : (
+                <p className="text-[13px] text-muted-foreground">
+                  Le lien de signature vous a été envoyé par e-mail. Pensez à vérifier vos spams.
+                </p>
+              )}
             </div>
           )}
 

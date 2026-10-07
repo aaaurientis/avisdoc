@@ -69,6 +69,7 @@ export interface ReqContrat {
   inscriptionId: string;
   modeleVersion: string;
   statut: "envoye" | "signe" | "refuse" | "expire";
+  signUrl: string | null;
   signedPath: string | null;
   preuvePath: string | null;
   envoyeLe: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, CheckCircle2, ExternalLink, XCircle } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, Download, ExternalLink, FileSignature, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { ReqDossier, ReqPiece } from "../../req/types";
 import {
@@ -231,6 +231,7 @@ export default function Fiche() {
   const [loading, setLoading] = useState(true);
   const [controle, setControle] = useState<ReqPiece | null>(null);
   const [action, setAction] = useState<"suspendre" | "refuser" | "resilier" | null>(null);
+  const [envoiContrat, setEnvoiContrat] = useState(false);
 
   const charger = useCallback(async () => {
     if (!id) return;
@@ -251,6 +252,27 @@ export default function Fiche() {
     const url = await reqRepo.pieceUrl(p);
     if (url) window.open(url, "_blank", "noopener");
     else toast.info("Pièce indisponible.");
+  };
+
+  const envoyerContrat = async () => {
+    if (!id) return;
+    setEnvoiContrat(true);
+    try {
+      const { emailEnvoye } = await reqRepo.envoyerContrat(id);
+      toast.success(emailEnvoye ? "Contrat envoyé par e-mail." : "Contrat créé et prêt à signer.");
+      void charger();
+    } catch (e) {
+      console.error(e);
+      toast.error("L'envoi du contrat a échoué.");
+    } finally {
+      setEnvoiContrat(false);
+    }
+  };
+
+  const telechargerContrat = async (path: string) => {
+    const url = await reqRepo.contratUrl(path);
+    if (url) window.open(url, "_blank", "noopener");
+    else toast.info("Document indisponible.");
   };
 
   const confirmerAction = async (motif: string) => {
@@ -288,6 +310,11 @@ export default function Fiche() {
         <h1 className="font-display text-2xl font-semibold text-avisdoc-ink">{i.prenom} {i.nom}</h1>
         <Badge className={ETAT_BADGE[i.etat]}>{ETAT_LABEL[i.etat]}</Badge>
         <div className="ml-auto flex flex-wrap gap-2">
+          {i.etat === "pret_a_signer" && (
+            <button type="button" onClick={() => void envoyerContrat()} disabled={envoiContrat} className="inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50">
+              <FileSignature className="size-3.5" /> {envoiContrat ? "Envoi…" : "Envoyer le contrat"}
+            </button>
+          )}
           {i.etat === "active" && (
             <button type="button" onClick={() => setAction("suspendre")} className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-[12.5px] font-bold text-amber-700">
               <Ban className="size-3.5" /> Suspendre
@@ -318,9 +345,46 @@ export default function Fiche() {
         <Card className="p-5">
           <SectionLabel className="mb-2">Contrat</SectionLabel>
           {contrats.length === 0 ? (
-            <p className="text-[13px] italic text-muted-foreground">Signature électronique (Yousign) — à brancher au Lot 4.</p>
+            i.etat === "pret_a_signer" ? (
+              <p className="text-[13px] text-muted-foreground">Dossier complet — cliquez sur « Envoyer le contrat » pour lancer la signature.</p>
+            ) : (
+              <p className="text-[13px] italic text-muted-foreground">Signature électronique (Yousign) une fois le dossier prêt à signer.</p>
+            )
           ) : (
-            contrats.map((c) => <Ligne key={c.id} k={`Contrat v${c.modeleVersion}`} v={`${c.statut} · envoyé le ${frDate(c.envoyeLe)}`} />)
+            <div className="flex flex-col gap-2">
+              {contrats.map((c) => {
+                const label = c.statut === "signe" ? "Signé" : c.statut === "refuse" ? "Refusé" : c.statut === "expire" ? "Expiré" : "Envoyé";
+                const badge = c.statut === "signe" ? "bg-emerald-100 text-emerald-700" : c.statut === "refuse" ? "bg-rose-100 text-rose-700" : c.statut === "expire" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700";
+                return (
+                  <div key={c.id} className="rounded-lg border border-border/60 p-3">
+                    <div className="flex items-center gap-2 text-[13px]">
+                      <span className="font-semibold text-avisdoc-ink">Convention {c.modeleVersion}</span>
+                      <Badge className={badge}>{label}</Badge>
+                    </div>
+                    <div className="mt-1 text-[12px] text-muted-foreground">
+                      Envoyé le {frDate(c.envoyeLe)}{c.signeLe ? ` · signé le ${frDate(c.signeLe)}` : ""}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {c.statut === "envoye" && c.signUrl && (
+                        <a href={c.signUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11.5px] font-bold text-avisdoc-ink transition-[filter] hover:brightness-95">
+                          <ExternalLink className="size-3" /> Lien de signature
+                        </a>
+                      )}
+                      {c.signedPath && (
+                        <button type="button" onClick={() => void telechargerContrat(c.signedPath!)} className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11.5px] font-bold text-white">
+                          <Download className="size-3" /> Contrat signé
+                        </button>
+                      )}
+                      {c.preuvePath && (
+                        <button type="button" onClick={() => void telechargerContrat(c.preuvePath!)} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11.5px] font-bold text-avisdoc-ink transition-[filter] hover:brightness-95">
+                          <Download className="size-3" /> Preuve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Card>
 

@@ -71,3 +71,7 @@ verify_jwt = true
 # Dépôt d'une pièce (RCP/URSSAF) par l'infirmière — JWT infirmière requis.
 [functions.piece-deposer]
 verify_jwt = true
+
+# Envoi du contrat à signer (Yousign) — admin @avisdoc.fr vérifié dans la fonction.
+[functions.contrat-envoyer]
+verify_jwt = true
