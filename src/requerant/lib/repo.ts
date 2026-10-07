@@ -11,6 +11,7 @@ function toInscription(r: any): ReqInscription {
     nom: r.nom,
     prenom: r.prenom,
     email: r.email,
+    telephone: r.telephone ?? null,
     rpps: r.rpps ?? null,
     identiteSource: r.identite_source ?? null,
     etat: r.etat,

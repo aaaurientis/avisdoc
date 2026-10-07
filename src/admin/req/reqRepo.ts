@@ -18,6 +18,7 @@ function toInscription(r: any): ReqInscription {
     nom: r.nom,
     prenom: r.prenom,
     email: r.email,
+    telephone: r.telephone ?? null,
     rpps: r.rpps ?? null,
     identiteSource: r.identite_source ?? null,
     etat: r.etat,
@@ -176,14 +177,14 @@ export const reqRepo = {
   },
 
   /** Crée une inscription (état « invitee ») et envoie le lien (Edge Function). */
-  async inviter(
-    nom: string,
-    prenom: string,
-    email: string,
-  ): Promise<{ id?: string; emailEnvoye: boolean }> {
-    const { data, error } = await sb.functions.invoke("inscription-inviter", {
-      body: { nom, prenom, email },
-    });
+  async inviter(input: {
+    nom: string;
+    prenom: string;
+    email: string;
+    rpps?: string | null;
+    telephone?: string | null;
+  }): Promise<{ id?: string; emailEnvoye: boolean }> {
+    const { data, error } = await sb.functions.invoke("inscription-inviter", { body: input });
     if (error) throw error;
     return { id: data?.id, emailEnvoye: !!data?.email_envoye };
   },
