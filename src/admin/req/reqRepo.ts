@@ -212,4 +212,19 @@ export const reqRepo = {
     if (error) throw error;
     return { id: data?.id, emailEnvoye: !!data?.email_envoye };
   },
+
+  /** Ajoute un requérant déjà validé (sans parcours) — directement « active ». */
+  async ajouterValide(input: {
+    nom: string;
+    prenom: string;
+    email: string;
+    rpps?: string | null;
+    telephone?: string | null;
+    rcpDateFin?: string | null;
+    urssafDateFin?: string | null;
+  }): Promise<{ id?: string }> {
+    const { data, error } = await sb.functions.invoke("inscription-ajouter", { body: input });
+    if (error) throw error;
+    return { id: data?.id };
+  },
 };

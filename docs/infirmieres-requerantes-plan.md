@@ -88,6 +88,14 @@ pièce dans le back-office ; quand les 3 sont validées → `pret_a_signer` → 
 → actif. Portail en **3 étapes** : Documents → Contrat → Actif. Interface alignée
 sur la charte (logo AvisDoc, typo/couleurs partagées).
 
+## Ajout direct d'un requérant déjà validé
+
+Pour les infirmières **validées avant la mise en place du process**, l'admin peut
+les **ajouter directement en « active »**, sans lancer le parcours : même modale
+(recherche Annuaire Santé + e-mail/téléphone), case « Déjà validé », avec dates de
+fin RCP/URSSAF optionnelles (crée des pièces « validée » → éligibilité + échéances).
+Edge Function `inscription-ajouter` (admin @avisdoc.fr).
+
 ## États
 
 - **Inscription** : `invitee → identite_a_controler → identite_verifiee →

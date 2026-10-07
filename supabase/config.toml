@@ -48,6 +48,10 @@ verify_jwt = true
 [functions.inscription-inviter]
 verify_jwt = true
 
+# Ajout direct d'un requérant déjà validé (sans parcours) — admin @avisdoc.fr.
+[functions.inscription-ajouter]
+verify_jwt = true
+
 # Contrôle d'une pièce (valider/refuser) + recalcul d'état — admin @avisdoc.fr.
 [functions.piece-controler]
 verify_jwt = true
