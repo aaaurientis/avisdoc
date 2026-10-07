@@ -1,0 +1,54 @@
+# Inscription & validation des infirmières requérantes — plan de lotissement
+
+Réf. spec : « Spécification : inscription et validation des infirmières requérantes »
+(Oct 2026). Ce document fige le découpage retenu et les décisions de cadrage.
+
+## Décisions de cadrage
+
+- **Projet Supabase** : on **réutilise le projet admin** (`wtovhzxymlqnfxyjxrdq`) pour
+  démarrer. Tables préfixées **`req_`**. À reconsidérer (projet « plateforme »
+  isolé) avant la prod — la copie de pièce d'identité est sensible.
+- **Connexion sans Pro Santé Connect dans un premier temps** : auth par **lien
+  magique e-mail**, identité par la **voie de secours** (RPPS saisi + pièce
+  filigranée contrôlée à la main). `identite_source = 'secours'`. PSC = Lot 5.
+- **Intégrations isolées derrière des interfaces** (`ServiceSignature` pour
+  Yousign ; adaptateur identité) pour les brancher sans toucher au métier.
+- **Toute transition d'état passe par une Edge Function** (service_role). Les
+  infirmières n'ont qu'un accès **lecture** à leur propre dossier (RLS).
+
+## Lots
+
+| Lot | Contenu | Dépend de |
+|---|---|---|
+| **0** | Externes à lancer en parallèle : DataPass/ANS (PSC, délai long), compte Yousign, validation juridique des durées de conservation | — |
+| **1** | **Socle** : modèle de données (`req_inscriptions`, `req_pieces`, `req_contrats`, `req_historique`), machine à états, RLS, buckets privés | — |
+| **2** | **Back-office** A1 Inscriptions / A2 Fiche / A3 Contrôle + fonctions `inscription-inviter`, `piece-controler`, `inscription-suspendre/-refuser/-resilier` | 1 |
+| **3** | **Portail `requerant.avisdoc.fr`** (P1–P5), auth lien magique + fonctions `identite-secours-deposer`, `piece-deposer` | 1 (se marie avec 2) |
+| **4** | **Yousign** : `ServiceSignature`, `contrat-envoyer`, `yousign-webhook` (idempotent, RI-07) | 1 + compte Yousign |
+| **5** | **Pro Santé Connect** : `identite-psc-retour` (RI-02), bascule P1 sur PSC | 1 + raccordement PSC |
+| **6** | **Échéances / conservation / éligibilité** : cron `inscription-echeances`, purge identité J+30 (RI-03), `affectation-eligible` (RI-01) | 1-2 |
+| **7** | **Recette & prod** : checklist §6 de la spec | tous |
+
+**Ordre conseillé** : 1 → 2 → 3 → 4 → 6, puis 5 (bloqué par l'externe), puis 7.
+Lot 0 tourne en parallèle dès le début.
+
+## États
+
+- **Inscription** : `invitee → identite_a_controler → identite_verifiee →
+  pieces_a_valider → a_completer → pret_a_signer → contrat_envoye → active`,
+  plus `suspendue`, terminaux `refusee / resiliee / abandonnee`.
+- **Pièce** : `deposee / validee / refusee / expiree / remplacee`
+  (types : `rcp`, `urssaf`, `identite`).
+- **Motifs de refus** (RI-06, liste fermée) : illisible, incomplète, mauvais
+  document, nom non concordant, période non couverte, exercice libéral absent,
+  code URSSAF non vérifiable, autre.
+
+## État d'avancement
+
+- [x] Lot 1 — socle (migration `0057_req_infirmieres.sql`)
+- [ ] Lot 2 — back-office
+- [ ] Lot 3 — portail
+- [ ] Lot 4 — Yousign
+- [ ] Lot 5 — Pro Santé Connect
+- [ ] Lot 6 — échéances / conservation
+- [ ] Lot 7 — recette
