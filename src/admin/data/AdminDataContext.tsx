@@ -137,6 +137,14 @@ interface DataValue {
   removeCategory: (name: string) => void;
   addSubType: (parent: string, name: string) => void;
   removeSubType: (parent: string, name: string) => void;
+  /** Renomme une catégorie (répercuté sur les sous-catégories et les documents). */
+  renameCategory: (oldName: string, newName: string) => void;
+  /** Renomme une sous-catégorie (répercuté sur les documents). */
+  renameSubType: (parent: string, oldName: string, newName: string) => void;
+  /** Déplace une catégorie dans l'ordre (dir = -1 monter, +1 descendre). */
+  moveCategory: (name: string, dir: -1 | 1) => void;
+  /** Déplace une sous-catégorie dans l'ordre. */
+  moveSubType: (parent: string, name: string, dir: -1 | 1) => void;
 
   // Tags standardisés
   setDocTags: (id: string, tags: string[]) => void;
@@ -610,6 +618,80 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     [persist, repo],
   );
 
+  const renameCategory: DataValue["renameCategory"] = useCallback(
+    (oldName, newName) => {
+      const n = newName.trim();
+      if (!n || n === oldName) return;
+      if (docTree.some((c) => c.name === n)) {
+        toast.error("Une catégorie porte déjà ce nom.");
+        return;
+      }
+      setDocTree((prev) => prev.map((c) => (c.name === oldName ? { ...c, name: n } : c)));
+      setDocs((prev) => prev.map((d) => (d.catParent === oldName ? { ...d, catParent: n } : d)));
+      persist(() => repo.renameCategory(oldName, n));
+    },
+    [persist, repo, docTree],
+  );
+
+  const renameSubType: DataValue["renameSubType"] = useCallback(
+    (parent, oldName, newName) => {
+      const n = newName.trim();
+      if (!n || n === oldName) return;
+      const cat = docTree.find((c) => c.name === parent);
+      if (cat?.subs.includes(n)) {
+        toast.error("Une sous-catégorie porte déjà ce nom.");
+        return;
+      }
+      setDocTree((prev) =>
+        prev.map((c) =>
+          c.name === parent ? { ...c, subs: c.subs.map((s) => (s === oldName ? n : s)) } : c,
+        ),
+      );
+      setDocs((prev) =>
+        prev.map((d) => (d.catParent === parent && d.cat === oldName ? { ...d, cat: n } : d)),
+      );
+      persist(() => repo.renameSubType(parent, oldName, n));
+    },
+    [persist, repo, docTree],
+  );
+
+  const moveCategory: DataValue["moveCategory"] = useCallback(
+    (name, dir) => {
+      let order: string[] = [];
+      setDocTree((prev) => {
+        const i = prev.findIndex((c) => c.name === name);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const next = [...prev];
+        [next[i], next[j]] = [next[j], next[i]];
+        order = next.map((c) => c.name);
+        return next;
+      });
+      if (order.length) persist(() => repo.reorderCategories(order));
+    },
+    [persist, repo],
+  );
+
+  const moveSubType: DataValue["moveSubType"] = useCallback(
+    (parent, name, dir) => {
+      let order: string[] = [];
+      setDocTree((prev) =>
+        prev.map((c) => {
+          if (c.name !== parent) return c;
+          const i = c.subs.findIndex((s) => s === name);
+          const j = i + dir;
+          if (i < 0 || j < 0 || j >= c.subs.length) return c;
+          const subs = [...c.subs];
+          [subs[i], subs[j]] = [subs[j], subs[i]];
+          order = subs;
+          return { ...c, subs };
+        }),
+      );
+      if (order.length) persist(() => repo.reorderSubTypes(parent, order));
+    },
+    [persist, repo],
+  );
+
   // --- Tags standardisés ---
   const setDocTags: DataValue["setDocTags"] = useCallback(
     (id, tags) => {
@@ -1075,6 +1157,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       removeCategory,
       addSubType,
       removeSubType,
+      renameCategory,
+      renameSubType,
+      moveCategory,
+      moveSubType,
       setDocTags,
       addTag,
       removeTag,
@@ -1090,6 +1176,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addCategory, removeCategory, addSubType, removeSubType,
+      renameCategory, renameSubType, moveCategory, moveSubType,
       setDocTags, addTag, removeTag,
     ],
   );
