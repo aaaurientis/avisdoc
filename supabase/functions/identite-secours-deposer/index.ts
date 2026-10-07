@@ -52,12 +52,10 @@ serve(async (req) => {
   }).select("id").single();
   if (insErr) return json({ error: insErr.message }, 500);
 
-  // Les 3 documents se déposent ensemble : l'inscription passe en « pièces à
-  // valider » (état unifié), le contrôle de l'identité se fait côté admin.
-  const PRE_CONTRAT = ["invitee", "identite_a_controler", "identite_verifiee", "pieces_a_valider", "a_completer", "suspendue"];
-  const nouvelEtat = PRE_CONTRAT.includes(ins.etat) ? "pieces_a_valider" : ins.etat;
+  // Pas d'avancement d'état : le dossier reste en « constitution » jusqu'à la
+  // soumission explicite (dossier-soumettre). On enregistre le RPPS et la source.
   await admin.from("req_inscriptions").update({
-    rpps: rpps.trim(), identite_source: "secours", etat: nouvelEtat,
+    rpps: rpps.trim(), identite_source: "secours",
     derniere_action_le: new Date().toISOString(),
   }).eq("id", ins.id);
   await admin.from("req_historique").insert({

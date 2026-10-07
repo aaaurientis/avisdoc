@@ -68,8 +68,16 @@ verify_jwt = true
 [functions.inscription-renvoyer]
 verify_jwt = false
 
-# Informations personnelles de l'infirmière (pour le contrat) — JWT infirmière.
+# Informations personnelles du requérant (pour le contrat) — JWT requérant.
 [functions.infos-requerant]
+verify_jwt = true
+
+# Détails de l'assurance RCP saisis par le requérant — JWT requérant.
+[functions.rcp-requerant]
+verify_jwt = true
+
+# Soumission du dossier (gate complétude) — JWT requérant.
+[functions.dossier-soumettre]
 verify_jwt = true
 
 # Dépôt identité (voie de secours) par l'infirmière — JWT infirmière requis.

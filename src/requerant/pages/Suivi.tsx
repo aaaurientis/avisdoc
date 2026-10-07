@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Camera, Check, Clock, FileSignature, LogOut, Upload } from "lucide-react";
+import { Camera, Check, Clock, FileSignature, LogOut, Send, Upload } from "lucide-react";
 import { toast } from "sonner";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { portalRepo, type MonDossier } from "../lib/repo";
@@ -8,9 +8,10 @@ import { PIECE_ETAT_LABEL, PIECE_TYPE_LABEL } from "../../admin/req/types";
 import { frDate } from "../../admin/lib/format";
 import { cn } from "@/lib/utils";
 import InfosForm from "./InfosForm";
+import RcpForm from "./RcpForm";
 
-// Parcours en 3 étapes : les 3 documents (identité + RCP + URSSAF) sont déposés
-// ensemble, l'équipe les valide, puis le contrat est signé.
+// Parcours en 3 étapes : constitution du dossier (3 documents + infos + RCP) →
+// soumission → validation par l'équipe → contrat → actif.
 const ETAPES = ["Documents", "Contrat", "Actif"];
 const DOCS: PieceType[] = ["identite", "rcp", "urssaf"];
 
@@ -22,7 +23,7 @@ function etapeCourante(etat: ReqEtat): number {
     case "active":
       return 2;
     default:
-      return 0; // invitee, identite_*, pieces_a_valider, a_completer, suspendue
+      return 0;
   }
 }
 
@@ -41,9 +42,7 @@ function Uploader({ label, busy, onFile }: { label: string; busy: boolean; onFil
   };
   return (
     <>
-      {/* Caméra (mobile) : ouvre directement l'appareil photo. */}
       <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
-      {/* Fichier : photo existante ou PDF. */}
       <input ref={fileRef} type="file" accept="image/*,.pdf" hidden onChange={pick} />
       <div className="flex flex-wrap gap-2">
         <button
@@ -68,7 +67,7 @@ function Uploader({ label, busy, onFile }: { label: string; busy: boolean; onFil
   );
 }
 
-// Une ligne par document : statut clair + dépôt quand c'est à l'infirmière d'agir.
+// Une ligne par document : statut clair + dépôt quand c'est au requérant d'agir.
 function DocLigne({ type, piece, busy, onFile }: { type: PieceType; piece?: ReqPiece; busy: boolean; onFile: (f: File) => void }) {
   const etat = piece?.etat;
   if (etat === "validee") {
@@ -80,22 +79,18 @@ function DocLigne({ type, piece, busy, onFile }: { type: PieceType; piece?: ReqP
   }
   const refus = etat === "refusee";
   const expiree = etat === "expiree";
-  const enAttente = etat === "deposee";
+  const depose = etat === "deposee";
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
-      <div className="text-[13.5px] font-semibold text-avisdoc-ink">
+      <div className="flex items-center gap-2 text-[13.5px] font-semibold text-avisdoc-ink">
+        {depose && <Check className="size-4 shrink-0 text-emerald-600" />}
         {PIECE_TYPE_LABEL[type]}
         {refus && <span className="text-avisdoc-coral"> — refusée, à redéposer</span>}
         {expiree && <span className="text-avisdoc-coral"> — expirée, à renouveler</span>}
+        {depose && <span className="text-[12px] font-normal text-muted-foreground">— déposé</span>}
       </div>
       {refus && piece?.motif && <div className="text-[12px] text-avisdoc-coral">{piece.motif}</div>}
-      {enAttente ? (
-        <div className="flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-[13px] font-semibold text-sky-700">
-          <Clock className="size-4 shrink-0" /> En cours de vérification par l'équipe
-        </div>
-      ) : (
-        <Uploader label={refus || expiree ? "Redéposer" : "Déposer"} busy={busy} onFile={onFile} />
-      )}
+      <Uploader label={refus || expiree || depose ? "Remplacer" : "Déposer"} busy={busy} onFile={onFile} />
     </div>
   );
 }
@@ -133,6 +128,19 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
     }
   };
 
+  const soumettre = async () => {
+    setBusy(true);
+    try {
+      await portalRepo.soumettre();
+      toast.success("Dossier soumis !");
+      await recharger();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "La soumission a échoué.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -162,38 +170,15 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
   const derniere = (t: PieceType) => pieces.find((p) => p.type === t); // triées version desc
 
-  // Étape Documents : synthèse de l'état des 3 pièces.
-  const etatDe = (t: PieceType) => derniere(t)?.etat;
-  const aDeposer = (t: PieceType) => {
-    const e = etatDe(t);
-    return !e || e === "refusee" || e === "expiree" || e === "remplacee";
-  };
-  const refusePresent = DOCS.some((t) => etatDe(t) === "refusee");
-  const resteAFaire = DOCS.some(aDeposer);
-  const enVerif = DOCS.some((t) => etatDe(t) === "deposee");
-
-  let messageEtape: string;
-  if (courante === 0) {
-    if (refusePresent) {
-      messageEtape = "Une pièce n'a pas été validée — merci de déposer une nouvelle version ci-dessous.";
-    } else if (!resteAFaire && enVerif) {
-      messageEtape = "Vos documents ont bien été reçus et sont en cours de vérification par l'équipe AvisDoc. Vous serez prévenu dès validation.";
-    } else {
-      messageEtape = "Déposez vos 3 documents : pièce d'identité, attestation de responsabilité civile (RCP) et attestation URSSAF. L'équipe les vérifie ensuite.";
-    }
-  } else if (i.etat === "pret_a_signer") {
-    messageEtape = "Votre dossier est complet et validé. La signature de votre convention arrive très bientôt.";
-  } else if (i.etat === "contrat_envoye") {
-    messageEtape = "Dernière étape : signez votre convention.";
-  } else {
-    messageEtape = "Votre inscription est active. Merci de votre confiance !";
-  }
-
-  const montrerDocs = (courante === 0 || i.etat === "suspendue") && !terminal;
+  const docDepose = (t: PieceType) => { const p = derniere(t); return !!p && p.etat !== "remplacee"; };
+  const enConstitution = !terminal && (i.etat === "invitee" || i.etat === "a_completer");
+  const enValidation = ["identite_a_controler", "identite_verifiee", "pieces_a_valider"].includes(i.etat);
+  const rcpOk = !!(i.rcpAssureur && i.rcpPolice && i.rcpDateFin);
+  const docsOk = DOCS.every(docDepose);
+  const pretASoumettre = !!i.infosCompletes && rcpOk && docsOk;
 
   return (
     <div className="mx-auto w-full max-w-md px-6 py-8">
-      {/* En-tête de marque */}
       <div className="flex items-start justify-between">
         <AvisdocLogo className="h-11 w-auto" />
         <button type="button" onClick={onDeconnexion} title="Se déconnecter" className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-avisdoc-ink">
@@ -232,21 +217,21 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
         </div>
       )}
 
-      {/* Vos informations (étape 1) */}
-      {!terminal && courante === 0 && (
-        <div className="mt-6">
+      {/* CONSTITUTION : infos + RCP + 3 documents + soumission */}
+      {enConstitution && (
+        <div className="mt-6 flex flex-col gap-4">
+          {i.etat === "a_completer" && (
+            <div className="rounded-2xl bg-amber-50 p-4 text-[14px] text-amber-800">
+              Une pièce n'a pas été validée. Corrigez ce qui est indiqué ci-dessous, puis soumettez à nouveau votre dossier.
+            </div>
+          )}
+
           <InfosForm i={i} onSaved={() => void recharger()} />
-        </div>
-      )}
+          <RcpForm i={i} onSaved={() => void recharger()} />
 
-      {/* Prochaine étape + dépôts */}
-      {!terminal && (
-        <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Prochaine étape</div>
-          <p className="mt-1 text-[15px] leading-relaxed text-avisdoc-ink">{messageEtape}</p>
-
-          {/* Dépôt groupé des 3 documents */}
-          {montrerDocs && (
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Vos 3 documents</div>
+            <p className="mt-1 text-[13px] text-muted-foreground">Photo ou PDF, 10 Mo max. La pièce d'identité est détruite après contrôle.</p>
             <div className="mt-4 flex flex-col gap-3">
               <DocLigne
                 type="identite"
@@ -254,40 +239,85 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
                 busy={busy}
                 onFile={(f) => {
                   const r = (i.rpps || "").trim();
-                  if (!r) {
-                    toast.error("Renseignez d'abord votre RPPS dans « Vos informations ».");
-                    return;
-                  }
+                  if (!r) { toast.error("Renseignez d'abord votre RPPS dans « Vos informations »."); return; }
                   void envoyer(() => portalRepo.deposerIdentite(r, f));
                 }}
               />
               <DocLigne type="rcp" piece={derniere("rcp")} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece("rcp", f))} />
               <DocLigne type="urssaf" piece={derniere("urssaf")} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece("urssaf", f))} />
-              <p className="text-[12px] text-muted-foreground">
-                Photo ou PDF, 10 Mo max. Votre pièce d'identité est conservée le temps du contrôle puis détruite.
-              </p>
             </div>
-          )}
+          </div>
 
-          {/* Signature du contrat */}
-          {i.etat === "contrat_envoye" && (
-            <div className="mt-4">
-              {contratCourant?.signUrl ? (
-                <a
-                  href={contratCourant.signUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-3 text-[15px] font-bold text-white transition-colors"
-                >
-                  <FileSignature className="size-4" /> Signer ma convention
-                </a>
-              ) : (
-                <p className="text-[13px] text-muted-foreground">
-                  Le lien de signature vous a été envoyé par e-mail. Pensez à vérifier vos spams.
-                </p>
-              )}
-            </div>
+          <button
+            type="button"
+            onClick={() => void soumettre()}
+            disabled={busy || !pretASoumettre}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-avisdoc-ink px-6 py-3.5 text-[15px] font-bold text-white transition-colors disabled:opacity-40"
+          >
+            <Send className="size-4" /> Soumettre mon dossier
+          </button>
+          {!pretASoumettre && (
+            <p className="-mt-1 text-center text-[12.5px] text-muted-foreground">
+              Pour soumettre : complétez vos informations, l'assurance RCP et déposez les 3 documents.
+            </p>
           )}
+        </div>
+      )}
+
+      {/* EN COURS DE VALIDATION */}
+      {enValidation && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-5 text-center shadow-soft">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+            <Clock className="size-6" />
+          </div>
+          <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Dossier en cours de validation</h2>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
+            Votre dossier a bien été soumis. L'équipe AvisDoc vérifie vos documents et vous préviendra dès qu'il sera validé.
+          </p>
+        </div>
+      )}
+
+      {/* CONTRAT */}
+      {i.etat === "pret_a_signer" && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-5 text-center shadow-soft">
+          <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Dossier validé</h2>
+          <p className="mt-1.5 text-[14px] text-muted-foreground">Votre dossier est complet et validé. La signature de votre convention arrive très bientôt.</p>
+        </div>
+      )}
+      {i.etat === "contrat_envoye" && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Dernière étape</div>
+          <p className="mt-1 text-[15px] text-avisdoc-ink">Signez votre convention.</p>
+          <div className="mt-4">
+            {contratCourant?.signUrl ? (
+              <a href={contratCourant.signUrl} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-3 text-[15px] font-bold text-white transition-colors">
+                <FileSignature className="size-4" /> Signer ma convention
+              </a>
+            ) : (
+              <p className="text-[13px] text-muted-foreground">Le lien de signature vous a été envoyé par e-mail. Pensez à vérifier vos spams.</p>
+            )}
+          </div>
+        </div>
+      )}
+      {i.etat === "active" && (
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center text-emerald-700">
+          <Check className="mx-auto mb-2 size-7" />
+          <h2 className="font-display text-lg font-semibold">Inscription active</h2>
+          <p className="mt-1 text-[14px]">Merci de votre confiance !</p>
+        </div>
+      )}
+
+      {/* SUSPENDUE : renouvellement d'une attestation */}
+      {i.etat === "suspendue" && (
+        <div className="mt-6 flex flex-col gap-4">
+          <RcpForm i={i} onSaved={() => void recharger()} />
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Mettre à jour mes documents</div>
+            <div className="mt-4 flex flex-col gap-3">
+              <DocLigne type="rcp" piece={derniere("rcp")} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece("rcp", f))} />
+              <DocLigne type="urssaf" piece={derniere("urssaf")} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece("urssaf", f))} />
+            </div>
+          </div>
         </div>
       )}
 

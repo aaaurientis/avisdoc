@@ -41,7 +41,7 @@ function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: (
   const [mode, setMode] = useState<"valider" | "refuser">("valider");
 
   // Champs de validation selon le type.
-  const [rcp, setRcp] = useState({ assureur: "", police: "", dateFin: "", c1: false, c2: false, c3: false });
+  const [rcp, setRcp] = useState({ assureur: piece.assureur ?? "", police: piece.police ?? "", dateFin: piece.dateFin ?? "", c1: false, c2: false, c3: false });
   const [urssaf, setUrssaf] = useState({ dateEmission: "", codeVerifie: false });
   const [ident, setIdent] = useState({ nomOk: false, rppsOk: false });
   const [motif, setMotif] = useState<MotifRefus | "">("");
@@ -332,6 +332,7 @@ export default function Fiche() {
     return p?.etat === "validee" && !!p.dateFin && p.dateFin >= today;
   };
   const eligible = i.etat === "active" && pieceOk("rcp") && pieceOk("urssaf");
+  const lieuExercice = [i.adresse, [i.codePostal, i.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
   return (
     <div>
@@ -378,10 +379,16 @@ export default function Fiche() {
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card className="p-5">
-          <SectionLabel className="mb-2">Identité</SectionLabel>
+          <SectionLabel className="mb-2">Informations requérant</SectionLabel>
+          <Ligne k="Civilité" v={i.civilite || "—"} />
+          <Ligne k="Prénom / Nom" v={`${i.prenom} ${i.nom}`} />
           <Ligne k="E-mail" v={i.email} />
           <Ligne k="Téléphone" v={i.telephone || "—"} />
           <Ligne k="RPPS" v={i.rpps || "—"} />
+          <Ligne k="Profession" v={i.profession || "—"} />
+          <Ligne k="Date de naissance" v={i.dateNaissance ? frDate(i.dateNaissance) : "—"} />
+          <Ligne k="Lieu de naissance" v={i.lieuNaissance || "—"} />
+          <Ligne k="Lieu d'exercice" v={lieuExercice || "—"} />
           <Ligne k="Source d'identité" v={i.identiteSource === "psc" ? "Pro Santé Connect" : i.identiteSource === "secours" ? "Voie de secours" : "—"} />
           <Ligne
             k="Éligible à l'affectation"
@@ -392,6 +399,13 @@ export default function Fiche() {
             v={<span className={i.infosCompletes ? "font-semibold text-emerald-700" : "text-avisdoc-coral"}>{i.infosCompletes ? "Complètes" : "À compléter par le requérant"}</span>}
           />
           {i.motif && <Ligne k="Motif" v={<span className="text-avisdoc-coral">{i.motif}</span>} />}
+        </Card>
+
+        <Card className="p-5">
+          <SectionLabel className="mb-2">Assurance RCP (saisie requérant)</SectionLabel>
+          <Ligne k="Assureur" v={i.rcpAssureur || "—"} />
+          <Ligne k="N° de police" v={i.rcpPolice || "—"} />
+          <Ligne k="Date de fin" v={i.rcpDateFin ? frDate(i.rcpDateFin) : "—"} />
         </Card>
 
         <Card className="p-5">

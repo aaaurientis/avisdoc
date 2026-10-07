@@ -106,6 +106,20 @@ Dans toute l'interface et les e-mails du module, on dit **« requérant »** (pl
 depuis l'Annuaire Santé et corrigeable avec **autocomplétion d'adresse (BAN)** —
 Google Maps n'est pas utilisable côté portail (clé restreinte au domaine admin).
 
+## Soumission du dossier & écran « en cours de validation »
+
+Le dossier reste en **constitution** (état `invitee` / `a_completer`) pendant que
+le requérant remplit : « Vos informations », l'**assurance RCP** (assureur, n° de
+police, date de fin) et dépose les **3 documents** — sans avancement d'état au
+dépôt. Le bouton **« Soumettre mon dossier »** n'est actif que si **tout** est
+rempli (fonction `dossier-soumettre`, re-vérifié côté serveur) ; à la soumission,
+l'état passe en `pieces_a_valider`, la date de fin RCP est reportée sur la pièce,
+et le portail affiche un écran **« Dossier en cours de validation »** (lecture
+seule). Un refus (`a_completer`) renvoie en constitution pour correction + nouvelle
+soumission. Fonctions : `rcp-requerant`, `dossier-soumettre` (migration 0064).
+La **fiche admin** affiche désormais **toutes** les infos (civilité, naissance,
+lieu d'exercice, profession, RPPS…) + les détails RCP saisis par le requérant.
+
 ## Réinitialisation d'un dossier
 
 Un dossier refusé / clôturé peut être **remis à zéro** (action admin
