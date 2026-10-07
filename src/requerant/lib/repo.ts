@@ -29,6 +29,9 @@ function toInscription(r: any): ReqInscription {
     dateNaissance: r.date_naissance ?? null,
     lieuNaissance: r.lieu_naissance ?? null,
     infosCompletes: !!r.infos_completes,
+    rcpAssureur: r.rcp_assureur ?? null,
+    rcpPolice: r.rcp_police ?? null,
+    rcpDateFin: r.rcp_date_fin ?? null,
   };
 }
 
@@ -149,6 +152,25 @@ export const portalRepo = {
   }): Promise<void> {
     const { error } = await supabase.functions.invoke("infos-requerant", { body: input });
     if (error) throw error;
+  },
+
+  /** Enregistre les détails de l'assurance RCP (assureur, police, date de fin). */
+  async enregistrerRcp(input: { assureur: string; police: string; dateFin: string }): Promise<void> {
+    const { error } = await supabase.functions.invoke("rcp-requerant", { body: input });
+    if (error) throw error;
+  },
+
+  /** Soumet le dossier (échoue si infos/RCP/documents incomplets). */
+  async soumettre(): Promise<void> {
+    const { error } = await supabase.functions.invoke("dossier-soumettre", { body: {} });
+    if (error) {
+      let msg = "La soumission a échoué.";
+      try {
+        const b = await (error as unknown as { context?: { json?: () => Promise<{ error?: string }> } }).context?.json?.();
+        if (b?.error) msg = b.error;
+      } catch { /* ignore */ }
+      throw new Error(msg);
+    }
   },
 
   async seDeconnecter(): Promise<void> {

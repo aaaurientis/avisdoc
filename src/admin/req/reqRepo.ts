@@ -38,6 +38,9 @@ function toInscription(r: any): ReqInscription {
     dateNaissance: r.date_naissance ?? null,
     lieuNaissance: r.lieu_naissance ?? null,
     infosCompletes: !!r.infos_completes,
+    rcpAssureur: r.rcp_assureur ?? null,
+    rcpPolice: r.rcp_police ?? null,
+    rcpDateFin: r.rcp_date_fin ?? null,
   };
 }
 

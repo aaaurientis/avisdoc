@@ -42,6 +42,10 @@ export interface ReqInscription {
   dateNaissance?: string | null;
   lieuNaissance?: string | null;
   infosCompletes?: boolean;
+  // Détails assurance RCP saisis par le requérant.
+  rcpAssureur?: string | null;
+  rcpPolice?: string | null;
+  rcpDateFin?: string | null;
   etat: ReqEtat;
   motif: string | null;
   authUserId: string | null;

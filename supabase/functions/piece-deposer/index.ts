@@ -51,14 +51,10 @@ serve(async (req) => {
   }).select("id").single();
   if (insErr) return json({ error: insErr.message }, 500);
 
-  // Une pièce vient d'arriver : il y a (de nouveau) quelque chose à valider.
-  // Les 3 documents peuvent être déposés dès le départ, dans n'importe quel ordre.
-  const PRE_CONTRAT = ["invitee", "identite_a_controler", "identite_verifiee", "pieces_a_valider", "a_completer", "suspendue"];
-  if (PRE_CONTRAT.includes(ins.etat)) {
-    await admin.from("req_inscriptions").update({
-      etat: "pieces_a_valider", derniere_action_le: new Date().toISOString(),
-    }).eq("id", ins.id);
-  }
+  // Pas d'avancement d'état automatique : le dossier reste en « constitution »
+  // jusqu'à la soumission explicite (dossier-soumettre). On met juste à jour la
+  // date de dernière action.
+  await admin.from("req_inscriptions").update({ derniere_action_le: new Date().toISOString() }).eq("id", ins.id);
   await admin.from("req_historique").insert({
     inscription_id: ins.id, acteur: "requerant", action: "piece_deposee", piece_id: pieceRow.id, detail: { type },
   });
