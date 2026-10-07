@@ -51,8 +51,10 @@ serve(async (req) => {
   }).select("id").single();
   if (insErr) return json({ error: insErr.message }, 500);
 
-  // Une pièce vient d'arriver : il y a de nouveau quelque chose à valider.
-  if (["identite_verifiee", "pieces_a_valider", "a_completer"].includes(ins.etat)) {
+  // Une pièce vient d'arriver : il y a (de nouveau) quelque chose à valider.
+  // Les 3 documents peuvent être déposés dès le départ, dans n'importe quel ordre.
+  const PRE_CONTRAT = ["invitee", "identite_a_controler", "identite_verifiee", "pieces_a_valider", "a_completer", "suspendue"];
+  if (PRE_CONTRAT.includes(ins.etat)) {
     await admin.from("req_inscriptions").update({
       etat: "pieces_a_valider", derniere_action_le: new Date().toISOString(),
     }).eq("id", ins.id);

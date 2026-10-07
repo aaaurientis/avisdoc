@@ -78,6 +78,16 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
   `YOUSIGN_TEMPLATE_ID` et `YOUSIGN_SIGNER_LABEL` (= label du signataire placeholder,
   sensible à la casse, défaut « signataire »).
 
+## Parcours portail (révisé, recette oct.)
+
+Les **3 documents se déposent ensemble** dès le départ : pièce d'identité +
+attestation RCP + attestation URSSAF. L'infirmière voit un statut clair par
+document (à déposer / en cours de vérification / validée / refusée) et peut les
+**prendre en photo** (caméra) ou **choisir un fichier**. L'**admin valide** chaque
+pièce dans le back-office ; quand les 3 sont validées → `pret_a_signer` → signature
+→ actif. Portail en **3 étapes** : Documents → Contrat → Actif. Interface alignée
+sur la charte (logo AvisDoc, typo/couleurs partagées).
+
 ## États
 
 - **Inscription** : `invitee → identite_a_controler → identite_verifiee →
