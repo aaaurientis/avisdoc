@@ -63,3 +63,11 @@ verify_jwt = true
 # Renvoi public d'un lien de connexion (ne divulgue pas l'existence du dossier).
 [functions.inscription-renvoyer]
 verify_jwt = false
+
+# Dépôt identité (voie de secours) par l'infirmière — JWT infirmière requis.
+[functions.identite-secours-deposer]
+verify_jwt = true
+
+# Dépôt d'une pièce (RCP/URSSAF) par l'infirmière — JWT infirmière requis.
+[functions.piece-deposer]
+verify_jwt = true

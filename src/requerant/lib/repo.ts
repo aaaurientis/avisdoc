@@ -78,6 +78,26 @@ export const portalRepo = {
     await supabase.functions.invoke("inscription-renvoyer", { body: { email } });
   },
 
+  /** Dépôt identité (voie de secours) : RPPS + fichier (vers une URL signée). */
+  async deposerIdentite(rpps: string, file: File): Promise<void> {
+    const { data, error } = await supabase.functions.invoke("identite-secours-deposer", {
+      body: { rpps, filename: file.name },
+    });
+    if (error) throw error;
+    const up = await supabase.storage.from(data.bucket).uploadToSignedUrl(data.path, data.token, file);
+    if (up.error) throw up.error;
+  },
+
+  /** Dépôt d'une pièce RCP/URSSAF (fichier vers une URL signée). */
+  async deposerPiece(type: "rcp" | "urssaf", file: File): Promise<void> {
+    const { data, error } = await supabase.functions.invoke("piece-deposer", {
+      body: { type, filename: file.name },
+    });
+    if (error) throw error;
+    const up = await supabase.storage.from(data.bucket).uploadToSignedUrl(data.path, data.token, file);
+    if (up.error) throw up.error;
+  },
+
   async seDeconnecter(): Promise<void> {
     await supabase.auth.signOut();
   },
