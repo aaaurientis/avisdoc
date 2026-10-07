@@ -80,7 +80,11 @@ serve(async (req) => {
   // Garde-fou : avec un template, Yousign exige que tous les champs lecture seule
   // soient remplis. On refuse si les informations du requérant sont incomplètes.
   if (YOUSIGN_TEMPLATE_ID && champs.some((c) => !c.text.trim())) {
-    return json({ error: "Informations du requérant incomplètes (civilité, naissance, adresse…). À compléter côté requérant avant l'envoi." }, 409);
+    const manquants = champs.filter((c) => !c.text.trim()).map((c) => c.label).join(", ");
+    await admin.from("req_historique").insert({
+      inscription_id: ins.id, acteur: adminEmail, action: "contrat_bloque", detail: { manquants },
+    });
+    return json({ error: `Informations du requérant incomplètes — champs manquants : ${manquants}.` }, 409);
   }
 
   // 1. Envoie pour signature (Yousign, derrière l'interface).
@@ -107,6 +111,10 @@ serve(async (req) => {
   } catch (e) {
     console.error("Signature:", e);
     const detail = (e instanceof Error ? e.message : String(e)).slice(0, 500);
+    // Trace l'échec dans l'historique du dossier (diagnostic).
+    await admin.from("req_historique").insert({
+      inscription_id: ins.id, acteur: adminEmail, action: "contrat_echec", detail: { erreur: detail },
+    });
     return json({ error: `Envoi à la signature impossible — ${detail}` }, 502);
   }
 

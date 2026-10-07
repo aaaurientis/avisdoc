@@ -502,15 +502,27 @@ export default function Fiche() {
             <p className="text-[13px] italic text-muted-foreground">Aucun événement.</p>
           ) : (
             <div className="flex flex-col gap-1.5">
-              {historique.map((h) => (
-                <div key={h.id} className="flex gap-3 text-[12.5px]">
-                  <span className="w-32 shrink-0 text-muted-foreground">
-                    {new Date(h.at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  <span className="text-avisdoc-ink">{h.action}</span>
-                  {h.acteur && <span className="text-muted-foreground">· {h.acteur}</span>}
-                </div>
-              ))}
+              {historique.map((h) => {
+                const d = (h.detail ?? {}) as Record<string, unknown>;
+                const detail = (d.erreur ?? d.manquants ?? d.motif) as string | undefined;
+                const echec = h.action === "contrat_echec" || h.action === "contrat_bloque";
+                return (
+                  <div key={h.id} className="flex flex-col text-[12.5px]">
+                    <div className="flex gap-3">
+                      <span className="w-32 shrink-0 text-muted-foreground">
+                        {new Date(h.at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className={echec ? "font-semibold text-avisdoc-coral" : "text-avisdoc-ink"}>{h.action}</span>
+                      {h.acteur && <span className="text-muted-foreground">· {h.acteur}</span>}
+                    </div>
+                    {detail && (
+                      <span className={cn("ml-[140px] break-words", echec ? "text-avisdoc-coral" : "text-muted-foreground")}>
+                        {detail}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>
