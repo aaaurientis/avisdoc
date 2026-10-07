@@ -11,7 +11,7 @@ export const MODULES: { key: Module; label: string }[] = [
   { key: "marketing", label: "Marketing" },
   { key: "finance", label: "Finance" },
   { key: "documents", label: "Documents" },
-  { key: "infirmieres", label: "Infirmières requérantes" },
+  { key: "infirmieres", label: "Requérants" },
   { key: "admin", label: "Admin" },
 ];
 

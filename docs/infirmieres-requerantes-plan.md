@@ -99,6 +99,13 @@ naissance…). `contrat-envoyer` mappe ces champs (`read_only_text_fields`) et
 Migration 0063 (civilite, profession, date/lieu de naissance, infos_completes) ;
 fonction `infos-requerant` (JWT infirmière).
 
+## Terminologie & lieu d'exercice
+
+Dans toute l'interface et les e-mails du module, on dit **« requérant »** (plus
+« infirmière »). Le champ adresse s'appelle **« Lieu d'exercice »**, prérempli
+depuis l'Annuaire Santé et corrigeable avec **autocomplétion d'adresse (BAN)** —
+Google Maps n'est pas utilisable côté portail (clé restreinte au domaine admin).
+
 ## Réinitialisation d'un dossier
 
 Un dossier refusé / clôturé peut être **remis à zéro** (action admin

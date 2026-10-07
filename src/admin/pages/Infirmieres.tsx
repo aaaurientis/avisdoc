@@ -60,7 +60,7 @@ export default function Infirmieres() {
   return (
     <div>
       <PageHeader
-        title="Infirmières requérantes"
+        title="Requérants"
         subtitle={`${items.length} inscription${items.length > 1 ? "s" : ""}`}
         action={
           <button
@@ -100,7 +100,7 @@ export default function Infirmieres() {
             className="grid gap-2.5 border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
             style={{ gridTemplateColumns: COLS }}
           >
-            <div>Infirmière</div>
+            <div>Requérant</div>
             <div>RPPS</div>
             <div>État</div>
             <div>Prochaine échéance</div>

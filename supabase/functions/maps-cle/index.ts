@@ -40,11 +40,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } },
     );
+    // Tout utilisateur authentifié (admin ou requérant). La clé est de toute
+    // façon publique côté navigateur ; sa protection est la restriction par
+    // référent HTTP (admin.avisdoc.fr + requerant.avisdoc.fr) côté Google.
     const { data: userData } = await supabase.auth.getUser();
-    const email = userData.user?.email ?? "";
-    if (!email.toLowerCase().endsWith("@avisdoc.fr")) {
-      return json({ error: "Accès réservé aux comptes @avisdoc.fr." }, 403);
-    }
+    if (!userData.user) return json({ error: "non authentifié" }, 401);
 
     const key = Deno.env.get("GOOGLE_MAPS_KEY") ?? "";
     return json({ key });

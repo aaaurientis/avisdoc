@@ -61,7 +61,7 @@ export async function genererContratPdf(i: ContratInfos): Promise<Uint8Array> {
   };
 
   line("AvisDoc — Téléexpertise dermatologique", 15, bold, teal, 4);
-  line("Convention de partenariat — infirmière requérante", 12.5, bold, ink, 2);
+  line("Convention de partenariat — requérant", 12.5, bold, ink, 2);
   line(`Modèle ${MODELE_VERSION} · établie le ${new Date().toLocaleDateString("fr-FR")}`, 9, font, soft, 16);
 
   line("Entre les soussignés", 11, bold, ink, 8);
@@ -69,22 +69,22 @@ export async function genererContratPdf(i: ContratInfos): Promise<Uint8Array> {
     "AvisDoc, service de téléexpertise dermatologique (ci-après « AvisDoc »), d'une part,",
   );
   para(
-    `et ${i.prenom} ${i.nom}, infirmier(ère) en exercice libéral` +
+    `et ${i.prenom} ${i.nom}, professionnel de santé en exercice libéral` +
       `${i.rpps ? `, RPPS n° ${i.rpps}` : ""}, joignable à l'adresse ${i.email} ` +
-      "(ci-après « l'Infirmière requérante »), d'autre part.",
+      "(ci-après « le Requérant »), d'autre part.",
   );
 
   y -= 6;
   line("Article 1 — Objet", 11, bold, ink, 8);
   para(
-    "La présente convention définit les conditions dans lesquelles l'Infirmière requérante " +
+    "La présente convention définit les conditions dans lesquelles le Requérant " +
       "sollicite, via la plateforme AvisDoc, l'avis d'un médecin dermatologue requis à partir " +
       "d'éléments cliniques et photographiques recueillis auprès du patient.",
   );
 
-  line("Article 2 — Engagements de l'Infirmière requérante", 11, bold, ink, 8);
+  line("Article 2 — Engagements du Requérant", 11, bold, ink, 8);
   para(
-    "Elle garantit l'exactitude des informations transmises, recueille le consentement du patient, " +
+    "Il garantit l'exactitude des informations transmises, recueille le consentement du patient, " +
       "maintient à jour ses attestations (responsabilité civile professionnelle et URSSAF) et " +
       "respecte le secret professionnel et la réglementation applicable.",
   );
@@ -118,7 +118,7 @@ export async function genererContratPdf(i: ContratInfos): Promise<Uint8Array> {
     borderColor: soft,
     borderWidth: 0.8,
   });
-  page.drawText("Signature de l'infirmière requérante", {
+  page.drawText("Signature du requérant", {
     x: SIGN_FIELD.x,
     y: ry + SIGN_FIELD.height + 6,
     size: 8.5,

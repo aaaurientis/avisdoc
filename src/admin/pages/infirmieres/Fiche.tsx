@@ -137,7 +137,7 @@ function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: (
                     <input type="date" className="ad-input mt-0.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" value={rcp.dateFin} onChange={(e) => setRcp((s) => ({ ...s, dateFin: e.target.value }))} />
                   </label>
                   <div className="mt-2 border-t border-border pt-2">
-                    <Case on={rcp.c1} set={(v) => setRcp((s) => ({ ...s, c1: v }))}>Nomme l'infirmière</Case>
+                    <Case on={rcp.c1} set={(v) => setRcp((s) => ({ ...s, c1: v }))}>Nomme le requérant</Case>
                     <Case on={rcp.c2} set={(v) => setRcp((s) => ({ ...s, c2: v }))}>Mentionne l'exercice libéral</Case>
                     <Case on={rcp.c3} set={(v) => setRcp((s) => ({ ...s, c3: v }))}>Couvre la date du jour</Case>
                   </div>
@@ -291,7 +291,7 @@ export default function Fiche() {
     if (!id) return;
     try {
       await reqRepo.reinitialiser(id);
-      toast.success("Dossier réinitialisé — l'infirmière peut recommencer.");
+      toast.success("Dossier réinitialisé — le requérant peut recommencer.");
       void charger();
     } catch (e) {
       console.error(e);
@@ -389,7 +389,7 @@ export default function Fiche() {
           />
           <Ligne
             k="Informations contrat"
-            v={<span className={i.infosCompletes ? "font-semibold text-emerald-700" : "text-avisdoc-coral"}>{i.infosCompletes ? "Complètes" : "À compléter par l'infirmière"}</span>}
+            v={<span className={i.infosCompletes ? "font-semibold text-emerald-700" : "text-avisdoc-coral"}>{i.infosCompletes ? "Complètes" : "À compléter par le requérant"}</span>}
           />
           {i.motif && <Ligne k="Motif" v={<span className="text-avisdoc-coral">{i.motif}</span>} />}
         </Card>

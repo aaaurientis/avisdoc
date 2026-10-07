@@ -99,7 +99,7 @@ serve(async (req) => {
     if (lien) {
       const html =
         `<p>Bonjour ${escapeHtml(prenom)},</p>` +
-        `<p>Vous êtes invitée à finaliser votre inscription comme infirmière requérante AvisDoc. ` +
+        `<p>Vous êtes invité(e) à finaliser votre inscription de requérant AvisDoc. ` +
         `Ce lien de connexion est personnel et valable 7 jours.</p>` +
         `<p><a href="${lien}">Commencer mon inscription</a></p>`;
       try {

@@ -135,9 +135,9 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
 
   return (
     <Modal onClose={onClose} width={480}>
-      <h2 className="mb-1 font-display text-[22px] font-semibold text-avisdoc-ink">Inviter une infirmière</h2>
+      <h2 className="mb-1 font-display text-[22px] font-semibold text-avisdoc-ink">Inviter un requérant</h2>
       <p className="mb-5 text-[13px] text-muted-foreground">
-        Recherchez l'infirmière dans l'Annuaire Santé (base officielle RPPS), puis complétez son e-mail et son téléphone.
+        Recherchez le requérant dans l'Annuaire Santé (base officielle RPPS), puis complétez son e-mail et son téléphone.
       </p>
 
       {/* Recherche Annuaire Santé */}

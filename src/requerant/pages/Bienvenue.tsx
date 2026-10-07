@@ -33,7 +33,7 @@ export default function Bienvenue() {
         Votre inscription AvisDoc
       </h1>
       <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
-        Finalisez votre inscription comme infirmière requérante. Comptez environ
+        Finalisez votre inscription de requérant AvisDoc. Comptez environ
         10 minutes : vérification de votre RPPS, dépôt de votre attestation de
         responsabilité civile et de votre attestation URSSAF, puis signature du
         contrat. Vos pièces ne sont consultées que par l'équipe AvisDoc.
