@@ -2,7 +2,7 @@
 // (admin_droits ; un super-admin voit tout). Les groupes se déplient et
 // s'ouvrent automatiquement quand une de leurs pages est active.
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useSearchParams } from "react-router-dom";
 import {
   BookUser,
   Building2,
@@ -33,6 +33,7 @@ import {
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../auth/AuthContext";
+import { useAdminData } from "../data/AdminDataContext";
 import { initials } from "../lib/format";
 import { ecrireArrivee, lireArrivee, type Arrivee } from "../lib/arrivee";
 import type { Module } from "../lib/modules";
@@ -145,6 +146,64 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
   );
 }
 
+/** « Documents » déroule les catégories (niveau 1) de l'arborescence. */
+function GroupeDocuments() {
+  const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const { docTree } = useAdminData();
+  const surDocuments = pathname.startsWith("/documents");
+  const [ouvert, setOuvert] = useState(surDocuments);
+  useEffect(() => {
+    if (surDocuments) setOuvert(true);
+  }, [surDocuments]);
+
+  // Catégorie active = paramètre d'URL, sinon la première (défaut de la page).
+  const catActive = params.get("cat") ?? docTree[0]?.name ?? "";
+
+  // Sans arborescence chargée : lien simple vers Documents.
+  if (docTree.length === 0) {
+    return (
+      <NavLink to="/documents" className={({ isActive }) => lienCls(isActive)}>
+        <FileText className="size-[18px]" strokeWidth={2.2} />
+        Documents
+      </NavLink>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOuvert((o) => !o)}
+        className={cn(lienCls(false), "w-full", surDocuments && "bg-accent font-bold text-avisdoc-ink")}
+      >
+        <FileText className="size-[18px]" strokeWidth={2.2} />
+        <span className="min-w-0 flex-1 truncate text-left">Documents</span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", ouvert && "rotate-180")} />
+      </button>
+      {ouvert && (
+        <div className="ml-[26px] flex flex-col gap-0.5 border-l border-border pl-2.5 pt-0.5">
+          {docTree.map((c) => {
+            const actif = surDocuments && catActive === c.name;
+            return (
+              <Link
+                key={c.name}
+                to={`/documents?cat=${encodeURIComponent(c.name)}`}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                  actif ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
+                )}
+              >
+                <span className="block min-w-0 truncate">{c.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
   const { user, signOut, isSuperAdmin, peut } = useAuth();
   const [theme, setTheme] = useState<Theme>(themeCourant());
@@ -184,6 +243,7 @@ export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
               </div>
             );
           }
+          if (m.module === "documents") return <GroupeDocuments key={m.label} />;
           if (m.enfants) return <Groupe key={m.label} entree={m} isSuperAdmin={isSuperAdmin} peut={peut} />;
           return (
             <NavLink key={m.to} to={m.to!} className={({ isActive }) => lienCls(isActive)}>
