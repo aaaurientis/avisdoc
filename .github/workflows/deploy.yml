@@ -73,9 +73,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Version figée : « latest » interroge l'API GitHub (rate limit du runner →
+      # échec intermittent « Failed to resolve latest Supabase CLI release »).
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.118.0
 
       - name: Déployer toutes les Edge Functions
         env:
