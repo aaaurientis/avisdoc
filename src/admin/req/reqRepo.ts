@@ -33,6 +33,11 @@ function toInscription(r: any): ReqInscription {
     ville: r.ville ?? null,
     lat: typeof r.lat === "number" ? r.lat : null,
     lng: typeof r.lng === "number" ? r.lng : null,
+    civilite: r.civilite ?? null,
+    profession: r.profession ?? null,
+    dateNaissance: r.date_naissance ?? null,
+    lieuNaissance: r.lieu_naissance ?? null,
+    infosCompletes: !!r.infos_completes,
   };
 }
 
@@ -168,6 +173,14 @@ export const reqRepo = {
     if (error) throw error;
   },
 
+  /** Réinitialise un dossier (refusé/clôturé) : repart à zéro (état « invitee »). */
+  async reinitialiser(id: string): Promise<void> {
+    const { error } = await sb.functions.invoke("inscription-action", {
+      body: { id, action: "reinitialiser" },
+    });
+    if (error) throw error;
+  },
+
   /** Envoie le contrat à signer (Yousign) ; passe l'inscription en contrat_envoye. */
   async envoyerContrat(id: string): Promise<{ signUrl: string | null; emailEnvoye: boolean }> {
     const { data, error } = await sb.functions.invoke("contrat-envoyer", { body: { id } });
@@ -207,6 +220,10 @@ export const reqRepo = {
     email: string;
     rpps?: string | null;
     telephone?: string | null;
+    profession?: string | null;
+    adresse?: string | null;
+    codePostal?: string | null;
+    ville?: string | null;
   }): Promise<{ id?: string; emailEnvoye: boolean }> {
     const { data, error } = await sb.functions.invoke("inscription-inviter", { body: input });
     if (error) throw error;
@@ -220,6 +237,10 @@ export const reqRepo = {
     email: string;
     rpps?: string | null;
     telephone?: string | null;
+    profession?: string | null;
+    adresse?: string | null;
+    codePostal?: string | null;
+    ville?: string | null;
     rcpDateFin?: string | null;
     urssafDateFin?: string | null;
   }): Promise<{ id?: string }> {

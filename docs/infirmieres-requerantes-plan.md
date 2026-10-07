@@ -88,6 +88,23 @@ pièce dans le back-office ; quand les 3 sont validées → `pret_a_signer` → 
 → actif. Portail en **3 étapes** : Documents → Contrat → Actif. Interface alignée
 sur la charte (logo AvisDoc, typo/couleurs partagées).
 
+## Informations contrat (préremplissage du template)
+
+Le template Yousign attend `civilite, name, surname, profession, address, RPPS,
+birth_date, birth_place`. Ces données sont **reprises de l'Annuaire Santé à
+l'invitation** (profession, adresse) puis **complétées/corrigées par l'infirmière
+à l'étape 1** (formulaire « Vos informations » : civilité, date et lieu de
+naissance…). `contrat-envoyer` mappe ces champs (`read_only_text_fields`) et
+**refuse l'envoi si incomplet** (Yousign exige tous les champs lecture seule).
+Migration 0063 (civilite, profession, date/lieu de naissance, infos_completes) ;
+fonction `infos-requerant` (JWT infirmière).
+
+## Réinitialisation d'un dossier
+
+Un dossier refusé / clôturé peut être **remis à zéro** (action admin
+« Réinitialiser » → état `invitee`, pièces remplacées, motif effacé ; identité et
+infos conservées). `inscription-action` action `reinitialiser`.
+
 ## Ajout direct d'un requérant déjà validé
 
 Pour les infirmières **validées avant la mise en place du process**, l'admin peut

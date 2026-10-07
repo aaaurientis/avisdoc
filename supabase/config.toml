@@ -68,6 +68,10 @@ verify_jwt = true
 [functions.inscription-renvoyer]
 verify_jwt = false
 
+# Informations personnelles de l'infirmière (pour le contrat) — JWT infirmière.
+[functions.infos-requerant]
+verify_jwt = true
+
 # Dépôt identité (voie de secours) par l'infirmière — JWT infirmière requis.
 [functions.identite-secours-deposer]
 verify_jwt = true

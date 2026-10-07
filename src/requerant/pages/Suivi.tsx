@@ -7,6 +7,7 @@ import type { PieceType, ReqEtat, ReqPiece } from "../../admin/req/types";
 import { PIECE_ETAT_LABEL, PIECE_TYPE_LABEL } from "../../admin/req/types";
 import { frDate } from "../../admin/lib/format";
 import { cn } from "@/lib/utils";
+import InfosForm from "./InfosForm";
 
 // Parcours en 3 étapes : les 3 documents (identité + RCP + URSSAF) sont déposés
 // ensemble, l'équipe les valide, puis le contrat est signé.
@@ -102,7 +103,6 @@ function DocLigne({ type, piece, busy, onFile }: { type: PieceType; piece?: ReqP
 export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) {
   const [dossier, setDossier] = useState<MonDossier | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rpps, setRpps] = useState("");
   const [busy, setBusy] = useState(false);
 
   const recharger = useCallback(async () => {
@@ -161,7 +161,6 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
   const courante = etapeCourante(i.etat);
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
   const derniere = (t: PieceType) => pieces.find((p) => p.type === t); // triées version desc
-  const idValide = derniere("identite")?.etat === "validee";
 
   // Étape Documents : synthèse de l'état des 3 pièces.
   const etatDe = (t: PieceType) => derniere(t)?.etat;
@@ -233,6 +232,13 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
         </div>
       )}
 
+      {/* Vos informations (étape 1) */}
+      {!terminal && courante === 0 && (
+        <div className="mt-6">
+          <InfosForm i={i} onSaved={() => void recharger()} />
+        </div>
+      )}
+
       {/* Prochaine étape + dépôts */}
       {!terminal && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -242,23 +248,14 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
           {/* Dépôt groupé des 3 documents */}
           {montrerDocs && (
             <div className="mt-4 flex flex-col gap-3">
-              {!idValide && (
-                <input
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-[15px] outline-none transition-colors focus:border-avisdoc-teal"
-                  placeholder="Votre numéro RPPS"
-                  inputMode="numeric"
-                  value={rpps || i.rpps || ""}
-                  onChange={(e) => setRpps(e.target.value)}
-                />
-              )}
               <DocLigne
                 type="identite"
                 piece={derniere("identite")}
                 busy={busy}
                 onFile={(f) => {
-                  const r = (rpps || i.rpps || "").trim();
+                  const r = (i.rpps || "").trim();
                   if (!r) {
-                    toast.error("Saisissez d'abord votre RPPS.");
+                    toast.error("Renseignez d'abord votre RPPS dans « Vos informations ».");
                     return;
                   }
                   void envoyer(() => portalRepo.deposerIdentite(r, f));

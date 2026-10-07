@@ -21,6 +21,14 @@ function toInscription(r: any): ReqInscription {
     derniereActionLe: r.derniere_action_le,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    adresse: r.adresse ?? null,
+    codePostal: r.code_postal ?? null,
+    ville: r.ville ?? null,
+    civilite: r.civilite ?? null,
+    profession: r.profession ?? null,
+    dateNaissance: r.date_naissance ?? null,
+    lieuNaissance: r.lieu_naissance ?? null,
+    infosCompletes: !!r.infos_completes,
   };
 }
 
@@ -124,6 +132,23 @@ export const portalRepo = {
     if (error) throw error;
     const up = await supabase.storage.from(data.bucket).uploadToSignedUrl(data.path, data.token, file);
     if (up.error) throw up.error;
+  },
+
+  /** Enregistre/corrige les informations personnelles (pour le contrat). */
+  async enregistrerInfos(input: {
+    civilite: string;
+    prenom: string;
+    nom: string;
+    profession: string;
+    adresse: string;
+    codePostal: string;
+    ville: string;
+    rpps: string;
+    dateNaissance: string;
+    lieuNaissance: string;
+  }): Promise<void> {
+    const { error } = await supabase.functions.invoke("infos-requerant", { body: input });
+    if (error) throw error;
   },
 
   async seDeconnecter(): Promise<void> {

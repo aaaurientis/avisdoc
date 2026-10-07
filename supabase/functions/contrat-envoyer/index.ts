@@ -30,7 +30,7 @@ const EMAIL_FROM = Deno.env.get("REQ_EMAIL_FROM") ?? "AvisDoc <noreply@avisdoc.f
 // Contrat standardisé : si un template Yousign est configuré, on l'utilise ;
 // sinon repli sur le PDF généré (gabarit interne).
 const YOUSIGN_TEMPLATE_ID = (Deno.env.get("YOUSIGN_TEMPLATE_ID") ?? "").trim();
-const YOUSIGN_SIGNER_LABEL = (Deno.env.get("YOUSIGN_SIGNER_LABEL") ?? "signataire").trim();
+const YOUSIGN_SIGNER_LABEL = (Deno.env.get("YOUSIGN_SIGNER_LABEL") ?? "Requérant").trim();
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
@@ -61,6 +61,28 @@ serve(async (req) => {
     return json({ error: "L'inscription doit être « prête à signer »." }, 409);
   }
 
+  // Champs du contrat préremplis depuis les informations de l'inscription.
+  // Labels du template (sensibles à la casse) : civilite, name, surname,
+  // profession, address, RPPS, birth_date, birth_place.
+  const frDate = (iso: string) => { const [y, m, d] = String(iso).slice(0, 10).split("-"); return d && m && y ? `${d}/${m}/${y}` : ""; };
+  const adresseComplete = [ins.adresse, [ins.code_postal, ins.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const champs = [
+    { label: "civilite", text: ins.civilite ?? "" },
+    { label: "name", text: ins.prenom ?? "" },
+    { label: "surname", text: ins.nom ?? "" },
+    { label: "profession", text: ins.profession ?? "Infirmier(ère)" },
+    { label: "address", text: adresseComplete },
+    { label: "RPPS", text: ins.rpps ?? "" },
+    { label: "birth_date", text: ins.date_naissance ? frDate(ins.date_naissance) : "" },
+    { label: "birth_place", text: ins.lieu_naissance ?? "" },
+  ];
+
+  // Garde-fou : avec un template, Yousign exige que tous les champs lecture seule
+  // soient remplis. On refuse si les informations du requérant sont incomplètes.
+  if (YOUSIGN_TEMPLATE_ID && champs.some((c) => !c.text.trim())) {
+    return json({ error: "Informations du requérant incomplètes (civilité, naissance, adresse…). À compléter côté infirmière avant l'envoi." }, 409);
+  }
+
   // 1. Envoie pour signature (Yousign, derrière l'interface).
   //    - Template configuré → document standardisé figé dans Yousign (recommandé).
   //    - Sinon → repli sur un PDF généré (gabarit interne).
@@ -76,6 +98,7 @@ serve(async (req) => {
         templateId: YOUSIGN_TEMPLATE_ID,
         signerLabel: YOUSIGN_SIGNER_LABEL,
         signataire,
+        champs,
       });
     } else {
       const pdf = await genererContratPdf({ nom: ins.nom, prenom: ins.prenom, email: ins.email, rpps: ins.rpps });
