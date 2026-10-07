@@ -95,7 +95,7 @@ export default function ContactDetail({
           />
           <SectionLabel className="mt-1">Rôles (plusieurs possibles)</SectionLabel>
           <div className="flex gap-1.5">
-            {(["Requérant", "Expert", "Réseau d'Aval"] as ContactType[]).map((t) => {
+            {(["Requis", "Réseau d'Aval"] as ContactType[]).map((t) => {
               const on = typesDe(draft).includes(t);
               return (
                 <button

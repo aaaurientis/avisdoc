@@ -50,6 +50,8 @@ interface Enfant {
   superadmin?: boolean;
   /** Module propre à cette page, quand il diffère de celui du groupe (ex. Merx). */
   module?: Module;
+  /** Correspondance exacte du lien actif (sinon un préfixe suffit). */
+  end?: boolean;
 }
 interface Entree {
   /** Module de droits ; null = visible par tous (tableau de bord). */
@@ -76,8 +78,12 @@ const MENU: Entree[] = [
     { to: "/couts", label: "CAP", icon: Coins, module: "merx" },
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
   ] },
-  { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
-  { module: "infirmieres", label: "Infirmières", icon: Stethoscope, to: "/infirmieres" },
+  { module: null, label: "Contacts Médicaux", icon: Users, enfants: [
+    { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, module: "contacts", end: true },
+    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "infirmieres" },
+    { to: "/contacts/requis", label: "Requis", icon: Users, module: "contacts" },
+    { to: "/contacts/reseau", label: "Réseau d'aval", icon: Building2, module: "contacts" },
+  ] },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
     { to: "/clients", label: "Facturation", icon: Receipt },
@@ -109,6 +115,9 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
     setOuvert(enfantActif);
   }, [enfantActif]);
 
+  // Un groupe dont aucun enfant n'est autorisé ne s'affiche pas.
+  if (enfants.length === 0) return null;
+
   return (
     <div>
       <button
@@ -128,6 +137,7 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
               <NavLink
                 key={e.to}
                 to={e.to}
+                end={e.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",

@@ -7,8 +7,7 @@ import { TYPE_DOT, typesDe } from "../lib/ui-tokens";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 
 const TYPE_LABELS: { type: ContactType; label: string }[] = [
-  { type: "Requérant", label: "Requérants" },
-  { type: "Expert", label: "Experts" },
+  { type: "Requis", label: "Requis" },
   { type: "Réseau d'Aval", label: "Réseau d'Aval" },
 ];
 

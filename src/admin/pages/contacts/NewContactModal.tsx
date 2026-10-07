@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-avisdoc-teal";
 
-const TYPES: ContactType[] = ["Requérant", "Expert", "Réseau d'Aval"];
+// L'annuaire ne gère plus que Requis et Réseau d'aval (les requérants viennent
+// du parcours infirmières).
+const TYPES: ContactType[] = ["Requis", "Réseau d'Aval"];
 
 // Fiche renvoyée par l'Edge Function annuaire-sante (base officielle RPPS).
 interface FichePro {
@@ -53,12 +55,12 @@ function libellePro(f: { profession?: string; savoir_faire?: string[]; specialit
   return f.profession || sf || "";
 }
 
-export default function NewContactModal({ onClose }: { onClose: () => void }) {
+export default function NewContactModal({ onClose, defaultType = "Requis" }: { onClose: () => void; defaultType?: ContactType }) {
   const { addContact } = useAdminData();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  // Rôles multiples : un contact peut cumuler Requérant / Expert / Réseau d'Aval.
-  const [types, setTypes] = useState<ContactType[]>(["Requérant"]);
+  // Rôles multiples : un contact peut cumuler Requis / Réseau d'Aval.
+  const [types, setTypes] = useState<ContactType[]>([defaultType]);
   const basculerType = (t: ContactType) =>
     setTypes((prev) => {
       const sans = prev.filter((x) => x !== t);

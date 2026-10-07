@@ -2,7 +2,9 @@
 // Les identifiants sont des chaînes (uuid côté Supabase, uuid généré côté mock)
 // pour que la couche mock et la couche Supabase soient interchangeables.
 
-export type ContactType = "Requérant" | "Expert" | "Réseau d'Aval";
+// « Requis » = ex-« Expert » (renommé au Lot 7). « Requérant » reste pour les
+// contacts annuaire historiques (les requérants actifs viennent du parcours).
+export type ContactType = "Requérant" | "Requis" | "Réseau d'Aval";
 export type ContactStatut = "Accepté" | "En attente" | "Refusé";
 
 /** Annuaire du réseau (requérants, experts, réseau d'aval). */

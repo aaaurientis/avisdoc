@@ -10,32 +10,30 @@ import ContactDetail from "./contacts/ContactDetail";
 import ContactsMap from "./contacts/ContactsMap";
 import NewContactModal from "./contacts/NewContactModal";
 
-type Filter = "Tous" | ContactType;
-
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: "Tous", label: "Tous" },
-  { value: "Requérant", label: "Requérants" },
-  { value: "Expert", label: "Experts" },
-  { value: "Réseau d'Aval", label: "Réseau d'Aval" },
-];
+const TYPE_TITRE: Record<ContactType, { titre: string; sous: string }> = {
+  Requérant: { titre: "Requérants", sous: "requérants" },
+  Requis: { titre: "Requis", sous: "requis" },
+  "Réseau d'Aval": { titre: "Réseau d'aval", sous: "contacts du réseau d'aval" },
+};
 
 const COLS_FULL = "minmax(150px,2fr) 110px minmax(70px,0.8fr) minmax(110px,1.2fr) 96px";
 const COLS_COMPACT = "minmax(140px,1.3fr) minmax(110px,1fr)";
 
-export default function Contacts() {
+export default function Contacts({ fixedType }: { fixedType: ContactType }) {
   const { contacts } = useAdminData();
-  const [filter, setFilter] = useState<Filter>("Tous");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [view, setView] = useState<"liste" | "carte">("liste");
 
+  const duType = useMemo(
+    () => contacts.filter((c) => typesDe(c).includes(fixedType)),
+    [contacts, fixedType],
+  );
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return contacts
-      .filter((c) => filter === "Tous" || typesDe(c).includes(filter))
-      .filter((c) => !q || `${c.name} ${c.ville} ${c.role}`.toLowerCase().includes(q));
-  }, [contacts, filter, search]);
+    return duType.filter((c) => !q || `${c.name} ${c.ville} ${c.role}`.toLowerCase().includes(q));
+  }, [duType, search]);
 
   const selected = contacts.find((c) => c.id === selectedId) ?? null;
   const cols = selected ? COLS_COMPACT : COLS_FULL;
@@ -43,8 +41,8 @@ export default function Contacts() {
   return (
     <div>
       <PageHeader
-        title="Contacts"
-        subtitle={`${contacts.length} contacts dans le réseau AvisDoc`}
+        title={TYPE_TITRE[fixedType].titre}
+        subtitle={`${duType.length} ${TYPE_TITRE[fixedType].sous}`}
         action={
           <button
             type="button"
@@ -57,24 +55,6 @@ export default function Contacts() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-full border border-border bg-card p-1">
-          {FILTERS.map((f) => {
-            const on = filter === f.value;
-            return (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setFilter(f.value)}
-                className={cn(
-                  "rounded-full px-4 py-2 text-[13px] font-semibold transition-colors",
-                  on ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
-                )}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
         <input
           className="ad-input max-w-[320px] flex-1 rounded-full border border-border bg-card px-4.5 py-2.5 text-[13.5px] outline-none transition-colors focus:border-avisdoc-teal"
           style={{ paddingLeft: 18, paddingRight: 18 }}
@@ -186,7 +166,7 @@ export default function Contacts() {
       </div>
       )}
 
-      {showModal && <NewContactModal onClose={() => setShowModal(false)} />}
+      {showModal && <NewContactModal onClose={() => setShowModal(false)} defaultType={fixedType} />}
     </div>
   );
 }
