@@ -3,7 +3,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./supabase";
-import type { ReqInscription, ReqPiece } from "../../admin/req/types";
+import type { ReqContrat, ReqInscription, ReqPiece } from "../../admin/req/types";
 
 function toInscription(r: any): ReqInscription {
   return {
@@ -43,9 +43,25 @@ function toPiece(r: any): ReqPiece {
   };
 }
 
+function toContrat(r: any): ReqContrat {
+  return {
+    id: r.id,
+    inscriptionId: r.inscription_id,
+    modeleVersion: r.modele_version,
+    statut: r.statut,
+    signUrl: r.sign_url ?? null,
+    signedPath: r.signed_path ?? null,
+    preuvePath: r.preuve_path ?? null,
+    envoyeLe: r.envoye_le,
+    signeLe: r.signe_le ?? null,
+    expireLe: r.expire_le ?? null,
+  };
+}
+
 export interface MonDossier {
   inscription: ReqInscription;
   pieces: ReqPiece[];
+  contrats: ReqContrat[];
 }
 
 export const portalRepo = {
@@ -58,13 +74,24 @@ export const portalRepo = {
       .maybeSingle();
     if (error) throw error;
     if (!ins) return null;
-    const { data: pieces } = await supabase
-      .from("req_pieces")
-      .select("*")
-      .eq("inscription_id", ins.id)
-      .order("type", { ascending: true })
-      .order("version", { ascending: false });
-    return { inscription: toInscription(ins), pieces: (pieces ?? []).map(toPiece) };
+    const [piecesRes, contratsRes] = await Promise.all([
+      supabase
+        .from("req_pieces")
+        .select("*")
+        .eq("inscription_id", ins.id)
+        .order("type", { ascending: true })
+        .order("version", { ascending: false }),
+      supabase
+        .from("req_contrats")
+        .select("*")
+        .eq("inscription_id", ins.id)
+        .order("envoye_le", { ascending: false }),
+    ]);
+    return {
+      inscription: toInscription(ins),
+      pieces: (piecesRes.data ?? []).map(toPiece),
+      contrats: (contratsRes.data ?? []).map(toContrat),
+    };
   },
 
   /** Rattache le compte connecté à l'inscription (via le token du lien). */
