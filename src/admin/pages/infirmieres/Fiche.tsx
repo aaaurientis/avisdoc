@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Ban, CheckCircle2, Download, ExternalLink, FileSignature, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import type { ReqDossier, ReqPiece } from "../../req/types";
+import type { ReqDossier, ReqInscription, ReqPiece } from "../../req/types";
 import {
   ETAT_BADGE,
   ETAT_LABEL,
@@ -35,7 +35,7 @@ function Case({ on, set, children }: { on: boolean; set: (v: boolean) => void; c
 }
 
 /** A3 — contrôle d'une pièce : aperçu + grille selon le type. */
-function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: () => void; onDone: () => void }) {
+function ControleModal({ piece, ins, onClose, onDone }: { piece: ReqPiece; ins: ReqInscription; onClose: () => void; onDone: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"valider" | "refuser">("valider");
@@ -43,7 +43,8 @@ function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: (
   // Champs de validation selon le type.
   const [rcp, setRcp] = useState({ assureur: piece.assureur ?? "", police: piece.police ?? "", dateFin: piece.dateFin ?? "", c1: false, c2: false, c3: false });
   const [urssaf, setUrssaf] = useState({ dateEmission: "", codeVerifie: false });
-  const [ident, setIdent] = useState({ nomOk: false, rppsOk: false });
+  // Pièce d'identité : pas de RPPS (absent d'une CNI) — on vérifie nom + naissance.
+  const [ident, setIdent] = useState({ nomOk: false, naissanceOk: false, lieuOk: false });
   const [motif, setMotif] = useState<MotifRefus | "">("");
   const [autre, setAutre] = useState("");
 
@@ -56,7 +57,7 @@ function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: (
       ? rcp.assureur && rcp.police && rcp.dateFin && rcp.c1 && rcp.c2 && rcp.c3
       : piece.type === "urssaf"
         ? urssaf.dateEmission && urssaf.codeVerifie
-        : ident.nomOk && ident.rppsOk;
+        : ident.nomOk && ident.naissanceOk && ident.lieuOk;
   const refusOk = motif && (motif !== "autre" || autre.trim());
 
   const soumettre = async () => {
@@ -159,8 +160,16 @@ function ControleModal({ piece, onClose, onDone }: { piece: ReqPiece; onClose: (
               )}
               {piece.type === "identite" && (
                 <div className="border-t border-border pt-2">
-                  <Case on={ident.nomOk} set={(v) => setIdent((s) => ({ ...s, nomOk: v }))}>Nom concordant avec le dossier</Case>
-                  <Case on={ident.rppsOk} set={(v) => setIdent((s) => ({ ...s, rppsOk: v }))}>RPPS concordant</Case>
+                  <p className="pb-1 text-[12px] text-muted-foreground">Vérifier la concordance avec la pièce :</p>
+                  <Case on={ident.nomOk} set={(v) => setIdent((s) => ({ ...s, nomOk: v }))}>
+                    Nom et prénom — <span className="font-semibold">{ins.prenom} {ins.nom}</span>
+                  </Case>
+                  <Case on={ident.naissanceOk} set={(v) => setIdent((s) => ({ ...s, naissanceOk: v }))}>
+                    Date de naissance — <span className="font-semibold">{ins.dateNaissance ? frDate(ins.dateNaissance) : "non renseignée"}</span>
+                  </Case>
+                  <Case on={ident.lieuOk} set={(v) => setIdent((s) => ({ ...s, lieuOk: v }))}>
+                    Lieu de naissance — <span className="font-semibold">{ins.lieuNaissance || "non renseigné"}</span>
+                  </Case>
                 </div>
               )}
             </div>
@@ -263,7 +272,7 @@ export default function Fiche() {
       void charger();
     } catch (e) {
       console.error(e);
-      toast.error("L'envoi du contrat a échoué.");
+      toast.error(e instanceof Error ? e.message : "L'envoi du contrat a échoué.");
     } finally {
       setEnvoiContrat(false);
     }
@@ -508,7 +517,7 @@ export default function Fiche() {
       </div>
 
       {controle && (
-        <ControleModal piece={controle} onClose={() => setControle(null)} onDone={() => { setControle(null); void charger(); }} />
+        <ControleModal piece={controle} ins={i} onClose={() => setControle(null)} onDone={() => { setControle(null); void charger(); }} />
       )}
       {action && <ActionModal action={action} onClose={() => setAction(null)} onConfirm={(m) => void confirmerAction(m)} />}
     </div>
