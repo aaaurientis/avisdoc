@@ -23,6 +23,7 @@ import {
   Settings,
   SlidersHorizontal,
   Sparkles,
+  Stethoscope,
   Sun,
   Target,
   Trash2,
@@ -76,6 +77,7 @@ const MENU: Entree[] = [
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
   ] },
   { module: "contacts", label: "Contacts Médicaux", icon: Users, to: "/contacts" },
+  { module: "infirmieres", label: "Infirmières", icon: Stethoscope, to: "/infirmieres" },
   { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
     { to: "/clients", label: "Facturation", icon: Receipt },
