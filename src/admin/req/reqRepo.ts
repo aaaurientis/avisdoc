@@ -187,7 +187,15 @@ export const reqRepo = {
   /** Envoie le contrat à signer (Yousign) ; passe l'inscription en contrat_envoye. */
   async envoyerContrat(id: string): Promise<{ signUrl: string | null; emailEnvoye: boolean }> {
     const { data, error } = await sb.functions.invoke("contrat-envoyer", { body: { id } });
-    if (error) throw error;
+    if (error) {
+      // Remonter le vrai message serveur (409/502…) plutôt qu'un message générique.
+      let msg = error.message;
+      try {
+        const b = await (error as { context?: { json?: () => Promise<{ error?: string }> } }).context?.json?.();
+        if (b?.error) msg = b.error;
+      } catch { /* ignore */ }
+      throw new Error(msg);
+    }
     return { signUrl: data?.signUrl ?? null, emailEnvoye: !!data?.email_envoye };
   },
 
