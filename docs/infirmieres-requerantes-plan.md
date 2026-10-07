@@ -51,12 +51,27 @@ est un **tableau de bord** (liste des 3 types + carte). Trois sous-menus :
 3. **« Expert » → « Requis »** renommé **partout, valeur stockée comprise**
    (migration de données + seed + `ContactType` + jetons UI).
 
-**Point ouvert à trancher à la construction** : le parcours infirmières
-(`req_inscriptions`) **ne capture pas d'adresse** aujourd'hui (nom, prénom,
-e-mail, RPPS). Pour faire apparaître les requérants **sur la carte** du tableau
-de bord, il faudra une source de localisation — options : (a) saisir une adresse
-à l'inscription (portail P1/P2), (b) géocoder depuis le RPPS via l'Annuaire Santé,
-(c) relier l'inscription à une fiche annuaire. À décider avant de coder le Lot 7.
+**Localisation des requérants sur la carte** : décision = **(b) géocoder via le
+RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
+
+**Découpage** :
+- **7a (fait)** : « Expert → Requis » (données comprises, migration 0060) ; menu
+  « Contacts médicaux » en groupe (Vue d'ensemble / Requérants → parcours / Requis
+  / Réseau d'aval) ; page tableau de bord (3 tuiles + carte) ; annuaire piloté par
+  type (`/contacts/requis`, `/contacts/reseau`).
+- **7b (à venir)** : requérants géolocalisés sur la carte via géocodage RPPS.
+- **7c** : recette & prod (checklist §6).
+
+## Demandes complémentaires (à planifier)
+
+- **Invitation infirmière via l'Annuaire Santé** : l'invitation doit commencer par
+  une **recherche Annuaire Santé** (comme `NewContactModal`), préremplir nom/prénom
+  /RPPS, et **ajouter e-mail + téléphone**. (Modifie `Infirmieres.tsx` + éventuellement
+  `inscription-inviter` pour stocker le téléphone.)
+- **Contrat standardisé** : le contrat à signer est un **document standard** (template
+  fixe), **hors champs de désignation des signataires**. Remplacer la génération du
+  texte (`_shared/contrat-pdf.ts`) par un **modèle fourni** + champs signataires.
+  → source du modèle à préciser (upload admin ? fichier figé ?).
 
 ## États
 
@@ -91,4 +106,6 @@ de bord, il faudra une source de localisation — options : (a) saisir une adres
   (expiration RCP/URSSAF → suspension, rappels e-mail uniques ≤ 30 j), purge
   identité J+30 (RI-03, fonction SQL + pg_cron), vue `req_eligibilite` (RI-01),
   réactivation admin après renouvellement
-- [ ] Lot 7 — recette & prod + refonte du menu Contacts médicaux (cf. section dédiée)
+- [~] Lot 7 — refonte menu Contacts médicaux : **7a fait** (rename Expert→Requis,
+  groupe + sous-menus, tableau de bord, annuaire par type) ; **7b** (requérants sur
+  la carte via RPPS) et **7c** (recette & prod) à venir

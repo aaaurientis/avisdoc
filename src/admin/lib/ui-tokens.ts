@@ -20,14 +20,14 @@ export function typesDe(c: { type: ContactType; types?: ContactType[] }): Contac
 /** Badge + avatar par type de contact. */
 export const TYPE_BADGE: Record<ContactType, string> = {
   Requérant: "bg-sky-100 text-sky-700",
-  Expert: "bg-emerald-100 text-emerald-700",
+  Requis: "bg-emerald-100 text-emerald-700",
   "Réseau d'Aval": "bg-amber-100 text-amber-700",
 };
 
 /** Point coloré (dashboard « Répartition du réseau »). */
 export const TYPE_DOT: Record<ContactType, string> = {
   Requérant: "bg-avisdoc-teal",
-  Expert: "bg-emerald-500",
+  Requis: "bg-emerald-500",
   "Réseau d'Aval": "bg-avisdoc-coral",
 };
 

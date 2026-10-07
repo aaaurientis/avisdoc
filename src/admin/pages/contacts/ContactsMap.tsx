@@ -18,7 +18,7 @@ import { Card } from "../../components/ui";
 // Couleurs des marqueurs, alignées sur les jetons de type de l'app.
 const TYPE_COLOR: Record<ContactType, string> = {
   Requérant: "#0284c7", // sky-600
-  Expert: "#059669", // emerald-600
+  Requis: "#059669", // emerald-600
   "Réseau d'Aval": "#d97706", // amber-600
 };
 
@@ -266,6 +266,9 @@ export default function ContactsMap({
   }
 
   const geoloc = contacts.filter((c) => typeof c.lat === "number").length;
+  const typesPresents = (Object.keys(TYPE_COLOR) as ContactType[]).filter((t) =>
+    contacts.some((c) => typesDe(c).includes(t)),
+  );
 
   return (
     <Card className="relative overflow-hidden p-0">
@@ -281,7 +284,7 @@ export default function ContactsMap({
       <div className="absolute bottom-3 left-3 rounded-xl border border-border bg-card/95 px-3 py-2.5 text-[12px] shadow-soft backdrop-blur">
         <div className="mb-1.5 font-bold text-avisdoc-ink">Type de contact</div>
         <div className="flex flex-col gap-1">
-          {(Object.keys(TYPE_COLOR) as ContactType[]).map((t) => (
+          {(typesPresents.length ? typesPresents : (Object.keys(TYPE_COLOR) as ContactType[])).map((t) => (
             <div key={t} className="flex items-center gap-2 text-muted-foreground">
               <span
                 className="inline-block size-2.5 rounded-full ring-2 ring-white"

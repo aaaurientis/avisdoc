@@ -17,6 +17,7 @@ import Debrief from "./pages/Debrief";
 import Planning from "./pages/Planning";
 import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
+import ContactsDashboard from "./pages/ContactsDashboard";
 import Documents from "./pages/Documents";
 import Infirmieres from "./pages/Infirmieres";
 import InfirmiereFiche from "./pages/infirmieres/Fiche";
@@ -86,7 +87,9 @@ function Gate() {
           <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
           <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
           <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
-          <Route path="/contacts" element={<Garde module="contacts"><Contacts /></Garde>} />
+          <Route path="/contacts" element={<Garde module="contacts"><ContactsDashboard /></Garde>} />
+          <Route path="/contacts/requis" element={<Garde module="contacts"><Contacts fixedType="Requis" /></Garde>} />
+          <Route path="/contacts/reseau" element={<Garde module="contacts"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
           <Route path="/infirmieres" element={<Garde module="infirmieres"><Infirmieres /></Garde>} />
           <Route path="/infirmieres/:id" element={<Garde module="infirmieres"><InfirmiereFiche /></Garde>} />
