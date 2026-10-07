@@ -47,3 +47,11 @@ verify_jwt = true
 # Invitation d'une infirmière requérante — admin @avisdoc.fr vérifié dans la fonction.
 [functions.inscription-inviter]
 verify_jwt = true
+
+# Contrôle d'une pièce (valider/refuser) + recalcul d'état — admin @avisdoc.fr.
+[functions.piece-controler]
+verify_jwt = true
+
+# Transition d'inscription (suspendre/refuser/résilier) — admin @avisdoc.fr.
+[functions.inscription-action]
+verify_jwt = true

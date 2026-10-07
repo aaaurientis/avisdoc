@@ -126,6 +126,33 @@ export const reqRepo = {
     return data?.signedUrl ?? null;
   },
 
+  /** Contrôle d'une pièce : validation (avec champs) ou refus (avec motif). */
+  async controlerPiece(input: {
+    pieceId: string;
+    decision: "valider" | "refuser";
+    assureur?: string;
+    police?: string;
+    dateFin?: string | null;
+    dateEmission?: string | null;
+    codeUrssafVerifie?: boolean;
+    motif?: string;
+  }): Promise<void> {
+    const { error } = await sb.functions.invoke("piece-controler", { body: input });
+    if (error) throw error;
+  },
+
+  /** Transition d'inscription avec motif obligatoire (suspendre/refuser/résilier). */
+  async action(
+    id: string,
+    action: "suspendre" | "refuser" | "resilier",
+    motif: string,
+  ): Promise<void> {
+    const { error } = await sb.functions.invoke("inscription-action", {
+      body: { id, action, motif },
+    });
+    if (error) throw error;
+  },
+
   /** Crée une inscription (état « invitee ») et envoie le lien (Edge Function). */
   async inviter(
     nom: string,
