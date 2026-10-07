@@ -59,6 +59,7 @@ interface DataValue {
   clients: Client[];
   docs: DocItem[];
   docTree: DocCategory[];
+  docTags: string[];
   activity: ActivityItem[];
 
   getClient: (id: string) => Client | undefined;
@@ -136,6 +137,11 @@ interface DataValue {
   removeCategory: (name: string) => void;
   addSubType: (parent: string, name: string) => void;
   removeSubType: (parent: string, name: string) => void;
+
+  // Tags standardisés
+  setDocTags: (id: string, tags: string[]) => void;
+  addTag: (name: string) => void;
+  removeTag: (name: string) => void;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -150,6 +156,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [docTree, setDocTree] = useState<DocCategory[]>([]);
+  const [docTags, setDocTagsState] = useState<string[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>(STAGES_DEFAUT);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -161,6 +168,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setClients(snap.clients);
     setDocs(snap.docs);
     setDocTree(snap.docTree);
+    setDocTagsState(snap.docTags);
     setActivity(snap.activity);
     setStages(snap.stages);
     setPipelines(snap.pipelines);
@@ -209,7 +217,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const tables = [
       "admin_network_contacts", "admin_clients", "admin_client_contacts",
       "admin_client_docs", "admin_suivis", "admin_documents",
-      "admin_doc_types", "admin_activity",
+      "admin_doc_types", "admin_doc_tags", "admin_activity",
     ];
     let timer: ReturnType<typeof setTimeout> | undefined;
     const bump = () => {
@@ -458,6 +466,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         ext: extFromName(file.name),
         catParent: parent,
         cat: sub,
+        tags: [],
         size: humanSize(file.size),
         date: todayLong(),
         owner: user?.name ?? "—",
@@ -597,6 +606,41 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         prev.map((c) => (c.name === parent ? { ...c, subs: c.subs.filter((s) => s !== name) } : c)),
       );
       persist(() => repo.removeSubType(parent, name));
+    },
+    [persist, repo],
+  );
+
+  // --- Tags standardisés ---
+  const setDocTags: DataValue["setDocTags"] = useCallback(
+    (id, tags) => {
+      setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, tags } : d)));
+      persist(() => repo.setDocTags(id, tags));
+    },
+    [persist, repo],
+  );
+
+  const addTag: DataValue["addTag"] = useCallback(
+    (name) => {
+      const n = name.trim();
+      if (!n) return;
+      let added = false;
+      setDocTagsState((prev) => {
+        if (prev.includes(n)) return prev;
+        added = true;
+        return [...prev, n];
+      });
+      if (added) persist(() => repo.addTag(n));
+    },
+    [persist, repo],
+  );
+
+  const removeTag: DataValue["removeTag"] = useCallback(
+    (name) => {
+      setDocTagsState((prev) => prev.filter((t) => t !== name));
+      // Retire aussi le tag des documents qui le portaient (état local ; en base,
+      // les tags sont des libellés, la liste gérée est indépendante des documents).
+      setDocs((prev) => prev.map((d) => (d.tags.includes(name) ? { ...d, tags: d.tags.filter((t) => t !== name) } : d)));
+      persist(() => repo.removeTag(name));
     },
     [persist, repo],
   );
@@ -999,6 +1043,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       clients,
       docs,
       docTree,
+      docTags,
       activity,
       getClient,
       addContact,
@@ -1030,9 +1075,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       removeCategory,
       addSubType,
       removeSubType,
+      setDocTags,
+      addTag,
+      removeTag,
     }),
     [
-      loading, contacts, clients, docs, docTree, activity, getClient,
+      loading, contacts, clients, docs, docTree, docTags, activity, getClient,
       addContact, updateContact, deleteContact, setContactGeo, addClient, updateClientFields, deleteClient,
       stages, addStage, renameStage, setStageTone, deleteStage, moveStage,
       pipelines, createPipeline, updatePipeline, deletePipeline,
@@ -1042,6 +1090,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       addProjectContact, removeProjectContact, addProjectDoc, removeProjectDoc,
       addSuivi, toggleSuivi, removeSuivi, importDoc, newDocVersion, downloadDoc, documentUrl,
       setDocCategory, deleteDoc, addCategory, removeCategory, addSubType, removeSubType,
+      setDocTags, addTag, removeTag,
     ],
   );
 

@@ -160,6 +160,8 @@ export interface DocItem {
   date: string;
   owner: string;
   version: number;
+  /** Tags standardisés (0 à n), choisis dans la liste gérée en Réglages. */
+  tags: string[];
   /** Chemin de l'objet dans le bucket Storage `admin-documents` (backend Supabase). */
   storagePath?: string;
 }

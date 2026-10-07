@@ -6,10 +6,14 @@ import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 
 export default function Settings() {
-  const { docTree, docs, addCategory, removeCategory, addSubType, removeSubType } = useAdminData();
+  const {
+    docTree, docs, docTags,
+    addCategory, removeCategory, addSubType, removeSubType, addTag, removeTag,
+  } = useAdminData();
   const [newCat, setNewCat] = useState("");
   // Saisie de nouvelle sous-catégorie, une par catégorie.
   const [subDraft, setSubDraft] = useState<Record<string, string>>({});
+  const [newTag, setNewTag] = useState("");
 
   const submitCat = () => {
     if (!newCat.trim()) return;
@@ -21,6 +25,11 @@ export default function Settings() {
     if (!v) return;
     addSubType(parent, v);
     setSubDraft((d) => ({ ...d, [parent]: "" }));
+  };
+  const submitTag = () => {
+    if (!newTag.trim()) return;
+    addTag(newTag);
+    setNewTag("");
   };
 
   return (
@@ -137,6 +146,58 @@ export default function Settings() {
             className="ad-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-[13px] font-bold text-white"
           >
             Ajouter une catégorie
+          </button>
+        </div>
+      </Card>
+
+      {/* Tags standardisés */}
+      <Card className="mt-6 max-w-[680px] p-6">
+        <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Tags standardisés</h2>
+        <p className="mb-4 mt-1 text-[13px] text-muted-foreground">
+          Étiquettes transversales applicables à un document (en plus de sa
+          catégorie). Un document peut en porter plusieurs.
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          {docTags.map((t) => {
+            const n = docs.filter((d) => d.tags.includes(t)).length;
+            return (
+              <span
+                key={t}
+                className="inline-flex items-center gap-2 rounded-full bg-avisdoc-teal/12 px-3 py-1.5 text-[12.5px] font-semibold text-avisdoc-teal"
+              >
+                {t}
+                <span className="text-[11px] font-normal text-avisdoc-teal/70">{n}</span>
+                <button
+                  type="button"
+                  onClick={() => removeTag(t)}
+                  title="Supprimer le tag (il sera retiré des documents)"
+                  className="transition-colors hover:text-avisdoc-coral"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </span>
+            );
+          })}
+          {docTags.length === 0 && (
+            <div className="text-[13px] italic text-muted-foreground">Aucun tag pour l'instant.</div>
+          )}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <input
+            className="ad-input flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+            placeholder="Nouveau tag…"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitTag()}
+          />
+          <button
+            type="button"
+            onClick={submitTag}
+            className="inline-flex items-center gap-1 rounded-full bg-avisdoc-teal px-5 py-2.5 text-[13px] font-bold text-white"
+          >
+            <Plus className="size-3.5" /> Ajouter un tag
           </button>
         </div>
       </Card>

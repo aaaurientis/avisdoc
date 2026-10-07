@@ -22,11 +22,12 @@ interface Preview {
 
 export default function Documents() {
   const {
-    docs, docTree, deleteDoc, importDoc, newDocVersion,
-    downloadDoc, documentUrl, setDocCategory,
+    docs, docTree, docTags, deleteDoc, importDoc, newDocVersion,
+    downloadDoc, documentUrl, setDocCategory, setDocTags,
   } = useAdminData();
   const [cat, setCat] = useState("Tous"); // catégorie (niveau 1) ou « Tous »
   const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
+  const [tagFilter, setTagFilter] = useState<string[]>([]); // filtre par tags (OU)
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [renderError, setRenderError] = useState(false);
@@ -46,9 +47,13 @@ export default function Documents() {
 
   const currentCat = useMemo(() => docTree.find((c) => c.name === cat), [docTree, cat]);
   const rows = docs.filter((d) => {
-    if (cat === "Tous") return true;
-    if (d.catParent !== cat) return false;
-    return sub == null || d.cat === sub;
+    if (cat !== "Tous") {
+      if (d.catParent !== cat) return false;
+      if (sub != null && d.cat !== sub) return false;
+    }
+    // Filtre par tags : le document doit porter au moins un des tags cochés.
+    if (tagFilter.length && !tagFilter.some((t) => d.tags.includes(t))) return false;
+    return true;
   });
 
   // Sous-catégorie cible d'un import, selon le filtre courant.
@@ -239,6 +244,40 @@ export default function Documents() {
         </div>
       )}
 
+      {/* Filtre par tags standardisés (OU) */}
+      {docTags.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+            Tags
+          </span>
+          {docTags.map((t) => {
+            const on = tagFilter.includes(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTagFilter((f) => (on ? f.filter((x) => x !== t) : [...f, t]))}
+                className={cn(
+                  "rounded-full px-3 py-1 text-[12px] font-semibold transition-colors",
+                  on ? "bg-avisdoc-ink text-white" : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+                )}
+              >
+                {t}
+              </button>
+            );
+          })}
+          {tagFilter.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setTagFilter([])}
+              className="text-[12px] text-muted-foreground underline underline-offset-2 hover:text-avisdoc-ink"
+            >
+              réinitialiser
+            </button>
+          )}
+        </div>
+      )}
+
       <Card className="overflow-x-auto">
         <div style={{ minWidth: 760 }}>
           <div
@@ -262,27 +301,65 @@ export default function Documents() {
                 className="ad-row grid items-center gap-2.5 border-b border-border/60 px-5 py-3 transition-colors last:border-b-0"
                 style={{ gridTemplateColumns: COLS }}
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <span
                     className={cn(
-                      "inline-flex size-9 shrink-0 items-center justify-center rounded-[9px] text-[10px] font-bold tracking-wide text-white",
+                      "mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-[9px] text-[10px] font-bold tracking-wide text-white",
                       DOC_EXT[d.ext],
                     )}
                   >
                     {d.ext}
                   </span>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openPreview(d)}
-                      title="Aperçu du document"
-                      className="truncate text-left text-[13.5px] font-semibold text-avisdoc-ink hover:text-avisdoc-teal hover:underline"
-                    >
-                      {d.name}
-                    </button>
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                      v{d.version}
-                    </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openPreview(d)}
+                        title="Aperçu du document"
+                        className="truncate text-left text-[13.5px] font-semibold text-avisdoc-ink hover:text-avisdoc-teal hover:underline"
+                      >
+                        {d.name}
+                      </button>
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        v{d.version}
+                      </span>
+                    </div>
+                    {/* Tags du document */}
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {d.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center gap-1 rounded-full bg-avisdoc-teal/12 px-2 py-0.5 text-[10.5px] font-semibold text-avisdoc-teal"
+                        >
+                          {t}
+                          <button
+                            type="button"
+                            onClick={() => setDocTags(d.id, d.tags.filter((x) => x !== t))}
+                            title="Retirer le tag"
+                            className="transition-colors hover:text-avisdoc-coral"
+                          >
+                            <X className="size-2.5" />
+                          </button>
+                        </span>
+                      ))}
+                      {docTags.some((t) => !d.tags.includes(t)) && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) setDocTags(d.id, [...d.tags, e.target.value]);
+                          }}
+                          title="Ajouter un tag"
+                          className="rounded-full border border-dashed border-border bg-transparent px-1.5 py-0.5 text-[10.5px] text-muted-foreground outline-none transition-colors hover:border-avisdoc-teal"
+                        >
+                          <option value="">＋ tag</option>
+                          {docTags
+                            .filter((t) => !d.tags.includes(t))
+                            .map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div>
