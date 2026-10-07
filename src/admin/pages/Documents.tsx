@@ -3,9 +3,19 @@ import { ArrowUp, Download, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
 import { DOC_EXT, catPalette } from "../lib/ui-tokens";
+import { humanSize } from "../lib/format";
+import { suggestTags } from "../lib/autotag";
 import { useAdminData } from "../data/AdminDataContext";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
+
+// Brouillon d'import : destination + tags (pré-suggérés), ajustables avant envoi.
+interface ImportDraft {
+  file: File;
+  parent: string;
+  sub: string;
+  tags: string[];
+}
 
 const COLS = "minmax(180px,2.2fr) 210px 60px 84px minmax(64px,0.8fr) 150px";
 // Séparateur interne (caractère de contrôle « unit separator ») pour encoder
@@ -28,6 +38,7 @@ export default function Documents() {
   const [cat, setCat] = useState(""); // catégorie (niveau 1) sélectionnée
   const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
   const [tagFilter, setTagFilter] = useState<string[]>([]); // filtre par tags (OU)
+  const [importDraft, setImportDraft] = useState<ImportDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [renderError, setRenderError] = useState(false);
@@ -77,7 +88,9 @@ export default function Documents() {
     setSub(null);
   };
 
-  const onPickImport = async (e: ChangeEvent<HTMLInputElement>) => {
+  // À la sélection d'un fichier : on n'importe pas directement, on ouvre la
+  // fenêtre d'import avec la destination pré-remplie et les tags pré-suggérés.
+  const onPickImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -85,12 +98,27 @@ export default function Documents() {
       toast.error("Créez d'abord une catégorie et une sous-catégorie (Réglages).");
       return;
     }
+    setImportDraft({
+      file,
+      parent: target.parent,
+      sub: target.sub,
+      tags: suggestTags(file.name, target.parent, target.sub, docTags),
+    });
+  };
+
+  const confirmImport = async () => {
+    if (!importDraft) return;
+    const { file, parent, sub, tags } = importDraft;
+    setImportDraft(null);
     setBusy(true);
     try {
-      await importDoc(file, target.parent, target.sub);
-      toast.success(`« ${file.name} » importé dans « ${target.parent} › ${target.sub} ».`);
+      await importDoc(file, parent, sub, tags);
+      toast.success(`« ${file.name} » importé dans « ${parent} › ${sub} ».`);
     } catch { /* toast géré dans le contexte */ } finally { setBusy(false); }
   };
+
+  // Catégorie choisie dans la fenêtre d'import (pour lister ses sous-catégories).
+  const draftCat = importDraft && docTree.find((c) => c.name === importDraft.parent);
 
   const onPickVersion = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -499,6 +527,129 @@ export default function Documents() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fenêtre d'import : destination + tags pré-suggérés */}
+      {importDraft && (
+        <div
+          onClick={() => setImportDraft(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-avisdoc-ink/50 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-[min(520px,94vw)] flex-col gap-4 rounded-2xl bg-card p-6 shadow-floating"
+          >
+            <div>
+              <h2 className="font-display text-lg font-semibold text-avisdoc-ink">
+                Importer un document
+              </h2>
+              <p className="mt-1 truncate text-[13px] text-muted-foreground">
+                {importDraft.file.name} · {humanSize(importDraft.file.size)}
+              </p>
+            </div>
+
+            {/* Destination */}
+            <div className="flex gap-2">
+              <label className="flex-1 text-[12px] font-semibold text-muted-foreground">
+                Catégorie
+                <select
+                  value={importDraft.parent}
+                  onChange={(e) => {
+                    const parent = e.target.value;
+                    const firstSub = docTree.find((c) => c.name === parent)?.subs[0] ?? "";
+                    setImportDraft((d) =>
+                      d
+                        ? { ...d, parent, sub: firstSub, tags: suggestTags(d.file.name, parent, firstSub, docTags) }
+                        : d,
+                    );
+                  }}
+                  className="ad-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+                >
+                  {docTree.map((c) => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex-1 text-[12px] font-semibold text-muted-foreground">
+                Sous-catégorie
+                <select
+                  value={importDraft.sub}
+                  onChange={(e) => {
+                    const s = e.target.value;
+                    setImportDraft((d) =>
+                      d ? { ...d, sub: s, tags: suggestTags(d.file.name, d.parent, s, docTags) } : d,
+                    );
+                  }}
+                  className="ad-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+                >
+                  {(draftCat?.subs ?? []).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {/* Tags pré-suggérés (modifiables) */}
+            <div>
+              <div className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+                Tags
+                <span className="rounded-full bg-avisdoc-teal/12 px-2 py-0.5 text-[10.5px] font-bold text-avisdoc-teal">
+                  pré-suggérés automatiquement
+                </span>
+              </div>
+              {docTags.length === 0 ? (
+                <p className="text-[12.5px] italic text-muted-foreground">
+                  Aucun tag défini (Réglages).
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {docTags.map((t) => {
+                    const on = importDraft.tags.includes(t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() =>
+                          setImportDraft((d) =>
+                            d
+                              ? { ...d, tags: on ? d.tags.filter((x) => x !== t) : [...d.tags, t] }
+                              : d,
+                          )
+                        }
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
+                          on
+                            ? "bg-avisdoc-teal text-white"
+                            : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+                        )}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setImportDraft(null)}
+                className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmImport()}
+                disabled={!importDraft.sub}
+                className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+              >
+                <Upload className="size-4" /> Importer
+              </button>
             </div>
           </div>
         </div>

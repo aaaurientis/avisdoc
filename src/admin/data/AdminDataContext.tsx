@@ -92,7 +92,7 @@ interface DataValue {
   toggleSuivi: (clientId: string, suiviId: string) => void;
   removeSuivi: (clientId: string, suiviId: string) => void;
 
-  importDoc: (file: File, parent: string, sub: string) => Promise<void>;
+  importDoc: (file: File, parent: string, sub: string, tags: string[]) => Promise<void>;
   newDocVersion: (id: string, file: File) => Promise<void>;
   downloadDoc: (id: string) => Promise<void>;
   /** URL signée d'un document : download=false pour l'aperçu en ligne. */
@@ -457,7 +457,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   /** Import d'un vrai fichier → upload Storage + enregistrement. */
   const importDoc: DataValue["importDoc"] = useCallback(
-    async (file, parent, sub) => {
+    async (file, parent, sub, tags) => {
       const id = uid();
       const version = 1;
       const doc: DocItem = {
@@ -466,7 +466,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         ext: extFromName(file.name),
         catParent: parent,
         cat: sub,
-        tags: [],
+        tags,
         size: humanSize(file.size),
         date: todayLong(),
         owner: user?.name ?? "—",
