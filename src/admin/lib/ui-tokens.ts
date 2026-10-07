@@ -112,3 +112,22 @@ export const PROPO_STATUTS: PropoStatut[] = [
   "Acceptée",
   "Refusée",
 ];
+
+/** Palette des catégories documentaires (niveau 1), par ordre d'affichage.
+ *  Classes Tailwind (pas de hex) : fond du pill actif + point coloré. */
+export const DOC_CAT_PALETTE: { active: string; dot: string }[] = [
+  { active: "bg-sky-500 text-white border-sky-500", dot: "bg-sky-500" },
+  { active: "bg-slate-600 text-white border-slate-600", dot: "bg-slate-600" },
+  { active: "bg-teal-600 text-white border-teal-600", dot: "bg-teal-600" },
+  { active: "bg-blue-600 text-white border-blue-600", dot: "bg-blue-600" },
+  { active: "bg-indigo-900 text-white border-indigo-900", dot: "bg-indigo-900" },
+  { active: "bg-sky-400 text-white border-sky-400", dot: "bg-sky-400" },
+  { active: "bg-fuchsia-800 text-white border-fuchsia-800", dot: "bg-fuchsia-800" },
+  { active: "bg-emerald-600 text-white border-emerald-600", dot: "bg-emerald-600" },
+];
+
+/** Couleurs d'une catégorie par son index (cyclique). */
+export function catPalette(index: number): { active: string; dot: string } {
+  const p = DOC_CAT_PALETTE;
+  return p[((index % p.length) + p.length) % p.length];
+}

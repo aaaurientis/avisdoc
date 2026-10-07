@@ -7,6 +7,7 @@ import type {
   AccountField,
   ActivityItem,
   Client,
+  DocCategory,
   DocItem,
   NetworkContact,
   Pipeline,
@@ -95,6 +96,7 @@ function toDoc(r: any): DocItem {
     id: r.id,
     name: r.name,
     ext: r.ext,
+    catParent: r.cat_parent ?? "",
     cat: r.cat ?? "",
     size: r.size ?? "",
     date: r.date_label ?? "",
@@ -116,7 +118,9 @@ export class SupabaseRepo implements AdminRepo {
         sb.from("admin_client_docs").select("*"),
         sb.from("admin_suivis").select("*"),
         sb.from("admin_documents").select("*").order("created_at", { ascending: false }),
-        sb.from("admin_doc_types").select("*").order("name", { ascending: true }),
+        sb.from("admin_doc_types").select("*")
+          .order("position", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true }),
         sb.from("admin_activity").select("*").order("created_at", { ascending: false }).limit(20),
         sb.from("admin_pipeline_stages").select("*").order("position", { ascending: true }),
         sb.from("admin_account_fields").select("*").order("position", { ascending: true }),
@@ -168,11 +172,21 @@ export class SupabaseRepo implements AdminRepo {
       suivis: svMap.get(r.id) ?? [],
     }));
 
+    // Arborescence à 2 niveaux : les lignes sans `parent` sont des catégories,
+    // les autres des sous-catégories rattachées par le nom de leur parent.
+    const typeRows = (typesRes.data ?? []) as any[];
+    const docTree: DocCategory[] = typeRows
+      .filter((r) => !r.parent)
+      .map((c) => ({
+        name: c.name,
+        subs: typeRows.filter((r) => r.parent === c.name).map((r) => r.name),
+      }));
+
     return {
       contacts: (contactsRes.data ?? []).map(toContact),
       clients,
       docs: (docsRes.data ?? []).map(toDoc),
-      docTypes: (typesRes.data ?? []).map((r: any) => r.name),
+      docTree,
       activity: (actRes.data ?? []).map(
         (r: any): ActivityItem => ({ id: r.id, dot: r.dot, text: r.text, when: r.when_label ?? "" }),
       ),
@@ -318,6 +332,7 @@ export class SupabaseRepo implements AdminRepo {
       name: doc.name,
       ext: doc.ext,
       cat: doc.cat,
+      cat_parent: doc.catParent,
       size: doc.size,
       date_label: doc.date,
       owner: doc.owner,
@@ -358,8 +373,11 @@ export class SupabaseRepo implements AdminRepo {
     return data?.signedUrl ?? null;
   }
 
-  async setDocCat(id: string, cat: string): Promise<void> {
-    const { error } = await sb.from("admin_documents").update({ cat }).eq("id", id);
+  async setDocCat(id: string, parent: string, sub: string): Promise<void> {
+    const { error } = await sb
+      .from("admin_documents")
+      .update({ cat: sub, cat_parent: parent })
+      .eq("id", id);
     this.assert(error);
   }
 
@@ -513,13 +531,30 @@ export class SupabaseRepo implements AdminRepo {
     }
   }
 
-  async addDocType(name: string): Promise<void> {
-    const { error } = await sb.from("admin_doc_types").insert({ name });
+  async addCategory(name: string): Promise<void> {
+    const { error } = await sb.from("admin_doc_types").insert({ name, parent: null });
     this.assert(error);
   }
 
-  async removeDocType(name: string): Promise<void> {
-    const { error } = await sb.from("admin_doc_types").delete().eq("name", name);
+  async removeCategory(name: string): Promise<void> {
+    // Supprime d'abord les sous-catégories, puis la catégorie elle-même.
+    const subs = await sb.from("admin_doc_types").delete().eq("parent", name);
+    this.assert(subs.error);
+    const cat = await sb.from("admin_doc_types").delete().eq("name", name).is("parent", null);
+    this.assert(cat.error);
+  }
+
+  async addSubType(parent: string, name: string): Promise<void> {
+    const { error } = await sb.from("admin_doc_types").insert({ name, parent });
+    this.assert(error);
+  }
+
+  async removeSubType(parent: string, name: string): Promise<void> {
+    const { error } = await sb
+      .from("admin_doc_types")
+      .delete()
+      .eq("parent", parent)
+      .eq("name", name);
     this.assert(error);
   }
 }

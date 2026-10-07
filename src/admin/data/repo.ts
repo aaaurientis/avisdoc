@@ -9,6 +9,7 @@ import type {
   AccountField,
   ActivityItem,
   Client,
+  DocCategory,
   DocItem,
   NetworkContact,
   Pipeline,
@@ -25,14 +26,14 @@ import {
   SEED_CLIENTS,
   SEED_CONTACTS,
   SEED_DOCS,
-  SEED_DOC_TYPES,
+  SEED_DOC_TREE,
 } from "./seed";
 
 export interface AdminSnapshot {
   contacts: NetworkContact[];
   clients: Client[];
   docs: DocItem[];
-  docTypes: string[];
+  docTree: DocCategory[];
   activity: ActivityItem[];
   /** Colonnes du pipeline, dans l'ordre (migration 0023). */
   stages: PipelineStage[];
@@ -69,7 +70,8 @@ export interface AdminRepo {
   /** URL signée du fichier. download=true force le téléchargement,
    *  download=false renvoie une URL affichable en ligne (aperçu). */
   docUrl(doc: DocItem, download?: boolean): Promise<string | null>;
-  setDocCat(id: string, cat: string): Promise<void>;
+  /** Classe un document dans une sous-catégorie (parent + feuille). */
+  setDocCat(id: string, parent: string, sub: string): Promise<void>;
   deleteDoc(id: string, storagePath?: string): Promise<void>;
 
   // Colonnes du pipeline
@@ -102,9 +104,11 @@ export interface AdminRepo {
    */
   secteurDuProspect(clientId: string): Promise<string | null>;
 
-  // Réglages
-  addDocType(name: string): Promise<void>;
-  removeDocType(name: string): Promise<void>;
+  // Réglages — arborescence documentaire à 2 niveaux
+  addCategory(name: string): Promise<void>;
+  removeCategory(name: string): Promise<void>;
+  addSubType(parent: string, name: string): Promise<void>;
+  removeSubType(parent: string, name: string): Promise<void>;
 }
 
 /** Implémentation en mémoire : sert le jeu de démo, mutations en no-op persistées. */
@@ -115,7 +119,7 @@ export class MockRepo implements AdminRepo {
       contacts: structuredClone(SEED_CONTACTS),
       clients: structuredClone(SEED_CLIENTS),
       docs: structuredClone(SEED_DOCS),
-      docTypes: [...SEED_DOC_TYPES],
+      docTree: structuredClone(SEED_DOC_TREE),
       activity: structuredClone(SEED_ACTIVITY),
       stages: structuredClone(STAGES_DEFAUT),
       pipelines: [],
@@ -163,6 +167,8 @@ export class MockRepo implements AdminRepo {
   }
   async setDocCat(): Promise<void> {}
   async deleteDoc(): Promise<void> {}
-  async addDocType(): Promise<void> {}
-  async removeDocType(): Promise<void> {}
+  async addCategory(): Promise<void> {}
+  async removeCategory(): Promise<void> {}
+  async addSubType(): Promise<void> {}
+  async removeSubType(): Promise<void> {}
 }
