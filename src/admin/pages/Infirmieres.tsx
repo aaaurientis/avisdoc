@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { ReqInscription } from "../req/types";
 import { ETAT_BADGE, ETAT_LABEL, ETATS_A_TRAITER } from "../req/types";
 import { reqRepo } from "../req/reqRepo";
 import { frDate } from "../lib/format";
-import { Badge, Card, Modal, PageHeader } from "../components/ui";
+import { Badge, Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
+import InviterModal from "./infirmieres/InviterModal";
 
 const COLS = "minmax(160px,2fr) 130px 150px 150px";
 
@@ -29,8 +30,6 @@ export default function Infirmieres() {
   const [loading, setLoading] = useState(true);
   const [vue, setVue] = useState<Vue>("a_traiter");
   const [showInvite, setShowInvite] = useState(false);
-  const [form, setForm] = useState({ nom: "", prenom: "", email: "" });
-  const [busy, setBusy] = useState(false);
 
   const charger = async () => {
     setLoading(true);
@@ -57,30 +56,6 @@ export default function Infirmieres() {
       return j != null && j <= 30;
     });
   }, [items, vue]);
-
-  const inviter = async () => {
-    if (!form.nom.trim() || !form.prenom.trim() || !form.email.includes("@")) {
-      toast.error("Nom, prénom et e-mail valides requis.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await reqRepo.inviter(form.nom, form.prenom, form.email);
-      setShowInvite(false);
-      setForm({ nom: "", prenom: "", email: "" });
-      toast.success(
-        r.emailEnvoye
-          ? "Invitation envoyée."
-          : "Inscription créée (e-mail non envoyé — à configurer).",
-      );
-      void charger();
-    } catch (e) {
-      console.error(e);
-      toast.error("L'invitation a échoué.");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div>
@@ -175,52 +150,10 @@ export default function Infirmieres() {
       </Card>
 
       {showInvite && (
-        <Modal onClose={() => setShowInvite(false)} width={440}>
-          <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Inviter une infirmière</h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Un lien d'inscription à usage unique (7 jours) lui sera envoyé.
-          </p>
-          <div className="mt-4 flex flex-col gap-2.5">
-            <div className="flex gap-2.5">
-              <input
-                className="ad-input flex-1 rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
-                placeholder="Prénom"
-                value={form.prenom}
-                onChange={(e) => setForm((f) => ({ ...f, prenom: e.target.value }))}
-              />
-              <input
-                className="ad-input flex-1 rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
-                placeholder="Nom"
-                value={form.nom}
-                onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))}
-              />
-            </div>
-            <input
-              className="ad-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
-              placeholder="E-mail"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowInvite(false)}
-              className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={() => void inviter()}
-              disabled={busy}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
-            >
-              <Plus className="size-4" /> {busy ? "Envoi…" : "Inviter"}
-            </button>
-          </div>
-        </Modal>
+        <InviterModal
+          onClose={() => setShowInvite(false)}
+          onDone={() => { setShowInvite(false); void charger(); }}
+        />
       )}
     </div>
   );

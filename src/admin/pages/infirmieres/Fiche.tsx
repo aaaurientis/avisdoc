@@ -363,6 +363,7 @@ export default function Fiche() {
         <Card className="p-5">
           <SectionLabel className="mb-2">Identité</SectionLabel>
           <Ligne k="E-mail" v={i.email} />
+          <Ligne k="Téléphone" v={i.telephone || "—"} />
           <Ligne k="RPPS" v={i.rpps || "—"} />
           <Ligne k="Source d'identité" v={i.identiteSource === "psc" ? "Pro Santé Connect" : i.identiteSource === "secours" ? "Voie de secours" : "—"} />
           <Ligne

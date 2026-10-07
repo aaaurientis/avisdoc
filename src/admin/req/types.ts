@@ -33,6 +33,7 @@ export interface ReqInscription {
   nom: string;
   prenom: string;
   email: string;
+  telephone: string | null;
   rpps: string | null;
   identiteSource: "psc" | "secours" | null;
   etat: ReqEtat;

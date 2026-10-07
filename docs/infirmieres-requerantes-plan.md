@@ -64,14 +64,16 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
 
 ## Demandes complémentaires (à planifier)
 
-- **Invitation infirmière via l'Annuaire Santé** : l'invitation doit commencer par
-  une **recherche Annuaire Santé** (comme `NewContactModal`), préremplir nom/prénom
-  /RPPS, et **ajouter e-mail + téléphone**. (Modifie `Infirmieres.tsx` + éventuellement
-  `inscription-inviter` pour stocker le téléphone.)
-- **Contrat standardisé** : le contrat à signer est un **document standard** (template
-  fixe), **hors champs de désignation des signataires**. Remplacer la génération du
-  texte (`_shared/contrat-pdf.ts`) par un **modèle fourni** + champs signataires.
-  → source du modèle à préciser (upload admin ? fichier figé ?).
+- [x] **Invitation infirmière via l'Annuaire Santé** : l'invitation commence par une
+  recherche Annuaire Santé, préremplit nom/prénom/RPPS, ajoute **e-mail + téléphone**
+  (modale `InviterModal`, colonne `req_inscriptions.telephone` — migration 0061,
+  `inscription-inviter` stocke RPPS + téléphone).
+- **Contrat standardisé — décision : template Yousign.** Le PDF standard est
+  téléversé dans Yousign comme **template** (zone de signature + champs
+  nom/RPPS placés une fois) ; `contrat-envoyer` crée la demande à partir du
+  `template_id` (plus de génération via `_shared/contrat-pdf.ts`). **À faire** :
+  l'admin fournit l'`id` du template Yousign (secret `YOUSIGN_TEMPLATE_ID`), puis
+  on bascule `contrat-envoyer` sur l'API « create from template ».
 
 ## États
 
