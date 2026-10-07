@@ -28,6 +28,14 @@ export interface DemandeSignature {
   champ: ChampSignature;
 }
 
+export interface DemandeTemplate {
+  titre: string;
+  templateId: string;
+  /** Label du signataire « placeholder » défini dans le template Yousign (sensible à la casse). */
+  signerLabel: string;
+  signataire: SignataireInfos;
+}
+
 export interface ResultatSignature {
   requestId: string;
   signerId: string;
@@ -43,6 +51,8 @@ export interface DocumentSigne {
 export interface ServiceSignature {
   /** Crée et active une demande de signature pour un unique signataire. */
   envoyer(d: DemandeSignature): Promise<ResultatSignature>;
+  /** Idem, à partir d'un template (document standardisé) : seul le signataire varie. */
+  envoyerTemplate(d: DemandeTemplate): Promise<ResultatSignature>;
   /** Télécharge le document signé (une fois la signature terminée). */
   telechargerSigne(requestId: string): Promise<DocumentSigne>;
   /** Télécharge le dossier de preuve (audit trail) d'un signataire, si disponible. */
@@ -110,6 +120,36 @@ export function creerYousign(): ServiceSignature {
         signUrl = s?.signature_link ?? null;
       }
       return { requestId: sr.id, signerId: signer.id, signUrl };
+    },
+
+    async envoyerTemplate(d) {
+      // Demande créée à partir du template ; le document et les champs sont figés
+      // dans le template, seul le signataire (placeholder) est renseigné.
+      const sr = await callJson("/signature_requests", {
+        method: "POST",
+        body: JSON.stringify({
+          name: d.titre,
+          delivery_mode: "none",
+          template_id: d.templateId,
+          template_placeholders: {
+            signers: [{
+              label: d.signerLabel,
+              info: { first_name: d.signataire.prenom, last_name: d.signataire.nom, email: d.signataire.email, locale: "fr" },
+            }],
+          },
+        }),
+      });
+      await callJson(`/signature_requests/${sr.id}/activate`, { method: "POST" });
+
+      const list = await callJson(`/signature_requests/${sr.id}/signers`);
+      const signers: any[] = Array.isArray(list) ? list : (list?.data ?? list?.signers ?? []);
+      const signer = signers[0] ?? {};
+      let signUrl: string | null = signer.signature_link ?? null;
+      if (!signUrl && signer.id) {
+        const s = await callJson(`/signature_requests/${sr.id}/signers/${signer.id}`).catch(() => null);
+        signUrl = s?.signature_link ?? null;
+      }
+      return { requestId: sr.id, signerId: signer.id ?? "", signUrl };
     },
 
     async telechargerSigne(requestId) {

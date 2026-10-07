@@ -27,6 +27,10 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = Deno.env.get("REQ_EMAIL_FROM") ?? "AvisDoc <noreply@avisdoc.fr>";
+// Contrat standardisé : si un template Yousign est configuré, on l'utilise ;
+// sinon repli sur le PDF généré (gabarit interne).
+const YOUSIGN_TEMPLATE_ID = (Deno.env.get("YOUSIGN_TEMPLATE_ID") ?? "").trim();
+const YOUSIGN_SIGNER_LABEL = (Deno.env.get("YOUSIGN_SIGNER_LABEL") ?? "signataire").trim();
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
@@ -57,20 +61,26 @@ serve(async (req) => {
     return json({ error: "L'inscription doit être « prête à signer »." }, 409);
   }
 
-  // 1. Génère le contrat PDF.
-  const pdf = await genererContratPdf({ nom: ins.nom, prenom: ins.prenom, email: ins.email, rpps: ins.rpps });
-
-  // 2. Envoie pour signature (Yousign, derrière l'interface).
+  // 1. Envoie pour signature (Yousign, derrière l'interface).
+  //    - Template configuré → document standardisé figé dans Yousign (recommandé).
+  //    - Sinon → repli sur un PDF généré (gabarit interne).
+  const titre = `Convention AvisDoc — ${ins.prenom} ${ins.nom}`;
+  const signataire = { nom: ins.nom, prenom: ins.prenom, email: ins.email };
   let resultat;
+  const modeleVersion = YOUSIGN_TEMPLATE_ID ? "yousign-template" : MODELE_VERSION;
   try {
     const service = creerYousign();
-    resultat = await service.envoyer({
-      titre: `Convention AvisDoc — ${ins.prenom} ${ins.nom}`,
-      pdf,
-      nomFichier: "convention-avisdoc.pdf",
-      signataire: { nom: ins.nom, prenom: ins.prenom, email: ins.email },
-      champ: SIGN_FIELD,
-    });
+    if (YOUSIGN_TEMPLATE_ID) {
+      resultat = await service.envoyerTemplate({
+        titre,
+        templateId: YOUSIGN_TEMPLATE_ID,
+        signerLabel: YOUSIGN_SIGNER_LABEL,
+        signataire,
+      });
+    } else {
+      const pdf = await genererContratPdf({ nom: ins.nom, prenom: ins.prenom, email: ins.email, rpps: ins.rpps });
+      resultat = await service.envoyer({ titre, pdf, nomFichier: "convention-avisdoc.pdf", signataire, champ: SIGN_FIELD });
+    }
   } catch (e) {
     console.error("Signature:", e);
     return json({ error: "Envoi à la signature impossible (configuration Yousign ?)." }, 502);
@@ -79,7 +89,7 @@ serve(async (req) => {
   // 3. Enregistre le contrat et fait avancer l'inscription.
   const { data: contrat, error: cErr } = await admin.from("req_contrats").insert({
     inscription_id: ins.id,
-    modele_version: MODELE_VERSION,
+    modele_version: modeleVersion,
     statut: "envoye",
     yousign_request_id: resultat.requestId,
     yousign_signer_id: resultat.signerId,

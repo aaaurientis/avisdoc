@@ -70,12 +70,13 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
   recherche Annuaire Santé, préremplit nom/prénom/RPPS, ajoute **e-mail + téléphone**
   (modale `InviterModal`, colonne `req_inscriptions.telephone` — migration 0061,
   `inscription-inviter` stocke RPPS + téléphone).
-- **Contrat standardisé — décision : template Yousign.** Le PDF standard est
-  téléversé dans Yousign comme **template** (zone de signature + champs
-  nom/RPPS placés une fois) ; `contrat-envoyer` crée la demande à partir du
-  `template_id` (plus de génération via `_shared/contrat-pdf.ts`). **À faire** :
-  l'admin fournit l'`id` du template Yousign (secret `YOUSIGN_TEMPLATE_ID`), puis
-  on bascule `contrat-envoyer` sur l'API « create from template ».
+- [x] **Contrat standardisé — template Yousign (code prêt).** `contrat-envoyer`
+  crée la demande à partir du `template_id` quand le secret `YOUSIGN_TEMPLATE_ID`
+  est posé (`POST /signature_requests` + `template_placeholders.signers[].label/info`,
+  puis activation) ; repli automatique sur le PDF généré sinon. **À faire côté admin** :
+  créer le template (statut *active*) dans Yousign, poser les secrets
+  `YOUSIGN_TEMPLATE_ID` et `YOUSIGN_SIGNER_LABEL` (= label du signataire placeholder,
+  sensible à la casse, défaut « signataire »).
 
 ## États
 
