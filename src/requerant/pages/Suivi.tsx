@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { Check, LogOut } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, LogOut, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { portalRepo, type MonDossier } from "../lib/repo";
-import type { ReqEtat } from "../../admin/req/types";
+import type { PieceType, ReqEtat } from "../../admin/req/types";
 import { PIECE_ETAT_LABEL, PIECE_TYPE_LABEL } from "../../admin/req/types";
 import { frDate } from "../../admin/lib/format";
 import { cn } from "@/lib/utils";
@@ -51,24 +51,72 @@ function prochaineAction(etat: ReqEtat): string {
   }
 }
 
+function Uploader({ label, busy, onFile }: { label: string; busy: boolean; onFile: (f: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*,.pdf"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) {
+            if (f.size > 10 * 1024 * 1024) {
+              toast.error("Fichier trop volumineux (10 Mo max).");
+              return;
+            }
+            onFile(f);
+          }
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        disabled={busy}
+        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-[14px] font-bold text-white transition-colors disabled:opacity-60"
+      >
+        <Upload className="size-4" /> {busy ? "Envoi…" : label}
+      </button>
+    </>
+  );
+}
+
 export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) {
   const [dossier, setDossier] = useState<MonDossier | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rpps, setRpps] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let actif = true;
-    portalRepo
-      .monDossier()
-      .then((d) => actif && setDossier(d))
-      .catch((e) => {
-        console.error(e);
-        toast.error("Impossible de charger votre dossier.");
-      })
-      .finally(() => actif && setLoading(false));
-    return () => {
-      actif = false;
-    };
+  const recharger = useCallback(async () => {
+    try {
+      setDossier(await portalRepo.monDossier());
+    } catch (e) {
+      console.error(e);
+      toast.error("Impossible de charger votre dossier.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+  useEffect(() => {
+    void recharger();
+  }, [recharger]);
+
+  const envoyer = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await fn();
+      toast.success("Document envoyé.");
+      await recharger();
+    } catch (e) {
+      console.error(e);
+      toast.error("L'envoi a échoué.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -85,11 +133,7 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
           Aucun dossier n'est encore rattaché à votre compte. Ouvrez le lien reçu
           par e-mail, ou contactez l'équipe AvisDoc.
         </p>
-        <button
-          type="button"
-          onClick={onDeconnexion}
-          className="mt-6 text-[13px] font-semibold text-avisdoc-teal underline"
-        >
+        <button type="button" onClick={onDeconnexion} className="mt-6 text-[13px] font-semibold text-avisdoc-teal underline">
           Se déconnecter
         </button>
       </div>
@@ -99,24 +143,16 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
   const { inscription: i, pieces } = dossier;
   const courante = etapeCourante(i.etat);
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
+  const derniere = (t: PieceType) => pieces.find((p) => p.type === t); // triées version desc
 
   return (
     <div className="mx-auto w-full max-w-md px-6 py-8">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Mon inscription
-          </div>
-          <h1 className="font-display text-xl font-semibold text-avisdoc-ink">
-            {i.prenom} {i.nom}
-          </h1>
+          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Mon inscription</div>
+          <h1 className="font-display text-xl font-semibold text-avisdoc-ink">{i.prenom} {i.nom}</h1>
         </div>
-        <button
-          type="button"
-          onClick={onDeconnexion}
-          title="Se déconnecter"
-          className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-avisdoc-ink"
-        >
+        <button type="button" onClick={onDeconnexion} title="Se déconnecter" className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-avisdoc-ink">
           <LogOut className="size-5" />
         </button>
       </div>
@@ -130,12 +166,7 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
             <div key={e} className="flex flex-1 flex-col items-center">
               <div className="flex w-full items-center">
                 <div className={cn("h-0.5 flex-1", idx === 0 ? "opacity-0" : fait || actif ? "bg-avisdoc-teal" : "bg-border")} />
-                <div
-                  className={cn(
-                    "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-                    fait ? "bg-avisdoc-teal text-white" : actif ? "border-2 border-avisdoc-teal text-avisdoc-teal" : "border-2 border-border text-muted-foreground",
-                  )}
-                >
+                <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", fait ? "bg-avisdoc-teal text-white" : actif ? "border-2 border-avisdoc-teal text-avisdoc-teal" : "border-2 border-border text-muted-foreground")}>
                   {fait ? <Check className="size-3.5" /> : idx + 1}
                 </div>
                 <div className={cn("h-0.5 flex-1", idx === ETAPES.length - 1 ? "opacity-0" : idx < courante ? "bg-avisdoc-teal" : "bg-border")} />
@@ -146,37 +177,77 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
         })}
       </div>
 
-      {/* Bannière état terminal / suspendu */}
       {(terminal || i.etat === "suspendue") && (
-        <div
-          className={cn(
-            "mt-6 rounded-2xl p-4 text-[14px]",
-            i.etat === "suspendue" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-800",
-          )}
-        >
+        <div className={cn("mt-6 rounded-2xl p-4 text-[14px]", i.etat === "suspendue" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-800")}>
           {i.etat === "suspendue" ? "Inscription suspendue." : "Inscription clôturée."}
           {i.motif && <div className="mt-1 text-[13px] opacity-80">Motif : {i.motif}</div>}
         </div>
       )}
 
-      {/* Prochaine action */}
+      {/* Prochaine action + dépôts */}
       {!terminal && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Prochaine étape
-          </div>
+          <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Prochaine étape</div>
           <p className="mt-1 text-[15px] leading-relaxed text-avisdoc-ink">{prochaineAction(i.etat)}</p>
-          <p className="mt-3 text-[12.5px] italic text-muted-foreground">
-            Le dépôt des pièces depuis ce portail arrive très bientôt.
-          </p>
+
+          {/* P2 — Identité (voie de secours) */}
+          {courante === 0 && (
+            <div className="mt-4 flex flex-col gap-2">
+              <input
+                className="rounded-xl border border-border bg-card px-4 py-3 text-[15px] outline-none transition-colors focus:border-avisdoc-teal"
+                placeholder="Votre numéro RPPS"
+                inputMode="numeric"
+                value={rpps || i.rpps || ""}
+                onChange={(e) => setRpps(e.target.value)}
+              />
+              <Uploader
+                label="Déposer ma pièce d'identité"
+                busy={busy}
+                onFile={(f) => {
+                  const r = (rpps || i.rpps || "").trim();
+                  if (!r) {
+                    toast.error("Saisissez d'abord votre RPPS.");
+                    return;
+                  }
+                  void envoyer(() => portalRepo.deposerIdentite(r, f));
+                }}
+              />
+              <p className="text-[12px] text-muted-foreground">
+                Photo ou PDF (10 Mo max). Conservée le temps du contrôle, puis détruite.
+              </p>
+            </div>
+          )}
+
+          {/* P4 — Dépôt RCP / URSSAF */}
+          {courante === 1 && (
+            <div className="mt-4 flex flex-col gap-4">
+              {(["rcp", "urssaf"] as const).map((t) => {
+                const p = derniere(t);
+                if (p?.etat === "validee") {
+                  return <div key={t} className="text-[13.5px] font-semibold text-emerald-700">✓ {PIECE_TYPE_LABEL[t]} validée</div>;
+                }
+                const refus = p?.etat === "refusee";
+                const enAttente = p?.etat === "deposee";
+                return (
+                  <div key={t} className="flex flex-col gap-1.5">
+                    <div className="text-[13.5px] font-semibold text-avisdoc-ink">
+                      {PIECE_TYPE_LABEL[t]}
+                      {refus && <span className="text-avisdoc-coral"> — refusée, à redéposer</span>}
+                      {enAttente && <span className="text-muted-foreground"> — en cours de vérification</span>}
+                    </div>
+                    {p?.motif && <div className="text-[12px] text-avisdoc-coral">{p.motif}</div>}
+                    <Uploader label={refus || enAttente ? "Redéposer" : "Déposer"} busy={busy} onFile={(f) => void envoyer(() => portalRepo.deposerPiece(t, f))} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Pièces */}
+      {/* Récap des pièces */}
       <div className="mt-6">
-        <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Mes pièces
-        </div>
+        <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Mes pièces</div>
         {pieces.length === 0 ? (
           <p className="text-[13px] italic text-muted-foreground">Aucune pièce déposée pour l'instant.</p>
         ) : (
@@ -184,12 +255,7 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
             {pieces.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-border bg-card px-4 py-3">
                 <span className="text-[13.5px] font-semibold text-avisdoc-ink">{PIECE_TYPE_LABEL[p.type]}</span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-bold",
-                    p.etat === "validee" ? "bg-emerald-100 text-emerald-700" : p.etat === "refusee" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600",
-                  )}
-                >
+                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", p.etat === "validee" ? "bg-emerald-100 text-emerald-700" : p.etat === "refusee" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600")}>
                   {PIECE_ETAT_LABEL[p.etat]}
                 </span>
                 {p.dateFin && <span className="text-[12px] text-muted-foreground">échéance {frDate(p.dateFin)}</span>}
