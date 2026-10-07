@@ -28,6 +28,11 @@ function toInscription(r: any): ReqInscription {
     derniereActionLe: r.derniere_action_le,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    adresse: r.adresse ?? null,
+    codePostal: r.code_postal ?? null,
+    ville: r.ville ?? null,
+    lat: typeof r.lat === "number" ? r.lat : null,
+    lng: typeof r.lng === "number" ? r.lng : null,
   };
 }
 
@@ -168,6 +173,25 @@ export const reqRepo = {
     const { data, error } = await sb.functions.invoke("contrat-envoyer", { body: { id } });
     if (error) throw error;
     return { signUrl: data?.signUrl ?? null, emailEnvoye: !!data?.email_envoye };
+  },
+
+  /** Met en cache l'adresse résolue + les coordonnées d'une inscription (carte). */
+  async enregistrerGeo(
+    id: string,
+    geo: { lat: number; lng: number; adresse?: string; codePostal?: string; ville?: string },
+  ): Promise<void> {
+    const { error } = await sb
+      .from("req_inscriptions")
+      .update({
+        lat: geo.lat,
+        lng: geo.lng,
+        adresse: geo.adresse ?? null,
+        code_postal: geo.codePostal ?? null,
+        ville: geo.ville ?? null,
+        geocode_le: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) throw error;
   },
 
   /** URL signée pour télécharger un contrat signé archivé (bucket req-contrats). */
