@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import AvisdocLogo from "@/components/AvisdocLogo";
 import { portalRepo } from "../lib/repo";
 
 export default function Bienvenue() {
@@ -27,6 +28,7 @@ export default function Bienvenue() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10">
+      <AvisdocLogo className="mb-6 h-12 w-auto self-start" />
       <h1 className="font-display text-2xl font-semibold text-avisdoc-ink">
         Votre inscription AvisDoc
       </h1>

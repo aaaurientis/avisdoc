@@ -40,6 +40,10 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
   const [busy, setBusy] = useState(false);
+  // Mode « déjà validé » : ajout direct en « active », sans lancer le parcours.
+  const [dejaValide, setDejaValide] = useState(false);
+  const [rcpFin, setRcpFin] = useState("");
+  const [urssafFin, setUrssafFin] = useState("");
 
   const chercher = async () => {
     if (!query.trim() || chargement) return;
@@ -84,25 +88,31 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
     } catch { /* best-effort */ }
   };
 
-  const inviter = async () => {
+  const soumettre = async () => {
     if (!nom.trim() || !prenom.trim() || !email.includes("@")) {
       toast.error("Nom, prénom et e-mail valides requis.");
       return;
     }
     setBusy(true);
     try {
-      const r = await reqRepo.inviter({
+      const base = {
         nom: nom.trim(),
         prenom: prenom.trim(),
         email: email.trim(),
         rpps: rpps.trim() || null,
         telephone: telephone.trim() || null,
-      });
-      toast.success(r.emailEnvoye ? "Invitation envoyée." : "Inscription créée (e-mail non envoyé — à configurer).");
+      };
+      if (dejaValide) {
+        await reqRepo.ajouterValide({ ...base, rcpDateFin: rcpFin || null, urssafDateFin: urssafFin || null });
+        toast.success("Requérant ajouté (actif).");
+      } else {
+        const r = await reqRepo.inviter(base);
+        toast.success(r.emailEnvoye ? "Invitation envoyée." : "Inscription créée (e-mail non envoyé — à configurer).");
+      }
       onDone();
     } catch (e) {
       console.error(e);
-      toast.error("L'invitation a échoué.");
+      toast.error(dejaValide ? "L'ajout a échoué." : "L'invitation a échoué.");
     } finally {
       setBusy(false);
     }
@@ -187,17 +197,41 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
           <input className={inputCls} placeholder="E-mail (pour le lien de connexion)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className={inputCls} placeholder="Téléphone" type="tel" value={telephone} onChange={(e) => setTelephone(e.target.value)} />
 
+          {/* Mode « déjà validé » : ajout direct sans lancer le parcours. */}
+          <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-xl border border-border bg-muted/30 p-3 text-[13px] text-avisdoc-ink">
+            <input type="checkbox" checked={dejaValide} onChange={(e) => setDejaValide(e.target.checked)} className="mt-0.5" />
+            <span>
+              <span className="font-semibold">Déjà validé</span> — ajouter directement comme actif, sans lancer le parcours d'inscription.
+            </span>
+          </label>
+
+          {dejaValide && (
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3">
+              <p className="text-[12px] text-muted-foreground">
+                Dates de fin des attestations (facultatif, recommandé) — pour l'éligibilité et les rappels d'échéance.
+              </p>
+              <label className="text-[12px] font-semibold text-muted-foreground">
+                Fin RCP
+                <input type="date" className={cn(inputCls, "mt-0.5")} value={rcpFin} onChange={(e) => setRcpFin(e.target.value)} />
+              </label>
+              <label className="text-[12px] font-semibold text-muted-foreground">
+                Fin URSSAF
+                <input type="date" className={cn(inputCls, "mt-0.5")} value={urssafFin} onChange={(e) => setUrssafFin(e.target.value)} />
+              </label>
+            </div>
+          )}
+
           <div className="mt-2 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">
               Annuler
             </button>
             <button
               type="button"
-              onClick={() => void inviter()}
+              onClick={() => void soumettre()}
               disabled={busy}
               className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
             >
-              <UserPlus className="size-4" /> {busy ? "Envoi…" : "Inviter"}
+              <UserPlus className="size-4" /> {busy ? "Envoi…" : dejaValide ? "Ajouter" : "Inviter"}
             </button>
           </div>
         </div>

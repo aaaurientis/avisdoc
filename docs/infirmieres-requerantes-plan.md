@@ -70,12 +70,31 @@ RPPS** (Annuaire Santé), repli saisie manuelle. À implémenter au Lot 7b.
   recherche Annuaire Santé, préremplit nom/prénom/RPPS, ajoute **e-mail + téléphone**
   (modale `InviterModal`, colonne `req_inscriptions.telephone` — migration 0061,
   `inscription-inviter` stocke RPPS + téléphone).
-- **Contrat standardisé — décision : template Yousign.** Le PDF standard est
-  téléversé dans Yousign comme **template** (zone de signature + champs
-  nom/RPPS placés une fois) ; `contrat-envoyer` crée la demande à partir du
-  `template_id` (plus de génération via `_shared/contrat-pdf.ts`). **À faire** :
-  l'admin fournit l'`id` du template Yousign (secret `YOUSIGN_TEMPLATE_ID`), puis
-  on bascule `contrat-envoyer` sur l'API « create from template ».
+- [x] **Contrat standardisé — template Yousign (code prêt).** `contrat-envoyer`
+  crée la demande à partir du `template_id` quand le secret `YOUSIGN_TEMPLATE_ID`
+  est posé (`POST /signature_requests` + `template_placeholders.signers[].label/info`,
+  puis activation) ; repli automatique sur le PDF généré sinon. **À faire côté admin** :
+  créer le template (statut *active*) dans Yousign, poser les secrets
+  `YOUSIGN_TEMPLATE_ID` et `YOUSIGN_SIGNER_LABEL` (= label du signataire placeholder,
+  sensible à la casse, défaut « signataire »).
+
+## Parcours portail (révisé, recette oct.)
+
+Les **3 documents se déposent ensemble** dès le départ : pièce d'identité +
+attestation RCP + attestation URSSAF. L'infirmière voit un statut clair par
+document (à déposer / en cours de vérification / validée / refusée) et peut les
+**prendre en photo** (caméra) ou **choisir un fichier**. L'**admin valide** chaque
+pièce dans le back-office ; quand les 3 sont validées → `pret_a_signer` → signature
+→ actif. Portail en **3 étapes** : Documents → Contrat → Actif. Interface alignée
+sur la charte (logo AvisDoc, typo/couleurs partagées).
+
+## Ajout direct d'un requérant déjà validé
+
+Pour les infirmières **validées avant la mise en place du process**, l'admin peut
+les **ajouter directement en « active »**, sans lancer le parcours : même modale
+(recherche Annuaire Santé + e-mail/téléphone), case « Déjà validé », avec dates de
+fin RCP/URSSAF optionnelles (crée des pièces « validée » → éligibilité + échéances).
+Edge Function `inscription-ajouter` (admin @avisdoc.fr).
 
 ## États
 
