@@ -34,6 +34,8 @@ export interface DemandeTemplate {
   /** Label du signataire « placeholder » défini dans le template Yousign (sensible à la casse). */
   signerLabel: string;
   signataire: SignataireInfos;
+  /** Champs « texte en lecture seule » à préremplir (label sensible à la casse). */
+  champs?: { label: string; text: string }[];
 }
 
 export interface ResultatSignature {
@@ -136,6 +138,7 @@ export function creerYousign(): ServiceSignature {
               label: d.signerLabel,
               info: { first_name: d.signataire.prenom, last_name: d.signataire.nom, email: d.signataire.email, locale: "fr" },
             }],
+            ...(d.champs?.length ? { read_only_text_fields: d.champs } : {}),
           },
         }),
       });

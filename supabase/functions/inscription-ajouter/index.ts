@@ -32,7 +32,7 @@ serve(async (req) => {
     return json({ error: "Réservé aux comptes @avisdoc.fr." }, 403);
   }
 
-  const { nom, prenom, email, rpps, telephone, rcpDateFin, urssafDateFin } = await req.json().catch(() => ({}));
+  const { nom, prenom, email, rpps, telephone, profession, adresse, codePostal, ville, rcpDateFin, urssafDateFin } = await req.json().catch(() => ({}));
   if (!nom?.trim() || !prenom?.trim() || !email?.includes("@")) {
     return json({ error: "nom, prénom et e-mail requis." }, 400);
   }
@@ -47,6 +47,10 @@ serve(async (req) => {
       email: email.trim().toLowerCase(),
       rpps: rpps?.trim() || null,
       telephone: telephone?.trim() || null,
+      profession: profession?.trim() || null,
+      adresse: adresse?.trim() || null,
+      code_postal: codePostal?.trim() || null,
+      ville: ville?.trim() || null,
       etat: "active",
       derniere_action_le: now,
     })

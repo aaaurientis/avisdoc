@@ -44,6 +44,8 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
   const [dejaValide, setDejaValide] = useState(false);
   const [rcpFin, setRcpFin] = useState("");
   const [urssafFin, setUrssafFin] = useState("");
+  // Repris de l'Annuaire Santé (préremplit le contrat ; complété par l'infirmière).
+  const [annuaire, setAnnuaire] = useState<{ profession?: string; adresse?: string; codePostal?: string; ville?: string }>({});
 
   const chercher = async () => {
     if (!query.trim() || chargement) return;
@@ -77,7 +79,8 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
     setChoisie(true);
     setResultats(null);
     setQuery("");
-    // Enrichissement best-effort : téléphone / e-mail de la structure d'exercice.
+    setAnnuaire({ profession: f.profession, adresse: f.adresse, codePostal: f.code_postal, ville: f.ville });
+    // Enrichissement best-effort : téléphone / e-mail + adresse de la structure.
     try {
       const { data } = await supabaseAdmin.functions.invoke("annuaire-sante", {
         body: { practitioner_id: f.id },
@@ -85,6 +88,14 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
       const st = (data as any)?.structures?.[0];
       if (st?.telephone) setTelephone((t) => t || st.telephone);
       if (st?.email) setEmail((e) => e || st.email);
+      if (st) {
+        setAnnuaire((a) => ({
+          profession: a.profession,
+          adresse: a.adresse || st.adresse,
+          codePostal: a.codePostal || st.code_postal,
+          ville: a.ville || st.ville,
+        }));
+      }
     } catch { /* best-effort */ }
   };
 
@@ -101,6 +112,10 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
         email: email.trim(),
         rpps: rpps.trim() || null,
         telephone: telephone.trim() || null,
+        profession: annuaire.profession || null,
+        adresse: annuaire.adresse || null,
+        codePostal: annuaire.codePostal || null,
+        ville: annuaire.ville || null,
       };
       if (dejaValide) {
         await reqRepo.ajouterValide({ ...base, rcpDateFin: rcpFin || null, urssafDateFin: urssafFin || null });

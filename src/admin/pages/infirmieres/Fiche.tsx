@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, CheckCircle2, Download, ExternalLink, FileSignature, XCircle } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, Download, ExternalLink, FileSignature, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { ReqDossier, ReqPiece } from "../../req/types";
 import {
@@ -287,6 +287,18 @@ export default function Fiche() {
     }
   };
 
+  const reinitialiser = async () => {
+    if (!id) return;
+    try {
+      await reqRepo.reinitialiser(id);
+      toast.success("Dossier réinitialisé — l'infirmière peut recommencer.");
+      void charger();
+    } catch (e) {
+      console.error(e);
+      toast.error("La réinitialisation a échoué.");
+    }
+  };
+
   const confirmerAction = async (motif: string) => {
     if (!id || !action) return;
     try {
@@ -356,6 +368,11 @@ export default function Fiche() {
               Résilier
             </button>
           )}
+          {terminal && (
+            <button type="button" onClick={() => void reinitialiser()} className="inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white">
+              <RotateCcw className="size-3.5" /> Réinitialiser
+            </button>
+          )}
         </div>
       </div>
 
@@ -369,6 +386,10 @@ export default function Fiche() {
           <Ligne
             k="Éligible à l'affectation"
             v={<span className={eligible ? "font-semibold text-emerald-700" : "text-muted-foreground"}>{eligible ? "Oui" : "Non"}</span>}
+          />
+          <Ligne
+            k="Informations contrat"
+            v={<span className={i.infosCompletes ? "font-semibold text-emerald-700" : "text-avisdoc-coral"}>{i.infosCompletes ? "Complètes" : "À compléter par l'infirmière"}</span>}
           />
           {i.motif && <Ligne k="Motif" v={<span className="text-avisdoc-coral">{i.motif}</span>} />}
         </Card>

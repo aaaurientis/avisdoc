@@ -36,6 +36,12 @@ export interface ReqInscription {
   telephone: string | null;
   rpps: string | null;
   identiteSource: "psc" | "secours" | null;
+  // Informations pour le contrat (reprises de l'annuaire, complétées au portail).
+  civilite?: string | null;
+  profession?: string | null;
+  dateNaissance?: string | null;
+  lieuNaissance?: string | null;
+  infosCompletes?: boolean;
   etat: ReqEtat;
   motif: string | null;
   authUserId: string | null;
