@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, FileSignature, LogOut, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Camera, Check, Clock, FileSignature, LogOut, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { portalRepo, type MonDossier } from "../lib/repo";
 import type { PieceType, ReqEtat } from "../../admin/req/types";
@@ -52,34 +52,43 @@ function prochaineAction(etat: ReqEtat): string {
 }
 
 function Uploader({ label, busy, onFile }: { label: string; busy: boolean; onFile: (f: File) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const camRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pick = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      toast.error("Fichier trop volumineux (10 Mo max).");
+      return;
+    }
+    onFile(f);
+  };
   return (
     <>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*,.pdf"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          if (f) {
-            if (f.size > 10 * 1024 * 1024) {
-              toast.error("Fichier trop volumineux (10 Mo max).");
-              return;
-            }
-            onFile(f);
-          }
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => ref.current?.click()}
-        disabled={busy}
-        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-[14px] font-bold text-white transition-colors disabled:opacity-60"
-      >
-        <Upload className="size-4" /> {busy ? "Envoi…" : label}
-      </button>
+      {/* Caméra (mobile) : ouvre directement l'appareil photo. */}
+      <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+      {/* Fichier : photo existante ou PDF. */}
+      <input ref={fileRef} type="file" accept="image/*,.pdf" hidden onChange={pick} />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => camRef.current?.click()}
+          disabled={busy}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-[14px] font-bold text-white transition-colors disabled:opacity-60"
+        >
+          <Camera className="size-4" /> {busy ? "Envoi…" : "Prendre en photo"}
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          title={label}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-avisdoc-teal px-5 py-2.5 text-[14px] font-bold text-avisdoc-teal transition-colors disabled:opacity-60"
+        >
+          <Upload className="size-4" /> Choisir un fichier
+        </button>
+      </div>
     </>
   );
 }
@@ -146,6 +155,31 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
   const derniere = (t: PieceType) => pieces.find((p) => p.type === t); // triées version desc
 
+  // Étape identité : distinguer « à déposer », « en cours de vérification » et « refusée ».
+  const idPiece = derniere("identite");
+  const idEnAttente = i.etat === "identite_a_controler" && idPiece?.etat === "deposee";
+  const idRefusee = idPiece?.etat === "refusee";
+
+  // Étape pièces : reste-t-il une attestation à (re)déposer, ou tout est en contrôle ?
+  const aDeposer = (t: PieceType) => {
+    const p = derniere(t);
+    return !p || p.etat === "refusee" || p.etat === "expiree" || p.etat === "remplacee";
+  };
+  const enControle = (t: PieceType) => derniere(t)?.etat === "deposee";
+  const piecesAFaire = aDeposer("rcp") || aDeposer("urssaf");
+  const piecesEnControle = enControle("rcp") || enControle("urssaf");
+
+  let messageEtape = prochaineAction(i.etat);
+  if (courante === 0) {
+    if (idEnAttente) {
+      messageEtape = "Votre pièce d'identité a bien été reçue. Elle est en cours de vérification par l'équipe AvisDoc — vous passerez à l'étape suivante une fois validée.";
+    } else if (idRefusee) {
+      messageEtape = "Votre pièce d'identité n'a pas été validée. Merci de déposer une nouvelle version.";
+    }
+  } else if (courante === 1 && !piecesAFaire && piecesEnControle) {
+    messageEtape = "Vos attestations ont bien été reçues et sont en cours de vérification par l'équipe AvisDoc.";
+  }
+
   return (
     <div className="mx-auto w-full max-w-md px-6 py-8">
       <div className="flex items-center justify-between">
@@ -189,10 +223,15 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
       {!terminal && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
           <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Prochaine étape</div>
-          <p className="mt-1 text-[15px] leading-relaxed text-avisdoc-ink">{prochaineAction(i.etat)}</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-avisdoc-ink">{messageEtape}</p>
 
-          {/* P2 — Identité (voie de secours) */}
-          {courante === 0 && (
+          {/* P2 — Identité (voie de secours). Masqué pendant la vérification. */}
+          {courante === 0 && idEnAttente && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2.5 text-[13px] text-sky-700">
+              <Clock className="size-4 shrink-0" /> En attente de validation par l'équipe.
+            </div>
+          )}
+          {courante === 0 && !idEnAttente && (
             <div className="mt-4 flex flex-col gap-2">
               <input
                 className="rounded-xl border border-border bg-card px-4 py-3 text-[15px] outline-none transition-colors focus:border-avisdoc-teal"
@@ -202,7 +241,7 @@ export default function Suivi({ onDeconnexion }: { onDeconnexion: () => void }) 
                 onChange={(e) => setRpps(e.target.value)}
               />
               <Uploader
-                label="Déposer ma pièce d'identité"
+                label={idRefusee ? "Redéposer ma pièce d'identité" : "Déposer ma pièce d'identité"}
                 busy={busy}
                 onFile={(f) => {
                   const r = (rpps || i.rpps || "").trim();
