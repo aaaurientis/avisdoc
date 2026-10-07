@@ -106,7 +106,8 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("Signature:", e);
-    return json({ error: "Envoi à la signature impossible (configuration Yousign ?)." }, 502);
+    const detail = (e instanceof Error ? e.message : String(e)).slice(0, 500);
+    return json({ error: `Envoi à la signature impossible — ${detail}` }, 502);
   }
 
   // 3. Enregistre le contrat et fait avancer l'inscription.
