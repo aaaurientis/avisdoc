@@ -25,7 +25,7 @@ export default function Documents() {
     docs, docTree, docTags, deleteDoc, importDoc, newDocVersion,
     downloadDoc, documentUrl, setDocCategory, setDocTags,
   } = useAdminData();
-  const [cat, setCat] = useState("Tous"); // catégorie (niveau 1) ou « Tous »
+  const [cat, setCat] = useState(""); // catégorie (niveau 1) sélectionnée
   const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
   const [tagFilter, setTagFilter] = useState<string[]>([]); // filtre par tags (OU)
   const [busy, setBusy] = useState(false);
@@ -46,24 +46,30 @@ export default function Documents() {
     ext === "DOC" || ext === "XLS" || ext === "PPT";
 
   const currentCat = useMemo(() => docTree.find((c) => c.name === cat), [docTree, cat]);
-  const rows = docs.filter((d) => {
-    if (cat !== "Tous") {
-      if (d.catParent !== cat) return false;
-      if (sub != null && d.cat !== sub) return false;
+
+  // Une catégorie est toujours sélectionnée : on cale sur la première dès que
+  // l'arborescence est chargée (ou si la catégorie courante n'existe plus).
+  useEffect(() => {
+    if (docTree.length && !docTree.some((c) => c.name === cat)) {
+      setCat(docTree[0].name);
+      setSub(null);
     }
+  }, [docTree, cat]);
+
+  const rows = docs.filter((d) => {
+    if (d.catParent !== cat) return false;
+    if (sub != null && d.cat !== sub) return false;
     // Filtre par tags : le document doit porter au moins un des tags cochés.
     if (tagFilter.length && !tagFilter.some((t) => d.tags.includes(t))) return false;
     return true;
   });
 
-  // Sous-catégorie cible d'un import, selon le filtre courant.
-  const target = useMemo(() => {
-    if (cat !== "Tous" && currentCat) {
-      return { parent: cat, sub: sub ?? currentCat.subs[0] ?? "" };
-    }
-    const first = docTree[0];
-    return { parent: first?.name ?? "", sub: first?.subs[0] ?? "" };
-  }, [cat, sub, currentCat, docTree]);
+  // Sous-catégorie cible d'un import : la catégorie courante + la sous-catégorie
+  // sélectionnée (ou la première de la catégorie).
+  const target = useMemo(
+    () => ({ parent: cat, sub: sub ?? currentCat?.subs[0] ?? "" }),
+    [cat, sub, currentCat],
+  );
   const canImport = Boolean(target.parent && target.sub);
 
   const selectCat = (name: string) => {
@@ -179,18 +185,6 @@ export default function Documents() {
 
       {/* Niveau 1 : catégories */}
       <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => selectCat("Tous")}
-          className={cn(
-            "rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors",
-            cat === "Tous"
-              ? "border-avisdoc-ink bg-avisdoc-ink text-white"
-              : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
-          )}
-        >
-          Tous
-        </button>
         {docTree.map((c, i) => {
           const on = cat === c.name;
           const pal = catPalette(i);
@@ -212,7 +206,7 @@ export default function Documents() {
       </div>
 
       {/* Niveau 2 : sous-catégories de la catégorie sélectionnée */}
-      {cat !== "Tous" && currentCat && currentCat.subs.length > 0 && (
+      {currentCat && currentCat.subs.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2 border-l-2 border-border pl-3">
           <button
             type="button"
