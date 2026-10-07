@@ -79,3 +79,7 @@ verify_jwt = true
 # Webhook Yousign (public) — authenticité vérifiée par signature HMAC du corps.
 [functions.yousign-webhook]
 verify_jwt = false
+
+# Échéances des attestations (cron quotidien) — protégée par un secret partagé.
+[functions.req-echeances]
+verify_jwt = false

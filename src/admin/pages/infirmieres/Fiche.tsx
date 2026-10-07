@@ -275,6 +275,18 @@ export default function Fiche() {
     else toast.info("Document indisponible.");
   };
 
+  const reactiver = async () => {
+    if (!id) return;
+    try {
+      await reqRepo.reactiver(id);
+      toast.success("Inscription réactivée.");
+      void charger();
+    } catch (e) {
+      console.error(e);
+      toast.error("La réactivation a échoué.");
+    }
+  };
+
   const confirmerAction = async (motif: string) => {
     if (!id || !action) return;
     try {
@@ -300,6 +312,15 @@ export default function Fiche() {
   const { inscription: i, pieces, contrats, historique } = dossier;
   const terminal = ["refusee", "resiliee", "abandonnee"].includes(i.etat);
 
+  // Éligibilité à l'affectation (RI-01) : active + RCP & URSSAF valides et non échues.
+  const today = new Date().toISOString().slice(0, 10);
+  const latestOf = (t: ReqPiece["type"]) => pieces.find((p) => p.type === t); // triées version desc
+  const pieceOk = (t: ReqPiece["type"]) => {
+    const p = latestOf(t);
+    return p?.etat === "validee" && !!p.dateFin && p.dateFin >= today;
+  };
+  const eligible = i.etat === "active" && pieceOk("rcp") && pieceOk("urssaf");
+
   return (
     <div>
       <Link to="/infirmieres" className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:text-avisdoc-ink">
@@ -313,6 +334,11 @@ export default function Fiche() {
           {i.etat === "pret_a_signer" && (
             <button type="button" onClick={() => void envoyerContrat()} disabled={envoiContrat} className="inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50">
               <FileSignature className="size-3.5" /> {envoiContrat ? "Envoi…" : "Envoyer le contrat"}
+            </button>
+          )}
+          {i.etat === "suspendue" && (
+            <button type="button" onClick={() => void reactiver()} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3.5 py-1.5 text-[12.5px] font-bold text-emerald-700">
+              <CheckCircle2 className="size-3.5" /> Réactiver
             </button>
           )}
           {i.etat === "active" && (
@@ -339,6 +365,10 @@ export default function Fiche() {
           <Ligne k="E-mail" v={i.email} />
           <Ligne k="RPPS" v={i.rpps || "—"} />
           <Ligne k="Source d'identité" v={i.identiteSource === "psc" ? "Pro Santé Connect" : i.identiteSource === "secours" ? "Voie de secours" : "—"} />
+          <Ligne
+            k="Éligible à l'affectation"
+            v={<span className={eligible ? "font-semibold text-emerald-700" : "text-muted-foreground"}>{eligible ? "Oui" : "Non"}</span>}
+          />
           {i.motif && <Ligne k="Motif" v={<span className="text-avisdoc-coral">{i.motif}</span>} />}
         </Card>
 
