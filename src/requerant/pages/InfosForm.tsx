@@ -2,10 +2,12 @@
 // l'infirmière complète/corrige (civilité, date et lieu de naissance notamment).
 // Ces données préremplissent le contrat.
 
-import { useRef, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useRef, useState } from "react";
 import { Check, MapPin, Save } from "lucide-react";
 import { toast } from "sonner";
 import { portalRepo } from "../lib/repo";
+import { fetchMapsKey, loadGooglePlaces } from "../lib/googleMaps";
 import type { ReqInscription } from "../../admin/req/types";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +22,44 @@ export default function InfosForm({ i, onSaved }: { i: ReqInscription; onSaved: 
   const [adresse, setAdresse] = useState(i.adresse ?? "");
   const [codePostal, setCodePostal] = useState(i.codePostal ?? "");
   const [ville, setVille] = useState(i.ville ?? "");
-  // Autocomplétion du lieu d'exercice (API Adresse BAN, gratuite, sans clé).
+  // Autocomplétion du lieu d'exercice : Google Places si la clé est dispo,
+  // sinon repli sur l'API Adresse BAN (gratuite, sans clé).
   const [sugs, setSugs] = useState<{ name: string; postcode: string; city: string; label: string }[]>([]);
+  const [googleReady, setGoogleReady] = useState(false);
   const debounce = useRef<number | undefined>(undefined);
+  const adresseRef = useRef<HTMLInputElement>(null);
+
+  // Branche Google Places Autocomplete sur le champ adresse si possible.
+  useEffect(() => {
+    let annule = false;
+    void (async () => {
+      try {
+        const key = await fetchMapsKey();
+        if (!key || annule) return;
+        const google = await loadGooglePlaces(key);
+        if (annule || !adresseRef.current || !google?.maps?.places) return;
+        const ac = new google.maps.places.Autocomplete(adresseRef.current, {
+          types: ["address"],
+          componentRestrictions: { country: "fr" },
+          fields: ["address_components"],
+        });
+        ac.addListener("place_changed", () => {
+          const comp: any[] = ac.getPlace()?.address_components ?? [];
+          const get = (t: string) => comp.find((c) => c.types?.includes(t))?.long_name ?? "";
+          const rue = [get("street_number"), get("route")].filter(Boolean).join(" ");
+          setAdresse(rue || get("route"));
+          setCodePostal(get("postal_code"));
+          setVille(get("locality") || get("municipality"));
+          setSugs([]);
+        });
+        setGoogleReady(true);
+      } catch { /* repli BAN */ }
+    })();
+    return () => { annule = true; };
+  }, []);
 
   const chercherAdresse = (q: string) => {
+    if (googleReady) return; // Google gère l'autocomplétion
     window.clearTimeout(debounce.current);
     if (q.trim().length < 3) { setSugs([]); return; }
     debounce.current = window.setTimeout(async () => {
@@ -40,6 +75,7 @@ export default function InfosForm({ i, onSaved }: { i: ReqInscription; onSaved: 
       } catch { setSugs([]); }
     }, 250);
   };
+
   const [rpps, setRpps] = useState(i.rpps ?? "");
   const [dateNaissance, setDateNaissance] = useState(i.dateNaissance ?? "");
   const [lieuNaissance, setLieuNaissance] = useState(i.lieuNaissance ?? "");
@@ -112,13 +148,14 @@ export default function InfosForm({ i, onSaved }: { i: ReqInscription; onSaved: 
         <input className={inputCls} placeholder="N° RPPS" inputMode="numeric" value={rpps} onChange={(e) => setRpps(e.target.value)} />
         <div className="relative">
           <input
+            ref={adresseRef}
             className={inputCls}
             placeholder="Lieu d'exercice (adresse)"
             value={adresse}
             onChange={(e) => { setAdresse(e.target.value); chercherAdresse(e.target.value); }}
             autoComplete="off"
           />
-          {sugs.length > 0 && (
+          {!googleReady && sugs.length > 0 && (
             <div className="absolute z-10 mt-1 flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft">
               {sugs.map((s, idx) => (
                 <button
