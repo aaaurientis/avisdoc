@@ -54,7 +54,7 @@ Lot 0 tourne en parallèle dès le début.
 ## État d'avancement
 
 - [x] Lot 1 — socle (migration `0057_req_infirmieres.sql`)
-- [~] Lot 2 — back-office : **2a fait** (module, liste A1, invitation, fiche A2 en lecture) ; **2b à venir** (contrôle A3 + actions)
+- [x] Lot 2 — back-office (A1 liste, A2 fiche, A3 contrôle, invitation + actions)
 - [ ] Lot 3 — portail
 - [ ] Lot 4 — Yousign
 - [ ] Lot 5 — Pro Santé Connect
