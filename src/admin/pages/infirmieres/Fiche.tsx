@@ -273,6 +273,7 @@ export default function Fiche() {
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "L'envoi du contrat a échoué.");
+      void charger(); // recharge l'historique (la trace de l'échec vient d'être écrite)
     } finally {
       setEnvoiContrat(false);
     }
