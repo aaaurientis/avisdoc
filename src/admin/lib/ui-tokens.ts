@@ -85,7 +85,7 @@ export const STAGES_DEFAUT: PipelineStage[] = [
  */
 export function colonnesDe(stages: PipelineStage[], pipelineId?: string | null): PipelineStage[] {
   const cible = pipelineId || stages[0]?.pipelineId;
-  return stages.filter((s) => s.pipelineId === cible);
+  return stages.filter((s) => s.pipelineId === cible).sort((a, b) => a.position - b.position);
 }
 
 /** Teintes d'une étape, à partir des colonnes de l'équipe. Une étape inconnue reste neutre. */

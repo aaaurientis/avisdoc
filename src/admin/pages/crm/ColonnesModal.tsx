@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, X } from "lucide-react";
 import type { Client, PipelineStage, StageTone } from "../../types";
 import { TONES } from "../../lib/ui-tokens";
+import { colonnesTriees } from "../../lib/colonnes";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Modal, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,7 @@ export default function ColonnesModal({
   pipelineId: string;
 }) {
   const { stages: toutes, addStage, renameStage, setStageTone, deleteStage, moveStage } = useAdminData();
-  const stages = toutes.filter((s) => s.pipelineId === pipelineId);
+  const stages = colonnesTriees(toutes, pipelineId);
   const [nouveau, setNouveau] = useState("");
   const [teinteNouveau, setTeinteNouveau] = useState<StageTone>("slate");
   const [aSupprimer, setASupprimer] = useState<PipelineStage | null>(null);

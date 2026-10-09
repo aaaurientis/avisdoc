@@ -23,6 +23,7 @@ import { chargerMembres, nomLisible } from "../lib/membres";
 import { confirmer } from "../components/Confirmation";
 import FiltresRepliables from "../components/FiltresRepliables";
 import { colonnesFusionnees, estGeneral, peutAllerDans } from "../lib/pipeline-general";
+import { colonnesTriees } from "../lib/colonnes";
 
 export default function Crm() {
   const { clientId } = useParams();
@@ -44,7 +45,7 @@ export default function Crm() {
     () =>
       ensemble && pipeline
         ? colonnesFusionnees(toutesColonnes, pipeline.id)
-        : toutesColonnes.filter((s) => s.pipelineId === pipeline?.id),
+        : colonnesTriees(toutesColonnes, pipeline?.id ?? ""),
     [toutesColonnes, pipeline, ensemble],
   );
   const [showModal, setShowModal] = useState(false);
