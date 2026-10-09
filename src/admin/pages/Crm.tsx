@@ -15,7 +15,6 @@ import FiltresPipeline, {
   type FiltresCrm,
 } from "./crm/FiltresPipeline";
 import BarrePipelines from "./crm/BarrePipelines";
-import ToutesLesAffaires, { type ColonneListe } from "./crm/ToutesLesAffaires";
 import Kanban from "./crm/Kanban";
 import ProjectView from "./crm/ProjectView";
 import NewClientModal from "./crm/NewClientModal";
@@ -23,32 +22,30 @@ import ColonnesModal from "./crm/ColonnesModal";
 import { chargerMembres, nomLisible } from "../lib/membres";
 import { confirmer } from "../components/Confirmation";
 import FiltresRepliables from "../components/FiltresRepliables";
-
-/** L'onglet qui regarde par-dessus les pipelines. */
-const TOUTES = "toutes";
+import { colonnesFusionnees, estGeneral, peutAllerDans } from "../lib/pipeline-general";
 
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const { clients: toutesAffaires, stages: toutesColonnes, pipelines, setClientStage, rafraichir } = useAdminData();
-  /**
-   * Le pipeline ouvert, ou « toutes les affaires ».
-   *
-   * `null` au premier affichage signifie « pas encore choisi » : on ouvre alors sur le
-   * premier tableau. La chaîne "toutes" est un choix explicite, et c'est le seul cas
-   * où l'on regarde par-dessus les pipelines.
-   */
+  /** Le pipeline ouvert. `null` au premier affichage : on ouvre alors sur le premier tableau. */
   const [pipelineId, setPipelineId] = useState<string | null>(null);
-  const toutes = pipelineId === TOUTES;
-  const pipeline = toutes ? null : (pipelines.find((p) => p.id === pipelineId) ?? pipelines[0] ?? null);
-  /* Un pipeline est un tableau : ses colonnes et ses affaires n'appartiennent qu'à lui. */
+  const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0] ?? null;
+  /**
+   * Un pipeline est un tableau : ses colonnes et ses affaires n'appartiennent qu'à lui.
+   * Sauf Général, la vue d'ensemble : toutes les affaires, toutes les colonnes.
+   */
+  const ensemble = estGeneral(pipeline);
   const clients = useMemo(
-    () => (pipeline ? toutesAffaires.filter((c) => c.pipelineId === pipeline.id) : toutesAffaires),
-    [toutesAffaires, pipeline],
+    () => (ensemble ? toutesAffaires : toutesAffaires.filter((c) => c.pipelineId === pipeline?.id)),
+    [toutesAffaires, pipeline, ensemble],
   );
   const stages = useMemo(
-    () => (pipeline ? toutesColonnes.filter((s) => s.pipelineId === pipeline.id) : toutesColonnes),
-    [toutesColonnes, pipeline],
+    () =>
+      ensemble && pipeline
+        ? colonnesFusionnees(toutesColonnes, pipeline.id)
+        : toutesColonnes.filter((s) => s.pipelineId === pipeline?.id),
+    [toutesColonnes, pipeline, ensemble],
   );
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
@@ -72,11 +69,6 @@ export default function Crm() {
         .sort((a, b) => nomLisible(a).localeCompare(nomLisible(b), "fr")),
     [equipe, toutesAffaires],
   );
-  /** Le tri de la vue « Toutes » : un Kanban n'a pas de tri, une liste en a besoin. */
-  const [triListe, setTriListe] = useState<{ colonne: ColonneListe; sens: "asc" | "desc" }>({
-    colonne: "entreprise",
-    sens: "asc",
-  });
   const [coches, setCoches] = useState<Set<string>>(new Set());
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
 
@@ -125,29 +117,6 @@ export default function Crm() {
   const selected = clientId ? clients.find((c) => c.id === clientId) : undefined;
 
   const visibles = useMemo(() => clients.filter((c) => retenueCrm(c, filtres, recherche)), [clients, filtres, recherche]);
-
-  /** Les mêmes affaires, rangées — la liste de « Toutes » se trie, le Kanban non. */
-  const visiblesTriees = useMemo(() => {
-    const sens = triListe.sens === "asc" ? 1 : -1;
-    const txt = (a: string | null | undefined, b: string | null | undefined) => {
-      const x = (a ?? "").trim(), y = (b ?? "").trim();
-      if (!x && !y) return 0;
-      if (!x) return 1;        // ce qui manque va au bout, dans les deux sens
-      if (!y) return -1;
-      return sens * x.localeCompare(y, "fr");
-    };
-    const nomPipeline = (id: string) => pipelines.find((p) => p.id === id)?.nom ?? "";
-    return [...visibles].sort((a, b) => {
-      switch (triListe.colonne) {
-        case "pipeline": return txt(nomPipeline(a.pipelineId), nomPipeline(b.pipelineId));
-        case "etape": return txt(a.stage, b.stage);
-        case "referent": return txt(a.referent, b.referent);
-        case "secteur": return txt(a.secteur, b.secteur);
-        case "montant": return sens * (a.jours * a.tarif - b.jours * b.tarif);
-        default: return sens * a.company.localeCompare(b.company, "fr");
-      }
-    });
-  }, [visibles, triListe, pipelines]);
 
   const selectionnees = useMemo(() => clients.filter((c) => coches.has(c.id)), [clients, coches]);
   const adresses = useMemo(
@@ -226,7 +195,6 @@ export default function Crm() {
         <BarrePipelines
           actif={pipeline}
           onChoisir={(p) => setPipelineId(p.id)}
-          onToutes={() => setPipelineId(TOUTES)}
           commerciaux={commerciaux}
         />
       )}
@@ -250,21 +218,6 @@ export default function Crm() {
 
       {selected ? (
         <ProjectView client={selected} onClose={() => navigate("/crm")} />
-      ) : toutes ? (
-        <ToutesLesAffaires
-          clients={visiblesTriees}
-          pipelines={pipelines}
-          stages={toutesColonnes}
-          tri={triListe}
-          onTrier={(c) =>
-            setTriListe((avant) =>
-              avant.colonne === c
-                ? { colonne: c, sens: avant.sens === "asc" ? "desc" : "asc" }
-                : { colonne: c, sens: c === "montant" ? "desc" : "asc" },
-            )
-          }
-          onOuvrir={(id) => navigate(`/crm/${id}`)}
-        />
       ) : stages.length === 0 ? (
         /* Un tableau sans colonne n'affiche rien : il faut le dire, et dire où aller. */
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
@@ -287,6 +240,13 @@ export default function Crm() {
           onSupprimer={(c) => void supprimerUne(c)}
           onModifier={(c) => navigate(`/crm/${c.id}?modifier=1`)}
           prevues={prevues}
+          {...(ensemble && pipeline
+            ? {
+                peutDeposer: (c: (typeof clients)[number], colonne: string) => peutAllerDans(c, colonne, toutesColonnes, pipeline.id),
+                etiquette: (c: (typeof clients)[number]) =>
+                  c.pipelineId === pipeline.id ? null : (pipelines.find((p) => p.id === c.pipelineId)?.nom ?? null),
+              }
+            : {})}
         />
       )}
 
@@ -303,7 +263,7 @@ export default function Crm() {
         />
       )}
 
-      {showColonnes && <ColonnesModal clients={clients} onClose={() => setShowColonnes(false)} pipelineId={pipeline?.id ?? ""} />}
+      {showColonnes && <ColonnesModal clients={clients.filter((c) => c.pipelineId === pipeline?.id)} onClose={() => setShowColonnes(false)} pipelineId={pipeline?.id ?? ""} />}
 
       {showModal && (
         <NewClientModal

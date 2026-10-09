@@ -26,6 +26,8 @@ export default function Kanban({
   onSupprimer,
   onModifier,
   prevues,
+  peutDeposer,
+  etiquette,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -46,6 +48,10 @@ export default function Kanban({
   onModifier?: (c: Client) => void;
   /** Ce qui est prévu sur chaque affaire : appels, rendez-vous, e-mails à venir. */
   prevues?: Map<string, Prevu>;
+  /** Vue d'ensemble : une affaire ne va que dans une colonne de son propre pipeline. */
+  peutDeposer?: (c: Client, colonne: Stage) => boolean;
+  /** Vue d'ensemble : le pipeline d'où vient la carte, quand ce n'est pas celui affiché. */
+  etiquette?: (c: Client) => string | null;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -56,8 +62,9 @@ export default function Kanban({
     setSurvolee(null);
     if (!id || !onDeplacer) return;
     const client = clients.find((c) => c.id === id);
-    if (client && client.stage !== stage) onDeplacer(id, stage);
+    if (client && client.stage !== stage && (!peutDeposer || peutDeposer(client, stage))) onDeplacer(id, stage);
   };
+  const enMain = saisi ? clients.find((c) => c.id === saisi) : undefined;
 
   return (
     // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
@@ -69,11 +76,13 @@ export default function Kanban({
         const list = clients.filter((c) => c.stage === stage.label);
         const cible = survolee === stage.label;
         const ton = TONES[stage.tone];
+        // Une colonne que le pipeline de la carte n'a pas se grise et refuse la carte.
+        const fermee = Boolean(enMain && peutDeposer && !peutDeposer(enMain, stage.label));
         return (
           <div
             key={stage.id}
             onDragOver={(e) => {
-              if (!saisi) return;
+              if (!saisi || fermee) return;
               e.preventDefault();
               setSurvolee(stage.label);
             }}
@@ -86,7 +95,9 @@ export default function Kanban({
               COLONNE_KANBAN,
               "transition-colors",
               cible && "bg-avisdoc-teal/10 ring-2 ring-avisdoc-teal/40",
+              fermee && "opacity-40",
             )}
+            title={fermee ? "Le pipeline de cette affaire n’a pas cette colonne" : undefined}
           >
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
@@ -154,6 +165,11 @@ export default function Kanban({
                     <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
                       {[origines?.get(c.id)?.activity ?? c.naf, c.ville].filter(Boolean).join(" · ") || "—"}
                     </div>
+                    {etiquette?.(c) && (
+                      <span className="mr-1.5 mt-1.5 inline-flex rounded-full border border-border px-2 py-0.5 text-[10.5px] font-bold text-muted-foreground">
+                        {etiquette(c)}
+                      </span>
+                    )}
                     {c.aRepondu && <Badge className="mt-1.5 bg-emerald-100 text-emerald-700">A répondu</Badge>}
                     {origines?.get(c.id)?.rationale && (
                       <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
