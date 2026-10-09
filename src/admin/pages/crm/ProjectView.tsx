@@ -27,6 +27,8 @@ import ResumeNotes from "../../components/ResumeNotes";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
+import BoutonsFiche from "../../components/fiche/BoutonsFiche";
+import LigneIdentite from "../../components/fiche/LigneIdentite";
 import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
@@ -348,16 +350,24 @@ export default function ProjectView({
             <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
           </>
         }
-        identite={
-          <div>
-            {client.siren && (
-              <div className="text-[12.5px] text-muted-foreground">
-                SIREN {client.siren} · {client.naf} —{" "}
-                <span className="font-bold text-blue-700">données Pappers ✓</span>
-              </div>
-            )}
-            <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
-          </div>
+        identite={<LigneIdentite prospect={origine} siren={client.siren} adresse={client.adresse} />}
+        actions={
+          <BoutonsFiche
+            approfondie={Boolean(origine?.enriched_at)}
+            // Jamais passée par Merx : Approfondir lui confie la fiche.
+            onApprofondir={() => void (origine ? demanderAMerx("approfondir") : confierAMerx())}
+            onEcrire={() =>
+              origine
+                ? void demanderAMerx("email")
+                : setMerxErreur("Cette affaire n’est pas encore passée par Merx : cliquez d’abord sur « Approfondir ».")
+            }
+            enCours={merxEnCours}
+          />
+        }
+        message={
+          merxErreur ? (
+            <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
+          ) : undefined
         }
         avancement={avancement}
         onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))}
@@ -379,13 +389,7 @@ export default function ProjectView({
           )}
 
           {tab === "approche" && (
-            <ApprocheEntreprise
-              origine={origine}
-              onApprofondir={() => void demanderAMerx("approfondir")}
-              enCours={merxEnCours === "approfondir"}
-              erreur={merxErreur}
-              sansOrigine={ConfierAMerx()}
-            />
+            <ApprocheEntreprise origine={origine} />
           )}
 
           {tab === "action" && (
@@ -583,33 +587,6 @@ export default function ProjectView({
   );
 
   /** Ce que Merx avait trouvé, et ce qu’on peut encore lui demander. */
-  /** Une affaire jamais passée par Merx : on peut la lui confier. */
-  function ConfierAMerx() {
-    return (
-        <div className="py-2">
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            Cette affaire n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Vous pouvez la lui confier
-            — il ira chercher le registre officiel, les coordonnées publiées, et dira comment aborder l’entreprise.
-          </p>
-          <button
-            type="button"
-            onClick={() => void confierAMerx()}
-            disabled={merxEnCours !== null}
-            className="ad-btn-accent mt-3 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {merxEnCours ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-            Confier cette fiche à Merx
-          </button>
-          <p className="mt-2 text-[12px] text-muted-foreground">
-            Cela prend une trentaine de secondes. Les sources consultées sont gratuites.
-          </p>
-          {merxErreur && (
-            <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
-          )}
-        </div>
-    );
-  }
-
   // ---- Contenus d'onglets (fermetures sur l'état du composant) ----
 
   function SuivisTab() {

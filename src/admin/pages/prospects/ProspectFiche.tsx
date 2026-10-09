@@ -2,7 +2,7 @@
 // et les pages réellement consultées. « Approfondir » va chercher le registre officiel et le site.
 
 import { useCallback, useMemo, useState } from "react";
-import { ArrowRightCircle, Check, Loader2, PenLine, Search } from "lucide-react";
+import { ArrowRightCircle, Check, Loader2, PenLine, Trash2 } from "lucide-react";
 import type { Client } from "../../types";
 import ChoixPipeline from "./ChoixPipeline";
 import { useAdminData } from "../../data/AdminDataContext";
@@ -17,6 +17,8 @@ import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import ActionsFiche from "../../components/ActionsFiche";
+import BoutonsFiche from "../../components/fiche/BoutonsFiche";
+import LigneIdentite from "../../components/fiche/LigneIdentite";
 import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
 import type { Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
@@ -145,33 +147,29 @@ export default function ProspectFiche({
       sousTitre={[p.activity, [p.city, p.department ? `(${p.department})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—"}
       notes={notesDe(p)}
       enHaut={
-        onModifier ? (
+        <>
+          {onModifier && (
+            <button
+              type="button"
+              onClick={() => onModifier(p)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+            >
+              <PenLine className="size-3.5" /> Modifier
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onModifier(p)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+            onClick={() => void lancer("ecarter")}
+            disabled={enCours !== null}
+            className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[12.5px] font-bold text-rose-700 transition-colors hover:border-rose-400 disabled:opacity-60"
           >
-            <PenLine className="size-3.5" /> Modifier
+            {enCours === "ecarter" ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+            {p.status === "ecarte" ? "Restaurer" : "Supprimer"}
           </button>
-        ) : undefined
-      }
-      referent={<ChoixReferent quoi="prospect" id={p.id} />}
-      identite={
-        <>
-          {p.siren && (
-            <div className="text-[12.5px] text-muted-foreground">
-              SIREN {p.siren}
-              {p.legal_name ? ` · ${p.legal_name}` : ""} —{" "}
-              <span className="font-bold text-avisdoc-teal">annuaire des entreprises ✓</span>
-            </div>
-          )}
-          {siege && (siege.address || siege.city) && (
-            <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-              {[siege.address, siege.city].filter(Boolean).join(", ")}
-            </div>
-          )}
         </>
       }
+      referent={<ChoixReferent quoi="prospect" id={p.id} />}
+      identite={<LigneIdentite prospect={p} />}
       actions={
         <>
               {p.converted_client_id ? (
@@ -198,34 +196,13 @@ export default function ProspectFiche({
                   Mettre dans le Pipeline
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => void lancer("approfondir")}
-                disabled={enCours !== null}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
-              >
-                {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                {p.enriched_at ? "Approfondir à nouveau" : "Approfondir"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void lancer("email")}
-                disabled={enCours !== null}
-                title="Merx rédige un brouillon à partir de cette fiche. Rien n'est envoyé."
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
-              >
-                {enCours === "email" ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
-                Écrire un e-mail personnalisé
-              </button>
-              <button
-                type="button"
-                onClick={() => void lancer("ecarter")}
-                disabled={enCours !== null}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground hover:border-rose-300 hover:text-rose-700 disabled:opacity-60"
-              >
-                {enCours === "ecarter" ? <Loader2 className="size-4 animate-spin" /> : null}
-                {p.status === "ecarte" ? "Restaurer" : "Supprimer"}
-              </button>
+              {/* Approfondir et Écrire : la même rangée que sur l'affaire et le client. */}
+              <BoutonsFiche
+                approfondie={Boolean(p.enriched_at)}
+                onApprofondir={() => void lancer("approfondir")}
+                onEcrire={() => void lancer("email")}
+                enCours={enCours}
+              />
         </>
       }
       message={
