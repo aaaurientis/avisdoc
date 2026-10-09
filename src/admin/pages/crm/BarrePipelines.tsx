@@ -22,12 +22,17 @@ import type { Pipeline, PipelineStage, StageTone } from "../../types";
 import { cn } from "@/lib/utils";
 import { estGeneral } from "../../lib/pipeline-general";
 
-/** Les colonnes proposées à la création : celles d'un pipeline commercial ordinaire. */
+/**
+ * Les colonnes proposées à la création : le tronc commun à tous les pipelines
+ * (migration 0067). Un point de départ, qu'on ajuste ensuite par pipeline.
+ */
 const COLONNES_PROPOSEES: { label: string; tone: StageTone }[] = [
-  { label: "Nouveau", tone: "slate" },
-  { label: "Qualifié", tone: "teal" },
+  { label: "Qualifié", tone: "slate" },
+  { label: "Contacté", tone: "teal" },
+  { label: "Présentation", tone: "coral" },
+  { label: "RDV", tone: "emerald" },
   { label: "Proposition", tone: "coral" },
-  { label: "Signé", tone: "emerald" },
+  { label: "Signé", tone: "violet" },
   { label: "Perdu", tone: "rose" },
 ];
 
