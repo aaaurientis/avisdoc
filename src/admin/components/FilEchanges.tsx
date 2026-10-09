@@ -87,6 +87,8 @@ export default function FilEchanges({
     }
   };
 
+  const estNote = (e: Echange) => e.kind === "note" && Boolean(e.detail?.trim());
+
   // Un seul fil : les échanges saisis et les jalons de la fiche, du plus récent au plus ancien.
   const fil = [
     ...echanges.map((e) => ({ type: "echange" as const, au: e.au, echange: e })),
@@ -105,17 +107,30 @@ export default function FilEchanges({
         ) : (
           fil.map((ligne) =>
             ligne.type === "echange" ? (
-              <div key={ligne.echange.id} className="group mb-4 flex items-start gap-3">
+              <div
+                key={ligne.echange.id}
+                className={cn(
+                  "group mb-4 flex items-start gap-3",
+                  // Les notes du commercial ressortent : c'est souvent ce qu'il y a de plus utile.
+                  estNote(ligne.echange) && "-ml-2 rounded-xl bg-amber-50 px-3 py-2.5 text-amber-800",
+                )}
+              >
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-avisdoc-ink">
+                  <p className={cn("text-[13px] font-semibold", estNote(ligne.echange) ? "inline-flex items-center gap-1.5" : "text-avisdoc-ink")}>
+                    {estNote(ligne.echange) && <NotebookPen className="size-3.5" />}
                     {libelleGenre(ligne.echange.kind)} — {ligne.echange.titre}
                   </p>
                   {ligne.echange.detail && (
-                    <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] leading-snug text-muted-foreground">
+                    <p
+                      className={cn(
+                        "mt-0.5 whitespace-pre-wrap leading-snug",
+                        estNote(ligne.echange) ? "text-[13px]" : "text-[12.5px] text-muted-foreground",
+                      )}
+                    >
                       {ligne.echange.detail}
                     </p>
                   )}
-                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                  <p className={cn("mt-0.5 text-[11.5px]", !estNote(ligne.echange) && "text-muted-foreground")}>
                     {quand(ligne.echange.au, ligne.echange.kind === "appel" || ligne.echange.kind === "rdv")}
                     {ligne.echange.par ? ` · ${ligne.echange.par}` : ""}
                   </p>

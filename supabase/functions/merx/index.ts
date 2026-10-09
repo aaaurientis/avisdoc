@@ -9,6 +9,8 @@
 //   { action: "traiter", demandeId? }             → exécute la demande (recherche ou approfondissement).
 //   { action: "approfondir", prospectId }         → crée la demande d'approfondissement et l'exécute.
 //   { action: "email", prospectId }               → rédige le brouillon de premier contact (rien n'est envoyé).
+//   { action: "resumer_notes", prospectId?, clientId?, accountId? }
+//                                                 → résume les notes du commercial pour la première page.
 //
 // Déploiement :
 //   supabase functions deploy merx
@@ -27,6 +29,10 @@ import {
   debriefPrompt,
   type DebriefOut,
   EMAIL_CLIENT_SYSTEM,
+  RESUME_SCHEMA,
+  RESUME_SYSTEM,
+  resumePrompt,
+  type ResumeOut,
   EMAIL_SCHEMA,
   EMAIL_SYSTEM,
   emailClientPrompt,
@@ -424,6 +430,76 @@ Deno.serve(async (req: Request) => {
             .eq("id", demande.id);
         }
         return json({ error: "Merx n'a pas pu lire ce débrief. Vous pouvez réessayer." }, 500);
+      }
+    }
+
+    // ── Résumer les notes d'une fiche ────────────────────────────────────
+    // Toutes les identités de l'entreprise (prospect → affaire → client) : une note
+    // prise en Prospection compte encore une fois l'entreprise devenue cliente. Le
+    // résumé se range sur la plus avancée, celle que la fiche affiche.
+    if (body.action === "resumer_notes") {
+      const cles = [
+        body.prospectId ? `prospect_id.eq.${body.prospectId}` : "",
+        body.clientId ? `client_id.eq.${body.clientId}` : "",
+        body.accountId ? `account_id.eq.${body.accountId}` : "",
+      ].filter(Boolean);
+      if (cles.length === 0) return json({ error: "Fiche non précisée." }, 400);
+      const [table, id] = body.accountId
+        ? ["admin_accounts", body.accountId]
+        : body.clientId
+          ? ["admin_clients", body.clientId]
+          : ["admin_prospects", body.prospectId];
+      const colonneNom = table === "admin_clients" ? "company" : "name";
+
+      const [{ data: fiche }, { data: notes }] = await Promise.all([
+        sb.from(table).select(colonneNom).eq("id", id).maybeSingle(),
+        sb.from("admin_echanges").select("titre, detail, au, created_at").or(cles.join(",")).eq("kind", "note").not("detail", "is", null).order("au"),
+      ]);
+      if (!fiche) return json({ error: "Fiche introuvable." }, 404);
+      const nom = String((fiche as Record<string, unknown>)[colonneNom] ?? "");
+      const lues = (notes ?? []).filter((n) => String(n.detail ?? "").trim());
+      if (lues.length === 0) {
+        await sb.from(table).update({ resume_notes: null }).eq("id", id);
+        return json({ resume: null });
+      }
+      const derniere = lues.map((n) => String(n.created_at)).sort().at(-1)!;
+
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "recherche", request: `Résumé des notes — ${nom}`, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      try {
+        const out = await complete<ResumeOut>(
+          resumePrompt(nom, lues.map((n) => ({ au: String(n.au), titre: String(n.titre), detail: String(n.detail) }))),
+          RESUME_SCHEMA as unknown as Record<string, unknown>,
+          { system: RESUME_SYSTEM, usage: "email", timeoutMs: 40_000, onUsage: (u) => (usage = u) },
+        );
+        const resume = {
+          points: (out.points ?? []).map((x) => String(x).trim()).filter(Boolean),
+          nb: lues.length,
+          derniere,
+          au: new Date().toISOString(),
+        };
+        await sb.from(table).update({ resume_notes: resume }).eq("id", id);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "terminee", usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ resume });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
       }
     }
 

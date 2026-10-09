@@ -13,7 +13,8 @@ import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../
 import { euroDollar } from "../../lib/couts";
 import NoteDetaillee from "./NoteDetaillee";
 import FicheEntreprise from "../../components/FicheEntreprise";
-import type { EtapeParcours } from "../../components/ParcoursFiche";
+import ResumeNotes from "../../components/ResumeNotes";
+import { etapesDeVie, notesDe } from "../../lib/fiche";
 import Onglets, { type Onglet } from "../../components/Onglets";
 import FilEchanges from "../../components/FilEchanges";
 import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
@@ -173,18 +174,15 @@ export default function ProspectFiche({
     }
   };
 
-  /**
-   * Le parcours d’un prospect s’arrête au Pipeline : dès qu’on l’a contacté, l’affaire
-   * se suit là-bas. « Contactée » n’est donc pas une étape d’avant le Pipeline.
-   */
-  const parcours = useMemo<EtapeParcours[]>(
-    () => [
-      { label: "Trouvée", au: p.created_at, tone: "slate" },
-      { label: "Approfondie", au: p.enriched_at, tone: "teal" },
-      { label: "Au Pipeline", au: p.converted_at, tone: "emerald" },
-    ],
-    [p.created_at, p.enriched_at, p.converted_at],
-  );
+  /** L'avancement de l'entreprise ; une fois au Pipeline, la colonne de son affaire. */
+  const affaire = p.converted_client_id ? clients.find((c) => c.id === p.converted_client_id) : undefined;
+  const avancement = etapesDeVie({
+    trouveeLe: p.created_at,
+    approfondieLe: p.enriched_at,
+    pipeline: p.converted_client_id ? { colonne: affaire?.stage ?? "—", au: p.converted_at } : null,
+    client: null,
+  });
+  const cles = useMemo(() => ({ prospectId: p.id, clientId: p.converted_client_id }), [p.id, p.converted_client_id]);
 
   /** Les jalons ne sont pas stockés : ce sont les dates que la fiche porte déjà. */
   const jalons = useMemo<Jalon[]>(
@@ -208,8 +206,8 @@ export default function ProspectFiche({
   return (
     <FicheEntreprise
       titre={p.name}
-      sousTitre={[p.activity, p.city].filter(Boolean).join(" · ") || "—"}
-      badge={<Badge className={tonNote(p.score_total)}>{p.score_total ?? "—"} / 100</Badge>}
+      sousTitre={[p.activity, [p.city, p.department ? `(${p.department})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—"}
+      notes={notesDe(p)}
       referent={<ChoixReferent quoi="prospect" id={p.id} />}
       identite={
         <>
@@ -293,7 +291,7 @@ export default function ProspectFiche({
           </p>
         )
       }
-      parcours={parcours}
+      avancement={avancement}
       onglets={onglets}
       actif={onglet}
       onOnglet={setOnglet}
@@ -302,6 +300,7 @@ export default function ProspectFiche({
       <div>
           {onglet === "identite" && (
             <>
+            <ResumeNotes cles={cles} />
             {/* Ce qu'on sait d'elle. Tout ce qui est connu s'affiche, approfondie ou
                 non : la recherche ramène désormais le dirigeant, l'effectif, l'adresse
                 et le chiffre d'affaires, et il n'y a aucune raison de les cacher
@@ -576,7 +575,7 @@ export default function ProspectFiche({
 
           {onglet === "suivi" && (
             <FilEchanges
-              cles={{ prospectId: p.converted_client_id ? null : p.id, clientId: p.converted_client_id }}
+              cles={cles}
               jalons={jalons}
               onCompte={compter}
             />

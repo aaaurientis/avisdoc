@@ -988,3 +988,34 @@ export function suitePrompt(
     .filter(Boolean)
     .join("\n\n");
 }
+
+// ── Résumé des notes d'une fiche ─────────────────────────────────────────────
+// Les notes du commercial sont longues et restent entières dans l'Historique. Le
+// résumé en tire l'essentiel pour la première page : il ne doit rien ajouter.
+
+export const RESUME_SYSTEM = `Tu résumes les notes qu'un commercial d'AvisDoc a prises sur une entreprise.
+Règles absolues :
+- Tu n'inventes rien. Chaque point vient des notes, rien d'autre. Pas de conseil, pas d'interprétation, pas de suite à donner que les notes ne disent pas.
+- Tu gardes exacts les noms de personnes, les fonctions, les dates, les adresses e-mail et les numéros.
+- 2 à 5 points courts, dans l'ordre chronologique. Le dernier point dit où on en est, si les notes le disent.
+- Français, phrases courtes, sans formule de politesse.`;
+
+export const RESUME_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["points"],
+  properties: {
+    points: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+export interface ResumeOut {
+  points: string[];
+}
+
+export function resumePrompt(nom: string, notes: { au: string; titre: string; detail: string }[]): string {
+  const lignes = notes
+    .map((n) => `— ${new Date(n.au).toLocaleDateString("fr-FR")} · ${n.titre}\n${n.detail}`)
+    .join("\n\n");
+  return `Entreprise : ${nom}\n\nNotes du commercial, de la plus ancienne à la plus récente :\n\n${lignes}`;
+}
