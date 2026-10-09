@@ -270,7 +270,7 @@ export default function Crm() {
         <NewClientModal
           onClose={() => setShowModal(false)}
           pipelineId={pipeline?.id ?? ""}
-          etapeDepart={stages[0]?.label ?? "Nouveau"}
+          etapeDepart={stages[0]?.label ?? "Qualifié"}
           onCreated={(id) => {
             setShowModal(false);
             navigate(`/crm/${id}`);

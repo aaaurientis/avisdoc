@@ -208,7 +208,7 @@ async function creerLaFiche(e: EntrepriseVue, par: string, etapeDeDepart?: strin
       .insert({
         company: nom,
         ville: e.ville?.trim() || null,
-        stage: e.etape?.trim() || etapeDeDepart || "Nouveau",
+        stage: e.etape?.trim() || etapeDeDepart || "Qualifié",
         jours: 1,
         tarif: 0,
         statut_propo: "Brouillon",
