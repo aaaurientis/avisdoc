@@ -192,6 +192,11 @@ export default function FicheClient({
     };
   }, [fiche?.clientId]);
 
+  const clesHistorique = useMemo(
+    () => ({ accountId: fiche?.id ?? null, clientId: fiche?.clientId ?? null, prospectId: origine?.id ?? null }),
+    [fiche?.id, fiche?.clientId, origine?.id],
+  );
+
   const jalons = useMemo<Jalon[]>(
     () =>
       ([
@@ -400,7 +405,8 @@ export default function FicheClient({
 
         {onglet === "suivi" && (
           <div className="max-h-[52vh] overflow-y-auto pr-1">
-            <FilEchanges cles={{ accountId: fiche?.id ?? null }} jalons={jalons} onCompte={compter} rafraichir={relire} />
+            {/* Tout le fil de l'entreprise : avant d'être cliente, elle a été prospect puis affaire. */}
+            <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
           </div>
         )}
         </div>

@@ -224,6 +224,8 @@ export default function ProjectView({
     void chargerOrigine();
   }, [chargerOrigine]);
 
+  const clesHistorique = useMemo(() => ({ clientId: client.id, prospectId: origine?.id ?? null }), [client.id, origine?.id]);
+
   const jalons = useMemo<Jalon[]>(
     () =>
       ([
@@ -621,7 +623,9 @@ export default function ProjectView({
                 <p className="mb-3 text-[12.5px] text-muted-foreground">
                   Ce qui s’est passé, dans l’ordre. Rien ne s’y modifie : les actions se prennent dans l’onglet Action.
                 </p>
-                <FilEchanges cles={{ clientId: client.id }} jalons={jalons} onCompte={compter} rafraichir={relire} />
+                {/* Le fil reprend celui de la fiche Prospection d'origine : ce qui s'est
+                    dit avant le Pipeline (contacts, relances, commentaires) reste lisible. */}
+                <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
               </>
             )}
           </div>
