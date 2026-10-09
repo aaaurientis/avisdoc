@@ -52,3 +52,45 @@ export function tonFiabilite(f: number | null): string {
   if (f >= 5) return "bg-amber-100 text-amber-800";
   return "bg-rose-100 text-rose-700";
 }
+
+/** Une personne telle que le bloc « Interlocuteurs » l'affiche. */
+export interface PersonneFiche {
+  id?: string;
+  nom: string;
+  fonction: string | null;
+  email: string | null;
+  telephone: string | null;
+  aConfirmer?: boolean;
+  source?: string | null;
+}
+
+/**
+ * Les personnes qu'une fiche de prospection connaît : l'interlocuteur retenu, puis
+ * toutes celles que Merx a trouvées. `deja` : celles déjà listées (saisies sur
+ * l'affaire), qu'on ne répète pas.
+ */
+export function personnesDuProspect(
+  p: {
+    contact_name: string | null;
+    contact_role: string | null;
+    contact_email: string | null;
+    contact_phone: string | null;
+    personnes: { nom: string; fonction: string | null; email: string | null; telephone: string | null; mobile: string | null; source: string | null; sur: boolean }[] | null;
+  } | null | undefined,
+  deja: PersonneFiche[] = [],
+): PersonneFiche[] {
+  if (!p) return [];
+  const vus = new Set(deja.map((q) => q.nom.trim().toLowerCase()));
+  const sortie: PersonneFiche[] = [];
+  const garder = (q: PersonneFiche) => {
+    const cle = q.nom.trim().toLowerCase();
+    if (!cle || vus.has(cle)) return;
+    vus.add(cle);
+    sortie.push(q);
+  };
+  if (p.contact_name) garder({ nom: p.contact_name, fonction: p.contact_role, email: p.contact_email, telephone: p.contact_phone });
+  for (const q of p.personnes ?? []) {
+    garder({ nom: q.nom, fonction: q.fonction, email: q.email, telephone: q.telephone ?? q.mobile, aConfirmer: !q.sur, source: q.source });
+  }
+  return sortie;
+}

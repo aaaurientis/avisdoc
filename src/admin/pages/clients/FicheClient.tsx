@@ -3,20 +3,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, Sparkles, Undo2, X } from "lucide-react";
+import { Loader2, Pencil, Undo2, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
-import { Modal, SectionLabel } from "../../components/ui";
+import { Modal } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
-import Onglets, { type Onglet } from "../../components/Onglets";
+import type { Onglet } from "../../components/Onglets";
 import FicheEntreprise from "../../components/FicheEntreprise";
 import ResumeNotes from "../../components/ResumeNotes";
-import { etapesDeVie, notesDe } from "../../lib/fiche";
+import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
+import CeQuOnSait from "../../components/fiche/CeQuOnSait";
+import Interlocuteurs from "../../components/fiche/Interlocuteurs";
+import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
-import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
+import EspaceClientCard from "../../espace/EspaceClientCard";
+import RendezVousCard from "../../espace/RendezVousCard";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import { approfondirProspect, redigerEmailClient } from "../../lib/merx-appels";
 import { confirmer } from "../../components/Confirmation";
@@ -24,7 +28,6 @@ import { useAuth } from "../../auth/AuthContext";
 import type { GenreEchange } from "../../lib/echanges";
 import type { Jalon } from "../../lib/echanges";
 import type { Prospect } from "../../lib/merx";
-import NoteDetaillee from "../prospects/NoteDetaillee";
 import { cn } from "@/lib/utils";
 
 const champCls =
@@ -56,7 +59,7 @@ export default function FicheClient({
   mode?: "lecture" | "edition";
   onClose: () => void;
 }) {
-  const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages } = useAdminData();
+  const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages, addProjectContact, removeProjectContact } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("identite");
   const [origine, setOrigine] = useState<Prospect | null>(null);
@@ -236,6 +239,46 @@ export default function FicheClient({
   };
 
   /** La fiche d'un client existant, en consultation : le même cadre que le prospect et l'affaire. */
+  /** Ce que la fiche client et son affaire savent en plus de la fiche de prospection. */
+  const ceQueSaitLeClient = [
+    ...(affaire && !origine
+      ? [
+          ...(affaire.siren ? [{ label: "SIREN", valeur: affaire.siren }] : []),
+          ...(affaire.effectif ? [{ label: "Effectif", valeur: affaire.effectif }] : []),
+          ...(affaire.adresse ? [{ label: "Adresse", valeur: [affaire.adresse, affaire.codePostal, affaire.ville].filter(Boolean).join(" ") }] : []),
+        ]
+      : []),
+    ...(affaire?.jours ? [{ label: "Journées vendues", valeur: String(affaire.jours) }] : []),
+    ...(affaire?.depistes ? [{ label: "Dépistés", valeur: String(affaire.depistes) }] : []),
+    ...(affaire?.orientes ? [{ label: "Orientés", valeur: String(affaire.orientes) }] : []),
+    ...accountFields
+      .filter((f) => f.key !== "etablissement" && lire(f.key).trim())
+      .map((f) => {
+        const v = lire(f.key).trim();
+        const valeur =
+          f.type === "date" && !Number.isNaN(new Date(v).getTime()) ? (
+            new Date(v).toLocaleDateString("fr-FR")
+          ) : f.type === "email" ? (
+            <a href={`mailto:${v}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{v}</a>
+          ) : f.type === "telephone" ? (
+            <a href={`tel:${v.replace(/\s/g, "")}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{v}</a>
+          ) : f.type === "lien" ? (
+            <a href={v} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">{v}</a>
+          ) : (
+            <span className="whitespace-pre-wrap break-words">{v}</span>
+          );
+        return { label: f.label, valeur };
+      }),
+  ];
+  const contactsSaisis = (affaire?.contacts ?? []).map((c) => ({
+    id: c.id,
+    nom: c.name || [c.prenom, c.nom].filter(Boolean).join(" "),
+    fonction: c.role && c.role !== "Contact" ? c.role : null,
+    email: c.email && c.email !== "—" ? c.email : null,
+    telephone: c.tel && c.tel !== "—" ? c.tel : null,
+  }));
+  const interlocuteurs = [...contactsSaisis, ...personnesDuProspect(origine, contactsSaisis)];
+
   if (fiche && mode === "lecture") {
     return (
       <>
@@ -285,73 +328,12 @@ export default function FicheClient({
         {onglet === "identite" && (
         <div>
         <ResumeNotes cles={clesHistorique} />
-        {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
-            elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
-        {affaire && (
-          <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
-            <SectionLabel>Ce qu’on sait d’eux</SectionLabel>
-            <div className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
-              {[
-                ["SIREN", affaire.siren],
-                ["Effectif", affaire.effectif],
-                ["Adresse", [affaire.adresse, affaire.codePostal, affaire.ville].filter(Boolean).join(" ")],
-                ["Journées vendues", affaire.jours ? String(affaire.jours) : ""],
-                ["Dépistés", affaire.depistes ? String(affaire.depistes) : ""],
-                ["Orientés", affaire.orientes ? String(affaire.orientes) : ""],
-              ]
-                .filter(([, v]) => v)
-                .map(([label, v]) => (
-                  <div key={label} className="flex gap-2 text-[13px]">
-                    <span className="shrink-0 text-muted-foreground">{label}</span>
-                    <span className="min-w-0 break-words font-semibold text-avisdoc-ink">{v}</span>
-                  </div>
-                ))}
-            </div>
-            {affaire.contacts.length > 0 && (
-              <div className="mt-3 border-t border-border pt-2.5">
-                <SectionLabel>Interlocuteur{affaire.contacts.length > 1 ? "s" : ""}</SectionLabel>
-                <div className="mt-1.5 space-y-1">
-                  {affaire.contacts.map((c) => (
-                    <div key={c.id} className="text-[13px] text-avisdoc-ink">
-                      <span className="font-semibold">{[c.prenom, c.nom].filter(Boolean).join(" ")}</span>
-                      {c.role && <span className="text-muted-foreground"> · {c.role}</span>}
-                      {c.email && (
-                        <a href={`mailto:${c.email}`} className="ml-2 text-avisdoc-teal underline-offset-2 hover:underline">
-                          {c.email}
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="divide-y divide-border">
-          {accountFields.map((f) => {
-            const v = lire(f.key).trim();
-            const affichee =
-              v && f.type === "date" && !Number.isNaN(new Date(v).getTime())
-                ? new Date(v).toLocaleDateString("fr-FR")
-                : v;
-            return (
-              <div key={f.id} className="flex gap-3 px-4 py-2.5">
-                <div className="w-40 shrink-0 text-[12.5px] text-muted-foreground">{f.label}</div>
-                <div className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words text-[13px]", affichee ? "text-avisdoc-ink" : "text-muted-foreground/50")}>
-                  {affichee
-                    ? f.type === "email"
-                      ? <a href={`mailto:${affichee}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                      : f.type === "telephone"
-                        ? <a href={`tel:${affichee.replace(/\s/g, "")}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                        : f.type === "lien"
-                          ? <a href={affichee} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                          : affichee
-                    : "—"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <CeQuOnSait prospect={origine} enPlus={ceQueSaitLeClient} />
+        <Interlocuteurs
+          personnes={interlocuteurs}
+          onAjouter={affaire ? (x) => addProjectContact(affaire.id, x) : undefined}
+          onRetirer={affaire ? (id) => removeProjectContact(affaire.id, id) : undefined}
+        />
         </div>
         )}
 
@@ -364,63 +346,23 @@ export default function FicheClient({
               onFait={() => setRelire((n) => n + 1)}
               relire={relire}
             />
+            {/* Ce qui arrive avec la signature : l'espace client et les journées. */}
+            {affaire && (
+              <div className="mt-5 space-y-4">
+                <EspaceClientCard bare clientId={affaire.id} clientName={affaire.company} />
+                <RendezVousCard bare clientId={affaire.id} />
+              </div>
+            )}
           </div>
         )}
 
         {onglet === "approche" && (
-          <div>
-            {origine ? (
-              <>
-                {/* Approfondir vaut aussi pour un client : les effectifs changent, les
-                    dirigeants aussi, et le dossier sert à reproposer une campagne. */}
-                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border p-3">
-                  <button
-                    type="button"
-                    onClick={() => void approfondir()}
-                    disabled={enCours !== null}
-                    className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {enCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    {enCours === "approfondir"
-                      ? "Merx cherche… une bonne minute"
-                      : dossierRempli(origine.dossier)
-                        ? "Approfondir à nouveau"
-                        : "Approfondir"}
-                  </button>
-                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
-                    {dossierRempli(origine.dossier)
-                      ? "Remet à jour l’identité officielle, l’effectif et le dossier commercial."
-                      : "Va chercher l’identité officielle, l’effectif, les dirigeants, et monte le dossier commercial."}
-                  </span>
-                </div>
-                {souci && (
-                  <p className="mb-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p>
-                )}
-                {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
-                {origine.rationale && (
-                  <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
-                    <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>
-                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
-                    {origine.approach && (
-                      <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
-                        <span className="font-semibold">Angle d’approche : </span>
-                        {origine.approach}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <SectionLabel>La note, critère par critère</SectionLabel>
-                <div className="mt-2">
-                  <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
-                </div>
-              </>
-            ) : (
-              <p className="py-6 text-[13px] text-muted-foreground">
-                Cette fiche n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
-                prospection gardent ici ce que Merx avait trouvé.
-              </p>
-            )}
-          </div>
+          <ApprocheEntreprise
+            origine={origine}
+            onApprofondir={() => void approfondir()}
+            enCours={enCours === "approfondir"}
+            erreur={souci}
+          />
         )}
 
         {onglet === "suivi" && (
@@ -445,7 +387,7 @@ export default function FicheClient({
 
   return (
     <>
-    <Modal onClose={onClose} width={mode === "lecture" ? 820 : 520}>
+    <Modal onClose={onClose} width={520}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
@@ -454,175 +396,15 @@ export default function FicheClient({
           <p className="mt-1 text-[13px] text-muted-foreground">
             {!fiche
               ? "Seul l’établissement est nécessaire ; le reste peut se remplir plus tard."
-              : mode === "lecture"
-                ? [fiche.sector, fiche.signedOn ? `client depuis le ${new Date(fiche.signedOn).toLocaleDateString("fr-FR")}` : null]
-                    .filter(Boolean)
-                    .join(" · ") || "Fiche client"
-                : "Modifiez ce qu’il faut, puis enregistrez."}
+              : "Modifiez ce qu’il faut, puis enregistrez."}
           </p>
-          {/* Hors des onglets : on doit voir qui suit ce client en ouvrant la fiche. */}
-          {fiche && mode === "lecture" && <ChoixReferent quoi="client" id={fiche.id} className="mt-2.5" />}
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
           <X className="size-5" />
         </button>
       </div>
 
-      {mode === "lecture" ? (
-        /* ── Consultation : trois onglets, aucun champ de saisie ── */
-        <div className="overflow-hidden rounded-2xl border border-border">
-        <Onglets onglets={onglets} actif={onglet} onChange={setOnglet} />
-
-        <div className="p-4">
-        {onglet === "identite" && (
-        <div className="max-h-[52vh] overflow-y-auto">
-        {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
-            elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
-        {affaire && (
-          <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
-            <SectionLabel>Ce qu’on sait d’eux</SectionLabel>
-            <div className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
-              {[
-                ["SIREN", affaire.siren],
-                ["Effectif", affaire.effectif],
-                ["Adresse", [affaire.adresse, affaire.codePostal, affaire.ville].filter(Boolean).join(" ")],
-                ["Journées vendues", affaire.jours ? String(affaire.jours) : ""],
-                ["Dépistés", affaire.depistes ? String(affaire.depistes) : ""],
-                ["Orientés", affaire.orientes ? String(affaire.orientes) : ""],
-              ]
-                .filter(([, v]) => v)
-                .map(([label, v]) => (
-                  <div key={label} className="flex gap-2 text-[13px]">
-                    <span className="shrink-0 text-muted-foreground">{label}</span>
-                    <span className="min-w-0 break-words font-semibold text-avisdoc-ink">{v}</span>
-                  </div>
-                ))}
-            </div>
-            {affaire.contacts.length > 0 && (
-              <div className="mt-3 border-t border-border pt-2.5">
-                <SectionLabel>Interlocuteur{affaire.contacts.length > 1 ? "s" : ""}</SectionLabel>
-                <div className="mt-1.5 space-y-1">
-                  {affaire.contacts.map((c) => (
-                    <div key={c.id} className="text-[13px] text-avisdoc-ink">
-                      <span className="font-semibold">{[c.prenom, c.nom].filter(Boolean).join(" ")}</span>
-                      {c.role && <span className="text-muted-foreground"> · {c.role}</span>}
-                      {c.email && (
-                        <a href={`mailto:${c.email}`} className="ml-2 text-avisdoc-teal underline-offset-2 hover:underline">
-                          {c.email}
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="divide-y divide-border">
-          {accountFields.map((f) => {
-            const v = lire(f.key).trim();
-            const affichee =
-              v && f.type === "date" && !Number.isNaN(new Date(v).getTime())
-                ? new Date(v).toLocaleDateString("fr-FR")
-                : v;
-            return (
-              <div key={f.id} className="flex gap-3 px-4 py-2.5">
-                <div className="w-40 shrink-0 text-[12.5px] text-muted-foreground">{f.label}</div>
-                <div className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words text-[13px]", affichee ? "text-avisdoc-ink" : "text-muted-foreground/50")}>
-                  {affichee
-                    ? f.type === "email"
-                      ? <a href={`mailto:${affichee}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                      : f.type === "telephone"
-                        ? <a href={`tel:${affichee.replace(/\s/g, "")}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                        : f.type === "lien"
-                          ? <a href={affichee} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
-                          : affichee
-                    : "—"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        </div>
-        )}
-
-        {onglet === "action" && (
-          <div className="max-h-[52vh] overflow-y-auto pr-1">
-            <ActionsFiche
-              cles={{ accountId: fiche?.id ?? null }}
-              suggestions={SUGGESTIONS}
-              onEcrireAvecMerx={fiche ? ecrireAvecMerx : undefined}
-              onFait={() => setRelire((n) => n + 1)}
-              relire={relire}
-            />
-          </div>
-        )}
-
-        {onglet === "approche" && (
-          <div className="max-h-[52vh] overflow-y-auto pr-1">
-            {origine ? (
-              <>
-                {/* Approfondir vaut aussi pour un client : les effectifs changent, les
-                    dirigeants aussi, et le dossier sert à reproposer une campagne. */}
-                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border p-3">
-                  <button
-                    type="button"
-                    onClick={() => void approfondir()}
-                    disabled={enCours !== null}
-                    className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {enCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    {enCours === "approfondir"
-                      ? "Merx cherche… une bonne minute"
-                      : dossierRempli(origine.dossier)
-                        ? "Approfondir à nouveau"
-                        : "Approfondir"}
-                  </button>
-                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
-                    {dossierRempli(origine.dossier)
-                      ? "Remet à jour l’identité officielle, l’effectif et le dossier commercial."
-                      : "Va chercher l’identité officielle, l’effectif, les dirigeants, et monte le dossier commercial."}
-                  </span>
-                </div>
-                {souci && (
-                  <p className="mb-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p>
-                )}
-                {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
-                {origine.rationale && (
-                  <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
-                    <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>
-                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
-                    {origine.approach && (
-                      <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
-                        <span className="font-semibold">Angle d’approche : </span>
-                        {origine.approach}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <SectionLabel>La note, critère par critère</SectionLabel>
-                <div className="mt-2">
-                  <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
-                </div>
-              </>
-            ) : (
-              <p className="py-6 text-[13px] text-muted-foreground">
-                Cette fiche n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
-                prospection gardent ici ce que Merx avait trouvé.
-              </p>
-            )}
-          </div>
-        )}
-
-        {onglet === "suivi" && (
-          <div className="max-h-[52vh] overflow-y-auto pr-1">
-            {/* Tout le fil de l'entreprise : avant d'être cliente, elle a été prospect puis affaire. */}
-            <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
-          </div>
-        )}
-        </div>
-        </div>
-      ) : (
+      {(
         <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
         {accountFields.map((f) => (
           <label key={f.id} className="block">
@@ -653,37 +435,7 @@ export default function FicheClient({
       )}
 
       <div className="mt-5 flex gap-2 border-t border-border pt-4">
-        {mode === "lecture" ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setMode("edition")}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
-            >
-              <Pencil className="size-4" /> Modifier
-            </button>
-            {/* Une signature par erreur se défait : l'affaire repart au Pipeline et
-                la fiche client va à la corbeille, d'où elle revient si besoin. */}
-            {fiche?.clientId && affaire && (
-              <button
-                type="button"
-                onClick={() => void remettreAuPipeline()}
-                disabled={enCours !== null}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
-              >
-                {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
-                Remettre au Pipeline
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink hover:text-avisdoc-ink"
-            >
-              Fermer
-            </button>
-          </>
-        ) : (
+        {(
           <>
             <button
               type="button"
