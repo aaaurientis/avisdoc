@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Check, ChevronDown, Loader2, Lock, Minus, Pencil, Plus, Search, UserPlus, X } from "lucide-react";
+import { Check, Loader2, Lock, Minus, Pencil, Plus, Search, UserPlus, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
-import { Avatar, Badge, Card } from "../../components/ui";
+import { Avatar, Badge } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
@@ -24,7 +24,9 @@ import type { Jalon } from "../../lib/echanges";
 import { SECTEURS } from "../../lib/merx";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
-import Onglets from "../../components/Onglets";
+import FicheEntreprise from "../../components/FicheEntreprise";
+import ResumeNotes from "../../components/ResumeNotes";
+import { etapesDeVie, notesDe } from "../../lib/fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
@@ -57,91 +59,6 @@ function Bloc({ titre, verrou, children }: { titre?: string; verrou?: string | n
         children
       )}
     </section>
-  );
-}
-
-// Section repliable pleine largeur (accordéon de la fiche projet).
-// `locked` : étape non atteinte → en-tête grisé, cadenas, contenu masqué.
-function Section({
-  titre,
-  compte,
-  defaultOpen = true,
-  actions,
-  fermer,
-  children,
-  locked = false,
-  lockedHint,
-}: {
-  titre: string;
-  compte?: number;
-  defaultOpen?: boolean;
-  actions?: ReactNode;
-  /** Fermer la fiche. Séparé des actions : sur un téléphone il reste sur la ligne
-      du titre, là où on le cherche, pendant que les actions passent en dessous. */
-  fermer?: () => void;
-  children: ReactNode;
-  locked?: boolean;
-  lockedHint?: string;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  if (locked) {
-    return (
-      <Card className="overflow-hidden opacity-60">
-        <div className="flex items-center gap-3 px-5 py-3.5">
-          <Lock className="size-4 shrink-0 text-muted-foreground/60" />
-          <span className="truncate font-display text-[15px] font-semibold text-muted-foreground">{titre}</span>
-          {lockedHint && (
-            <span className="ml-auto shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {lockedHint}
-            </span>
-          )}
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden">
-      {/* Sur un téléphone : le nom et la croix sur la première ligne, les actions
-          rangées en dessous, alignées à gauche. Tout sur une seule ligne, « Modifier »,
-          « Supprimer » et la croix prenaient les 375 pixels et le nom de l'entreprise
-          disparaissait ; en les renvoyant simplement à la ligne, elles s'empilaient en
-          escalier à droite et la croix se perdait au bout.
-          L'ordre du DOM garde la croix en dernier : sur grand écran, rien ne bouge. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="order-1 flex min-w-0 flex-1 items-center gap-3 text-left"
-        >
-          <ChevronDown
-            className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
-          />
-          <span className="truncate font-display text-[15px] font-semibold text-avisdoc-ink">{titre}</span>
-          {compte != null && (
-            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-              {compte}
-            </span>
-          )}
-        </button>
-        {actions && (
-          <div className="order-3 flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full sm:order-2">{actions}</div>
-        )}
-        {fermer && (
-          <button
-            type="button"
-            onClick={fermer}
-            title="Fermer la fiche"
-            aria-label="Fermer la fiche"
-            className="order-2 shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:text-avisdoc-ink sm:order-3"
-          >
-            <X className="size-5" />
-          </button>
-        )}
-      </div>
-      {open && <div className="border-t border-border px-5 pb-5 pt-4">{children}</div>}
-    </Card>
   );
 }
 
@@ -223,6 +140,13 @@ export default function ProjectView({
   useEffect(() => {
     void chargerOrigine();
   }, [chargerOrigine]);
+
+  const avancement = etapesDeVie({
+    trouveeLe: origine?.created_at ?? null,
+    approfondieLe: origine?.enriched_at ?? null,
+    pipeline: { colonne: client.stage, au: origine?.converted_at ?? null },
+    client: null,
+  });
 
   const clesHistorique = useMemo(() => ({ clientId: client.id, prospectId: origine?.id ?? null }), [client.id, origine?.id]);
 
@@ -391,246 +315,249 @@ export default function ProjectView({
   const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-avisdoc-ink/45 p-4 sm:p-6">
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-5xl min-w-0 flex-col gap-3 rounded-3xl bg-card p-5 shadow-floating sm:p-6"
-      >
-        {/* 1. Nom de la société et infos */}
-        <Section
-          titre={client.company}
-          actions={
-            <>
-              {/* Qui suit cette affaire — visible même section repliée. Le choix descend
-                  tout seul sur la fiche client le jour où elle est signée. */}
-              <ChoixReferent quoi="affaire" id={client.id} />
-              <QontoTag clientId={client.id} />
-              {editing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(false)}
-                    className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveEdit}
-                    className={btnAccent}
-                    style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 8, paddingBottom: 8 }}
-                  >
-                    Enregistrer
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" onClick={startEdit} className={btnOutline}>
-                    <Pencil className="size-3.5" /> Modifier
-                  </button>
-                  <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
-                </>
-              )}
-            </>
-          }
-          fermer={onClose}
-        >
+    <>
+      <FicheEntreprise
+        titre={client.company}
+        sousTitre={[origine?.activity ?? client.naf, [client.ville, origine?.department ? `(${origine.department})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—"}
+        notes={notesDe(origine)}
+        badge={client.aRepondu ? <Badge className="bg-emerald-100 text-emerald-700">A répondu</Badge> : undefined}
+        referent={
+          <>
+            {/* Qui suit cette affaire. Le choix descend tout seul sur la fiche client le jour où elle est signée. */}
+            <ChoixReferent quoi="affaire" id={client.id} />
+            <QontoTag clientId={client.id} />
+          </>
+        }
+        enHaut={
+          <>
           {editing ? (
-            <div className="flex flex-col gap-2">
-              <input
-                className={cn(inputCls, "font-semibold")}
-                placeholder="Raison sociale"
-                value={draft.company}
-                onChange={(e) => setDraft({ ...draft, company: e.target.value })}
-              />
-              <div className="flex flex-wrap gap-2">
-                <input
-                  className={cn(inputCls, "w-[130px]")}
-                  placeholder="SIREN"
-                  value={draft.siren}
-                  onChange={(e) => setDraft({ ...draft, siren: e.target.value })}
-                />
-                <input
-                  className={cn(inputCls, "min-w-0 flex-1")}
-                  placeholder="Activité (NAF)"
-                  value={draft.naf}
-                  onChange={(e) => setDraft({ ...draft, naf: e.target.value })}
-                />
-              </div>
-              {/* Le secteur sert à filtrer le Pipeline en travers des commerciaux.
-                  Repris du prospect quand l'affaire en vient, corrigeable ici. */}
-              <select
-                value={draft.secteur}
-                onChange={(e) => setDraft({ ...draft, secteur: e.target.value })}
-                aria-label="Secteur de l’affaire"
-                className={inputCls}
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors"
               >
-                <option value="">Secteur — non précisé</option>
-                {SECTEURS.map((sec) => (
-                  <option key={sec.id} value={sec.id}>
-                    {sec.label}
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                className={btnAccent}
+                style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 8, paddingBottom: 8 }}
+              >
+                Enregistrer
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={startEdit} className={btnOutline}>
+                <Pencil className="size-3.5" /> Modifier
+              </button>
+              <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
+            </>
+          )}
+          </>
+        }
+        identite={
+          <>
+
+        {editing ? (
+          <div className="flex flex-col gap-2">
+            <input
+              className={cn(inputCls, "font-semibold")}
+              placeholder="Raison sociale"
+              value={draft.company}
+              onChange={(e) => setDraft({ ...draft, company: e.target.value })}
+            />
+            <div className="flex flex-wrap gap-2">
+              <input
+                className={cn(inputCls, "w-[130px]")}
+                placeholder="SIREN"
+                value={draft.siren}
+                onChange={(e) => setDraft({ ...draft, siren: e.target.value })}
+              />
+              <input
+                className={cn(inputCls, "min-w-0 flex-1")}
+                placeholder="Activité (NAF)"
+                value={draft.naf}
+                onChange={(e) => setDraft({ ...draft, naf: e.target.value })}
+              />
+            </div>
+            {/* Le secteur sert à filtrer le Pipeline en travers des commerciaux.
+                Repris du prospect quand l'affaire en vient, corrigeable ici. */}
+            <select
+              value={draft.secteur}
+              onChange={(e) => setDraft({ ...draft, secteur: e.target.value })}
+              aria-label="Secteur de l’affaire"
+              className={inputCls}
+            >
+              <option value="">Secteur — non précisé</option>
+              {SECTEURS.map((sec) => (
+                <option key={sec.id} value={sec.id}>
+                  {sec.label}
+                </option>
+              ))}
+            </select>
+            <input
+              className={inputCls}
+              placeholder="Adresse (n° et voie)"
+              value={draft.rue}
+              onChange={(e) => setDraft({ ...draft, rue: e.target.value })}
+            />
+            <div className="flex flex-wrap gap-2">
+              <input
+                className={cn(inputCls, "w-[110px]")}
+                placeholder="Code postal"
+                value={draft.cp}
+                onChange={(e) => setDraft({ ...draft, cp: e.target.value })}
+              />
+              <input
+                className={cn(inputCls, "min-w-0 flex-1")}
+                placeholder="Ville"
+                value={draft.ville}
+                onChange={(e) => setDraft({ ...draft, ville: e.target.value })}
+              />
+            </div>
+
+            {/* Déplacer l'affaire. Une affaire n'est que dans un seul tableau : la
+                sortir d'ici, c'est la poser ailleurs, sur une colonne de là-bas. */}
+            <div className="mt-1 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+              <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</span>
+              <select
+                value={draft.pipelineId}
+                onChange={(e) => choisirPipeline(e.target.value)}
+                aria-label="Pipeline de l’affaire"
+                className={cn(inputCls, "w-auto font-semibold")}
+              >
+                {pipelines.map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.nom}
                   </option>
                 ))}
               </select>
-              <input
-                className={inputCls}
-                placeholder="Adresse (n° et voie)"
-                value={draft.rue}
-                onChange={(e) => setDraft({ ...draft, rue: e.target.value })}
-              />
-              <div className="flex flex-wrap gap-2">
-                <input
-                  className={cn(inputCls, "w-[110px]")}
-                  placeholder="Code postal"
-                  value={draft.cp}
-                  onChange={(e) => setDraft({ ...draft, cp: e.target.value })}
-                />
-                <input
-                  className={cn(inputCls, "min-w-0 flex-1")}
-                  placeholder="Ville"
-                  value={draft.ville}
-                  onChange={(e) => setDraft({ ...draft, ville: e.target.value })}
-                />
-              </div>
-
-              {/* Déplacer l'affaire. Une affaire n'est que dans un seul tableau : la
-                  sortir d'ici, c'est la poser ailleurs, sur une colonne de là-bas. */}
-              <div className="mt-1 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</span>
-                <select
-                  value={draft.pipelineId}
-                  onChange={(e) => choisirPipeline(e.target.value)}
-                  aria-label="Pipeline de l’affaire"
-                  className={cn(inputCls, "w-auto font-semibold")}
-                >
-                  {pipelines.map((pl) => (
-                    <option key={pl.id} value={pl.id}>
-                      {pl.nom}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Colonne</span>
-                <select
-                  value={draft.stage}
-                  onChange={(e) => setDraft({ ...draft, stage: e.target.value })}
-                  aria-label="Colonne de l’affaire"
-                  className={cn(inputCls, "w-auto font-semibold")}
-                >
-                  {colonnesDuBrouillon.map((st) => (
-                    <option key={st.id} value={st.label}>
-                      {st.label}
-                    </option>
-                  ))}
-                </select>
-                {draft.pipelineId !== client.pipelineId && (
-                  <span className="text-[12px] font-semibold text-avisdoc-teal">
-                    L’affaire quittera « {pipelines.find((pl) => pl.id === client.pipelineId)?.nom ?? "son pipeline"} »
-                  </span>
-                )}
-              </div>
-              {/* Une pastille, pas une étape : l'affaire reste dans sa colonne. */}
-              <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-avisdoc-ink">
-                <input
-                  type="checkbox"
-                  checked={draft.aRepondu}
-                  onChange={(e) => setDraft({ ...draft, aRepondu: e.target.checked })}
-                  className="size-4 accent-emerald-600"
-                />
-                A répondu
-              </label>
+              <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Colonne</span>
+              <select
+                value={draft.stage}
+                onChange={(e) => setDraft({ ...draft, stage: e.target.value })}
+                aria-label="Colonne de l’affaire"
+                className={cn(inputCls, "w-auto font-semibold")}
+              >
+                {colonnesDuBrouillon.map((st) => (
+                  <option key={st.id} value={st.label}>
+                    {st.label}
+                  </option>
+                ))}
+              </select>
+              {draft.pipelineId !== client.pipelineId && (
+                <span className="text-[12px] font-semibold text-avisdoc-teal">
+                  L’affaire quittera « {pipelines.find((pl) => pl.id === client.pipelineId)?.nom ?? "son pipeline"} »
+                </span>
+              )}
             </div>
-          ) : (
-            <div>
-              {client.aRepondu && <Badge className="mb-1.5 bg-emerald-100 text-emerald-700">A répondu</Badge>}
+            {/* Une pastille, pas une étape : l'affaire reste dans sa colonne. */}
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-avisdoc-ink">
+              <input
+                type="checkbox"
+                checked={draft.aRepondu}
+                onChange={(e) => setDraft({ ...draft, aRepondu: e.target.checked })}
+                className="size-4 accent-emerald-600"
+              />
+              A répondu
+            </label>
+          </div>
+        ) : (
+          <div>
+            {client.siren && (
               <div className="text-[12.5px] text-muted-foreground">
                 SIREN {client.siren} · {client.naf} —{" "}
                 <span className="font-bold text-blue-700">données Pappers ✓</span>
               </div>
-              <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
-            </div>
+            )}
+            <div className="mt-0.5 text-[12.5px] text-muted-foreground">{client.adresse}</div>
+          </div>
+        )}
+
+          </>
+        }
+        avancement={avancement}
+        onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))}
+        actif={tab}
+        onOnglet={setTab}
+        onClose={onClose}
+      >
+          {tab === "identite" && (
+            <>
+              <ResumeNotes cles={clesHistorique} />
+              <Bloc titre="Interlocuteurs">{ContactsTab()}</Bloc>
+              <Bloc titre="Documents">{DocumentsTab()}</Bloc>
+            </>
           )}
 
-        </Section>
+          {tab === "approche" && ApprocheTab()}
 
-        {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
-        <ParcoursBanner
-          clientId={client.id}
-          currentStage={client.stage}
-          // Comme en prospection : la fiche se referme et on voit la carte arriver
-          // dans sa nouvelle colonne.
-          onEtape={(s) => {
-            setClientStage(client.id, s);
-            onClose();
-          }}
-        />
+          {tab === "action" && (
+            <>
+    {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
+    <ParcoursBanner
+      clientId={client.id}
+      currentStage={client.stage}
+      // Comme en prospection : la fiche se referme et on voit la carte arriver
+      // dans sa nouvelle colonne.
+      onEtape={(s) => {
+        setClientStage(client.id, s);
+        onClose();
+      }}
+    />
 
-        {/* Onglets des fonctions (sous le bandeau) */}
-        <Card className="overflow-hidden">
-          <Onglets onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))} actif={tab} onChange={setTab} />
+              <Bloc titre="Agir maintenant">
+                <ActionsFiche
+                  cles={{ clientId: client.id }}
+                  onFait={() => setRelire((n) => n + 1)}
+                  relire={relire}
+                  onEcrireAvecMerx={origine ? () => demanderAMerx("email") : undefined}
+                />
+              </Bloc>
 
-          <div className="px-5 pb-5 pt-4">
-            {tab === "identite" && (
-              <>
-                <Bloc titre="Interlocuteurs">{ContactsTab()}</Bloc>
-                <Bloc titre="Documents">{DocumentsTab()}</Bloc>
-              </>
-            )}
+              <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
 
-            {tab === "approche" && ApprocheTab()}
+              {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
+              {verrou("Proposition") ? (
+                <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
+              ) : (
+                <>
+                  <Bloc titre="Proposition">{PropositionTab()}</Bloc>
+                  <Bloc>
+                    <DevisQonto clientId={client.id} />
+                  </Bloc>
+                </>
+              )}
 
-            {tab === "action" && (
-              <>
-                <Bloc titre="Agir maintenant">
-                  <ActionsFiche
-                    cles={{ clientId: client.id }}
-                    onFait={() => setRelire((n) => n + 1)}
-                    relire={relire}
-                    onEcrireAvecMerx={origine ? () => demanderAMerx("email") : undefined}
-                  />
-                </Bloc>
+              {verrou("Signé") ? (
+                <Verrouille etape="Signé" fonctions="L’espace client et les rendez-vous" />
+              ) : (
+                <>
+                  <Bloc>
+                    <EspaceClientCard bare clientId={client.id} clientName={client.company} />
+                  </Bloc>
+                  <Bloc>
+                    <RendezVousCard bare clientId={client.id} />
+                  </Bloc>
+                </>
+              )}
+            </>
+          )}
 
-                <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
-
-                {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
-                {verrou("Proposition") ? (
-                  <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
-                ) : (
-                  <>
-                    <Bloc titre="Proposition">{PropositionTab()}</Bloc>
-                    <Bloc>
-                      <DevisQonto clientId={client.id} />
-                    </Bloc>
-                  </>
-                )}
-
-                {verrou("Signé") ? (
-                  <Verrouille etape="Signé" fonctions="L’espace client et les rendez-vous" />
-                ) : (
-                  <>
-                    <Bloc>
-                      <EspaceClientCard bare clientId={client.id} clientName={client.company} />
-                    </Bloc>
-                    <Bloc>
-                      <RendezVousCard bare clientId={client.id} />
-                    </Bloc>
-                  </>
-                )}
-              </>
-            )}
-
-            {tab === "historique" && (
-              <>
-                <p className="mb-3 text-[12.5px] text-muted-foreground">
-                  Ce qui s’est passé, dans l’ordre. Rien ne s’y modifie : les actions se prennent dans l’onglet Action.
-                </p>
-                {/* Le fil reprend celui de la fiche Prospection d'origine : ce qui s'est
-                    dit avant le Pipeline (contacts, relances, commentaires) reste lisible. */}
-                <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
-              </>
-            )}
-          </div>
-        </Card>
-      </div>
+          {tab === "historique" && (
+            <>
+              <p className="mb-3 text-[12.5px] text-muted-foreground">
+                Ce qui s’est passé, dans l’ordre. Rien ne s’y modifie : les actions se prennent dans l’onglet Action.
+              </p>
+              {/* Le fil reprend celui de la fiche Prospection d'origine : ce qui s'est
+                  dit avant le Pipeline (contacts, relances, commentaires) reste lisible. */}
+              <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
+            </>
+          )}
+      </FicheEntreprise>
 
       {brouillon && (
         <BrouillonEmail
@@ -641,7 +568,7 @@ export default function ProjectView({
           onClose={() => setBrouillon(null)}
         />
       )}
-    </div>
+    </>
   );
 
   /** Ce que Merx avait trouvé, et ce qu’on peut encore lui demander. */

@@ -11,6 +11,9 @@ import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal, SectionLabel } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
 import Onglets, { type Onglet } from "../../components/Onglets";
+import FicheEntreprise from "../../components/FicheEntreprise";
+import ResumeNotes from "../../components/ResumeNotes";
+import { etapesDeVie, notesDe } from "../../lib/fiche";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
 import DossierCommercial, { dossierRempli } from "../../components/DossierCommercial";
@@ -231,6 +234,214 @@ export default function FicheClient({
     toast.success(fiche ? "Fiche enregistrée" : `${nom} ajouté au fichier client`);
     onClose();
   };
+
+  /** La fiche d'un client existant, en consultation : le même cadre que le prospect et l'affaire. */
+  if (fiche && mode === "lecture") {
+    return (
+      <>
+      <FicheEntreprise
+        titre={fiche.name}
+        sousTitre={
+          [fiche.sector, fiche.signedOn ? `client depuis le ${new Date(fiche.signedOn).toLocaleDateString("fr-FR")}` : null]
+            .filter(Boolean)
+            .join(" · ") || "Fiche client"
+        }
+        notes={notesDe(origine)}
+        referent={<ChoixReferent quoi="client" id={fiche.id} />}
+        enHaut={
+          <button
+            type="button"
+            onClick={() => setMode("edition")}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+          >
+            <Pencil className="size-3.5" /> Modifier
+          </button>
+        }
+        actions={
+          /* Une signature par erreur se défait : l'affaire repart au Pipeline. */
+          fiche.clientId && affaire ? (
+            <button
+              type="button"
+              onClick={() => void remettreAuPipeline()}
+              disabled={enCours !== null}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
+            >
+              {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+              Remettre au Pipeline
+            </button>
+          ) : undefined
+        }
+        avancement={etapesDeVie({
+          trouveeLe: origine?.created_at ?? null,
+          approfondieLe: origine?.enriched_at ?? null,
+          pipeline: affaire ? { colonne: affaire.stage, au: origine?.converted_at ?? null } : null,
+          client: { au: fiche.signedOn },
+        })}
+        onglets={onglets}
+        actif={onglet}
+        onOnglet={setOnglet}
+        onClose={onClose}
+      >
+        {onglet === "identite" && (
+        <div>
+        <ResumeNotes cles={clesHistorique} />
+        {/* Ce que l'affaire du Pipeline a établi. La fiche client ne le recopie pas :
+            elle le montre à sa source, pour qu'une correction là-bas se voie ici. */}
+        {affaire && (
+          <div className="mb-3 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+            <SectionLabel>Ce qu’on sait d’eux</SectionLabel>
+            <div className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {[
+                ["SIREN", affaire.siren],
+                ["Effectif", affaire.effectif],
+                ["Adresse", [affaire.adresse, affaire.codePostal, affaire.ville].filter(Boolean).join(" ")],
+                ["Journées vendues", affaire.jours ? String(affaire.jours) : ""],
+                ["Dépistés", affaire.depistes ? String(affaire.depistes) : ""],
+                ["Orientés", affaire.orientes ? String(affaire.orientes) : ""],
+              ]
+                .filter(([, v]) => v)
+                .map(([label, v]) => (
+                  <div key={label} className="flex gap-2 text-[13px]">
+                    <span className="shrink-0 text-muted-foreground">{label}</span>
+                    <span className="min-w-0 break-words font-semibold text-avisdoc-ink">{v}</span>
+                  </div>
+                ))}
+            </div>
+            {affaire.contacts.length > 0 && (
+              <div className="mt-3 border-t border-border pt-2.5">
+                <SectionLabel>Interlocuteur{affaire.contacts.length > 1 ? "s" : ""}</SectionLabel>
+                <div className="mt-1.5 space-y-1">
+                  {affaire.contacts.map((c) => (
+                    <div key={c.id} className="text-[13px] text-avisdoc-ink">
+                      <span className="font-semibold">{[c.prenom, c.nom].filter(Boolean).join(" ")}</span>
+                      {c.role && <span className="text-muted-foreground"> · {c.role}</span>}
+                      {c.email && (
+                        <a href={`mailto:${c.email}`} className="ml-2 text-avisdoc-teal underline-offset-2 hover:underline">
+                          {c.email}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="divide-y divide-border">
+          {accountFields.map((f) => {
+            const v = lire(f.key).trim();
+            const affichee =
+              v && f.type === "date" && !Number.isNaN(new Date(v).getTime())
+                ? new Date(v).toLocaleDateString("fr-FR")
+                : v;
+            return (
+              <div key={f.id} className="flex gap-3 px-4 py-2.5">
+                <div className="w-40 shrink-0 text-[12.5px] text-muted-foreground">{f.label}</div>
+                <div className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words text-[13px]", affichee ? "text-avisdoc-ink" : "text-muted-foreground/50")}>
+                  {affichee
+                    ? f.type === "email"
+                      ? <a href={`mailto:${affichee}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
+                      : f.type === "telephone"
+                        ? <a href={`tel:${affichee.replace(/\s/g, "")}`} className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
+                        : f.type === "lien"
+                          ? <a href={affichee} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">{affichee}</a>
+                          : affichee
+                    : "—"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        </div>
+        )}
+
+        {onglet === "action" && (
+          <div>
+            <ActionsFiche
+              cles={{ accountId: fiche?.id ?? null }}
+              suggestions={SUGGESTIONS}
+              onEcrireAvecMerx={fiche ? ecrireAvecMerx : undefined}
+              onFait={() => setRelire((n) => n + 1)}
+              relire={relire}
+            />
+          </div>
+        )}
+
+        {onglet === "approche" && (
+          <div>
+            {origine ? (
+              <>
+                {/* Approfondir vaut aussi pour un client : les effectifs changent, les
+                    dirigeants aussi, et le dossier sert à reproposer une campagne. */}
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border p-3">
+                  <button
+                    type="button"
+                    onClick={() => void approfondir()}
+                    disabled={enCours !== null}
+                    className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {enCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    {enCours === "approfondir"
+                      ? "Merx cherche… une bonne minute"
+                      : dossierRempli(origine.dossier)
+                        ? "Approfondir à nouveau"
+                        : "Approfondir"}
+                  </button>
+                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
+                    {dossierRempli(origine.dossier)
+                      ? "Remet à jour l’identité officielle, l’effectif et le dossier commercial."
+                      : "Va chercher l’identité officielle, l’effectif, les dirigeants, et monte le dossier commercial."}
+                  </span>
+                </div>
+                {souci && (
+                  <p className="mb-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p>
+                )}
+                {dossierRempli(origine.dossier) && <DossierCommercial dossier={origine.dossier} />}
+                {origine.rationale && (
+                  <div className="mb-4 rounded-2xl border border-l-4 border-border border-l-avisdoc-teal p-4">
+                    <SectionLabel>Pourquoi c’était un bon prospect</SectionLabel>
+                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-avisdoc-ink">{origine.rationale}</p>
+                    {origine.approach && (
+                      <p className="mt-3 text-[13.5px] leading-relaxed text-avisdoc-ink">
+                        <span className="font-semibold">Angle d’approche : </span>
+                        {origine.approach}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <SectionLabel>La note, critère par critère</SectionLabel>
+                <div className="mt-2">
+                  <NoteDetaillee total={origine.score_total} score={origine.score ?? {}} />
+                </div>
+              </>
+            ) : (
+              <p className="py-6 text-[13px] text-muted-foreground">
+                Cette fiche n’est pas venue de Merx : elle n’a ni note ni angle d’approche. Les fiches issues de la
+                prospection gardent ici ce que Merx avait trouvé.
+              </p>
+            )}
+          </div>
+        )}
+
+        {onglet === "suivi" && (
+          <div>
+            {/* Tout le fil de l'entreprise : avant d'être cliente, elle a été prospect puis affaire. */}
+            <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
+          </div>
+        )}
+      </FicheEntreprise>
+      {brouillon && (
+        <BrouillonEmail
+          nom={fiche.name}
+          objet={brouillon.objet}
+          corps={brouillon.corps}
+          destinataire={brouillon.destinataire}
+          onClose={() => setBrouillon(null)}
+        />
+      )}
+      </>
+    );
+  }
 
   return (
     <>
