@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, Undo2, X } from "lucide-react";
+import { Loader2, Pencil, Trash2, Undo2, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
@@ -17,6 +17,8 @@ import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
+import BoutonsFiche from "../../components/fiche/BoutonsFiche";
+import LigneIdentite from "../../components/fiche/LigneIdentite";
 import FilEchanges from "../../components/FilEchanges";
 import ActionsFiche from "../../components/ActionsFiche";
 import EspaceClientCard from "../../espace/EspaceClientCard";
@@ -24,6 +26,7 @@ import RendezVousCard from "../../espace/RendezVousCard";
 import BrouillonEmail from "../prospects/BrouillonEmail";
 import { approfondirProspect, redigerEmailClient } from "../../lib/merx-appels";
 import { confirmer } from "../../components/Confirmation";
+import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
 import { useAuth } from "../../auth/AuthContext";
 import type { GenreEchange } from "../../lib/echanges";
 import type { Jalon } from "../../lib/echanges";
@@ -59,7 +62,7 @@ export default function FicheClient({
   mode?: "lecture" | "edition";
   onClose: () => void;
 }) {
-  const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages, addProjectContact, removeProjectContact } = useAdminData();
+  const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages, addProjectContact, removeProjectContact, rafraichir } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("identite");
   const [origine, setOrigine] = useState<Prospect | null>(null);
@@ -279,6 +282,19 @@ export default function FicheClient({
   }));
   const interlocuteurs = [...contactsSaisis, ...personnesDuProspect(origine, contactsSaisis)];
 
+  /** Supprimer depuis la fiche, comme depuis la liste : confirmé, puis corbeille. */
+  const supprimer = async () => {
+    if (!fiche) return;
+    if (!(await confirmer({ titre: `Supprimer ${fiche.name} ?`, message: `Elle quitte le fichier client. Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` }))) return;
+    try {
+      await jeter("client", [fiche.id]);
+      await rafraichir();
+      onClose();
+    } catch (e) {
+      setSouci(e instanceof Error ? e.message : "La suppression a échoué.");
+    }
+  };
+
   if (fiche && mode === "lecture") {
     return (
       <>
@@ -292,6 +308,7 @@ export default function FicheClient({
         notes={notesDe(origine)}
         referent={<ChoixReferent quoi="client" id={fiche.id} />}
         enHaut={
+          <>
           <button
             type="button"
             onClick={() => setMode("edition")}
@@ -299,20 +316,43 @@ export default function FicheClient({
           >
             <Pencil className="size-3.5" /> Modifier
           </button>
+          <button
+            type="button"
+            onClick={() => void supprimer()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[12.5px] font-bold text-rose-700 transition-colors hover:border-rose-400"
+          >
+            <Trash2 className="size-3.5" /> Supprimer
+          </button>
+          </>
         }
+        identite={<LigneIdentite prospect={origine} siren={affaire?.siren} adresse={affaire?.adresse} />}
         actions={
-          /* Une signature par erreur se défait : l'affaire repart au Pipeline. */
-          fiche.clientId && affaire ? (
-            <button
-              type="button"
-              onClick={() => void remettreAuPipeline()}
-              disabled={enCours !== null}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
-            >
-              {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
-              Remettre au Pipeline
-            </button>
-          ) : undefined
+          <BoutonsFiche
+            etape={
+              /* Une signature par erreur se défait : l'affaire repart au Pipeline. */
+              fiche.clientId && affaire ? (
+                <button
+                  type="button"
+                  onClick={() => void remettreAuPipeline()}
+                  disabled={enCours !== null}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
+                >
+                  {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+                  Remettre au Pipeline
+                </button>
+              ) : undefined
+            }
+            approfondie={Boolean(origine?.enriched_at)}
+            onApprofondir={() =>
+              origine ? void approfondir() : setSouci("Cette fiche client n’est pas passée par Merx : il n’a rien à approfondir.")
+            }
+            // Un client s'écrit à partir de ce qu'on veut lui dire : cela se choisit dans Action.
+            onEcrire={() => setOnglet("action")}
+            enCours={enCours}
+          />
+        }
+        message={
+          souci ? <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p> : undefined
         }
         avancement={etapesDeVie({
           trouveeLe: origine?.created_at ?? null,
@@ -357,12 +397,7 @@ export default function FicheClient({
         )}
 
         {onglet === "approche" && (
-          <ApprocheEntreprise
-            origine={origine}
-            onApprofondir={() => void approfondir()}
-            enCours={enCours === "approfondir"}
-            erreur={souci}
-          />
+          <ApprocheEntreprise origine={origine} />
         )}
 
         {onglet === "suivi" && (
