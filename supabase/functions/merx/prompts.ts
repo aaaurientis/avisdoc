@@ -206,11 +206,11 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
 6. L'angle d'approche : une ou deux phrases pour proposer une campagne de dépistage à la personne que tu as mise en tête de « contacts », fondées sur les faits trouvés, sans promesse chiffrée. Si rien de précis n'a été trouvé, dis-le.
 
 7. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
-   • fiche_appel : les quatre lignes qu'il lit AVANT tout le reste, parce qu'elles suffisent à passer l'appel. Elles passent avant les arguments, avant les faits, avant l'accroche.
-     – numero : le numéro à composer, celui de l'ÉTABLISSEMENT concerné quand l'affaire porte sur une agence. Jamais vide si une page en publie un.
-     – qui_demander : la phrase exacte à dire au standard. « Le responsable QSE de l'agence de Hœrdt, s'il vous plaît » — pas « la direction », pas « le service compétent ».
-     – format_email : le format maison déduit d'une adresse nominative publique, avec la page qui l'a montrée. Vide si aucune adresse nominative n'a été vue : ne devine pas un format à partir du nom de domaine seul.
-     – si_on_insiste : la seconde porte, quand la première ne répond pas ou renvoie ailleurs. Une autre personne, un autre service, un autre établissement.
+   • les quatre lignes appel_* (la fiche d'appel), qu'il lit AVANT tout le reste, parce qu'elles suffisent à passer l'appel. Elles passent avant les arguments, avant les faits, avant l'accroche.
+     – appel_numero : le numéro à composer, celui de l'ÉTABLISSEMENT concerné quand l'affaire porte sur une agence. Jamais vide si une page en publie un.
+     – appel_qui_demander : la phrase exacte à dire au standard. « Le responsable QSE de l'agence de Hœrdt, s'il vous plaît » — pas « la direction », pas « le service compétent ».
+     – appel_format_email : le format maison déduit d'une adresse nominative publique, avec la page qui l'a montrée. Vide si aucune adresse nominative n'a été vue : ne devine pas un format à partir du nom de domaine seul.
+     – appel_si_on_insiste : la seconde porte, quand la première ne répond pas ou renvoie ailleurs. Une autre personne, un autre service, un autre établissement.
    • a_retenir : trois à six faits CONCRETS sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
    • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
    • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
@@ -283,28 +283,18 @@ export const ENRICH_SCHEMA = {
     dossier: {
       type: "object",
       additionalProperties: false,
-      required: ["fiche_appel", "a_retenir", "qui_aborder", "accroche", "arguments", "objections", "offre", "a_verifier"],
+      // La fiche d'appel est À PLAT (appel_*) : imbriquée, avec la recherche web, la
+      // grammaire du schéma dépasse ce que l'API accepte (400 « compiled grammar is too
+      // large ») — tous les approfondissements échouaient depuis le 01/10. Elle est
+      // remise en bloc `fiche_appel` à l'enregistrement (voir enregistrerDossier).
+      required: ["appel_numero", "appel_qui_demander", "appel_format_email", "appel_si_on_insiste", "a_retenir", "qui_aborder", "accroche", "arguments", "objections", "offre", "a_verifier"],
       properties: {
-        /**
-         * Les quatre lignes qui suffisent à passer l'appel.
-         *
-         * Le reste du dossier sert à tenir la conversation ; celles-ci servent à
-         * l'obtenir. Un commercial qui appelle l'agence et demande le bon service
-         * apprend en trente secondes ce qu'aucune recherche ne publie.
-         */
-        fiche_appel: {
-          type: "object",
-          additionalProperties: false,
-          required: ["numero", "qui_demander", "format_email", "si_on_insiste"],
-          properties: {
-            numero: { type: "string" },
-            qui_demander: { type: "string" },
-            /** « prenom.nom@domaine.fr, d'après X relevé sur telle page ». Jamais deviné. */
-            format_email: { type: "string" },
-            si_on_insiste: { type: "string" },
-          },
-        },
-        /** Ce qu'on a appris d'elle et qu'aucun registre ne dit. */
+        // Les quatre lignes qui suffisent à passer l'appel : le reste du dossier sert à
+        // tenir la conversation, celles-ci servent à l'obtenir.
+        appel_numero: { type: "string" },
+        appel_qui_demander: { type: "string" },
+        appel_format_email: { type: "string" },
+        appel_si_on_insiste: { type: "string" },
         a_retenir: { type: "array", items: { type: "string" } },
         qui_aborder: { type: "string" },
         /** La première phrase, celle qu'on dit au téléphone. */
@@ -354,7 +344,10 @@ export interface EnrichOut {
   contact_confirme: Preuve;
   angle_approche: string;
   dossier: {
-    fiche_appel: { numero: string; qui_demander: string; format_email: string; si_on_insiste: string };
+    appel_numero: string;
+    appel_qui_demander: string;
+    appel_format_email: string;
+    appel_si_on_insiste: string;
     a_retenir: string[];
     qui_aborder: string;
     accroche: string;
@@ -1018,4 +1011,14 @@ export function resumePrompt(nom: string, notes: { au: string; titre: string; de
     .map((n) => `— ${new Date(n.au).toLocaleDateString("fr-FR")} · ${n.titre}\n${n.detail}`)
     .join("\n\n");
   return `Entreprise : ${nom}\n\nNotes du commercial, de la plus ancienne à la plus récente :\n\n${lignes}`;
+}
+
+/** Le dossier tel que la fiche l'affiche : la fiche d'appel remise en bloc. */
+export function enregistrerDossier(d: EnrichOut["dossier"] | null | undefined) {
+  if (!d) return null;
+  const { appel_numero, appel_qui_demander, appel_format_email, appel_si_on_insiste, ...reste } = d;
+  return {
+    fiche_appel: { numero: appel_numero, qui_demander: appel_qui_demander, format_email: appel_format_email, si_on_insiste: appel_si_on_insiste },
+    ...reste,
+  };
 }
