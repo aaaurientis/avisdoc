@@ -3,7 +3,7 @@
 // sans jamais être supprimée.
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { ArrowUpDown, Check, Loader2, Mail, Pencil, Phone, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUpDown, Check, Download, Loader2, Mail, Pencil, Phone, Plus, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
 import NouveauProspect from "./prospects/NouveauProspect";
+import ImportProspection from "./prospects/ImportProspection";
+import { COLONNES_MODELE } from "../lib/import-prospection";
 import FiltresProspects, { FILTRES_VIDES, retenue, type Filtres } from "./prospects/FiltresProspects";
 import { coutMoyen, euroDollar, type Consommation } from "../lib/couts";
 import { jeter, JOURS_DE_GARDE } from "../lib/corbeille";
@@ -133,6 +135,7 @@ export default function Prospects() {
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
+  const [importOuvert, setImportOuvert] = useState(false);
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
   // Plus de kanban en Prospection : une recherche au registre rend des dizaines, voire
   // des centaines d'entreprises, et en colonnes on ne retrouve plus rien. La liste se
@@ -569,17 +572,56 @@ export default function Prospects() {
     [charger],
   );
 
+  /**
+   * Export de ce qui est affiché, aux colonnes du modèle d'import : le fichier
+   * exporté se réimporte tel quel. L'historique, lui, reste dans les fiches.
+   */
+  const exporter = async () => {
+    const XLSX = await import("xlsx");
+    const lignes = visibles.map((p) => {
+      const [prenom, ...nom] = (p.contact_name ?? "").trim().split(" ");
+      const valeurs: Partial<Record<(typeof COLONNES_MODELE)[number], string>> = {
+        "Date enreg": new Date(p.created_at).toLocaleDateString("fr-FR"),
+        "Raison sociale": p.name,
+        Nom: nom.join(" "),
+        Prénom: prenom ?? "",
+        Fonction: p.contact_role ?? "",
+        "E-mail": p.contact_email ?? "",
+        Téléphone: p.contact_phone ?? "",
+        Département: p.department ?? "",
+        Structure: secteurLisible(p.sector),
+      };
+      return Object.fromEntries(COLONNES_MODELE.map((c) => [c, valeurs[c] ?? ""]));
+    });
+    const feuille = XLSX.utils.json_to_sheet(lignes, { header: [...COLONNES_MODELE] });
+    const classeur = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(classeur, feuille, "Prospection");
+    XLSX.writeFile(classeur, `prospection-avisdoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const boutonSecondaire =
+    "inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal max-sm:hidden";
+
   return (
     <div>
       <PageHeader
         action={
-          <button
-            type="button"
-            onClick={() => setAjout(true)}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
-          >
-            <Plus className="size-4" /> Ajouter un prospect
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Importer et exporter un tableur se fait devant un ordinateur, comme en Clients. */}
+            <button type="button" onClick={() => setImportOuvert(true)} className={boutonSecondaire}>
+              <Upload className="size-4" /> Importer
+            </button>
+            <button type="button" onClick={() => void exporter()} className={boutonSecondaire}>
+              <Download className="size-4" /> Exporter
+            </button>
+            <button
+              type="button"
+              onClick={() => setAjout(true)}
+              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            >
+              <Plus className="size-4" /> Ajouter un prospect
+            </button>
+          </div>
         }
         title="Prospection"
         subtitle={
@@ -801,6 +843,8 @@ export default function Prospects() {
           onCree={charger}
         />
       )}
+
+      {importOuvert && <ImportProspection existantes={prospects} onClose={() => setImportOuvert(false)} onFini={charger} />}
 
       {fiche && (
         <ProspectFiche

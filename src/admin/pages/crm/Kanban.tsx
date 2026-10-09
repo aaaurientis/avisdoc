@@ -154,6 +154,7 @@ export default function Kanban({
                     <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
                       {[origines?.get(c.id)?.activity ?? c.naf, c.ville].filter(Boolean).join(" · ") || "—"}
                     </div>
+                    {c.aRepondu && <Badge className="mt-1.5 bg-emerald-100 text-emerald-700">A répondu</Badge>}
                     {origines?.get(c.id)?.rationale && (
                       <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
                         {origines.get(c.id)!.rationale}

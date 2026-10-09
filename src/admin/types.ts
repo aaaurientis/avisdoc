@@ -138,6 +138,8 @@ export interface Client {
   referent?: string | null;
   /** La fiche du fichier client a déjà été créée : ne pas la recréer. */
   ficheClientCreee?: boolean;
+  /** Le contact a répondu : une pastille sur la carte, pas une étape (migration 0065). */
+  aRepondu?: boolean;
   jours: number;
   tarif: number;
   depistes: number;
