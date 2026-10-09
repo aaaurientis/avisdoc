@@ -5,7 +5,7 @@ import type { Client, Stage } from "../../types";
 import { euro, frDate, initials, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
-import { Avatar, Card } from "../../components/ui";
+import { Avatar, Badge, Card } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
 import DangerZone from "../../espace/DangerZone";
@@ -174,7 +174,7 @@ export default function ProjectView({
   // « ?modifier=1 » : le crayon d'une carte ouvre la fiche prête à être corrigée.
   const [chercheur] = useSearchParams();
   const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
-  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "", referent: "" });
+  const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "", referent: "", aRepondu: false });
   const [nc, setNc] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ndName, setNdName] = useState("");
   const [ns, setNs] = useState({ text: "", deadline: "" });
@@ -329,7 +329,7 @@ export default function ProjectView({
       company: client.company, siren: client.siren, naf: client.naf,
       rue: p.rue, cp: client.codePostal || p.cp, ville: client.ville || p.ville,
       pipelineId: client.pipelineId, stage: client.stage, secteur: client.secteur ?? "",
-      referent: client.referent ?? "",
+      referent: client.referent ?? "", aRepondu: Boolean(client.aRepondu),
     });
     setEditing(true);
   };
@@ -343,6 +343,8 @@ export default function ProjectView({
       // colonne qui n'appartient pas au pipeline retenu.
       pipelineId: draft.pipelineId, stage: draft.stage, secteur: draft.secteur || null,
       referent: draft.referent || null,
+      // Envoyée seulement si elle change : la colonne naît avec la migration 0065.
+      ...(draft.aRepondu !== Boolean(client.aRepondu) ? { aRepondu: draft.aRepondu } : {}),
     });
     setEditing(false);
   };
@@ -524,9 +526,20 @@ export default function ProjectView({
                   </span>
                 )}
               </div>
+              {/* Une pastille, pas une étape : l'affaire reste dans sa colonne. */}
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-avisdoc-ink">
+                <input
+                  type="checkbox"
+                  checked={draft.aRepondu}
+                  onChange={(e) => setDraft({ ...draft, aRepondu: e.target.checked })}
+                  className="size-4 accent-emerald-600"
+                />
+                A répondu
+              </label>
             </div>
           ) : (
             <div>
+              {client.aRepondu && <Badge className="mb-1.5 bg-emerald-100 text-emerald-700">A répondu</Badge>}
               <div className="text-[12.5px] text-muted-foreground">
                 SIREN {client.siren} · {client.naf} —{" "}
                 <span className="font-bold text-blue-700">données Pappers ✓</span>

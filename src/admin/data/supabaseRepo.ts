@@ -163,6 +163,7 @@ export class SupabaseRepo implements AdminRepo {
       secteur: r.secteur ?? null,
       referent: r.referent ?? null,
       ficheClientCreee: r.fiche_client_creee ?? false,
+      aRepondu: r.a_repondu ?? false,
       jours: r.jours ?? 1,
       tarif: r.tarif ?? 0,
       depistes: r.depistes ?? 0,
@@ -265,6 +266,8 @@ export class SupabaseRepo implements AdminRepo {
       effectif: c.effectif, stage: c.stage, pipeline_id: c.pipelineId || undefined,
       secteur: c.secteur ?? null, jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,
+      // Posée seulement quand elle vaut : une création ordinaire ne dépend pas de la 0065.
+      ...(c.aRepondu ? { a_repondu: true } : {}),
     });
     this.assert(error);
     for (const pc of c.contacts) await this.addProjectContact(c.id, pc);
@@ -274,7 +277,7 @@ export class SupabaseRepo implements AdminRepo {
 
   async updateClientFields(id: string, fields: Partial<Client>): Promise<void> {
     const row: Record<string, unknown> = {};
-    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee", pipelineId: "pipeline_id" };
+    const map: Record<string, string> = { statutPropo: "statut_propo", codePostal: "code_postal", ficheClientCreee: "fiche_client_creee", pipelineId: "pipeline_id", aRepondu: "a_repondu" };
     for (const [k, v] of Object.entries(fields)) {
       if (["contacts", "docs", "suivis"].includes(k)) continue;
       row[map[k] ?? k] = v;
