@@ -35,6 +35,7 @@ import type {
 import { docStoragePath, extFromName, humanSize, todayLabel, uid } from "../lib/format";
 import { ADMIN_BACKEND } from "../lib/config";
 import { etapeQuiSigne, STAGES_DEFAUT } from "../lib/ui-tokens";
+import { deplacerColonne, nomPris, positionSuivante } from "../lib/colonnes";
 import { logAudit } from "../lib/audit";
 import { MockRepo, type AdminRepo, type AdminSnapshot } from "./repo";
 import { SupabaseRepo } from "./supabaseRepo";
@@ -767,15 +768,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (!propre) return;
       setStages((prev) => {
         // L'unicité vaut DANS un tableau : deux pipelines peuvent avoir leur « Signé ».
-        const duTableau = prev.filter((s) => s.pipelineId === pipelineId);
-        if (duTableau.some((s) => s.label.toLowerCase() === propre.toLowerCase())) {
+        if (nomPris(prev, pipelineId, propre)) {
           toast.error("Une colonne porte déjà ce nom dans ce pipeline.");
           return prev;
         }
         const stage: PipelineStage = {
           id: crypto.randomUUID(),
           label: propre,
-          position: (duTableau.at(-1)?.position ?? 0) + 1,
+          position: positionSuivante(prev, pipelineId),
           tone,
           pipelineId,
         };
@@ -793,7 +793,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       setStages((prev) => {
         const stage = prev.find((s) => s.id === id);
         if (!stage || stage.label === propre) return prev;
-        if (prev.some((s) => s.id !== id && s.label.toLowerCase() === propre.toLowerCase())) {
+        if (nomPris(prev, stage.pipelineId, propre, id)) {
           toast.error("Une colonne porte déjà ce nom dans ce pipeline.");
           return prev;
         }
@@ -841,14 +841,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const moveStage: DataValue["moveStage"] = useCallback(
     (id, sens) => {
       setStages((prev) => {
-        const i = prev.findIndex((s) => s.id === id);
-        const j = i + sens;
-        if (i < 0 || j < 0 || j >= prev.length) return prev;
-        const suite = [...prev];
-        [suite[i], suite[j]] = [suite[j], suite[i]];
-        const ordonne = suite.map((s, k) => ({ ...s, position: k + 1 }));
-        persist(() => repo.reorderStages(ordonne.map((s) => ({ id: s.id, position: s.position }))));
-        return ordonne;
+        // Borné au pipeline de la colonne : les autres tableaux gardent leur ordre.
+        const r = deplacerColonne(prev, id, sens);
+        if (!r) return prev;
+        persist(() => repo.reorderStages(r.aEcrire));
+        return r.stages;
       });
     },
     [persist, repo],
