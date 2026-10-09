@@ -20,6 +20,7 @@ import { uid } from "../../lib/format";
 import { TONES } from "../../lib/ui-tokens";
 import type { Pipeline, PipelineStage, StageTone } from "../../types";
 import { cn } from "@/lib/utils";
+import { estGeneral } from "../../lib/pipeline-general";
 
 /** Les colonnes proposées à la création : celles d'un pipeline commercial ordinaire. */
 const COLONNES_PROPOSEES: { label: string; tone: StageTone }[] = [
@@ -45,13 +46,10 @@ const champCls =
 export default function BarrePipelines({
   actif,
   onChoisir,
-  onToutes,
   commerciaux,
 }: {
-  /** null quand on regarde « Toutes les affaires ». */
   actif: Pipeline | null;
   onChoisir: (p: Pipeline) => void;
-  onToutes: () => void;
   /** Ceux à qui on peut assigner un tableau. */
   commerciaux: string[];
 }) {
@@ -138,24 +136,9 @@ export default function BarrePipelines({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {/* Retrouver une affaire sans savoir dans quel tableau elle est rangée :
-            sans cet onglet, il fallait les ouvrir un par un. */}
-        <button
-          type="button"
-          onClick={onToutes}
-          className={cn(
-            "rounded-full px-4 py-2 text-[13px] font-bold transition-colors",
-            actif === null ? "bg-avisdoc-ink text-white" : "border border-border bg-card text-avisdoc-ink hover:border-avisdoc-teal",
-          )}
-        >
-          Tous
-          <span className={cn("ml-1.5 text-[11.5px] font-semibold", actif === null ? "opacity-80" : "text-muted-foreground")}>
-            {clients.length}
-          </span>
-        </button>
-
         {pipelines.map((p) => {
-          const combien = clients.filter((c) => c.pipelineId === p.id).length;
+          // Général est la vue d'ensemble : il compte toutes les affaires.
+          const combien = estGeneral(p) ? clients.length : clients.filter((c) => c.pipelineId === p.id).length;
           return (
             <span
               key={p.id}
