@@ -854,6 +854,7 @@ export default function Prospects() {
           onEcarter={ecarter}
           onMettreAuPipeline={mettreAuPipeline}
           onRedigerEmail={redigerEmail}
+          onModifier={(q) => setAModifier(q)}
           couts={couts}
           demandeOrigine={demandes.find((d) => d.id === fiche.found_by)?.request ?? null}
           brouillons={brouillonsDeLaFiche}
