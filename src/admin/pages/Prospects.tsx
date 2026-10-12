@@ -852,7 +852,7 @@ export default function Prospects() {
           onClose={() => setOuverte(null)}
           onApprofondir={approfondir}
           onEcarter={ecarter}
-          onMettreAuPipeline={mettreAuPipeline}
+          onActualiser={charger}
           onRedigerEmail={redigerEmail}
           onModifier={(q) => setAModifier(q)}
           couts={couts}

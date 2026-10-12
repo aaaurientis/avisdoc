@@ -73,14 +73,17 @@ export default function Crm() {
   const [coches, setCoches] = useState<Set<string>>(new Set());
   const [prevues, setPrevues] = useState<Map<string, Prevu>>(new Map());
 
-  /** Ce qui attend sur chaque affaire : une action notée doit se voir depuis le tableau. */
+  /**
+   * Ce qui attend sur chaque affaire : une action notée doit se voir depuis le tableau.
+   * Relu aussi à la fermeture d'une fiche : on vient peut-être d'y programmer un rendez-vous.
+   */
   useEffect(() => {
     let vivant = true;
     void actionsPrevues().then((m) => vivant && setPrevues(m));
     return () => {
       vivant = false;
     };
-  }, [clients]);
+  }, [clients, clientId]);
 
   const cocher = (id: string) =>
     setCoches((prev) => {

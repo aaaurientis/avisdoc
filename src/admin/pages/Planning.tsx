@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarClock, ChevronLeft, ChevronRight, Eye, ListTodo, Loader2, Mail, NotebookPen, Pencil, Phone, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, FileText, Linkedin, ListTodo, Loader2, Mail, MessageSquare, NotebookPen, Pencil, Phone, Plus, Presentation, Store, Trash2 } from "lucide-react";
 import { PageHeader, SectionLabel } from "../components/ui";
 import { LIBELLE, type Origine } from "../lib/corbeille";
 import { chargerPlanning, lundiDe, memeJour, type Rendezvous } from "../lib/planning";
@@ -17,7 +17,7 @@ import ApercuFiche from "../components/ApercuFiche";
 import ProjectView from "./crm/ProjectView";
 import FicheClient from "./clients/FicheClient";
 import { useAdminData } from "../data/AdminDataContext";
-import { supprimerEchange } from "../lib/echanges";
+import { estColonneRdv, supprimerEchange } from "../lib/echanges";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
 
@@ -27,6 +27,11 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   rdv: CalendarClock,
   tache: ListTodo,
   note: NotebookPen,
+  presentation: Presentation,
+  salon: Store,
+  sms: MessageSquare,
+  linkedin: Linkedin,
+  devis: FileText,
 };
 
 const TEINTES: Record<GenreEchange, string> = {
@@ -35,9 +40,25 @@ const TEINTES: Record<GenreEchange, string> = {
   email: "bg-violet-500 text-white",
   tache: "bg-amber-500 text-white",
   note: "bg-slate-500 text-white",
+  presentation: "bg-sky-600 text-white",
+  salon: "bg-emerald-600 text-white",
+  sms: "bg-teal-600 text-white",
+  linkedin: "bg-blue-600 text-white",
+  devis: "bg-indigo-500 text-white",
 };
 
-const NOMS: Record<GenreEchange, string> = { appel: "appel", rdv: "rendez-vous", email: "e-mail", tache: "à faire", note: "note" };
+const NOMS: Record<GenreEchange, string> = {
+  appel: "appel",
+  rdv: "rendez-vous",
+  email: "e-mail",
+  tache: "à faire",
+  note: "note",
+  presentation: "présentation",
+  salon: "salon",
+  sms: "SMS",
+  linkedin: "LinkedIn",
+  devis: "devis",
+};
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -65,7 +86,7 @@ export default function Planning() {
   const [aModifier, setAModifier] = useState<Rendezvous | null>(null);
   const [aVoir, setAVoir] = useState<Rendezvous | null>(null);
   const [ajout, setAjout] = useState(false);
-  const { clients, accounts } = useAdminData();
+  const { clients, accounts, setClientStage } = useAdminData();
 
   // La fiche s'ouvre telle qu'elle est ailleurs — mêmes onglets, mêmes actions.
   const affaireVue = aVoir?.origine === "affaire" ? clients.find((c) => c.id === aVoir.ficheId) : undefined;
@@ -74,11 +95,17 @@ export default function Planning() {
   const supprimer = async (a: Rendezvous) => {
     if (!(await confirmer({ titre: `Supprimer « ${a.titre} » ?`, message: "Cette action disparaîtra du planning et de la fiche." }))) return;
     try {
-      await supprimerEchange(a.id);
-      await charger();
+      await apresSuppression(await supprimerEchange(a.id));
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
     }
+  };
+
+  /** Un rendez-vous retiré : l'affaire qu'il avait passée en « RDV » retourne dans sa colonne d'avant. */
+  const apresSuppression = async (retour?: { clientId: string; colonne: string } | null) => {
+    const affaire = retour ? clients.find((c) => c.id === retour.clientId) : undefined;
+    if (retour && affaire && estColonneRdv(affaire.stage)) setClientStage(retour.clientId, retour.colonne);
+    await charger();
   };
 
   // La lecture s'arrête au vendredi soir : ce qui tombe le week-end n'est pas montré,
@@ -226,8 +253,8 @@ export default function Planning() {
                           key={a.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setAModifier(a)}
-                          onKeyDown={(e) => e.key === "Enter" && setAModifier(a)}
+                          onClick={() => (a.modifiable ? setAModifier(a) : a.fiche && setAVoir(a))}
+                          onKeyDown={(e) => e.key === "Enter" && (a.modifiable ? setAModifier(a) : a.fiche && setAVoir(a))}
                           className="group flex w-full cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-avisdoc-teal"
                         >
                           <span className={cn("mt-0.5 inline-flex size-[26px] shrink-0 items-center justify-center rounded-full", TEINTES[a.kind])}>
@@ -238,6 +265,7 @@ export default function Planning() {
                               <span className="font-mono text-[12.5px] font-bold text-avisdoc-ink">{heure(a.au)}</span>
                               <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
                                 {NOMS[a.kind]}
+                                {!a.modifiable && " · fait"}
                               </span>
                             </span>
                             <span className="mt-1 line-clamp-2 [display:-webkit-box] text-[13px] font-semibold leading-snug text-avisdoc-ink">
@@ -269,6 +297,8 @@ export default function Planning() {
                                 <Eye className="size-3.5" />
                               </button>
                             )}
+                            {a.modifiable && (
+                            <>
                             <button
                               type="button"
                               onClick={() => setAModifier(a)}
@@ -287,6 +317,8 @@ export default function Planning() {
                             >
                               <Trash2 className="size-3.5" />
                             </button>
+                            </>
+                            )}
                           </span>
                         </div>
                       );
@@ -337,7 +369,7 @@ export default function Planning() {
             par: aModifier.par,
           }}
           onClose={() => setAModifier(null)}
-          onFait={charger}
+          onFait={apresSuppression}
         />
       )}
     </div>

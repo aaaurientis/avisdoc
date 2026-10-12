@@ -3,24 +3,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, Trash2, Undo2, X } from "lucide-react";
+import { Loader2, Pencil, Search, Trash2, Undo2, X } from "lucide-react";
 import type { Account, AccountField } from "../../types";
 import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
-import type { Onglet } from "../../components/Onglets";
 import FicheEntreprise from "../../components/FicheEntreprise";
-import ResumeNotes from "../../components/ResumeNotes";
-import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
+import { notesDe, personnesDuProspect } from "../../lib/fiche";
+import ColonneEntreprise, { etablissementDe } from "../../components/fiche/ColonneEntreprise";
+import OngletActions from "../../components/fiche/OngletActions";
+import DevisQonto from "../../espace/DevisQonto";
+import { quandCourt } from "../../lib/actions-fiche";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
-import BoutonsFiche from "../../components/fiche/BoutonsFiche";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
-import FilEchanges from "../../components/FilEchanges";
-import ActionsFiche from "../../components/ActionsFiche";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
 import BrouillonEmail from "../prospects/BrouillonEmail";
@@ -64,12 +63,11 @@ export default function FicheClient({
 }) {
   const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages, addProjectContact, removeProjectContact, rafraichir } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
-  const [onglet, setOnglet] = useState("identite");
+  const [onglet, setOnglet] = useState("actions");
   const [origine, setOrigine] = useState<Prospect | null>(null);
-  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
-  const [relire, setRelire] = useState(0);
+  const [nbAVenir, setNbAVenir] = useState(0);
   const [brouillon, setBrouillon] = useState<{ objet: string; corps: string; destinataire: string | null } | null>(null);
-  const compter = useCallback((n: number) => setNbEchanges(n), []);
+  const compter = useCallback((n: number) => setNbAVenir(n), []);
   const { user } = useAuth();
   const [enCours, setEnCours] = useState<"approfondir" | "pipeline" | null>(null);
   const [souci, setSouci] = useState<string | null>(null);
@@ -165,12 +163,6 @@ export default function FicheClient({
   /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
   const affaire = fiche?.clientId ? getClient(fiche.clientId) : undefined;
 
-  const onglets: Onglet[] = [
-    { cle: "identite", label: "Identité" },
-    { cle: "approche", label: "Approche" },
-    { cle: "action", label: "Action" },
-    { cle: "suivi", label: "Historique", compte: nbEchanges },
-  ];
   const [valeurs, setValeurs] = useState<Record<string, string>>(() => {
     if (!fiche) return { date_client: new Date().toISOString().slice(0, 10) };
     return {
@@ -299,111 +291,121 @@ export default function FicheClient({
     return (
       <>
       <FicheEntreprise
-        titre={fiche.name}
-        sousTitre={
-          [fiche.sector, fiche.signedOn ? `client depuis le ${new Date(fiche.signedOn).toLocaleDateString("fr-FR")}` : null]
-            .filter(Boolean)
-            .join(" · ") || "Fiche client"
+        colonne={
+          <ColonneEntreprise
+            titre={fiche.name}
+            sousTitre={fiche.sector || "Fiche client"}
+            identite={<LigneIdentite prospect={origine} siren={affaire?.siren} adresse={affaire?.adresse} />}
+            notes={notesDe(origine)}
+            place={
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-[34px] items-center rounded-full bg-avisdoc-teal px-3.5 text-[13px] font-semibold text-white">
+                  Client{fiche.signedOn ? ` depuis le ${new Date(fiche.signedOn).toLocaleDateString("fr-FR")}` : ""}
+                </span>
+                {/* Une signature par erreur se défait : l'affaire repart au Pipeline. */}
+                {fiche.clientId && affaire && (
+                  <button
+                    type="button"
+                    onClick={() => void remettreAuPipeline()}
+                    disabled={enCours !== null}
+                    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-muted-foreground underline-offset-2 hover:text-avisdoc-coral hover:underline disabled:opacity-60"
+                  >
+                    {enCours === "pipeline" ? <Loader2 className="size-3.5 animate-spin" /> : <Undo2 className="size-3.5" />}
+                    Remettre au Pipeline
+                  </button>
+                )}
+              </div>
+            }
+            referent={<ChoixReferent quoi="client" id={fiche.id} />}
+            inscrite={origine ? `Trouvée le ${quandCourt(origine.created_at)} par Merx` : null}
+            interlocuteurs={
+              <Interlocuteurs
+                personnes={interlocuteurs}
+                onAjouter={affaire ? (x) => addProjectContact(affaire.id, x) : undefined}
+                onRetirer={affaire ? (id) => removeProjectContact(affaire.id, id) : undefined}
+              />
+            }
+            etablissement={ceQueSaitLeClient}
+            manquants={origine ? etablissementDe(origine).manquants : []}
+            onCompleter={() => setMode("edition")}
+          />
         }
-        notes={notesDe(origine)}
-        referent={<ChoixReferent quoi="client" id={fiche.id} />}
+        onglets={[
+          { cle: "actions", label: nbAVenir ? `Actions · ${nbAVenir} à venir` : "Actions" },
+          { cle: "dossier", label: "Dossier", etoile: Boolean(origine?.enriched_at) },
+          { cle: "devis", label: "Devis" },
+        ]}
+        actif={onglet}
+        onOnglet={setOnglet}
         enHaut={
-          <>
           <button
             type="button"
             onClick={() => setMode("edition")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+            className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
           >
-            <Pencil className="size-3.5" /> Modifier
+            <Pencil className="size-3.5" /> Modifier la fiche
           </button>
-          <button
-            type="button"
-            onClick={() => void supprimer()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[12.5px] font-bold text-rose-700 transition-colors hover:border-rose-400"
-          >
-            <Trash2 className="size-3.5" /> Supprimer
-          </button>
-          </>
-        }
-        identite={<LigneIdentite prospect={origine} siren={affaire?.siren} adresse={affaire?.adresse} />}
-        actions={
-          <BoutonsFiche
-            etape={
-              /* Une signature par erreur se défait : l'affaire repart au Pipeline. */
-              fiche.clientId && affaire ? (
-                <button
-                  type="button"
-                  onClick={() => void remettreAuPipeline()}
-                  disabled={enCours !== null}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-coral hover:text-avisdoc-coral disabled:opacity-60"
-                >
-                  {enCours === "pipeline" ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
-                  Remettre au Pipeline
-                </button>
-              ) : undefined
-            }
-            approfondie={Boolean(origine?.enriched_at)}
-            onApprofondir={() =>
-              origine ? void approfondir() : setSouci("Cette fiche client n’est pas passée par Merx : il n’a rien à approfondir.")
-            }
-            // Un client s'écrit à partir de ce qu'on veut lui dire : cela se choisit dans Action.
-            onEcrire={() => setOnglet("action")}
-            enCours={enCours}
-          />
         }
         message={
-          souci ? <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p> : undefined
+          souci ? <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p> : undefined
         }
-        avancement={etapesDeVie({
-          trouveeLe: origine?.created_at ?? null,
-          approfondieLe: origine?.enriched_at ?? null,
-          pipeline: affaire ? { colonne: affaire.stage, au: origine?.converted_at ?? null } : null,
-          client: { au: fiche.signedOn },
-        })}
-        onglets={onglets}
-        actif={onglet}
-        onOnglet={setOnglet}
         onClose={onClose}
       >
-        {onglet === "identite" && (
-        <div>
-        <ResumeNotes cles={clesHistorique} />
-        <CeQuOnSait prospect={origine} enPlus={ceQueSaitLeClient} />
-        <Interlocuteurs
-          personnes={interlocuteurs}
-          onAjouter={affaire ? (x) => addProjectContact(affaire.id, x) : undefined}
-          onRetirer={affaire ? (id) => removeProjectContact(affaire.id, id) : undefined}
-        />
+        {/* Toujours monté : le compte des actions à venir reste juste sur les autres onglets. */}
+        <div className={onglet === "actions" ? "" : "hidden"}>
+          <OngletActions
+            cles={clesHistorique}
+            personnes={interlocuteurs.map((q) => q.nom)}
+            etape={null}
+            jalons={jalons}
+            suggestions={SUGGESTIONS}
+            onEcrireAvecMerx={ecrireAvecMerx}
+            onCompte={compter}
+          />
         </div>
-        )}
 
-        {onglet === "action" && (
-          <div>
-            <ActionsFiche
-              cles={{ accountId: fiche?.id ?? null }}
-              suggestions={SUGGESTIONS}
-              onEcrireAvecMerx={fiche ? ecrireAvecMerx : undefined}
-              onFait={() => setRelire((n) => n + 1)}
-              relire={relire}
-            />
-            {/* Ce qui arrive avec la signature : l'espace client et les journées. */}
-            {affaire && (
-              <div className="mt-5 space-y-4">
-                <EspaceClientCard bare clientId={affaire.id} clientName={affaire.company} />
-                <RendezVousCard bare clientId={affaire.id} />
-              </div>
-            )}
+        {onglet === "dossier" && (
+          <div className="flex max-w-[820px] flex-col gap-5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => (origine ? void approfondir() : setSouci("Cette fiche client n’est pas passée par Merx : il n’a rien à approfondir."))}
+                disabled={enCours !== null}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+              >
+                {enCours === "approfondir" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                {enCours === "approfondir" ? "Merx approfondit… une bonne minute" : origine?.enriched_at ? "Approfondir à nouveau" : "Approfondir la fiche"}
+              </button>
+              {origine?.enriched_at && <span className="text-[12.5px] text-muted-foreground">Approfondie le {quandCourt(origine.enriched_at)}.</span>}
+            </div>
+            <ApprocheEntreprise origine={origine} />
+            <CeQuOnSait prospect={origine} enPlus={ceQueSaitLeClient} />
+            {/* Supprimer, tout en bas du dossier : loin des boutons du quotidien. */}
+            <div className="border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => void supprimer()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[13px] font-bold text-rose-700 transition-colors hover:border-rose-400"
+              >
+                <Trash2 className="size-3.5" /> Supprimer la fiche
+              </button>
+            </div>
           </div>
         )}
 
-        {onglet === "approche" && (
-          <ApprocheEntreprise origine={origine} />
-        )}
-
-        {onglet === "suivi" && (
-          <div>
-            {/* Tout le fil de l'entreprise : avant d'être cliente, elle a été prospect puis affaire. */}
-            <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
+        {onglet === "devis" && (
+          <div className="space-y-4">
+            {affaire ? (
+              <>
+                <DevisQonto clientId={affaire.id} />
+                <EspaceClientCard bare clientId={affaire.id} clientName={affaire.company} />
+                <RendezVousCard bare clientId={affaire.id} />
+              </>
+            ) : (
+              <p className="text-[13px] text-muted-foreground">
+                Cette fiche client a été saisie à la main, sans affaire au Pipeline : il n’y a pas de devis rattaché.
+              </p>
+            )}
           </div>
         )}
       </FicheEntreprise>

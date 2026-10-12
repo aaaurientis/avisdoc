@@ -18,9 +18,10 @@ export default function ModifierAction({
   onClose,
   onFait,
 }: {
-  action: Echange;
+  action: Pick<Echange, "id" | "kind" | "titre" | "detail" | "au" | "par">;
   onClose: () => void;
-  onFait: () => Promise<void> | void;
+  /** `retour` : le rendez-vous supprimé rend la colonne où l'affaire était. */
+  onFait: (retour?: { clientId: string; colonne: string } | null) => Promise<void> | void;
 }) {
   const d = new Date(action.au);
   const [titre, setTitre] = useState(action.titre);
@@ -38,9 +39,11 @@ export default function ModifierAction({
     setEnvoi(true);
     setErreur(null);
     try {
-      if (quoi === "supprimer") await supprimerEchange(action.id);
-      else await modifierEchange(action.id, { titre, detail, au: new Date(`${jour}T${heure}:00`).toISOString() });
-      await onFait();
+      if (quoi === "supprimer") await onFait(await supprimerEchange(action.id));
+      else {
+        await modifierEchange(action.id, { titre, detail, au: new Date(`${jour}T${heure}:00`).toISOString() });
+        await onFait();
+      }
       onClose();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L’enregistrement a échoué.");

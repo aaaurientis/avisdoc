@@ -27,6 +27,11 @@ verify_jwt = false
 [functions.rdv-rappels]
 verify_jwt = false
 
+# Rappels des actions programmées sur les fiches (cron) — protégée par un secret
+# tiré dans la base (admin_secrets_internes, migration 0069).
+[functions.rappels-actions]
+verify_jwt = false
+
 # Devis Qonto — admin @avisdoc.fr vérifié dans la fonction ; clé Qonto côté serveur.
 [functions.qonto]
 verify_jwt = true
