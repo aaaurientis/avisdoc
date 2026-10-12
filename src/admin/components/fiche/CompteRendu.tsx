@@ -19,7 +19,7 @@ import {
   libelleGenre,
   marquerTraitee,
   modifierEchange,
-  supprimerEchange,
+  annulerAction,
   type ClesFiche,
   type Echange,
   type GenreEchange,
@@ -305,21 +305,21 @@ export default function CompteRendu({
 
   const supprimer = async () => {
     if (!existante || envoi) return;
-    if (!(await confirmer({ titre: `Supprimer cette action (${libelleGenre(quoi)} prévu) ?`, message:
+    if (!(await confirmer({ titre: `Annuler cette action (${libelleGenre(quoi)} prévu) ?`, action: "Annuler l’action", message:
           quoi === "rdv" && estColonneRdv(etape?.actuelle)
-            ? "Elle disparaît de la fiche et du Planning, et la fiche retourne dans la colonne où elle était."
-            : "Elle disparaît de la fiche et du Planning.",
+            ? "Elle quitte les actions à venir et le Planning, et la fiche retourne dans la colonne où elle était. Elle reste dans l’historique, « Annulé »."
+            : "Elle quitte les actions à venir et le Planning. Elle reste dans l’historique, « Annulé ».",
       }))
     )
       return;
     setEnvoi(true);
     try {
-      const retour = await supprimerEchange(existante.id);
+      const retour = await annulerAction(existante.id, prenomDe(par) || par);
       // Le rendez-vous retiré, l'affaire retourne dans la colonne où elle était.
       if (retour && avancer && estColonneRdv(etape?.actuelle)) await avancer(retour.colonne);
       onEnregistre();
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
+      setErreur(e instanceof Error ? e.message : "L’annulation a échoué.");
       setEnvoi(false);
     }
   };
@@ -353,7 +353,7 @@ export default function CompteRendu({
         <div className="mt-3 rounded-2xl bg-muted/60 px-4 py-3">
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-avisdoc-ink">
             <span>
-              <strong>{existante.kind === "note" ? "Écrite le" : "Fait le"}</strong> {quandCourt(existante.au)} · {heureISO(new Date(existante.au))}
+              <strong>{existante.kind === "note" ? "Écrite le" : existante.prevu ? "Prévu le" : "Fait le"}</strong> {quandCourt(existante.au)} · {heureISO(new Date(existante.au))}
             </span>
             {existante.resultat && (
               <span>
@@ -533,7 +533,7 @@ export default function CompteRendu({
             disabled={envoi}
             className="h-11 rounded-full border border-rose-200 px-5 text-[13.5px] font-bold text-rose-700 transition-colors hover:border-rose-400 disabled:opacity-60"
           >
-            Supprimer
+            Annuler l’action
           </button>
         )}
       </div>

@@ -6,7 +6,9 @@
 import { useState } from "react";
 import { Loader2, Trash2, X } from "lucide-react";
 import { Modal, SectionLabel } from "./ui";
-import { libelleGenre, modifierEchange, supprimerEchange, type Echange } from "../lib/echanges";
+import { annulerAction, libelleGenre, modifierEchange, type Echange } from "../lib/echanges";
+import { useAuth } from "../auth/AuthContext";
+import { prenomDe } from "../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import { confirmer } from "./Confirmation";
 
@@ -23,6 +25,7 @@ export default function ModifierAction({
   /** `retour` : le rendez-vous supprimé rend la colonne où l'affaire était. */
   onFait: (retour?: { clientId: string; colonne: string } | null) => Promise<void> | void;
 }) {
+  const { user } = useAuth();
   const d = new Date(action.au);
   const [titre, setTitre] = useState(action.titre);
   const [detail, setDetail] = useState(action.detail ?? "");
@@ -35,11 +38,15 @@ export default function ModifierAction({
 
   const agir = async (quoi: "enregistrer" | "supprimer") => {
     if (envoi) return;
-    if (quoi === "supprimer" && !(await confirmer({ titre: `Supprimer « ${action.titre} » ?`, message: "Cette action disparaîtra du planning et de la fiche." }))) return;
+    if (
+      quoi === "supprimer" &&
+      !(await confirmer({ titre: `Annuler « ${action.titre} » ?`, action: "Annuler l’action", message: "Elle quitte le Planning et les actions à venir. Elle reste dans l’historique de la fiche, « Annulé »." }))
+    )
+      return;
     setEnvoi(true);
     setErreur(null);
     try {
-      if (quoi === "supprimer") await onFait(await supprimerEchange(action.id));
+      if (quoi === "supprimer") await onFait(await annulerAction(action.id, prenomDe(user?.email) || (user?.email ?? "")));
       else {
         await modifierEchange(action.id, { titre, detail, au: new Date(`${jour}T${heure}:00`).toISOString() });
         await onFait();
@@ -101,7 +108,7 @@ export default function ModifierAction({
           onClick={() => void agir("supprimer")}
           className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-rose-300 hover:text-rose-700"
         >
-          <Trash2 className="size-4" /> Supprimer
+          <Trash2 className="size-4" /> Annuler l’action
         </button>
         <button
           type="button"

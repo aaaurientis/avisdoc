@@ -47,6 +47,9 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
     .from("admin_echanges")
     .select("id, kind, titre, detail, au, par, prevu, traite_le, prospect_id, client_id, account_id")
     .neq("kind", "note")
+    // Une action programmée puis faite a son compte rendu sur une autre ligne ; annulée,
+    // elle n'a pas eu lieu. Dans les deux cas, elle ne se montre qu'à l'historique.
+    .or("prevu.eq.false,traite_le.is.null")
     .gte("au", du.toISOString())
     .lt("au", au.toISOString())
     .order("au", { ascending: true });
