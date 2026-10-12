@@ -25,6 +25,7 @@ import {
   type GenreEchange,
   type ModeRdv,
   estColonneRdv,
+  rdvEncorePrevu,
   seDeplacer,
 } from "../../lib/echanges";
 import {
@@ -186,6 +187,9 @@ export default function CompteRendu({
   const entree = Boolean(entrer) && !auPipeline && (mode === "fait" || mode === "programmer") && !existante && faitEntrerAuPipeline(quoi);
   const colonneEntree = versRdv ?? (etape ? colonneDEntree(mode === "fait", etape.colonnes) : "Contacté");
   const aProposer = proposee && !(entree && proposee === colonneEntree) ? proposee : null;
+  // Rendez-vous annulé : la fiche retournera dans sa colonne d'avant (s'il n'en reste pas d'autre).
+  const retourSiAnnule =
+    depuisPrevue?.kind === "rdv" && resultat === "Annulé" && suite !== "rdv" && estColonneRdv(etape?.actuelle) ? depuisPrevue.colonne_avant : null;
   const avecQui = (mode === "programmer" || mode === "fait") && personnes.length > 0;
   const par = user?.email ?? "";
 
@@ -283,6 +287,14 @@ export default function CompteRendu({
         if (versRdv) await avancer(versRdv);
         else if (aProposer && etapeOk) await avancer(aProposer);
       }
+      // Le rendez-vous est annulé : la fiche repart dans sa colonne d'avant. Le compte
+      // rendu « Annulé », lui, reste dans l'historique (Olivier, 12/10).
+      const avant = depuisPrevue?.colonne_avant;
+      if (
+        depuisPrevue?.kind === "rdv" && resultat === "Annulé" && avant && avancer &&
+        c.clientId && estColonneRdv(etape?.actuelle) && !(await rdvEncorePrevu(c.clientId))
+      )
+        await avancer(avant);
       onEnregistre();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L’enregistrement a échoué.");
@@ -482,10 +494,15 @@ export default function CompteRendu({
         </>
       )}
 
-      {(entree || aProposer || versRdv) && (
+      {(entree || aProposer || versRdv || retourSiAnnule) && (
         <div className="mt-4 rounded-xl bg-muted/60 px-3 py-2.5 text-[12.5px] leading-snug text-muted-foreground">
           {entree && <div>La fiche entrera au Pipeline{!versRdv && aProposer && etapeOk ? "" : `, en « ${colonneEntree} »`}.</div>}
           {!entree && versRdv && <div className="font-semibold text-avisdoc-ink">Rendez-vous pris : la fiche passera en « {versRdv} ».</div>}
+          {retourSiAnnule && (
+            <div className="font-semibold text-avisdoc-ink">
+              Rendez-vous annulé : la fiche retournera en « {retourSiAnnule} ». L’annulation reste dans l’historique.
+            </div>
+          )}
           {aProposer && (
             <label className={cn("flex cursor-pointer items-center gap-2 font-semibold text-avisdoc-ink", entree && "mt-1.5")}>
               <input type="checkbox" checked={etapeOk} onChange={(e) => setEtapeOk(e.target.checked)} className="size-4 accent-avisdoc-teal" />

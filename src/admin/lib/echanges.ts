@@ -47,6 +47,8 @@ export interface Echange {
   avec: string | null;
   rdv_mode: ModeRdv | null;
   rdv_lien: string | null;
+  /** Le rendez-vous a fait passer la fiche en « RDV » : la colonne où elle était. */
+  colonne_avant: string | null;
   created_at: string;
 }
 
@@ -79,7 +81,7 @@ export interface Jalon {
   au: string;
 }
 
-const COLONNES = "id, kind, titre, detail, au, par, prevu, traite_le, resultat, avec, rdv_mode, rdv_lien, created_at";
+const COLONNES = "id, kind, titre, detail, au, par, prevu, traite_le, resultat, avec, rdv_mode, rdv_lien, colonne_avant, created_at";
 
 function filtre(cles: ClesFiche): string | null {
   const morceaux = [
@@ -162,14 +164,20 @@ export async function supprimerEchange(id: string): Promise<{ clientId: string; 
   if (error) throw new Error(error.message);
   const a = avant as { kind: string; client_id: string | null; colonne_avant: string | null } | null;
   if (!a || a.kind !== "rdv" || !a.client_id || !a.colonne_avant) return null;
-  const { count } = await supabaseAdmin
+  return (await rdvEncorePrevu(a.client_id)) ? null : { clientId: a.client_id, colonne: a.colonne_avant };
+}
+
+/** Reste-t-il un rendez-vous programmé, pas encore fait, sur cette affaire ? */
+export async function rdvEncorePrevu(clientId: string): Promise<boolean> {
+  const { count, error } = await supabaseAdmin
     .from("admin_echanges")
     .select("id", { count: "exact", head: true })
-    .eq("client_id", a.client_id)
+    .eq("client_id", clientId)
     .eq("kind", "rdv")
     .eq("prevu", true)
     .is("traite_le", null);
-  return count ? null : { clientId: a.client_id, colonne: a.colonne_avant };
+  if (error) throw new Error(error.message);
+  return Boolean(count);
 }
 
 /** La colonne « RDV » d'un pipeline, quel que soit son nom exact. */
