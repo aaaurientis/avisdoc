@@ -24,6 +24,8 @@ import {
   type Echange,
   type GenreEchange,
   type ModeRdv,
+  estColonneRdv,
+  seDeplacer,
 } from "../../lib/echanges";
 import {
   INVITE,
@@ -79,7 +81,7 @@ const prochaineHeure = () => {
   return `${heureISO(d).slice(0, 2)}:00`;
 };
 
-/** En visio ou sur place, et le lien de la visio. Le rappel en dépend. */
+/** En visio, sur place ou chez le client, et le lien de la visio. Le rappel en dépend. */
 function ChoixRdv({ mode, setMode, lien, setLien }: { mode: ModeRdv | null; setMode: (m: ModeRdv) => void; lien: string; setLien: (l: string) => void }) {
   return (
     <>
@@ -87,13 +89,14 @@ function ChoixRdv({ mode, setMode, lien, setLien }: { mode: ModeRdv | null; setM
       <div className="flex flex-wrap gap-1.5">
         <Pastille actif={mode === "visio"} onClick={() => setMode("visio")}>En visio</Pastille>
         <Pastille actif={mode === "sur_place"} onClick={() => setMode("sur_place")}>Sur place</Pastille>
+        <Pastille actif={mode === "chez_client"} onClick={() => setMode("chez_client")}>Chez le client</Pastille>
       </div>
       {mode === "visio" && (
         <input value={lien} onChange={(e) => setLien(e.target.value)} placeholder="Lien de la visio — https://meet.google.com/…" className={cn(champ, "mt-2")} />
       )}
       {mode && (
         <p className="mt-1.5 text-[12px] text-muted-foreground">
-          Rappel par mail {mode === "sur_place" ? "2 heures avant, pour le trajet" : "15 minutes avant"}.
+          Rappel par mail {seDeplacer(mode) ? "2 heures avant, pour le trajet" : "15 minutes avant"}.
         </p>
       )}
     </>
@@ -198,14 +201,16 @@ export default function CompteRendu({
     if (mode === "fait" && !resultats && quoi !== "email" && !contenu.trim()) return setErreur("Dites ce qui s’est passé.");
     if (suite && !suiteLe) return setErreur("Choisissez le jour de l’action suivante.");
     if (suite && !suiteHeure) return setErreur("Choisissez l’heure de l’action suivante.");
-    if (mode === "programmer" && quoi === "rdv" && !rdvMode) return setErreur("En visio ou sur place ?");
-    if (suite === "rdv" && !suiteMode) return setErreur("Le rendez-vous suivant : en visio ou sur place ?");
+    if (mode === "programmer" && quoi === "rdv" && !rdvMode) return setErreur("En visio, sur place ou chez le client ?");
+    if (suite === "rdv" && !suiteMode) return setErreur("Le rendez-vous suivant : en visio, sur place ou chez le client ?");
     if (!lienValide(rdvLien) || !lienValide(suiteLien)) return setErreur("Le lien de la visio doit commencer par https://");
 
     setEnvoi(true);
     setErreur(null);
     try {
       const destinataire = avecQui ? avec : null;
+      // Le rendez-vous qui fait passer la fiche en « RDV » retient d'où elle venait.
+      const colonneAvant = versRdv ? (etape?.actuelle ?? etape?.colonnes[0] ?? null) : null;
       const programmerSuite = async (c: ClesFiche) => {
         if (!suite) return;
         await ajouterEchange(c, {
@@ -218,6 +223,7 @@ export default function CompteRendu({
           avec: destinataire,
           rdvMode: suite === "rdv" ? suiteMode : null,
           rdvLien: suite === "rdv" ? suiteLien : null,
+          colonneAvant: suite === "rdv" ? colonneAvant : null,
         });
       };
 
@@ -254,6 +260,7 @@ export default function CompteRendu({
           avec: destinataire,
           rdvMode: quoi === "rdv" ? rdvMode : null,
           rdvLien: quoi === "rdv" ? rdvLien : null,
+          colonneAvant,
         });
         if (!entree && versRdv && avancer) await avancer(versRdv);
         onEnregistre();
@@ -286,10 +293,18 @@ export default function CompteRendu({
 
   const supprimer = async () => {
     if (!existante || envoi) return;
-    if (!(await confirmer({ titre: `Supprimer cette action (${libelleGenre(quoi)} prévu) ?`, message: "Elle disparaît de la fiche et du Planning." }))) return;
+    if (!(await confirmer({ titre: `Supprimer cette action (${libelleGenre(quoi)} prévu) ?`, message:
+          quoi === "rdv" && estColonneRdv(etape?.actuelle)
+            ? "Elle disparaît de la fiche et du Planning, et la fiche retourne dans la colonne où elle était."
+            : "Elle disparaît de la fiche et du Planning.",
+      }))
+    )
+      return;
     setEnvoi(true);
     try {
-      await supprimerEchange(existante.id);
+      const retour = await supprimerEchange(existante.id);
+      // Le rendez-vous retiré, l'affaire retourne dans la colonne où elle était.
+      if (retour && avancer && estColonneRdv(etape?.actuelle)) await avancer(retour.colonne);
       onEnregistre();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "La suppression a échoué.");

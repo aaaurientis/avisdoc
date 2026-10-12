@@ -5,7 +5,7 @@
 // savoir qu'un appel attend.
 
 import { CalendarClock, FileText, Linkedin, ListTodo, Mail, MessageSquare, NotebookPen, Phone, Presentation, Store } from "lucide-react";
-import type { GenreEchange } from "../lib/echanges";
+import { LIEU_RDV, type GenreEchange } from "../lib/echanges";
 import type { Prevu } from "../lib/actions-prevues";
 import { cn } from "@/lib/utils";
 
@@ -74,7 +74,7 @@ export default function PastillesPrevues({ prevu }: { prevu?: Prevu }) {
         const urgent = t <= Date.now() + 86_400_000;
         // Ce que c'est, comment, et quand : « Rendez-vous en visio · 14 oct. à 10:00 ».
         const nom = NOMS[a.kind].charAt(0).toUpperCase() + NOMS[a.kind].slice(1);
-        const mode = a.rdvMode === "visio" ? " en visio" : a.rdvMode === "sur_place" ? " sur place" : "";
+        const mode = a.rdvMode ? ` ${LIEU_RDV[a.rdvMode]}` : "";
         return (
           <div
             key={`${a.kind}-${a.au}`}

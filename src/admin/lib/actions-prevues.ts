@@ -4,7 +4,7 @@
 // fiche doit se voir depuis le tableau, sans ouvrir chaque fiche l'une après l'autre.
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
-import type { GenreEchange } from "./echanges";
+import type { GenreEchange, ModeRdv } from "./echanges";
 
 /** Une action à venir : sa sorte et son heure. Chacune a la sienne. */
 export interface ActionPrevue {
@@ -12,7 +12,7 @@ export interface ActionPrevue {
   au: string;
   titre: string;
   /** Un rendez-vous : en visio ou sur place. */
-  rdvMode: "visio" | "sur_place" | null;
+  rdvMode: ModeRdv | null;
 }
 
 export interface Prevu {
@@ -37,7 +37,7 @@ export async function actionsPrevues(): Promise<Map<string, Prevu>> {
   const par = new Map<string, Prevu>();
   for (const e of (data ?? []) as {
     client_id: string | null; prospect_id: string | null; account_id: string | null;
-    kind: GenreEchange; au: string; titre: string; rdv_mode: "visio" | "sur_place" | null;
+    kind: GenreEchange; au: string; titre: string; rdv_mode: ModeRdv | null;
   }[]) {
     const cle = e.client_id ?? e.prospect_id ?? e.account_id;
     if (!cle) continue;

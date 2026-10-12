@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { chargerEchanges, libelleGenre, type ClesFiche, type Echange, type GenreEchange, type Jalon } from "../../lib/echanges";
+import { LIEU_RDV, chargerEchanges, libelleGenre, type ClesFiche, type Echange, type GenreEchange, type Jalon } from "../../lib/echanges";
 import { AUTRES_ACTIONS, BOUTONS_ACTION, LIBELLE_BOUTON, heureISO, prenomDe, quandCourt, resultatNegatif } from "../../lib/actions-fiche";
 import CompteRendu, { type EtapeFiche } from "./CompteRendu";
 import ResumeActivite from "./ResumeActivite";
@@ -243,7 +243,7 @@ export default function OngletActions({
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-bold text-avisdoc-ink">
                       {libelleLigne(a)}
-                      {a.rdv_mode && <span className="font-semibold"> {a.rdv_mode === "visio" ? "en visio" : "sur place"}</span>}
+                      {a.rdv_mode && <span className="font-semibold"> {LIEU_RDV[a.rdv_mode]}</span>}
                       {a.avec && <span className="font-normal text-muted-foreground"> · avec {a.avec}</span>}
                     </div>
                     {titreParlant(a) && <div className="mt-0.5 text-[13px] font-semibold text-avisdoc-ink">{a.titre}</div>}

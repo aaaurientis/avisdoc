@@ -1,7 +1,7 @@
 // Rappels des actions programmées sur les fiches — fonction planifiée (toutes les 5 min).
 //
 // Repris du hub Onetip (12/10) : un mail part au commercial qui a programmé l'action,
-// 15 minutes avant (2 heures pour un rendez-vous sur place, pour le trajet). Une seule
+// 15 minutes avant (2 heures pour un rendez-vous sur place ou chez le client, pour le trajet). Une seule
 // fois par action (`rappel_envoye_le`) ; déplacer l'action remet le rappel à zéro.
 //
 // Protégée par un secret tiré au hasard dans la base (migration 0069) : la tâche
@@ -49,7 +49,8 @@ interface Action {
 
 async function envoyer(a: Action, fiche: string) {
   const quoi = NOMS[a.kind] ?? a.kind;
-  const lieu = a.kind === "rdv" && a.rdv_mode ? (a.rdv_mode === "visio" ? " en visio" : " sur place") : "";
+  const LIEUX: Record<string, string> = { visio: " en visio", sur_place: " sur place", chez_client: " chez le client" };
+  const lieu = a.kind === "rdv" && a.rdv_mode ? (LIEUX[a.rdv_mode] ?? "") : "";
   const sujet = `À ${heure(a.au)} : ${quoi}${lieu}${fiche ? ` — ${fiche}` : ""}${a.avec ? ` avec ${a.avec}` : ""}`;
   const lien = a.client_id ? `${HUB}/crm/${a.client_id}` : a.prospect_id ? `${HUB}/prospects` : a.account_id ? `${HUB}/fichier-client` : `${HUB}/planning`;
   // Le lien de la visio a été contrôlé à la saisie (http ou https, sans espace ni guillemet).
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
 
   const actions = (data ?? []) as Action[];
   const dues = actions.filter((a) => {
-    const avance = a.kind === "rdv" && a.rdv_mode === "sur_place" ? 120 : 15;
+    const avance = a.kind === "rdv" && (a.rdv_mode === "sur_place" || a.rdv_mode === "chez_client") ? 120 : 15;
     return maintenant >= new Date(a.au).getTime() - avance * 60_000 && a.par.includes("@");
   });
 

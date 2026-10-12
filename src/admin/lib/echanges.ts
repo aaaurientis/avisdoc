@@ -25,7 +25,14 @@ export type GenreEchange =
   | "linkedin"
   | "devis";
 
-export type ModeRdv = "visio" | "sur_place";
+/** En visio, sur place (chez nous), ou chez le client (migration 0070). */
+export type ModeRdv = "visio" | "sur_place" | "chez_client";
+
+/** Comment on le dit : « en visio », « sur place », « chez le client ». */
+export const LIEU_RDV: Record<ModeRdv, string> = { visio: "en visio", sur_place: "sur place", chez_client: "chez le client" };
+
+/** Un rendez-vous où il faut se déplacer : le rappel part 2 heures avant. */
+export const seDeplacer = (m: ModeRdv | null | undefined) => m === "sur_place" || m === "chez_client";
 
 export interface Echange {
   id: string;
@@ -99,6 +106,8 @@ export interface Precisions {
   avec?: string | null;
   rdvMode?: ModeRdv | null;
   rdvLien?: string | null;
+  /** Le rendez-vous a fait passer la fiche en « RDV » : la colonne où elle était. */
+  colonneAvant?: string | null;
 }
 
 /**
@@ -131,6 +140,7 @@ export async function ajouterEchange(
       avec: saisie.avec?.trim() || null,
       rdv_mode: saisie.rdvMode ?? null,
       rdv_lien: saisie.rdvMode === "visio" ? saisie.rdvLien?.trim() || null : null,
+      ...(saisie.colonneAvant ? { colonne_avant: saisie.colonneAvant } : {}),
     })
     .select("id")
     .single();
@@ -138,11 +148,32 @@ export async function ajouterEchange(
   return data.id as string;
 }
 
-/** Une action PROGRAMMÉE se supprime ; ce qui a eu lieu, jamais. */
-export async function supprimerEchange(id: string): Promise<void> {
+/**
+ * Une action PROGRAMMÉE se supprime ; ce qui a eu lieu, jamais.
+ *
+ * Un rendez-vous qui avait fait passer l'affaire en « RDV » rend la colonne où elle
+ * était, s'il ne reste aucun autre rendez-vous programmé sur elle : à l'appelant de
+ * l'y remettre (Olivier, 12/10 : « tu lui retires son rendez-vous, tu la remets dans
+ * sa case »).
+ */
+export async function supprimerEchange(id: string): Promise<{ clientId: string; colonne: string } | null> {
+  const { data: avant } = await supabaseAdmin.from("admin_echanges").select("kind, client_id, colonne_avant").eq("id", id).maybeSingle();
   const { error } = await supabaseAdmin.from("admin_echanges").delete().eq("id", id).eq("prevu", true).is("traite_le", null);
   if (error) throw new Error(error.message);
+  const a = avant as { kind: string; client_id: string | null; colonne_avant: string | null } | null;
+  if (!a || a.kind !== "rdv" || !a.client_id || !a.colonne_avant) return null;
+  const { count } = await supabaseAdmin
+    .from("admin_echanges")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", a.client_id)
+    .eq("kind", "rdv")
+    .eq("prevu", true)
+    .is("traite_le", null);
+  return count ? null : { clientId: a.client_id, colonne: a.colonne_avant };
 }
+
+/** La colonne « RDV » d'un pipeline, quel que soit son nom exact. */
+export const estColonneRdv = (colonne: string | null | undefined) => (colonne ?? "").trim().toLowerCase() === "rdv";
 
 /**
  * Déplacer ou corriger une action programmée : on décale un appel, on précise un
