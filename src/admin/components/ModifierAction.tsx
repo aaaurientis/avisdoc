@@ -18,7 +18,7 @@ export default function ModifierAction({
   onClose,
   onFait,
 }: {
-  action: Echange;
+  action: Pick<Echange, "id" | "kind" | "titre" | "detail" | "au" | "par">;
   onClose: () => void;
   onFait: () => Promise<void> | void;
 }) {

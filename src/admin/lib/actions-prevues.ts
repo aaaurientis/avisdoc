@@ -21,14 +21,15 @@ export interface Prevu {
 }
 
 /**
- * Les actions À VENIR de chaque affaire. Le passé est dans l'historique ; sur une
- * carte, seul compte ce qui reste à faire.
+ * Les actions À VENIR de chaque affaire : programmées, pas encore faites — en retard
+ * comprises. Le passé est dans l'historique ; sur une carte, seul compte ce qui reste à faire.
  */
 export async function actionsPrevues(): Promise<Map<string, Prevu>> {
   const { data } = await supabaseAdmin
     .from("admin_echanges")
     .select("client_id, prospect_id, account_id, kind, au, titre")
-    .gte("au", new Date().toISOString())
+    .eq("prevu", true)
+    .is("traite_le", null)
     .order("au", { ascending: true });
 
   const par = new Map<string, Prevu>();

@@ -1013,6 +1013,48 @@ export function resumePrompt(nom: string, notes: { au: string; titre: string; de
   return `Entreprise : ${nom}\n\nNotes du commercial, de la plus ancienne à la plus récente :\n\n${lignes}`;
 }
 
+// ── « Où on en est » : le résumé de toutes les actions d'une fiche ───────────
+// Repris du hub Onetip (12/10). Un paragraphe court, en tête de l'onglet Actions :
+// ce qui a été fait, ce que ça a donné, ce qui est prévu. Rien d'inventé.
+
+export const ACTIVITE_SYSTEM = `Tu résumes le suivi commercial d'une entreprise par l'équipe d'AvisDoc : les actions faites (appels, rendez-vous, présentations, mails, notes) et les actions programmées.
+Règles absolues :
+- Tu n'inventes rien. Chaque élément vient des actions listées. Pas de conseil, pas de suite à donner que les actions ne disent pas.
+- Tu gardes exacts les noms de personnes, les fonctions, les dates, les montants.
+- Un seul paragraphe de 2 à 4 phrases : où on en est, ce qui s'est passé de marquant, et la prochaine action programmée s'il y en a une.
+- Français, phrases courtes, sans formule de politesse, sans titre ni liste.`;
+
+export const ACTIVITE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["texte"],
+  properties: {
+    texte: { type: "string" },
+  },
+} as const;
+
+export interface ActiviteOut {
+  texte: string;
+}
+
+export function activitePrompt(
+  nom: string,
+  actions: { au: string; genre: string; prevu: boolean; fait: boolean; resultat: string | null; avec: string | null; titre: string; detail: string | null; par: string }[],
+  maintenant: string,
+): string {
+  const lignes = actions
+    .map((a) => {
+      const quand = new Date(a.au).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" });
+      const statut = a.prevu ? (a.fait ? "programmé, fait depuis" : "PROGRAMMÉ") : "fait";
+      const entete = [quand, a.genre, statut, a.resultat ? `résultat : ${a.resultat}` : "", a.avec ? `avec ${a.avec}` : "", a.titre && a.titre !== a.genre ? a.titre : "", `par ${a.par}`]
+        .filter(Boolean)
+        .join(" · ");
+      return `— ${entete}${a.detail ? `\n${a.detail}` : ""}`;
+    })
+    .join("\n\n");
+  return `Entreprise : ${nom}\nNous sommes le ${maintenant}.\n\nActions, de la plus ancienne à la plus récente :\n\n${lignes}`;
+}
+
 /** Le dossier tel que la fiche l'affiche : la fiche d'appel remise en bloc. */
 export function enregistrerDossier(d: EnrichOut["dossier"] | null | undefined) {
   if (!d) return null;

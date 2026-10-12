@@ -11,6 +11,9 @@
 //   { action: "email", prospectId }               → rédige le brouillon de premier contact (rien n'est envoyé).
 //   { action: "resumer_notes", prospectId?, clientId?, accountId? }
 //                                                 → résume les notes du commercial pour la première page.
+//   { action: "resumer_activite", prospectId?, clientId?, accountId?, empreinte }
+//                                                 → « Où on en est » : résume toutes les actions de la fiche.
+//                                                   Ouvert à toute l'équipe @avisdoc.fr, sans le module Merx.
 //
 // Déploiement :
 //   supabase functions deploy merx
@@ -23,6 +26,10 @@ import { transcrire } from "./transcription.ts";
 import { chercherTerrain, lireFiche } from "./consulter.ts";
 import { complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
+  ACTIVITE_SCHEMA,
+  ACTIVITE_SYSTEM,
+  activitePrompt,
+  type ActiviteOut,
   CHAT_SYSTEM,
   DEBRIEF_SCHEMA,
   DEBRIEF_SYSTEM,
@@ -86,11 +93,90 @@ Deno.serve(async (req: Request) => {
     const { data: userData } = await asUser.auth.getUser();
     const email = userData.user?.email ?? "";
     if (!email.toLowerCase().endsWith("@avisdoc.fr")) return json({ error: "Accès réservé aux comptes @avisdoc.fr." }, 403);
-    if (!(await peutMerx(email))) return json({ error: "Le module Merx n'est pas ouvert sur ce compte." }, 403);
     if (!Deno.env.get("ANTHROPIC_API_KEY")) return json({ error: "ANTHROPIC_API_KEY non configurée." }, 500);
 
     const sb = admin();
     const body = await req.json().catch(() => ({}));
+
+    // ── « Où on en est » : résumer les actions d'une fiche ───────────────
+    // Ouvert à toute l'équipe (Olivier, 12/10 : « il est pour tout le monde, il faut
+    // l'ouvrir à tous les commerciaux »). Il se range sur la fiche la plus avancée.
+    if (body.action === "resumer_activite") {
+      const cles = [
+        body.prospectId ? `prospect_id.eq.${body.prospectId}` : "",
+        body.clientId ? `client_id.eq.${body.clientId}` : "",
+        body.accountId ? `account_id.eq.${body.accountId}` : "",
+      ].filter(Boolean);
+      if (cles.length === 0) return json({ error: "Fiche non précisée." }, 400);
+      const [table, id] = body.accountId
+        ? ["admin_accounts", body.accountId]
+        : body.clientId
+          ? ["admin_clients", body.clientId]
+          : ["admin_prospects", body.prospectId];
+      const colonneNom = table === "admin_clients" ? "company" : "name";
+
+      const [{ data: fiche }, { data: actions }] = await Promise.all([
+        sb.from(table).select(colonneNom).eq("id", id).maybeSingle(),
+        sb
+          .from("admin_echanges")
+          .select("kind, titre, detail, au, par, prevu, traite_le, resultat, avec")
+          .or(cles.join(","))
+          .order("au"),
+      ]);
+      if (!fiche) return json({ error: "Fiche introuvable." }, 404);
+      const nom = String((fiche as Record<string, unknown>)[colonneNom] ?? "");
+      const lues = (actions ?? []) as {
+        kind: string; titre: string; detail: string | null; au: string; par: string;
+        prevu: boolean; traite_le: string | null; resultat: string | null; avec: string | null;
+      }[];
+      if (lues.length === 0) {
+        await sb.from(table).update({ resume_activite: null }).eq("id", id);
+        return json({ resume: null });
+      }
+
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "recherche", request: `Où on en est — ${nom}`, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      try {
+        const out = await complete<ActiviteOut>(
+          activitePrompt(
+            nom,
+            lues.map((a) => ({
+              au: a.au, genre: a.kind, prevu: a.prevu, fait: Boolean(a.traite_le), resultat: a.resultat,
+              avec: a.avec, titre: a.titre, detail: a.detail, par: a.par,
+            })),
+            new Date().toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short", timeZone: "Europe/Paris" }),
+          ),
+          ACTIVITE_SCHEMA as unknown as Record<string, unknown>,
+          { system: ACTIVITE_SYSTEM, usage: "email", timeoutMs: 40_000, onUsage: (u) => (usage = u) },
+        );
+        const resume = { texte: String(out.texte ?? "").trim(), empreinte: String(body.empreinte ?? ""), au: new Date().toISOString() };
+        await sb.from(table).update({ resume_activite: resume }).eq("id", id);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "terminee", usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ resume });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) {
+          await sb
+            .from("admin_merx_demandes")
+            .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
+            .eq("id", demande.id);
+        }
+        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+      }
+    }
+
+    // Tout le reste de Merx reste réservé au module « merx ».
+    if (!(await peutMerx(email))) return json({ error: "Le module Merx n'est pas ouvert sur ce compte." }, 403);
 
     // ── Traiter une demande en attente ───────────────────────────────────
     if (body.action === "traiter") {

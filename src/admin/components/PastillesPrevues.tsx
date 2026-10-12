@@ -3,7 +3,7 @@
 // Discrètes tant que l'échéance est loin, elles passent en orange le jour venu —
 // on ne doit pas avoir à ouvrir la fiche pour savoir qu'un appel attend.
 
-import { CalendarClock, ListTodo, Mail, NotebookPen, Phone } from "lucide-react";
+import { CalendarClock, FileText, Linkedin, ListTodo, Mail, MessageSquare, NotebookPen, Phone, Presentation, Store } from "lucide-react";
 import type { GenreEchange } from "../lib/echanges";
 import type { Prevu } from "../lib/actions-prevues";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,11 @@ const ICONES: Record<GenreEchange, typeof Phone> = {
   rdv: CalendarClock,
   tache: ListTodo,
   note: NotebookPen,
+  presentation: Presentation,
+  salon: Store,
+  sms: MessageSquare,
+  linkedin: Linkedin,
+  devis: FileText,
 };
 
 /** Une couleur par sorte : on reconnaît un appel d'un rendez-vous sans lire. */
@@ -23,6 +28,11 @@ const TEINTES: Record<GenreEchange, string> = {
   email: "bg-violet-500 text-white",
   tache: "bg-amber-500 text-white",
   note: "bg-slate-500 text-white",
+  presentation: "bg-sky-600 text-white",
+  salon: "bg-emerald-600 text-white",
+  sms: "bg-teal-600 text-white",
+  linkedin: "bg-blue-600 text-white",
+  devis: "bg-indigo-500 text-white",
 };
 
 const NOMS: Record<GenreEchange, string> = {
@@ -31,6 +41,11 @@ const NOMS: Record<GenreEchange, string> = {
   rdv: "rendez-vous",
   tache: "à faire",
   note: "note",
+  presentation: "présentation",
+  salon: "salon",
+  sms: "SMS",
+  linkedin: "LinkedIn",
+  devis: "devis",
 };
 
 const leJour = (iso: string) =>

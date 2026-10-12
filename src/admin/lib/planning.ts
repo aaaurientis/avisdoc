@@ -15,6 +15,8 @@ export interface Rendezvous {
   detail: string | null;
   au: string;
   par: string;
+  /** Programmée et pas encore faite : elle se déplace ou se supprime. Le reste a eu lieu. */
+  modifiable: boolean;
   /** Sur quoi porte l'action, et d'où elle vient. */
   fiche: string;
   origine: Origine;
@@ -43,8 +45,8 @@ export const memeJour = (a: Date, b: Date) =>
 export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]> {
   const { data, error } = await supabaseAdmin
     .from("admin_echanges")
-    .select("id, kind, titre, detail, au, par, prospect_id, client_id, account_id")
-    .in("kind", ["appel", "rdv", "email", "tache"])
+    .select("id, kind, titre, detail, au, par, prevu, traite_le, prospect_id, client_id, account_id")
+    .neq("kind", "note")
     .gte("au", du.toISOString())
     .lt("au", au.toISOString())
     .order("au", { ascending: true });
@@ -52,6 +54,7 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
 
   const lignes = (data ?? []) as {
     id: string; kind: GenreEchange; titre: string; detail: string | null; au: string; par: string;
+    prevu: boolean; traite_le: string | null;
     prospect_id: string | null; client_id: string | null; account_id: string | null;
   }[];
   if (lignes.length === 0) return [];
@@ -84,6 +87,7 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
       detail: l.detail,
       au: l.au,
       par: l.par,
+      modifiable: l.prevu && !l.traite_le,
       fiche: ficheId ? (nom.get(ficheId) ?? "Fiche supprimée") : "",
       origine,
       ficheId,

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Check, Loader2, Lock, Minus, Pencil, Plus, Search, X } from "lucide-react";
+import { Loader2, Lock, Minus, Pencil, Plus, Search, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
-import { euro, frDate, todayISO, splitAdresse, joinAdresse } from "../../lib/format";
+import { euro, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Modal } from "../../components/ui";
@@ -12,24 +12,23 @@ import DangerZone from "../../espace/DangerZone";
 import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
-import ParcoursBanner from "../../espace/ParcoursBanner";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import BrouillonEmail from "../prospects/BrouillonEmail";
-import FilEchanges from "../../components/FilEchanges";
-import ActionsFiche from "../../components/ActionsFiche";
 import type { Jalon } from "../../lib/echanges";
 import { SECTEURS } from "../../lib/merx";
 import type { Prospect } from "../../lib/merx";
 import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
 import FicheEntreprise from "../../components/FicheEntreprise";
-import ResumeNotes from "../../components/ResumeNotes";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
-import BoutonsFiche from "../../components/fiche/BoutonsFiche";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
-import { etapesDeVie, notesDe, personnesDuProspect } from "../../lib/fiche";
+import { notesDe, personnesDuProspect } from "../../lib/fiche";
+import ColonneEntreprise, { etablissementDe } from "../../components/fiche/ColonneEntreprise";
+import PlacePipeline from "../../components/fiche/PlacePipeline";
+import OngletActions from "../../components/fiche/OngletActions";
+import { quandCourt } from "../../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
@@ -78,9 +77,6 @@ export default function ProjectView({
     removeProjectContact,
     addProjectDoc,
     removeProjectDoc,
-    addSuivi,
-    toggleSuivi,
-    removeSuivi,
     stages: toutesColonnes,
     pipelines,
     accounts,
@@ -96,9 +92,7 @@ export default function ProjectView({
   const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "", referent: "", aRepondu: false });
   const [ndName, setNdName] = useState("");
-  const [ns, setNs] = useState({ text: "", deadline: "" });
 
-  const today = todayISO();
   const total = client.jours * client.tarif;
 
   // Déblocage par étape : une fonction verrouillée tant que l'étape minimale
@@ -113,25 +107,16 @@ export default function ProjectView({
   };
 
   const [origine, setOrigine] = useState<Prospect | null>(null);
-  const [nbEchanges, setNbEchanges] = useState<number | null>(null);
-  const compter = useCallback((n: number) => setNbEchanges(n), []);
+  const [nbAVenir, setNbAVenir] = useState(0);
+  const compter = useCallback((n: number) => setNbAVenir(n), []);
   const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
   const [merxErreur, setMerxErreur] = useState<string | null>(null);
   const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
   /** Change de valeur après une action : l'historique se relit. */
   const [relire, setRelire] = useState(0);
 
-  // Onglets des fonctions, dans l'ordre du parcours.
-  // Quatre onglets, les mêmes que sur les autres fiches : ce qui est vrai, ce qu'on
-  // pense, ce qu'on fait, ce qui s'est passé. Leurs fonctions se rangent dedans.
-  const TABS: { key: string; label: string; compte?: number }[] = [
-    { key: "identite", label: "Identité" },
-    { key: "approche", label: "Approche" },
-    { key: "action", label: "Action" },
-    { key: "historique", label: "Historique", compte: (nbEchanges ?? 0) + client.suivis.length },
-  ];
-
-  const [tab, setTab] = useState("identite");
+  // Les onglets de la fiche « façon Onetip » : Actions, Dossier, et Devis (12/10).
+  const [tab, setTab] = useState("actions");
 
   /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
   const chargerOrigine = useCallback(async () => {
@@ -143,12 +128,6 @@ export default function ProjectView({
     void chargerOrigine();
   }, [chargerOrigine]);
 
-  const avancement = etapesDeVie({
-    trouveeLe: origine?.created_at ?? null,
-    approfondieLe: origine?.enriched_at ?? null,
-    pipeline: { colonne: client.stage, au: origine?.converted_at ?? null },
-    client: null,
-  });
 
   /** Ce que l'affaire sait en plus de sa fiche de prospection, ou tout, si elle n'en a pas. */
   const ceQueSaitLAffaire = [
@@ -318,11 +297,6 @@ export default function ProjectView({
     addProjectDoc(client.id, ndName);
     setNdName("");
   };
-  const submitSuivi = () => {
-    if (!ns.text.trim()) return;
-    addSuivi(client.id, { text: ns.text, deadline: ns.deadline || null });
-    setNs({ text: "", deadline: "" });
-  };
 
   const btnOutline =
     "ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors";
@@ -331,92 +305,100 @@ export default function ProjectView({
   return (
     <>
       <FicheEntreprise
-        titre={client.company}
-        sousTitre={[origine?.activity ?? client.naf, [client.ville, origine?.department ? `(${origine.department})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—"}
-        notes={notesDe(origine)}
-        badge={client.aRepondu ? <Badge className="bg-emerald-100 text-emerald-700">A répondu</Badge> : undefined}
-        referent={
-          <>
-            {/* Qui suit cette affaire. Le choix descend tout seul sur la fiche client le jour où elle est signée. */}
-            <ChoixReferent quoi="affaire" id={client.id} />
-            <QontoTag clientId={client.id} />
-          </>
-        }
-        enHaut={
-          <>
-            <button type="button" onClick={startEdit} className={btnOutline}>
-              <Pencil className="size-3.5" /> Modifier
-            </button>
-            <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
-          </>
-        }
-        identite={<LigneIdentite prospect={origine} siren={client.siren} adresse={client.adresse} />}
-        actions={
-          <BoutonsFiche
-            approfondie={Boolean(origine?.enriched_at)}
-            // Jamais passée par Merx : Approfondir lui confie la fiche.
-            onApprofondir={() => void (origine ? demanderAMerx("approfondir") : confierAMerx())}
-            onEcrire={() =>
-              origine
-                ? void demanderAMerx("email")
-                : setMerxErreur("Cette affaire n’est pas encore passée par Merx : cliquez d’abord sur « Approfondir ».")
+        colonne={
+          <ColonneEntreprise
+            titre={client.company}
+            sousTitre={[origine?.activity ?? client.naf, [client.ville, origine?.department ? `(${origine.department})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—"}
+            identite={<LigneIdentite prospect={origine} siren={client.siren} adresse={client.adresse} />}
+            notes={notesDe(origine)}
+            place={
+              <PlacePipeline
+                pipelines={pipelines}
+                stages={toutesColonnes}
+                pipelineId={client.pipelineId}
+                colonne={client.stage}
+                onChoisir={(s) => setClientStage(client.id, s)}
+              />
             }
-            enCours={merxEnCours}
-          />
-        }
-        message={
-          merxErreur ? (
-            <p className="mt-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p>
-          ) : undefined
-        }
-        avancement={avancement}
-        onglets={TABS.map((t) => ({ cle: t.key, label: t.label, compte: t.compte }))}
-        actif={tab}
-        onOnglet={setTab}
-        onClose={onClose}
-      >
-          {tab === "identite" && (
-            <>
-              <ResumeNotes cles={clesHistorique} />
-              <CeQuOnSait prospect={origine} enPlus={ceQueSaitLAffaire} />
+            referent={
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Qui suit cette affaire. Le choix descend tout seul sur la fiche client le jour où elle est signée. */}
+                <ChoixReferent quoi="affaire" id={client.id} />
+                <QontoTag clientId={client.id} />
+                {client.aRepondu && <Badge className="bg-emerald-100 text-emerald-700">A répondu</Badge>}
+              </div>
+            }
+            inscrite={origine ? `Trouvée le ${quandCourt(origine.created_at)} par Merx` : null}
+            interlocuteurs={
               <Interlocuteurs
                 personnes={interlocuteurs}
                 onAjouter={(x) => addProjectContact(client.id, x)}
                 onRetirer={(id) => removeProjectContact(client.id, id)}
               />
-              <Bloc titre="Documents">{DocumentsTab()}</Bloc>
-            </>
+            }
+            etablissement={origine ? etablissementDe(origine).lignes : ceQueSaitLAffaire}
+            manquants={origine ? etablissementDe(origine).manquants : []}
+            onCompleter={startEdit}
+          />
+        }
+        onglets={[
+          { cle: "actions", label: nbAVenir ? `Actions · ${nbAVenir} à venir` : "Actions" },
+          { cle: "dossier", label: "Dossier", etoile: Boolean(origine?.enriched_at) },
+          { cle: "devis", label: "Devis" },
+        ]}
+        actif={tab}
+        onOnglet={setTab}
+        enHaut={
+          <button type="button" onClick={startEdit} className={btnOutline}>
+            <Pencil className="size-3.5" /> Modifier la fiche
+          </button>
+        }
+        message={
+          merxErreur ? <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p> : undefined
+        }
+        onClose={onClose}
+      >
+          {/* Toujours monté : le compte des actions à venir reste juste sur les autres onglets. */}
+          <div className={tab === "actions" ? "" : "hidden"}>
+            <OngletActions
+              cles={clesHistorique}
+              personnes={interlocuteurs.map((q) => q.nom)}
+              etape={{ actuelle: client.stage, colonnes: stages.map((s) => s.label) }}
+              jalons={jalons}
+              avancer={async (s) => setClientStage(client.id, s)}
+              onEcrireAvecMerx={origine ? () => demanderAMerx("email") : undefined}
+              onCompte={compter}
+            />
+          </div>
+
+          {tab === "dossier" && (
+            <div className="flex max-w-[820px] flex-col gap-5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  // Jamais passée par Merx : Approfondir lui confie la fiche.
+                  onClick={() => void (origine ? demanderAMerx("approfondir") : confierAMerx())}
+                  disabled={merxEnCours !== null}
+                  className={btnOutline}
+                >
+                  {merxEnCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+                  {merxEnCours === "approfondir" ? "Merx approfondit… une bonne minute" : origine?.enriched_at ? "Approfondir à nouveau" : "Approfondir la fiche"}
+                </button>
+                <span className="text-[12.5px] text-muted-foreground">
+                  {origine?.enriched_at ? `Approfondie le ${quandCourt(origine.enriched_at)}.` : "Merx cherche le registre, le site, les interlocuteurs."}
+                </span>
+              </div>
+              <ApprocheEntreprise origine={origine} />
+              <CeQuOnSait prospect={origine} enPlus={ceQueSaitLAffaire} />
+              {/* Supprimer, tout en bas du dossier : loin des boutons du quotidien. */}
+              <div className="border-t border-border pt-4">
+                <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
+              </div>
+            </div>
           )}
 
-          {tab === "approche" && (
-            <ApprocheEntreprise origine={origine} />
-          )}
-
-          {tab === "action" && (
+          {tab === "devis" && (
             <>
-    {/* Bandeau d'avancement : dates de passage + durées entre étapes */}
-    <ParcoursBanner
-      clientId={client.id}
-      currentStage={client.stage}
-      // Comme en prospection : la fiche se referme et on voit la carte arriver
-      // dans sa nouvelle colonne.
-      onEtape={(s) => {
-        setClientStage(client.id, s);
-        onClose();
-      }}
-    />
-
-              <Bloc titre="Agir maintenant">
-                <ActionsFiche
-                  cles={{ clientId: client.id }}
-                  onFait={() => setRelire((n) => n + 1)}
-                  relire={relire}
-                  onEcrireAvecMerx={origine ? () => demanderAMerx("email") : undefined}
-                />
-              </Bloc>
-
-              <Bloc titre="Relances à faire">{SuivisTab()}</Bloc>
-
               {/* Un palier verrouillé se dit une fois, avec ce qu'il retient. */}
               {verrou("Proposition") ? (
                 <Verrouille etape="Proposition" fonctions="La proposition et le devis Qonto" />
@@ -428,6 +410,8 @@ export default function ProjectView({
                   </Bloc>
                 </>
               )}
+
+              <Bloc titre="Documents">{DocumentsTab()}</Bloc>
 
               {verrou("Signé") ? (
                 <Verrouille etape="Signé" fonctions="L’espace client et les rendez-vous" />
@@ -441,17 +425,6 @@ export default function ProjectView({
                   </Bloc>
                 </>
               )}
-            </>
-          )}
-
-          {tab === "historique" && (
-            <>
-              <p className="mb-3 text-[12.5px] text-muted-foreground">
-                Ce qui s’est passé, dans l’ordre. Rien ne s’y modifie : les actions se prennent dans l’onglet Action.
-              </p>
-              {/* Le fil reprend celui de la fiche Prospection d'origine : ce qui s'est
-                  dit avant le Pipeline (contacts, relances, commentaires) reste lisible. */}
-              <FilEchanges cles={clesHistorique} jalons={jalons} onCompte={compter} rafraichir={relire} />
             </>
           )}
       </FicheEntreprise>
@@ -588,77 +561,6 @@ export default function ProjectView({
 
   /** Ce que Merx avait trouvé, et ce qu’on peut encore lui demander. */
   // ---- Contenus d'onglets (fermetures sur l'état du composant) ----
-
-  function SuivisTab() {
-    return (
-      <>
-          <div className="flex flex-col">
-            {client.suivis.map((ev) => {
-              const overdue = ev.deadline && !ev.done && ev.deadline < today;
-              const badgeCls = ev.done
-                ? "bg-emerald-100 text-emerald-700"
-                : overdue
-                  ? "bg-rose-100 text-rose-700"
-                  : ev.deadline
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-muted text-muted-foreground";
-              const label = ev.deadline ? frDate(ev.deadline) : ev.when || "Sans échéance";
-              return (
-                <div key={ev.id} className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleSuivi(client.id, ev.id)}
-                    className={cn(
-                      "flex size-[18px] shrink-0 items-center justify-center rounded-md border-2 transition-colors",
-                      ev.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border",
-                    )}
-                  >
-                    {ev.done && <Check className="size-3" strokeWidth={3} />}
-                  </button>
-                  <div
-                    className={cn(
-                      "min-w-0 flex-1 text-[13px] leading-snug",
-                      ev.done ? "text-muted-foreground/70 line-through" : "text-avisdoc-ink",
-                    )}
-                  >
-                    {ev.text}
-                  </div>
-                  <span
-                    className={cn("shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold", badgeCls)}
-                  >
-                    {label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeSuivi(client.id, ev.id)}
-                    className="ad-x px-1 text-muted-foreground/60 transition-colors"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-3.5 flex flex-wrap gap-2">
-            <input
-              className={cn(inputCls, "min-w-[160px] flex-[2] rounded-full")}
-              placeholder="Nouvelle action de suivi…"
-              value={ns.text}
-              onChange={(e) => setNs({ ...ns, text: e.target.value })}
-            />
-            <input
-              type="date"
-              className={cn(inputCls, "rounded-full text-muted-foreground")}
-              value={ns.deadline}
-              onChange={(e) => setNs({ ...ns, deadline: e.target.value })}
-            />
-            <button type="button" onClick={submitSuivi} className={btnAccent} style={{ padding: "10px 18px" }}>
-              Ajouter
-            </button>
-          </div>
-      </>
-    );
-  }
 
   function DocumentsTab() {
     return (
