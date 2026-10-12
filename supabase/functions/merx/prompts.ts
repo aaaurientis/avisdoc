@@ -1045,7 +1045,7 @@ export function activitePrompt(
   const lignes = actions
     .map((a) => {
       const quand = new Date(a.au).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" });
-      const statut = a.prevu ? (a.fait ? "programmé, fait depuis" : "PROGRAMMÉ") : "fait";
+      const statut = a.prevu ? (a.resultat === "Annulé" ? "programmé puis annulé" : a.fait ? "programmé, fait depuis" : "PROGRAMMÉ") : "fait";
       const entete = [quand, a.genre, statut, a.resultat ? `résultat : ${a.resultat}` : "", a.avec ? `avec ${a.avec}` : "", a.titre && a.titre !== a.genre ? a.titre : "", `par ${a.par}`]
         .filter(Boolean)
         .join(" · ");

@@ -17,7 +17,9 @@ import ApercuFiche from "../components/ApercuFiche";
 import ProjectView from "./crm/ProjectView";
 import FicheClient from "./clients/FicheClient";
 import { useAdminData } from "../data/AdminDataContext";
-import { estColonneRdv, supprimerEchange } from "../lib/echanges";
+import { annulerAction, estColonneRdv } from "../lib/echanges";
+import { useAuth } from "../auth/AuthContext";
+import { prenomDe } from "../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
 
@@ -87,17 +89,21 @@ export default function Planning() {
   const [aVoir, setAVoir] = useState<Rendezvous | null>(null);
   const [ajout, setAjout] = useState(false);
   const { clients, accounts, setClientStage } = useAdminData();
+  const { user } = useAuth();
 
   // La fiche s'ouvre telle qu'elle est ailleurs — mêmes onglets, mêmes actions.
   const affaireVue = aVoir?.origine === "affaire" ? clients.find((c) => c.id === aVoir.ficheId) : undefined;
   const clientVu = aVoir?.origine === "client" ? accounts.find((a) => a.id === aVoir.ficheId) : undefined;
 
   const supprimer = async (a: Rendezvous) => {
-    if (!(await confirmer({ titre: `Supprimer « ${a.titre} » ?`, message: "Cette action disparaîtra du planning et de la fiche." }))) return;
+    if (
+      !(await confirmer({ titre: `Annuler « ${a.titre} » ?`, action: "Annuler l’action", message: "Elle quitte le Planning et les actions à venir. Elle reste dans l’historique de la fiche, « Annulé »." }))
+    )
+      return;
     try {
-      await apresSuppression(await supprimerEchange(a.id));
+      await apresSuppression(await annulerAction(a.id, prenomDe(user?.email) || (user?.email ?? "")));
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : "La suppression a échoué.");
+      setErreur(e instanceof Error ? e.message : "L’annulation a échoué.");
     }
   };
 
@@ -311,8 +317,8 @@ export default function Planning() {
                             <button
                               type="button"
                               onClick={() => void supprimer(a)}
-                              aria-label={`Supprimer ${a.titre}`}
-                              title="Supprimer"
+                              aria-label={`Annuler ${a.titre}`}
+                              title="Annuler l’action"
                               className="rounded-lg p-1 text-muted-foreground hover:text-rose-700"
                             >
                               <Trash2 className="size-3.5" />

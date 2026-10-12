@@ -14,7 +14,7 @@ import ResumeActivite from "./ResumeActivite";
 import { cn } from "@/lib/utils";
 
 /** « Appel prévu », « Rendez-vous prévu »… ou, pour une action faite, son nom. */
-const libelleLigne = (a: Echange) => (a.prevu && !a.traite_le ? `${libelleGenre(a.kind)} prévu` : libelleGenre(a.kind));
+const libelleLigne = (a: Echange) => (a.prevu ? `${libelleGenre(a.kind)} prévu` : libelleGenre(a.kind));
 
 /** Le titre ne dit quelque chose que s'il n'est pas le nom du genre (les anciennes actions en ont un vrai). */
 const titreParlant = (a: Echange) => a.titre && ![libelleGenre(a.kind), `${libelleGenre(a.kind)} prévu`, "Note"].includes(a.titre);
@@ -170,7 +170,8 @@ export default function OngletActions({
 
   const aVenir = actions.filter((a) => a.prevu && !a.traite_le).sort((a, b) => a.au.localeCompare(b.au));
   // Une action programmée puis faite n'encombre pas l'historique : son compte rendu y est déjà.
-  const faites = actions.filter((a) => !a.prevu);
+  // Annulée, elle y reste, « Annulé » : rien ne s'efface (Olivier, 12/10).
+  const faites = actions.filter((a) => !a.prevu || (a.traite_le && a.resultat === "Annulé"));
   const historique = [
     ...faites.map((a) => ({ au: a.au, action: a as Echange | null, jalon: null as Jalon | null })),
     ...jalons.map((j) => ({ au: j.au, action: null, jalon: j })),

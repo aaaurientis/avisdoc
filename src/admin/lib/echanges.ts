@@ -151,19 +151,30 @@ export async function ajouterEchange(
 }
 
 /**
- * Une action PROGRAMMÉE se supprime ; ce qui a eu lieu, jamais.
+ * Annuler une action programmée. RIEN NE S'EFFACE (Olivier, 12/10 : « on garde tout
+ * dans l'historique, rien ne peut être supprimé ») : elle quitte « À venir », le
+ * Planning et les rappels, et reste dans l'historique, « Annulé », avec qui et quand.
  *
  * Un rendez-vous qui avait fait passer l'affaire en « RDV » rend la colonne où elle
  * était, s'il ne reste aucun autre rendez-vous programmé sur elle : à l'appelant de
  * l'y remettre (Olivier, 12/10 : « tu lui retires son rendez-vous, tu la remets dans
  * sa case »).
  */
-export async function supprimerEchange(id: string): Promise<{ clientId: string; colonne: string } | null> {
-  const { data: avant } = await supabaseAdmin.from("admin_echanges").select("kind, client_id, colonne_avant").eq("id", id).maybeSingle();
-  const { error } = await supabaseAdmin.from("admin_echanges").delete().eq("id", id).eq("prevu", true).is("traite_le", null);
+export async function annulerAction(id: string, qui: string): Promise<{ clientId: string; colonne: string } | null> {
+  const { data: avant, error: lecture } = await supabaseAdmin.from("admin_echanges").select("kind, client_id, colonne_avant, detail").eq("id", id).maybeSingle();
+  if (lecture) throw new Error(lecture.message);
+  const a = avant as { kind: string; client_id: string | null; colonne_avant: string | null; detail: string | null } | null;
+  if (!a) return null;
+  const jour = new Date().toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+  const trace = `— Annulé le ${jour}${qui ? ` par ${qui}` : ""}.`;
+  const { error } = await supabaseAdmin
+    .from("admin_echanges")
+    .update({ traite_le: new Date().toISOString(), resultat: "Annulé", detail: a.detail?.trim() ? `${a.detail.trim()}\n\n${trace}` : trace })
+    .eq("id", id)
+    .eq("prevu", true)
+    .is("traite_le", null);
   if (error) throw new Error(error.message);
-  const a = avant as { kind: string; client_id: string | null; colonne_avant: string | null } | null;
-  if (!a || a.kind !== "rdv" || !a.client_id || !a.colonne_avant) return null;
+  if (a.kind !== "rdv" || !a.client_id || !a.colonne_avant) return null;
   return (await rdvEncorePrevu(a.client_id)) ? null : { clientId: a.client_id, colonne: a.colonne_avant };
 }
 
