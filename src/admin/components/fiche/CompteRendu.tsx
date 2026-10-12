@@ -30,6 +30,7 @@ import {
   RESULTATS,
   SUITES,
   colonneDEntree,
+  colonneRdvSiAvance,
   etapeProposee,
   faitEntrerAuPipeline,
   heureISO,
@@ -170,10 +171,17 @@ export default function CompteRendu({
 
   const aujourdhui = jourISO(new Date());
   const auPipeline = Boolean(etape?.actuelle);
-  const proposee = mode === "fait" && etape ? etapeProposee(quoi, resultat, suite, etape.actuelle, etape.colonnes) : null;
+  const propose = mode === "fait" && etape ? etapeProposee(quoi, resultat, suite, etape.actuelle, etape.colonnes) : null;
+  // Un rendez-vous pris (programmé, à suivre, fait ou reporté) : la fiche passe en « RDV », sans demander.
+  const rdvPris =
+    (mode === "programmer" && quoi === "rdv" && !replanifie) ||
+    ((mode === "fait" || mode === "revoir") && suite === "rdv") ||
+    (mode === "fait" && quoi === "rdv" && (resultat === "Fait" || resultat === "Reporté"));
+  const versRdv = rdvPris && etape ? colonneRdvSiAvance(etape.actuelle, etape.colonnes) : null;
+  const proposee = propose === versRdv ? null : propose;
   // Hors Pipeline, mettre une action sur le prospect l'y fait entrer.
   const entree = Boolean(entrer) && !auPipeline && (mode === "fait" || mode === "programmer") && !existante && faitEntrerAuPipeline(quoi);
-  const colonneEntree = etape ? colonneDEntree(mode === "fait", etape.colonnes) : "Contacté";
+  const colonneEntree = versRdv ?? (etape ? colonneDEntree(mode === "fait", etape.colonnes) : "Contacté");
   const aProposer = proposee && !(entree && proposee === colonneEntree) ? proposee : null;
   const avecQui = (mode === "programmer" || mode === "fait") && personnes.length > 0;
   const par = user?.email ?? "";
@@ -225,6 +233,7 @@ export default function CompteRendu({
         } else {
           if (contenu.trim()) await ajouterPrecision(existante, contenu, prenomDe(par) || par);
           await programmerSuite(cles);
+          if (versRdv && avancer) await avancer(versRdv);
         }
         onEnregistre();
         return;
@@ -232,7 +241,7 @@ export default function CompteRendu({
 
       // Le prospect entre d'abord au Pipeline : l'action se range sur l'affaire.
       let c = cles;
-      if (entree && entrer) c = await entrer(aProposer && etapeOk && mode === "fait" ? aProposer : colonneEntree);
+      if (entree && entrer) c = await entrer(!versRdv && aProposer && etapeOk && mode === "fait" ? aProposer : colonneEntree);
 
       if (mode === "programmer") {
         await ajouterEchange(c, {
@@ -246,6 +255,7 @@ export default function CompteRendu({
           rdvMode: quoi === "rdv" ? rdvMode : null,
           rdvLien: quoi === "rdv" ? rdvLien : null,
         });
+        if (!entree && versRdv && avancer) await avancer(versRdv);
         onEnregistre();
         return;
       }
@@ -262,7 +272,10 @@ export default function CompteRendu({
       });
       if (depuisPrevue) await marquerTraitee(depuisPrevue.id);
       await programmerSuite(c);
-      if (!entree && aProposer && etapeOk && avancer) await avancer(aProposer);
+      if (!entree && avancer) {
+        if (versRdv) await avancer(versRdv);
+        else if (aProposer && etapeOk) await avancer(aProposer);
+      }
       onEnregistre();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L’enregistrement a échoué.");
@@ -454,9 +467,10 @@ export default function CompteRendu({
         </>
       )}
 
-      {(entree || aProposer) && (
+      {(entree || aProposer || versRdv) && (
         <div className="mt-4 rounded-xl bg-muted/60 px-3 py-2.5 text-[12.5px] leading-snug text-muted-foreground">
-          {entree && <div>La fiche entrera au Pipeline{aProposer && etapeOk ? "" : `, en « ${colonneEntree} »`}.</div>}
+          {entree && <div>La fiche entrera au Pipeline{!versRdv && aProposer && etapeOk ? "" : `, en « ${colonneEntree} »`}.</div>}
+          {!entree && versRdv && <div className="font-semibold text-avisdoc-ink">Rendez-vous pris : la fiche passera en « {versRdv} ».</div>}
           {aProposer && (
             <label className={cn("flex cursor-pointer items-center gap-2 font-semibold text-avisdoc-ink", entree && "mt-1.5")}>
               <input type="checkbox" checked={etapeOk} onChange={(e) => setEtapeOk(e.target.checked)} className="size-4 accent-avisdoc-teal" />

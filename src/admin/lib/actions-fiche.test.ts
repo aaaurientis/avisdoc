@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { colonneDEntree, etapeProposee, faitEntrerAuPipeline, instant, lienValide } from "./actions-fiche";
+import { colonneDEntree, colonneRdvSiAvance, etapeProposee, faitEntrerAuPipeline, instant, lienValide } from "./actions-fiche";
 
 const COLONNES = ["Qualifié", "Contacté", "Présentation", "RDV", "Proposition", "Signé", "Perdu"];
 
@@ -49,5 +49,16 @@ describe("le lien de la visio", () => {
     expect(lienValide("")).toBe(true);
     expect(lienValide("javascript:alert(1)")).toBe(false);
     expect(lienValide("https://x.fr/\"onmouseover")).toBe(false);
+  });
+});
+
+describe("un rendez-vous pris", () => {
+  it("fait passer la fiche en « RDV »", () => {
+    expect(colonneRdvSiAvance("Contacté", COLONNES)).toBe("RDV");
+    expect(colonneRdvSiAvance(null, COLONNES)).toBe("RDV");
+  });
+  it("ne la fait jamais reculer", () => {
+    expect(colonneRdvSiAvance("Proposition", COLONNES)).toBeNull();
+    expect(colonneRdvSiAvance("RDV", COLONNES)).toBeNull();
   });
 });

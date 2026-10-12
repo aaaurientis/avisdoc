@@ -71,6 +71,18 @@ export function etapeProposee(
 }
 
 /**
+ * Un rendez-vous est pris : la fiche passe d'elle-même dans la colonne « RDV »
+ * (Olivier, 12/10 : « si on colle un rendez-vous, ça va dans la colonne rendez-vous »).
+ * Sans case à cocher, mais jamais en arrière : une affaire déjà en Proposition y reste.
+ */
+export function colonneRdvSiAvance(actuelle: string | null, colonnes: string[]): string | null {
+  const rang = (nom: string) => colonnes.findIndex((c) => c.trim().toLowerCase() === nom.trim().toLowerCase());
+  const rdv = colonnes.find((c) => c.trim().toLowerCase() === "rdv");
+  if (!rdv) return null;
+  return rang(rdv) > (actuelle ? rang(actuelle) : -1) ? rdv : null;
+}
+
+/**
  * Mettre une action sur un prospect le fait entrer au Pipeline (Olivier, 12/10 :
  * « quand on commence à lui mettre une action, automatiquement elle rentre dans le
  * pipeline »). Une note, elle, ne le bouge pas.

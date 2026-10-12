@@ -11,6 +11,8 @@ export interface ActionPrevue {
   kind: GenreEchange;
   au: string;
   titre: string;
+  /** Un rendez-vous : en visio ou sur place. */
+  rdvMode: "visio" | "sur_place" | null;
 }
 
 export interface Prevu {
@@ -27,7 +29,7 @@ export interface Prevu {
 export async function actionsPrevues(): Promise<Map<string, Prevu>> {
   const { data } = await supabaseAdmin
     .from("admin_echanges")
-    .select("client_id, prospect_id, account_id, kind, au, titre")
+    .select("client_id, prospect_id, account_id, kind, au, titre, rdv_mode")
     .eq("prevu", true)
     .is("traite_le", null)
     .order("au", { ascending: true });
@@ -35,12 +37,12 @@ export async function actionsPrevues(): Promise<Map<string, Prevu>> {
   const par = new Map<string, Prevu>();
   for (const e of (data ?? []) as {
     client_id: string | null; prospect_id: string | null; account_id: string | null;
-    kind: GenreEchange; au: string; titre: string;
+    kind: GenreEchange; au: string; titre: string; rdv_mode: "visio" | "sur_place" | null;
   }[]) {
     const cle = e.client_id ?? e.prospect_id ?? e.account_id;
     if (!cle) continue;
     const vu = par.get(cle) ?? { actions: [], prochain: null };
-    vu.actions.push({ kind: e.kind, au: e.au, titre: e.titre });
+    vu.actions.push({ kind: e.kind, au: e.au, titre: e.titre, rdvMode: e.rdv_mode });
     // Les lignes arrivent triées : la première vue est la plus proche.
     if (!vu.prochain) vu.prochain = e.au;
     par.set(cle, vu);
