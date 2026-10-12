@@ -98,18 +98,30 @@ Deno.serve(async (req) => {
   // Les noms des fiches concernées, en trois requêtes plutôt qu'une par action.
   const ids = (cle: "prospect_id" | "client_id" | "account_id") => [...new Set(dues.map((a) => a[cle]).filter((v): v is string => Boolean(v)))];
   const [prospects, affaires, clients] = await Promise.all([
-    ids("prospect_id").length ? admin.from("admin_prospects").select("id, name").in("id", ids("prospect_id")) : { data: [] },
-    ids("client_id").length ? admin.from("admin_clients").select("id, company").in("id", ids("client_id")) : { data: [] },
-    ids("account_id").length ? admin.from("admin_accounts").select("id, name").in("id", ids("account_id")) : { data: [] },
+    ids("prospect_id").length ? admin.from("admin_prospects").select("id, name, deleted_at").in("id", ids("prospect_id")) : { data: [] },
+    ids("client_id").length ? admin.from("admin_clients").select("id, company, deleted_at").in("id", ids("client_id")) : { data: [] },
+    ids("account_id").length ? admin.from("admin_accounts").select("id, name, deleted_at").in("id", ids("account_id")) : { data: [] },
   ]);
   const nom = new Map<string, string>();
-  for (const p of (prospects.data ?? []) as { id: string; name: string }[]) nom.set(p.id, p.name);
-  for (const c of (affaires.data ?? []) as { id: string; company: string }[]) nom.set(c.id, c.company);
-  for (const a of (clients.data ?? []) as { id: string; name: string }[]) nom.set(a.id, a.name);
+  // Une fiche à la corbeille ne fait plus partir de rappel.
+  const jetees = new Set<string>();
+  for (const p of (prospects.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+    nom.set(p.id, p.name);
+    if (p.deleted_at) jetees.add(p.id);
+  }
+  for (const c of (affaires.data ?? []) as { id: string; company: string; deleted_at: string | null }[]) {
+    nom.set(c.id, c.company);
+    if (c.deleted_at) jetees.add(c.id);
+  }
+  for (const a of (clients.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+    nom.set(a.id, a.name);
+    if (a.deleted_at) jetees.add(a.id);
+  }
 
   let envoyes = 0;
   const echecs: string[] = [];
   for (const a of dues) {
+    if ([a.client_id, a.prospect_id, a.account_id].some((id) => id && jetees.has(id))) continue;
     try {
       await envoyer(a, nom.get(a.client_id ?? a.prospect_id ?? a.account_id ?? "") ?? "");
       // Posé seulement si le mail est parti : un échec sera retenté au passage suivant.

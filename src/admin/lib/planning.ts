@@ -64,17 +64,29 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
     [...new Set(lignes.map((l) => l[cle]).filter((v): v is string => Boolean(v)))];
 
   const [prospects, affaires, clients] = await Promise.all([
-    ids("prospect_id").length ? supabaseAdmin.from("admin_prospects").select("id, name").in("id", ids("prospect_id")) : { data: [] },
-    ids("client_id").length ? supabaseAdmin.from("admin_clients").select("id, company").in("id", ids("client_id")) : { data: [] },
-    ids("account_id").length ? supabaseAdmin.from("admin_accounts").select("id, name").in("id", ids("account_id")) : { data: [] },
+    ids("prospect_id").length ? supabaseAdmin.from("admin_prospects").select("id, name, deleted_at").in("id", ids("prospect_id")) : { data: [] },
+    ids("client_id").length ? supabaseAdmin.from("admin_clients").select("id, company, deleted_at").in("id", ids("client_id")) : { data: [] },
+    ids("account_id").length ? supabaseAdmin.from("admin_accounts").select("id, name, deleted_at").in("id", ids("account_id")) : { data: [] },
   ]);
 
   const nom = new Map<string, string>();
-  for (const p of (prospects.data ?? []) as { id: string; name: string }[]) nom.set(p.id, p.name);
-  for (const c of (affaires.data ?? []) as { id: string; company: string }[]) nom.set(c.id, c.company);
-  for (const a of (clients.data ?? []) as { id: string; name: string }[]) nom.set(a.id, a.name);
+  // Une fiche partie à la corbeille emporte ses actions hors du planning. Elles ne
+  // sont pas effacées : la fiche restaurée les retrouve (Olivier, 12/10).
+  const jetees = new Set<string>();
+  for (const p of (prospects.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+    nom.set(p.id, p.name);
+    if (p.deleted_at) jetees.add(p.id);
+  }
+  for (const c of (affaires.data ?? []) as { id: string; company: string; deleted_at: string | null }[]) {
+    nom.set(c.id, c.company);
+    if (c.deleted_at) jetees.add(c.id);
+  }
+  for (const a of (clients.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+    nom.set(a.id, a.name);
+    if (a.deleted_at) jetees.add(a.id);
+  }
 
-  return lignes.map((l) => {
+  return lignes.filter((l) => ![l.client_id, l.prospect_id, l.account_id].some((id) => id && jetees.has(id))).map((l) => {
     const ficheId = l.client_id ?? l.prospect_id ?? l.account_id ?? "";
     // Une action peut ne concerner aucune entreprise : préparer une tournée, passer
     // au salon. Elle n'a alors pas de fiche, et l'écran n'en propose pas l'ouverture ;

@@ -34,12 +34,25 @@ export async function actionsPrevues(): Promise<Map<string, Prevu>> {
     .is("traite_le", null)
     .order("au", { ascending: true });
 
-  const par = new Map<string, Prevu>();
-  for (const e of (data ?? []) as {
+  const lignes = (data ?? []) as {
     client_id: string | null; prospect_id: string | null; account_id: string | null;
     kind: GenreEchange; au: string; titre: string; rdv_mode: ModeRdv | null;
-  }[]) {
-    const cle = e.client_id ?? e.prospect_id ?? e.account_id;
+  }[];
+
+  // Une action notée quand l'entreprise n'était encore qu'un prospect se voit sur la
+  // carte de l'affaire qu'il est devenu (Mars, Bollinger : rendez-vous pris avant le Pipeline).
+  const prospects = [...new Set(lignes.filter((e) => !e.client_id && e.prospect_id).map((e) => e.prospect_id as string))];
+  const devenu = new Map<string, string>();
+  if (prospects.length) {
+    const { data: convertis } = await supabaseAdmin.from("admin_prospects").select("id, converted_client_id").in("id", prospects);
+    for (const p of (convertis ?? []) as { id: string; converted_client_id: string | null }[]) {
+      if (p.converted_client_id) devenu.set(p.id, p.converted_client_id);
+    }
+  }
+
+  const par = new Map<string, Prevu>();
+  for (const e of lignes) {
+    const cle = e.client_id ?? (e.prospect_id ? (devenu.get(e.prospect_id) ?? e.prospect_id) : null) ?? e.account_id;
     if (!cle) continue;
     const vu = par.get(cle) ?? { actions: [], prochain: null };
     vu.actions.push({ kind: e.kind, au: e.au, titre: e.titre, rdvMode: e.rdv_mode });
