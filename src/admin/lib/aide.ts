@@ -108,9 +108,10 @@ export const ECRANS: EcranAide[] = [
     id: "planning",
     titre: "Planning",
     to: "/planning",
-    resume: "La semaine, du lundi au vendredi, de tout ce qui est programmé par l'équipe.",
+    resume: "Tout ce qui est programmé par l'équipe, à la semaine (du lundi au vendredi) ou au mois.",
     points: [
       "Toute action programmée sur une fiche y apparaît au jour prévu.",
+      "« Semaine » montre le détail de chaque action ; « Mois » montre le mois entier, week-ends compris. Un clic sur un jour du mois ouvre sa semaine.",
       "« Ajouter une action » : rendez-vous, appel, e-mail ou « À faire », pour une entreprise ou juste pour vous (« Aucune — c'est une action à moi »).",
       "Au survol d'une action : l'œil ouvre la fiche, le crayon la modifie ou la déplace, la poubelle l'annule.",
       "Un mail de rappel part à celui qui a programmé l'action : 15 minutes avant, ou 2 heures avant un rendez-vous sur place ou chez le client.",
@@ -296,7 +297,11 @@ export const QUESTIONS: ThemeAide[] = [
       },
       {
         question: "Je vois les actions de mes collègues : c'est normal ?",
-        reponse: "Oui, le Planning montre toute l'équipe, du lundi au vendredi.",
+        reponse: "Oui, le Planning montre toute l'équipe.",
+      },
+      {
+        question: "Comment voir tout le mois ?",
+        reponse: "Dans le Planning, cliquez sur « Mois ». Chaque jour montre ses trois premières actions ; « + N autres » ou un clic sur le jour ouvre la semaine en détail. Les flèches passent d'un mois à l'autre.",
       },
     ],
   },
