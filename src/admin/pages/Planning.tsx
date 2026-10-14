@@ -1,4 +1,4 @@
-// Le planning de la semaine : tout ce qui est programmé, d'où que ça vienne.
+// Le planning de la semaine, ou du mois : tout ce qui est programmé, d'où que ça vienne.
 //
 // C'est l'écran qu'on ouvre le matin. Les appels, rendez-vous, e-mails et notes
 // notés depuis la prospection, le Pipeline ou le fichier client s'y retrouvent tous,
@@ -79,9 +79,17 @@ const chemin: Record<Origine, (id: string) => string> = {
   note: () => "/debrief",
 };
 
+/** Le 1er du mois d'une date, à minuit. */
+const premierDuMois = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+/** Combien d'actions un jour du mois montre avant « + N autres ». */
+const PAR_JOUR_DANS_LE_MOIS = 3;
+
 export default function Planning() {
   const navigate = useNavigate();
+  const [vue, setVue] = useState<"semaine" | "mois">("semaine");
   const [debut, setDebut] = useState(() => lundiDe(new Date()));
+  const [mois, setMois] = useState(() => premierDuMois(new Date()));
   const [lignes, setLignes] = useState<Rendezvous[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -114,18 +122,27 @@ export default function Planning() {
     await charger();
   };
 
-  // La lecture s'arrête au vendredi soir : ce qui tombe le week-end n'est pas montré,
-  // et ne doit donc pas être compté.
+  // La semaine s'arrête au vendredi soir : ce qui tombe le week-end n'y est pas montré,
+  // et ne doit donc pas être compté. Le mois, lui, montre tout, week-ends compris, du
+  // lundi de sa première semaine au dimanche de sa dernière.
   const fin = useMemo(() => {
     const f = new Date(debut);
     f.setDate(f.getDate() + JOURS_OUVRES);
     return f;
   }, [debut]);
+  const grille = useMemo(() => {
+    const du = lundiDe(mois);
+    const dernier = new Date(mois.getFullYear(), mois.getMonth() + 1, 0);
+    const au = lundiDe(dernier);
+    au.setDate(au.getDate() + 7);
+    return { du, au };
+  }, [mois]);
+  const plage = vue === "semaine" ? { du: debut, au: fin } : grille;
 
   const charger = useCallback(async () => {
     setChargement(true);
     try {
-      setLignes(await chargerPlanning(debut, fin));
+      setLignes(await chargerPlanning(plage.du, plage.au));
       setErreur(null);
     } catch (e) {
       const m = e instanceof Error ? e.message : "Chargement impossible.";
@@ -137,7 +154,9 @@ export default function Planning() {
     } finally {
       setChargement(false);
     }
-  }, [debut, fin]);
+    // plage change avec ses deux dates : on les suit, elles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plage.du.getTime(), plage.au.getTime()]);
 
   useEffect(() => {
     void charger();
@@ -153,14 +172,39 @@ export default function Planning() {
     [debut, lignes],
   );
 
-  const decaler = (semaines: number) => {
+  /** Les jours de la grille du mois, semaine par semaine, avec leurs actions. */
+  const jours = useMemo(() => {
+    const liste: { jour: Date; actions: Rendezvous[] }[] = [];
+    for (const j = new Date(grille.du); j < grille.au; j.setDate(j.getDate() + 1)) {
+      const jour = new Date(j);
+      liste.push({ jour, actions: lignes.filter((l) => memeJour(new Date(l.au), jour)) });
+    }
+    return liste;
+  }, [grille, lignes]);
+
+  const decaler = (pas: number) => {
+    if (vue === "mois") return setMois(new Date(mois.getFullYear(), mois.getMonth() + pas, 1));
     const d = new Date(debut);
-    d.setDate(d.getDate() + semaines * 7);
+    d.setDate(d.getDate() + pas * 7);
     setDebut(d);
   };
 
+  /** Un jour du mois cliqué : sa semaine s'ouvre, avec tout le détail. */
+  const ouvrirSemaine = (jour: Date) => {
+    setDebut(lundiDe(jour));
+    setVue("semaine");
+  };
+
   const cetteSemaine = memeJour(debut, lundiDe(new Date()));
+  const ceMois = memeJour(mois, premierDuMois(new Date()));
+  const surAujourdhui = vue === "semaine" ? cetteSemaine : ceMois;
   const duAu = `${debut.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} au ${new Date(fin.getTime() - 1).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`;
+  const nomDuMois = mois.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  // Le compte du mois ne prend que les jours du mois, pas ceux des semaines qui débordent.
+  const dansLeMois = lignes.filter((l) => {
+    const d = new Date(l.au);
+    return d.getMonth() === mois.getMonth() && d.getFullYear() === mois.getFullYear();
+  }).length;
 
   return (
     <div>
@@ -169,7 +213,9 @@ export default function Planning() {
         subtitle={
           chargement
             ? "Chargement…"
-            : `${lignes.length} action${lignes.length > 1 ? "s" : ""} du ${duAu} — prospection, Pipeline et clients réunis`
+            : vue === "semaine"
+              ? `${lignes.length} action${lignes.length > 1 ? "s" : ""} du ${duAu} — prospection, Pipeline et clients réunis`
+              : `${dansLeMois} action${dansLeMois > 1 ? "s" : ""} en ${nomDuMois} — prospection, Pipeline et clients réunis`
         }
         action={
           <div className="flex flex-wrap items-center gap-1">
@@ -180,27 +226,48 @@ export default function Planning() {
             >
               <Plus className="size-3.5" /> Ajouter une action
             </button>
+            <div className="mr-1 inline-flex rounded-full border border-border p-0.5" role="group" aria-label="Vue du planning">
+              {(["semaine", "mois"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={vue === v}
+                  onClick={() => {
+                    // On passe au mois de la semaine regardée, et inversement.
+                    if (v === "mois") setMois(premierDuMois(debut));
+                    else if (vue === "mois") setDebut(lundiDe(ceMois ? new Date() : mois));
+                    setVue(v);
+                  }}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors",
+                    vue === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
+                  )}
+                >
+                  {v === "semaine" ? "Semaine" : "Mois"}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => decaler(-1)}
-              aria-label="Semaine précédente"
+              aria-label={vue === "semaine" ? "Semaine précédente" : "Mois précédent"}
               className="rounded-full border border-border p-2 text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
             >
               <ChevronLeft className="size-4" />
             </button>
-            {!cetteSemaine && (
+            {!surAujourdhui && (
               <button
                 type="button"
-                onClick={() => setDebut(lundiDe(new Date()))}
+                onClick={() => (vue === "semaine" ? setDebut(lundiDe(new Date())) : setMois(premierDuMois(new Date())))}
                 className="rounded-full border border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
               >
-                Cette semaine
+                {vue === "semaine" ? "Cette semaine" : "Ce mois-ci"}
               </button>
             )}
             <button
               type="button"
               onClick={() => decaler(1)}
-              aria-label="Semaine suivante"
+              aria-label={vue === "semaine" ? "Semaine suivante" : "Mois suivant"}
               className="rounded-full border border-border p-2 text-muted-foreground transition-colors hover:border-avisdoc-teal hover:text-avisdoc-ink"
             >
               <ChevronRight className="size-4" />
@@ -214,6 +281,88 @@ export default function Planning() {
       {chargement ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Chargement…
+        </div>
+      ) : vue === "mois" ? (
+        <div>
+          <h2 className="mb-3 font-display text-xl font-semibold capitalize text-avisdoc-ink">{nomDuMois}</h2>
+          {/* Les noms des jours ; sur téléphone, les jours s'empilent et portent leur nom. */}
+          <div className="mb-1.5 grid grid-cols-7 gap-1.5 max-sm:hidden">
+            {JOURS.map((j, i) => (
+              <div key={j} className={cn("px-2 text-[11px] font-bold uppercase tracking-wide", i >= 5 ? "text-muted-foreground/70" : "text-muted-foreground")}>
+                {j}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1.5 max-sm:grid-cols-1">
+            {jours.map(({ jour, actions }) => {
+              const aujourdhui = memeJour(jour, new Date());
+              const horsDuMois = jour.getMonth() !== mois.getMonth();
+              const weekEnd = jour.getDay() === 0 || jour.getDay() === 6;
+              const montrees = actions.slice(0, PAR_JOUR_DANS_LE_MOIS);
+              return (
+                <div
+                  key={jour.toISOString()}
+                  className={cn(
+                    "flex min-h-[112px] min-w-0 flex-col rounded-xl border p-1.5 max-sm:min-h-0",
+                    aujourdhui ? "border-avisdoc-teal bg-avisdoc-teal/5" : "border-border",
+                    weekEnd && !aujourdhui && "bg-muted/40",
+                    horsDuMois && "opacity-50",
+                    // Sur téléphone, un jour sans rien ne prend pas de place.
+                    actions.length === 0 && "max-sm:hidden",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => ouvrirSemaine(jour)}
+                    title="Voir la semaine"
+                    className={cn(
+                      "mb-1 flex items-baseline gap-1.5 rounded-md px-1 text-left text-[12.5px] font-bold hover:text-avisdoc-teal",
+                      aujourdhui ? "text-avisdoc-teal" : "text-avisdoc-ink",
+                    )}
+                  >
+                    <span className="sm:hidden">{JOURS[(jour.getDay() + 6) % 7]}</span>
+                    {jour.getDate()}
+                    {jour.getDate() === 1 && <span className="font-semibold">{jour.toLocaleDateString("fr-FR", { month: "short" })}</span>}
+                  </button>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    {montrees.map((a) => {
+                      const Icone = ICONES[a.kind];
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => (a.modifiable ? setAModifier(a) : a.fiche && setAVoir(a))}
+                          title={[heure(a.au), a.titre, a.fiche].filter(Boolean).join(" · ")}
+                          className="flex min-w-0 flex-col rounded-md bg-card px-1 py-0.5 text-left text-[11.5px] leading-tight transition-colors hover:bg-accent"
+                        >
+                          {/* L'heure, puis le nom sur sa propre ligne : côte à côte, une case
+                              étroite ne laissait voir qu'une lettre du nom. */}
+                          <span className="flex items-center gap-1">
+                            <span className={cn("inline-flex size-4 shrink-0 items-center justify-center rounded-full", TEINTES[a.kind])}>
+                              <Icone className="size-2.5" strokeWidth={2.6} />
+                            </span>
+                            <span className="font-mono font-bold text-avisdoc-ink">{heure(a.au)}</span>
+                          </span>
+                          <span className={cn("min-w-0 truncate font-semibold", a.modifiable ? "text-avisdoc-ink" : "text-muted-foreground line-through")}>
+                            {a.fiche || a.titre}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {actions.length > PAR_JOUR_DANS_LE_MOIS && (
+                      <button
+                        type="button"
+                        onClick={() => ouvrirSemaine(jour)}
+                        className="rounded-md px-1 text-left text-[11.5px] font-bold text-avisdoc-teal hover:underline"
+                      >
+                        + {actions.length - PAR_JOUR_DANS_LE_MOIS} autre{actions.length - PAR_JOUR_DANS_LE_MOIS > 1 ? "s" : ""}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div
@@ -339,7 +488,7 @@ export default function Planning() {
 
       {!chargement && lignes.length === 0 && (
         <div className="mt-3 rounded-2xl bg-muted/60 p-6 text-center">
-          <SectionLabel>Semaine libre</SectionLabel>
+          <SectionLabel>{vue === "semaine" ? "Semaine libre" : "Mois libre"}</SectionLabel>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
             Les appels, rendez-vous et relances que vous notez depuis l’onglet Action d’une fiche apparaissent ici, au
             jour et à l’heure prévus. « Ajouter une action » en pose une directement, avec ou sans entreprise.
@@ -362,7 +511,7 @@ export default function Planning() {
         />
       )}
 
-      {ajout && <NouvelleAction jour={cetteSemaine ? new Date() : debut} onClose={() => setAjout(false)} onFait={charger} />}
+      {ajout && <NouvelleAction jour={vue === "semaine" ? (cetteSemaine ? new Date() : debut) : ceMois ? new Date() : mois} onClose={() => setAjout(false)} onFait={charger} />}
 
       {aModifier && (
         <ModifierAction
