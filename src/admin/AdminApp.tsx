@@ -15,6 +15,7 @@ import Corbeille from "./pages/Corbeille";
 import Confirmation from "./components/Confirmation";
 import Debrief from "./pages/Debrief";
 import Planning from "./pages/Planning";
+import Aide from "./pages/Aide";
 import Clients from "./pages/Clients";
 import Contacts from "./pages/Contacts";
 import ContactsDashboard from "./pages/ContactsDashboard";
@@ -86,6 +87,7 @@ function Gate() {
           <Route path="/notes-dictees" element={<Navigate to="/debrief" replace />} />
           <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
           <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
+          <Route path="/aide" element={<Garde module="crm"><Aide /></Garde>} />
           <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
           <Route path="/contacts" element={<Garde module="contacts"><ContactsDashboard /></Garde>} />
           <Route path="/contacts/requis" element={<Garde module="contacts"><Contacts fixedType="Requis" /></Garde>} />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Columns3, Plus, Search } from "lucide-react";
+import { Columns3, Download, Plus, Search, Upload } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { PageHeader, SectionLabel } from "../components/ui";
@@ -24,6 +24,10 @@ import { confirmer } from "../components/Confirmation";
 import FiltresRepliables from "../components/FiltresRepliables";
 import { colonnesFusionnees, estGeneral, peutAllerDans } from "../lib/pipeline-general";
 import { colonnesTriees } from "../lib/colonnes";
+import ImportProspection from "./prospects/ImportProspection";
+import BarreDefilement from "../components/BarreDefilement";
+import { COLONNES_MODELE, COLONNES_PIPELINE } from "../lib/import-prospection";
+import { secteurLisible, type Prospect } from "../lib/merx";
 
 export default function Crm() {
   const { clientId } = useParams();
@@ -50,6 +54,54 @@ export default function Crm() {
   );
   const [showModal, setShowModal] = useState(false);
   const [showColonnes, setShowColonnes] = useState(false);
+  /** Le tableau qui défile de côté : la barre du haut, sous les filtres, le suit. */
+  const [zoneKanban, setZoneKanban] = useState<HTMLDivElement | null>(null);
+  /** Les fiches de Prospection, lues à l'ouverture de l'import : il les complète au lieu de les recréer. */
+  const [importFiches, setImportFiches] = useState<Prospect[] | null>(null);
+
+  const ouvrirImport = async () => {
+    const { data, error } = await supabaseAdmin.from("admin_prospects").select("*").is("deleted_at", null);
+    if (error) return toast.error(error.message);
+    setImportFiches((data ?? []) as Prospect[]);
+  };
+
+  /**
+   * Export de ce qui est affiché : une ligne par interlocuteur, aux colonnes du modèle
+   * d'import plus le pipeline, la colonne et la campagne. Le fichier se réimporte tel
+   * quel. L'historique, lui, reste dans les fiches.
+   */
+  const exporter = async () => {
+    const XLSX = await import("xlsx");
+    const entetes = [...COLONNES_MODELE, ...COLONNES_PIPELINE];
+    const lignes = visibles.flatMap((c) => {
+      const commun: Record<string, string | number> = {
+        "Raison sociale": c.company,
+        Département: departementDe(c) ?? "",
+        Structure: c.secteur ? secteurLisible(c.secteur) : "",
+        Pipeline: pipelines.find((p) => p.id === c.pipelineId)?.nom ?? "",
+        Colonne: c.stage,
+        Ville: c.ville ?? "",
+        Journées: c.jours,
+        "Tarif / journée": c.tarif,
+      };
+      const sansTiret = (t: string) => (t.trim() === "—" ? "" : t);
+      const parContact = c.contacts.length
+        ? c.contacts.map((pc) => ({
+            ...commun,
+            Nom: pc.nom || "",
+            Prénom: pc.prenom || (pc.nom ? "" : pc.name),
+            Fonction: pc.role === "Contact" ? "" : pc.role,
+            "E-mail": sansTiret(pc.email),
+            Téléphone: sansTiret(pc.tel),
+          }))
+        : [commun];
+      return parContact.map((v) => Object.fromEntries(entetes.map((e) => [e, (v as Record<string, string | number>)[e] ?? ""])));
+    });
+    const feuille = XLSX.utils.json_to_sheet(lignes, { header: entetes });
+    const classeur = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(classeur, feuille, "Pipeline");
+    XLSX.writeFile(classeur, `pipeline-avisdoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
   const [filtres, setFiltres] = useState<FiltresCrm>(FILTRES_CRM_VIDES);
   const [recherche, setRecherche] = useState("");
   /**
@@ -176,7 +228,21 @@ export default function Crm() {
         }
         action={
           <div className="flex items-center gap-2">
-          {/* Réorganiser les colonnes du Pipeline se fait devant un ordinateur. */}
+          {/* Importer, exporter et réorganiser les colonnes se fait devant un ordinateur. */}
+          <button
+            type="button"
+            onClick={() => void ouvrirImport()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal max-sm:hidden"
+          >
+            <Upload className="size-4" /> Importer
+          </button>
+          <button
+            type="button"
+            onClick={() => void exporter()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal max-sm:hidden"
+          >
+            <Download className="size-4" /> Exporter
+          </button>
           <button
             type="button"
             onClick={() => setShowColonnes(true)}
@@ -219,6 +285,7 @@ export default function Crm() {
           </FiltresRepliables>
         </div>
       )}
+      {!selected && <BarreDefilement cible={zoneKanban} />}
 
       {selected ? (
         <ProjectView client={selected} onClose={() => navigate("/crm")} />
@@ -244,6 +311,7 @@ export default function Crm() {
           onSupprimer={(c) => void supprimerUne(c)}
           onModifier={(c) => navigate(`/crm/${c.id}?modifier=1`)}
           prevues={prevues}
+          zoneRef={setZoneKanban}
           {...(ensemble && pipeline
             ? {
                 peutDeposer: (c: (typeof clients)[number], colonne: string) => peutAllerDans(c, colonne, toutesColonnes, pipeline.id),
@@ -267,6 +335,15 @@ export default function Crm() {
         />
       )}
 
+      {importFiches && (
+        <ImportProspection
+          versLePipeline
+          pipelineParDefaut={pipeline && !ensemble ? pipeline.id : ""}
+          existantes={importFiches}
+          onClose={() => setImportFiches(null)}
+          onFini={rafraichir}
+        />
+      )}
       {showColonnes && <ColonnesModal clients={clients.filter((c) => c.pipelineId === pipeline?.id)} onClose={() => setShowColonnes(false)} pipelineId={pipeline?.id ?? ""} />}
 
       {showModal && (

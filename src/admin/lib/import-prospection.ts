@@ -30,7 +30,13 @@ export const COLONNES_MODELE = [
   "Commentaires",
 ] as const;
 
-type Colonne = (typeof COLONNES_MODELE)[number];
+/**
+ * Les colonnes en plus du fichier du Pipeline : l'export les écrit, l'import les lit.
+ * Absentes d'un fichier de Prospection, elles ne gênent rien.
+ */
+export const COLONNES_PIPELINE = ["Pipeline", "Colonne", "Ville", "Journées", "Tarif / journée"] as const;
+
+type Colonne = (typeof COLONNES_MODELE)[number] | (typeof COLONNES_PIPELINE)[number];
 
 /** Les intitulés du fichier d'origine de Stéphan, et quelques variantes courantes. */
 const AUTRES_NOMS: Partial<Record<Colonne, string[]>> = {
@@ -45,6 +51,9 @@ const AUTRES_NOMS: Partial<Record<Colonne, string[]>> = {
   "Date de relance": ["relance contact", "relance", "date relance"],
   "Date du RDV": ["date presentation", "date rdv", "rdv", "date du rdv de presentation"],
   Commentaires: ["commentaire", "notes", "note", "remarques"],
+  Colonne: ["etape", "colonne du pipeline"],
+  Journées: ["journees", "jours", "nombre de journees"],
+  "Tarif / journée": ["tarif", "tarif journee", "tarif par journee"],
 };
 
 /** Les valeurs proposées dans le modèle pour « Avancement ». */
@@ -72,6 +81,12 @@ export interface LigneProspection {
   relanceLe: string | null;
   rdvLe: string | null;
   commentaires: string | null;
+  /** Fichier du Pipeline : où ranger l'affaire, et sa campagne. */
+  pipeline: string | null;
+  colonne: string | null;
+  ville: string | null;
+  journees: number | null;
+  tarif: number | null;
 }
 
 const texte = (v: unknown): string => (v == null ? "" : v instanceof Date ? v.toISOString() : String(v)).trim();
@@ -102,6 +117,15 @@ export function dateIso(v: unknown): string | null {
   }
   const d = new Date(a, m - 1, j, 12);
   return isNaN(d.getTime()) || d.getDate() !== j ? null : d.toISOString();
+}
+
+/** « 1 200 € », « 1200,50 » ou une cellule numérique ; rien de lisible = rien. */
+export function nombre(v: unknown): number | null {
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  const t = texte(v).replace(/[\s\u00a0\u202f€]/g, "").replace(",", ".");
+  if (!t) return null;
+  const n = Number(t);
+  return isFinite(n) ? n : null;
 }
 
 export function avancementDe(v: string): Avancement | null {
@@ -135,7 +159,7 @@ function genreDe(v: string): GenreEchange {
 /** Retrouve, pour chaque colonne du modèle, l'intitulé qui lui correspond dans le fichier. */
 export function reconnaitreColonnes(entetes: string[]): Map<Colonne, string> {
   const trouvees = new Map<Colonne, string>();
-  for (const col of COLONNES_MODELE) {
+  for (const col of [...COLONNES_MODELE, ...COLONNES_PIPELINE] as Colonne[]) {
     const noms = [nu(col), ...(AUTRES_NOMS[col] ?? [])];
     const e = entetes.find((h) => noms.includes(nu(h)) && ![...trouvees.values()].includes(h));
     if (e) trouvees.set(col, e);
@@ -179,6 +203,11 @@ export function lireLignes(lignes: Record<string, unknown>[]): { lignes: LignePr
       relanceLe: dateIso(val(r, "Date de relance")),
       rdvLe: dateIso(val(r, "Date du RDV")),
       commentaires: ouNull(texte(val(r, "Commentaires"))),
+      pipeline: ouNull(texte(val(r, "Pipeline"))),
+      colonne: ouNull(texte(val(r, "Colonne"))),
+      ville: ouNull(texte(val(r, "Ville"))),
+      journees: nombre(val(r, "Journées")),
+      tarif: nombre(val(r, "Tarif / journée")),
     });
   });
   return { lignes: lues, manque: null };
@@ -198,17 +227,130 @@ export const nomInterlocuteur = (l: LigneProspection): string | null =>
 export function echangesDe(
   l: LigneProspection,
   avecQui = false,
-): { kind: GenreEchange; titre: string; detail: string | null; au: string }[] {
+  maintenant = Date.now(),
+): EchangeImporte[] {
   const precision = l.genreContact === "note" && l.typeContact ? ` (${l.typeContact})` : "";
   const qui = avecQui && nomInterlocuteur(l) ? ` — ${nomInterlocuteur(l)}` : "";
-  const sortie: { kind: GenreEchange; titre: string; detail: string | null; au: string }[] = [];
+  const sortie: Omit<EchangeImporte, "prevu">[] = [];
   if (l.contactLe) sortie.push({ kind: l.genreContact, titre: `Premier contact${precision}${qui}`, detail: null, au: l.contactLe });
   if (l.relanceLe) sortie.push({ kind: l.genreContact, titre: `Relance${precision}${qui}`, detail: null, au: l.relanceLe });
   if (l.rdvLe) sortie.push({ kind: "rdv", titre: `RDV de présentation${qui}`, detail: null, au: l.rdvLe });
   // Sans aucune date, le commentaire prend celle de l'import plutôt que de se perdre.
   const au = l.contactLe ?? l.creeLe ?? new Date().toISOString();
   if (l.commentaires) sortie.push({ kind: "note", titre: `Commentaires${qui}`, detail: l.commentaires, au });
-  return sortie;
+  // Une relance ou un rendez-vous encore à venir est à faire, pas fait : il va dans les
+  // actions à venir, au Planning, et son rappel part. Une note n'est jamais à venir :
+  // une relance future sans type de contact devient un « À faire ».
+  return sortie.map((x) => {
+    const aVenir = new Date(x.au).getTime() > maintenant;
+    const kind: GenreEchange = aVenir && x.kind === "note" && x.titre.startsWith("Relance") ? "tache" : x.kind;
+    return { ...x, kind, prevu: aVenir && kind !== "note" };
+  });
+}
+
+export interface EchangeImporte {
+  kind: GenreEchange;
+  titre: string;
+  detail: string | null;
+  au: string;
+  prevu: boolean;
+}
+
+type LigneHistorique = { kind: string; titre: string; detail: string | null; au: string };
+
+/** « Relance — Claire Dupont » → « relance » : le titre sans l'interlocuteur. */
+const sansInterlocuteur = (titre: string) => titre.split(" — ")[0].trim().toLowerCase();
+
+/**
+ * Ce qui identifie une ligne d'historique venue d'un fichier.
+ * - Un commentaire : son texte. Il n'a souvent pas de date (il prend celle de l'import),
+ *   la date ne peut donc pas compter.
+ * - Le reste : le genre, le titre et le jour. Le détail ne compte pas : il change quand
+ *   on annule l'action ou qu'on y ajoute une précision, ce n'est pas une autre action.
+ *   « À faire » et note se confondent : une relance sans type est un « À faire » tant
+ *   qu'elle est à venir, une note une fois passée — c'est la même relance.
+ */
+function cleEchange(x: LigneHistorique, titre = x.titre.trim().toLowerCase()): string {
+  if (titre.startsWith("commentaires")) return ["commentaires", titre, (x.detail ?? "").trim()].join("|");
+  return [x.kind === "tache" ? "note" : x.kind, titre, x.au.slice(0, 10)].join("|");
+}
+
+/**
+ * Un fichier réimporté n'ajoute à l'historique que ce qui n'y est pas déjà.
+ *
+ * Une entreprise qui gagne ou perd un interlocuteur voit ses titres prendre ou perdre
+ * le nom de chacun (« Relance — Claire Dupont » / « Relance ») : une ligne déjà là
+ * avec le nom vaut pour la même sans le nom, et inversement — mais une seule fois
+ * chacune, pour ne pas avaler la relance de Paul avec celle de Claire.
+ */
+export function echangesNouveaux<T extends LigneHistorique>(candidats: T[], deja: LigneHistorique[]): T[] {
+  const vus = new Set(deja.map((d) => cleEchange(d)));
+  const nomme = (x: LigneHistorique) => x.titre.includes(" — ");
+  const base = (x: LigneHistorique) => cleEchange(x, sansInterlocuteur(x.titre));
+  // Ce qui reste disponible pour un rapprochement « avec nom ↔ sans nom », compté.
+  const reserve = { sansNom: new Map<string, number>(), avecNom: new Map<string, number>() };
+  for (const d of deja) {
+    const pile = nomme(d) ? reserve.avecNom : reserve.sansNom;
+    pile.set(base(d), (pile.get(base(d)) ?? 0) + 1);
+  }
+  return candidats.filter((c) => {
+    const k = cleEchange(c);
+    if (vus.has(k)) return false;
+    const pile = nomme(c) ? reserve.sansNom : reserve.avecNom;
+    const reste = pile.get(base(c)) ?? 0;
+    if (reste > 0) {
+      pile.set(base(c), reste - 1);
+      return false;
+    }
+    vus.add(k);
+    return true;
+  });
+}
+
+/** Un interlocuteur d'affaire tel que le fichier le donne. */
+export interface ContactImporte {
+  prenom: string;
+  nom: string;
+  role: string;
+  email: string;
+  tel: string;
+}
+
+const vide = (t: string | null | undefined) => !t || t.trim() === "" || t.trim() === "—";
+
+/**
+ * Ce qu'un fichier apporte aux interlocuteurs d'une affaire : les nouveaux, et les
+ * cases vides des connus. Rien de ce qui est rempli n'est remplacé.
+ */
+export function contactsACompleter(
+  connus: { id: string; name: string; role: string; email: string; tel: string }[],
+  lignes: LigneProspection[],
+): { ajouts: ContactImporte[]; completes: { id: string; champs: Partial<Record<"role" | "email" | "tel", string>> }[] } {
+  const ajouts: ContactImporte[] = [];
+  const completes = new Map<string, Partial<Record<"role" | "email" | "tel", string>>>();
+  for (const l of lignes) {
+    const nom = nomInterlocuteur(l);
+    if (!nom) continue;
+    const connu = connus.find((c) => c.name.trim().toLowerCase() === nom.toLowerCase());
+    if (!connu) {
+      // Le même nouvel interlocuteur sur deux lignes : la seconde complète la première.
+      const deja = ajouts.find((a) => `${a.prenom} ${a.nom}`.trim().toLowerCase() === nom.toLowerCase());
+      if (deja) {
+        if (deja.role === "Contact" && l.fonction) deja.role = l.fonction;
+        if (vide(deja.email) && l.email) deja.email = l.email;
+        if (vide(deja.tel) && l.telephone) deja.tel = l.telephone;
+        continue;
+      }
+      ajouts.push({ prenom: l.interlocuteur!.prenom, nom: l.interlocuteur!.nom, role: l.fonction || "Contact", email: l.email || "—", tel: l.telephone || "—" });
+      continue;
+    }
+    const champs = completes.get(connu.id) ?? {};
+    if ((vide(connu.role) || connu.role === "Contact") && l.fonction) champs.role = l.fonction;
+    if (vide(connu.email) && l.email) champs.email = l.email;
+    if (vide(connu.tel) && l.telephone) champs.tel = l.telephone;
+    if (Object.keys(champs).length) completes.set(connu.id, champs);
+  }
+  return { ajouts, completes: [...completes].map(([id, champs]) => ({ id, champs })) };
 }
 
 /** La colonne du pipeline où va une entreprise : « A répondu » reste dans Contacté. */
@@ -250,14 +392,23 @@ const dep = (d: string | null | undefined) => {
  * La fiche déjà en Prospection qui est la même entreprise AU MÊME ENDROIT.
  *
  * Même nom ne suffit pas : SMAC à Bordeaux et SMAC dans le Haut-Rhin sont deux
- * établissements, deux interlocuteurs, deux démarches. Sans département dans le
- * fichier, on ne peut pas savoir : on ne rattache pas, la fiche sera créée à part.
+ * établissements, deux interlocuteurs, deux démarches. Quand un département manque,
+ * on ne rattache qu'à la seule fiche de ce nom : sinon, on ne peut pas savoir.
  */
+/** Deux départements qui se contredisent ; un absent ne contredit rien. */
+export const departementsDifferents = (a: string | null | undefined, b: string | null | undefined) =>
+  Boolean(dep(a) && dep(b) && dep(a) !== dep(b));
+
 export function ficheExistante<T extends { name: string; department: string | null }>(
   e: EntrepriseImportee,
   fiches: T[],
 ): T | undefined {
   const d = dep(e.lignes.find((l) => l.departement)?.departement);
-  if (!d) return undefined;
-  return fiches.find((f) => f.name.trim().toLowerCase() === e.nom.toLowerCase() && dep(f.department) === d);
+  const memeNom = fiches.filter((f) => f.name.trim().toLowerCase() === e.nom.toLowerCase());
+  const memeEndroit = d ? memeNom.find((f) => dep(f.department) === d) : undefined;
+  if (memeEndroit) return memeEndroit;
+  // Un département manque d'un côté ou de l'autre : une seule fiche de ce nom, et sans
+  // département contraire, c'est elle. Deux, ou un autre département : on ne devine pas.
+  const sansContradiction = memeNom.filter((f) => !d || !dep(f.department));
+  return memeNom.length === 1 && sansContradiction.length === 1 ? sansContradiction[0] : undefined;
 }

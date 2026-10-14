@@ -28,6 +28,7 @@ export default function Kanban({
   prevues,
   peutDeposer,
   etiquette,
+  zoneRef,
 }: {
   clients: Client[];
   /** Colonnes définies par l'équipe (« Colonnes » dans le Pipeline). */
@@ -52,6 +53,8 @@ export default function Kanban({
   peutDeposer?: (c: Client, colonne: Stage) => boolean;
   /** Vue d'ensemble : le pipeline d'où vient la carte, quand ce n'est pas celui affiché. */
   etiquette?: (c: Client) => string | null;
+  /** Reçoit la zone qui défile : la barre du haut s'y accroche. */
+  zoneRef?: (el: HTMLDivElement | null) => void;
 }) {
   const [saisi, setSaisi] = useState<string | null>(null);
   const [survolee, setSurvolee] = useState<Stage | null>(null);
@@ -69,6 +72,7 @@ export default function Kanban({
   return (
     // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
     <div
+      ref={zoneRef}
       className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
       style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(300px, 380px))` }}
     >

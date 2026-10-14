@@ -29,6 +29,7 @@ import { useAdminData } from "../data/AdminDataContext";
 import { confirmer } from "../components/Confirmation";
 import { useActualisation } from "../lib/actualisation";
 import FiltresRepliables from "../components/FiltresRepliables";
+import BarreDefilement from "../components/BarreDefilement";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -136,6 +137,8 @@ export default function Prospects() {
   const [recherche, setRecherche] = useState("");
   const [ajout, setAjout] = useState(false);
   const [importOuvert, setImportOuvert] = useState(false);
+  /** La liste qui défile de côté : la barre du haut, sous les filtres, la suit. */
+  const [zoneListe, setZoneListe] = useState<HTMLDivElement | null>(null);
   const [aModifier, setAModifier] = useState<Prospect | null>(null);
   // Plus de kanban en Prospection : une recherche au registre rend des dizaines, voire
   // des centaines d'entreprises, et en colonnes on ne retrouve plus rien. La liste se
@@ -661,6 +664,8 @@ export default function Prospects() {
         </FiltresRepliables>
       </div>
 
+      <BarreDefilement cible={zoneListe} />
+
       {chargement ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Chargement des fiches…
@@ -674,7 +679,7 @@ export default function Prospects() {
         </div>
       ) : (
         /* ── Liste : toutes les fiches d'un coup, triées par note ── */
-        <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
+        <div ref={setZoneListe} className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[980px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
