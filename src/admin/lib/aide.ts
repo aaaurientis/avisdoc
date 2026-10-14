@@ -27,10 +27,10 @@ export interface ThemeAide {
 
 /** Le chemin d'une entreprise, du premier repérage à la signature. */
 export const PARCOURS: { etape: string; texte: string }[] = [
-  { etape: "Merx", texte: "trouve des entreprises à démarcher, les note et les documente." },
-  { etape: "Prospection", texte: "les reçoit, avec celles importées ou saisies à la main." },
-  { etape: "Pipeline", texte: "suit l'affaire dès la première action : appel, rendez-vous, présentation." },
-  { etape: "Clients", texte: "reçoit l'entreprise quand l'affaire passe en « Signé »." },
+  { etape: "Merx", texte: "sert à trouver des entreprises à démarcher, à les noter et à les documenter." },
+  { etape: "Prospection", texte: "le fichier des prospects trouvés par Merx, importés ou saisis à la main." },
+  { etape: "Pipeline", texte: "le tunnel de conversion des clients, de la première action (appel, rendez-vous, présentation) jusqu'à la signature." },
+  { etape: "Clients", texte: "l'étape finale : la page où sont classées les entreprises signées au Pipeline." },
 ];
 
 export const ECRANS: EcranAide[] = [

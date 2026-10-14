@@ -140,12 +140,21 @@ export default function Aide() {
             </li>
           ))}
         </ol>
-        <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
-          Autour : le <strong className="text-avisdoc-ink">Planning</strong> montre tout ce qui est programmé, le{" "}
-          <strong className="text-avisdoc-ink">Débrief</strong> range ce que vous racontez après un rendez-vous, le{" "}
-          <strong className="text-avisdoc-ink">CAP</strong> dit ce que coûte chaque prospect, et la{" "}
-          <strong className="text-avisdoc-ink">Corbeille</strong> garde 30 jours ce qui est supprimé.
-        </p>
+        <ul className="mt-4 flex flex-col gap-1 text-[13px] leading-relaxed text-muted-foreground">
+          <li>
+            Le <strong className="text-avisdoc-ink">Planning</strong> montre tout ce qui est programmé.
+          </li>
+          <li>
+            Le <strong className="text-avisdoc-ink">Débrief</strong> range ce que vous avez raconté après un rendez-vous, depuis le
+            téléphone ou l’ordinateur.
+          </li>
+          <li>
+            Le <strong className="text-avisdoc-ink">CAP</strong> dit ce que coûte chaque prospect.
+          </li>
+          <li>
+            La <strong className="text-avisdoc-ink">Corbeille</strong> garde 30 jours ce qui est supprimé.
+          </li>
+        </ul>
       </Card>
 
       {/* Pour prendre la main : quelques gestes à faire une fois, dans l'ordre. */}
