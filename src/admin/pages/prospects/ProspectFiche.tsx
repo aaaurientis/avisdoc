@@ -257,7 +257,7 @@ export default function ProspectFiche({
               className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[13px] font-bold text-rose-700 transition-colors hover:border-rose-400 disabled:opacity-60"
             >
               {enCours === "ecarter" ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              {p.status === "ecarte" ? "Restaurer la fiche" : "Supprimer la fiche"}
+              Supprimer la fiche
             </button>
           </div>
         </div>

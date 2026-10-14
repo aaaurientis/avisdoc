@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Lock, Minus, Pencil, Plus, Search, X } from "lucide-react";
+import { Loader2, Lock, Minus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -8,7 +8,6 @@ import { useAdminData } from "../../data/AdminDataContext";
 import { Badge, Modal } from "../../components/ui";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
-import DangerZone from "../../espace/DangerZone";
 import DevisQonto from "../../espace/DevisQonto";
 import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
@@ -32,6 +31,7 @@ import { quandCourt } from "../../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
+import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -82,8 +82,21 @@ export default function ProjectView({
     accounts,
     addAccount,
     setClientStage,
+    rafraichir,
   } = useAdminData();
   const { user } = useAuth();
+  const [souciSuppression, setSouciSuppression] = useState<string | null>(null);
+
+  const supprimer = async () => {
+    if (!(await confirmer({ titre: `Supprimer ${client.company} ?`, message: `Vous la retrouverez ${JOURS_DE_GARDE} jours dans la corbeille.` }))) return;
+    try {
+      await jeter("affaire", [client.id]);
+      await rafraichir();
+      onClose();
+    } catch (e) {
+      setSouciSuppression(e instanceof Error ? e.message : "La suppression a échoué.");
+    }
+  };
   // Les colonnes du tableau où vit l'affaire : celles des autres ne la concernent pas.
   const stages = colonnesDe(toutesColonnes, client.pipelineId);
 
@@ -392,7 +405,16 @@ export default function ProjectView({
               <CeQuOnSait prospect={origine} enPlus={ceQueSaitLAffaire} />
               {/* Supprimer, tout en bas du dossier : loin des boutons du quotidien. */}
               <div className="border-t border-border pt-4">
-                <DangerZone compact clientId={client.id} clientName={client.company} onDeleted={onClose} />
+                {/* À la corbeille, comme partout : 30 jours pour se raviser, la destruction
+                    reste à l'administration. */}
+                <button
+                  type="button"
+                  onClick={() => void supprimer()}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 px-4 py-2 text-[13px] font-bold text-rose-700 transition-colors hover:border-rose-400"
+                >
+                  <Trash2 className="size-3.5" /> Supprimer la fiche
+                </button>
+                {souciSuppression && <p className="mt-2 text-[13px] font-semibold text-rose-700">{souciSuppression}</p>}
               </div>
             </div>
           )}

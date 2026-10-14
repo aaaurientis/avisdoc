@@ -5,7 +5,7 @@
 export type Module = "crm" | "merx" | "contacts" | "marketing" | "finance" | "documents" | "infirmieres" | "admin";
 
 export const MODULES: { key: Module; label: string }[] = [
-  { key: "crm", label: "Clients et Prospection" },
+  { key: "crm", label: "Commercial" },
   { key: "merx", label: "Merx (prospection)" },
   { key: "contacts", label: "Contacts Médicaux" },
   { key: "marketing", label: "Marketing" },

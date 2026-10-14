@@ -13,6 +13,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LayoutGrid,
+  LifeBuoy,
   Megaphone,
   MessagesSquare,
   Mic,
@@ -68,7 +69,7 @@ interface Entree {
 
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
-  { module: "crm", label: "Clients et Prospection", icon: Building2, enfants: [
+  { module: "crm", label: "Commercial", icon: Building2, enfants: [
     { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
     { to: "/planning", label: "Planning", icon: CalendarDays, module: "merx" },
     { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
@@ -76,6 +77,7 @@ const MENU: Entree[] = [
     { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
     { to: "/debrief", label: "Débrief", icon: MessagesSquare, module: "merx" },
     { to: "/couts", label: "CAP", icon: Coins, module: "merx" },
+    { to: "/aide", label: "Aide", icon: LifeBuoy },
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
   ] },
   { module: null, label: "Contacts Médicaux", icon: Users, enfants: [

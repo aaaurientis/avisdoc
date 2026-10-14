@@ -1,6 +1,7 @@
 // Suppression complète d'un client (fusion).
 // Appelée depuis le back-office admin. Garde-fous :
 //   - l'appelant doit être un compte @avisdoc.fr ;
+//   - et super-admin : les autres mettent à la corbeille, la fiche part seule à 30 jours ;
 //   - clé service_role (jamais exposée au frontend).
 //
 // La base se nettoie seule : toutes les tables enfant (CRM contacts/docs/suivis
@@ -34,10 +35,18 @@ serve(async (req) => {
   if (!(u.user.email ?? "").toLowerCase().endsWith("@avisdoc.fr"))
     return json({ error: "réservé aux comptes @avisdoc.fr" }, 403);
 
+  // Détruire pour de bon est réservé au super-admin, comme dans la corbeille : les
+  // autres jettent, et la fiche part d'elle-même au bout de 30 jours.
+  const admin = createClient(URL, SERVICE);
+  // Comparaison exacte (sans casse) : un motif ilike laisserait passer « % » et « _ ».
+  const moi = (u.user.email ?? "").trim().toLowerCase();
+  const { data: supers, error: lecture } = await admin.from("admin_superadmins").select("email");
+  if (lecture) return json({ error: lecture.message }, 500);
+  const estSuper = (supers ?? []).some((s) => String(s.email ?? "").trim().toLowerCase() === moi);
+  if (!moi || !estSuper) return json({ error: "suppression définitive réservée au super-admin" }, 403);
+
   const { client_id } = await req.json().catch(() => ({}));
   if (!client_id) return json({ error: "client_id requis" }, 400);
-
-  const admin = createClient(URL, SERVICE);
 
   // 1. Vider le Storage (dossier <client_id>/ dans chaque bucket).
   const fichiers: Record<string, number> = {};

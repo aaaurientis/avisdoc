@@ -58,3 +58,25 @@
     padding: 1.25rem 1rem;
   }
 }
+
+/* Barre de défilement du haut (Pipeline, Prospection) : toujours visible, même quand
+   le Mac masque les barres tant qu'on ne défile pas. */
+/* Chrome ignore les ::-webkit-scrollbar dès que scrollbar-color est posé : la règle
+   standard ne sert qu'aux navigateurs qui n'ont pas les pseudo-éléments (Firefox). */
+@supports not selector(::-webkit-scrollbar) {
+  .ad-barre-defilement {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+  }
+}
+.ad-barre-defilement::-webkit-scrollbar {
+  height: 10px;
+}
+.ad-barre-defilement::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 999px;
+}
+.ad-barre-defilement::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.45);
+  border-radius: 999px;
+}

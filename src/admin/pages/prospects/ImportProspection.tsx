@@ -3,6 +3,13 @@
 // Trois temps : choisir le fichier, voir ce qui va entrer, l'importer. Rien n'est
 // écrit avant le dernier clic. Les entreprises qui ont un « Avancement » entrent
 // aussi dans le pipeline choisi — Contacté ou RDV, « A répondu » en pastille.
+//
+// Depuis le Pipeline, le même fichier fait tout entrer au Pipeline : les colonnes
+// « Pipeline » et « Colonne » disent où, sinon l'Avancement, sinon la 1re colonne.
+//
+// Réimporter un fichier ne remet rien en double : une entreprise déjà connue est
+// complétée là où il lui manque quelque chose (fiche, interlocuteurs, historique),
+// jamais écrasée, et une affaire déjà au Pipeline ne change pas de colonne.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
@@ -11,21 +18,28 @@ import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { useAdminData } from "../../data/AdminDataContext";
 import { useAuth } from "../../auth/AuthContext";
 import { Modal, SectionLabel } from "../../components/ui";
-import { clientDepuisProspect } from "../../lib/conversion";
+import { clientDepuisProspect, contactDepuisProspect } from "../../lib/conversion";
+import { departementDe } from "../crm/FiltresPipeline";
 import { uid } from "../../lib/format";
 import { chargerMembres, nomLisible } from "../../lib/membres";
 import { colonnesDe } from "../../lib/ui-tokens";
+import { chargerEchanges } from "../../lib/echanges";
+import { nu } from "../../lib/import-colonnes";
 import type { Prospect } from "../../lib/merx";
 import {
   AVANCEMENTS,
   colonnePour,
   COLONNES_MODELE,
+  contactsACompleter,
+  departementsDifferents,
   echangesDe,
+  echangesNouveaux,
   ficheExistante,
   lireLignes,
   nomInterlocuteur,
   regrouper,
   type Avancement,
+  type EntrepriseImportee,
   type LigneProspection,
 } from "../../lib/import-prospection";
 import { cn } from "@/lib/utils";
@@ -81,25 +95,35 @@ export default function ImportProspection({
   existantes,
   onClose,
   onFini,
+  versLePipeline = false,
+  pipelineParDefaut = "",
 }: {
   /** Les fiches déjà en Prospection : une entreprise qui y est déjà est complétée, pas recréée. */
   existantes: Prospect[];
   onClose: () => void;
   onFini: () => Promise<void>;
+  /** Import lancé depuis le Pipeline : toutes les entreprises y entrent. */
+  versLePipeline?: boolean;
+  /** Le pipeline ouvert à l'écran, proposé d'office. */
+  pipelineParDefaut?: string;
 }) {
   const { user } = useAuth();
-  const { pipelines, stages, clients, addClient } = useAdminData();
+  const { pipelines, stages, clients, addClient, rafraichir } = useAdminData();
   const fichierRef = useRef<HTMLInputElement>(null);
   const [fichier, setFichier] = useState<{ nom: string; lignes: LigneProspection[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [membres, setMembres] = useState<string[]>([]);
-  const [pipelineId, setPipelineId] = useState("");
+  const [pipelineId, setPipelineId] = useState(pipelineParDefaut);
   const [commercial, setCommercial] = useState("");
   const [avance, setAvance] = useState<{ fait: number; total: number } | null>(null);
   const [bilan, setBilan] = useState<Bilan | null>(null);
 
   useEffect(() => {
     void chargerMembres().then(setMembres);
+    const assigne = pipelines.find((p) => p.id === pipelineParDefaut)?.assigneA;
+    if (assigne) setCommercial(assigne);
+    // Une seule fois, à l'ouverture : ensuite c'est le commercial qui choisit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const choisirPipeline = (id: string) => {
@@ -125,32 +149,62 @@ export default function ImportProspection({
   };
 
   const entreprises = useMemo(() => regrouper(fichier?.lignes ?? []), [fichier]);
+  /** L'affaire déjà au Pipeline pour cette entreprise, s'il y en a une. */
+  const affaireDe = (e: EntrepriseImportee, prospect: Prospect | null): Client | undefined => {
+    const liee = prospect?.converted_client_id ? clients.find((c) => c.id === prospect.converted_client_id) : undefined;
+    if (liee) return liee;
+    // Par le nom, mais pas d'un département à l'autre : SMAC du 68 n'est pas SMAC du 33.
+    const d = e.lignes.find((l) => l.departement)?.departement ?? prospect?.department;
+    const memeNom = clients.filter((c) => c.company.trim().toLowerCase() === e.nom.toLowerCase() && !departementsDifferents(d, departementDe(c)));
+    return memeNom.length === 1 ? memeNom[0] : undefined;
+  };
+
   const colonnes = colonnesDe(stages, pipelineId);
+  /** Où va une nouvelle affaire : le pipeline et la colonne du fichier s'ils existent, sinon ce qu'on a choisi. */
+  const destination = (e: EntrepriseImportee): { pipeline: string; colonne: string } | null => {
+    const l = e.lignes.find((x) => x.pipeline || x.colonne);
+    const nomme = l?.pipeline ? pipelines.find((p) => nu(p.nom) === nu(l.pipeline!)) : undefined;
+    const pipeline = nomme?.id ?? pipelineId;
+    if (!pipeline) return null;
+    const cols = colonnesDe(stages, pipeline);
+    const dite = l?.colonne ? cols.find((c) => nu(c.label) === nu(l.colonne!))?.label : undefined;
+    const parAvancement = e.avancement ? colonnePour(e.avancement, cols) : null;
+    const colonne = dite ?? parAvancement ?? (versLePipeline ? cols[0]?.label : null);
+    return colonne ? { pipeline, colonne } : null;
+  };
+
   const compte = useMemo(() => {
     const c = { contacte: 0, repondu: 0, rdv: 0, sans: 0, dejaLa: [] as string[] };
     for (const e of entreprises) {
       if (e.avancement) c[e.avancement]++;
       else c.sans++;
-      if (ficheExistante(e, existantes)) c.dejaLa.push(e.nom);
+      const fiche = ficheExistante(e, existantes);
+      if (fiche || affaireDe(e, fiche ?? null)) c.dejaLa.push(e.nom);
     }
     return c;
-  }, [entreprises, existantes]);
+    // affaireDe ne lit que `clients`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entreprises, existantes, clients]);
   const inconnus = (fichier?.lignes ?? []).filter((l) => l.avancementInconnu);
-  const versPipeline = compte.contacte + compte.repondu + compte.rdv;
-  // Une colonne manque dans le pipeline choisi : on le dit avant, pas après.
-  const manquantes = pipelineId
+  const versPipeline = versLePipeline ? entreprises.length : compte.contacte + compte.repondu + compte.rdv;
+  // Une colonne manque dans le pipeline choisi : on le dit avant, pas après. Depuis le
+  // Pipeline, il n'en manque jamais : à défaut, l'affaire va dans la 1re colonne.
+  const manquantes = pipelineId && !versLePipeline
     ? (["contacte", "rdv"] as const)
         .filter((a) => (a === "contacte" ? compte.contacte + compte.repondu : compte.rdv) > 0 && !colonnePour(a, colonnes))
         .map((a) => (a === "rdv" ? "RDV" : "Contacté"))
     : [];
-  const pret = Boolean(fichier) && (versPipeline === 0 || (pipelineId && manquantes.length === 0)) && !avance;
+  // Depuis le Pipeline, un fichier dont chaque ligne dit déjà où aller n'a pas besoin
+  // qu'on choisisse un pipeline (un export de la vue Général, par exemple).
+  const placeesParLeFichier = versLePipeline && entreprises.length > 0 && entreprises.every((e) => destination(e));
+  const pret =
+    Boolean(fichier) && (versPipeline === 0 || placeesParLeFichier || (pipelineId && manquantes.length === 0)) && !avance;
 
   const importer = async () => {
     if (!fichier || !pret) return;
     const par = commercial || user?.email || "";
     const source = `fichier importé (${fichier.nom})`;
     const resultat: Bilan = { creees: 0, completees: [], auPipeline: 0, echecs: [] };
-    const presents = new Set(clients.map((c) => c.company.trim().toLowerCase()));
     setAvance({ fait: 0, total: entreprises.length });
 
     for (const [i, e] of entreprises.entries()) {
@@ -167,34 +221,55 @@ export default function ImportProspection({
           sur: true,
         }));
         const principal = avecContact[0] ?? e.lignes[0];
-        const existante = ficheExistante(e, existantes);
+        const existante = ficheExistante(e, existantes) ?? null;
+        const affaire = affaireDe(e, existante);
 
-        let prospect: Prospect;
+        let prospect: Prospect | null = existante;
         if (existante) {
           // On complète ce qui manque, sans rien effacer de ce que Merx avait trouvé.
           const connus = new Set([existante.contact_name, ...(existante.personnes ?? []).map((q) => q.nom)].filter(Boolean).map((n) => n!.toLowerCase()));
           const nouvelles = personnes.filter((q) => !connus.has(q.nom.toLowerCase()));
+          // Un interlocuteur déjà connu reçoit ce qui lui manquait (fonction, e-mail, téléphone).
+          let personnesCompletees = false;
+          const anciennes = (existante.personnes ?? []).map((q) => {
+            const apport = personnes.find((x) => x.nom.toLowerCase() === q.nom.toLowerCase());
+            if (!apport) return q;
+            const plus = {
+              ...(!q.fonction && apport.fonction ? { fonction: apport.fonction } : {}),
+              ...(!q.email && apport.email ? { email: apport.email } : {}),
+              ...(!q.telephone && apport.telephone ? { telephone: apport.telephone } : {}),
+            };
+            if (Object.keys(plus).length) personnesCompletees = true;
+            return { ...q, ...plus };
+          });
           const patch: Record<string, unknown> = {};
           if (!existante.contact_name && nomInterlocuteur(principal)) {
             Object.assign(patch, { contact_name: nomInterlocuteur(principal), contact_role: principal.fonction, contact_source: source });
           }
-          if (!existante.contact_email && principal.email) patch.contact_email = principal.email;
-          if (!existante.contact_phone && principal.telephone) patch.contact_phone = principal.telephone;
+          const memeContact = existante.contact_name && nomInterlocuteur(principal)?.toLowerCase() === existante.contact_name.toLowerCase();
+          if (!existante.contact_role && memeContact && principal.fonction) patch.contact_role = principal.fonction;
+          // Les coordonnées du contact principal ne viennent que de lui : celles d'un autre
+          // interlocuteur du fichier iraient sur le mauvais nom.
+          const sonContact = memeContact || Boolean(patch.contact_name) || !nomInterlocuteur(principal);
+          if (sonContact && !existante.contact_email && principal.email) patch.contact_email = principal.email;
+          if (sonContact && !existante.contact_phone && principal.telephone) patch.contact_phone = principal.telephone;
           if (!existante.department && principal.departement) patch.department = principal.departement;
+          if ((!existante.sector || existante.sector === "autre") && principal.secteur !== "autre") patch.sector = principal.secteur;
           if (!(existante as Prospect & { referent?: string | null }).referent && commercial) patch.referent = commercial;
-          if (nouvelles.length) patch.personnes = [...(existante.personnes ?? []), ...nouvelles];
+          if (nouvelles.length || personnesCompletees) patch.personnes = [...anciennes, ...nouvelles];
           if (Object.keys(patch).length) {
             const { data, error } = await supabaseAdmin.from("admin_prospects").update(patch).eq("id", existante.id).select("*").single();
             if (error) throw new Error(error.message);
             prospect = data as Prospect;
-          } else prospect = existante;
+          }
           resultat.completees.push(e.nom);
-        } else {
+        } else if (!affaire) {
           const { data, error } = await supabaseAdmin
             .from("admin_prospects")
             .insert({
               name: e.nom,
               department: principal.departement,
+              city: principal.ville,
               sector: principal.secteur,
               contact_name: nomInterlocuteur(principal),
               contact_role: nomInterlocuteur(principal) ? principal.fonction : null,
@@ -212,7 +287,7 @@ export default function ImportProspection({
           if (error) {
             resultat.echecs.push(
               /duplicate key|unique/i.test(error.message)
-                ? `${qui} : une fiche de ce nom est à la corbeille — restaurez-la puis réimportez`
+                ? `${qui} : une fiche de ce nom existe déjà (peut-être à la corbeille) — restaurez-la ou renommez la ligne, puis réimportez`
                 : `${qui} : ${error.message}`,
             );
             continue;
@@ -221,43 +296,75 @@ export default function ImportProspection({
           resultat.creees++;
         }
 
-        const echanges = e.lignes.flatMap((l) => echangesDe(l, e.lignes.length > 1)).map((x) => ({ ...x, prospect_id: prospect.id, par }));
-        if (echanges.length) {
-          const { error } = await supabaseAdmin.from("admin_echanges").insert(echanges);
-          if (error) resultat.echecs.push(`${qui} : historique non enregistré (${error.message})`);
+        // L'historique : seulement les lignes qu'il n'a pas déjà. Il s'accroche à la
+        // fiche de Prospection quand elle existe, sinon à l'affaire.
+        const candidats = e.lignes.flatMap((l) => echangesDe(l, e.lignes.length > 1));
+        if (candidats.length) {
+          const deja = await chargerEchanges({ prospectId: prospect?.id, clientId: affaire?.id });
+          const ajouts = echangesNouveaux(candidats, deja).map((x) => ({
+            ...x,
+            ...(prospect ? { prospect_id: prospect.id } : { client_id: affaire!.id }),
+            par,
+          }));
+          if (ajouts.length) {
+            const { error } = await supabaseAdmin.from("admin_echanges").insert(ajouts);
+            if (error) resultat.echecs.push(`${qui} : historique non enregistré (${error.message})`);
+          }
         }
 
-        if (!e.avancement || !pipelineId) continue;
-        // Une même entreprise n'existe qu'une fois dans le Pipeline.
-        if (prospect.converted_client_id || presents.has(prospect.name.trim().toLowerCase())) {
-          resultat.echecs.push(`${qui} : déjà dans le Pipeline, l’historique y a été ajouté`);
+        if (affaire) {
+          // Déjà au Pipeline : on complète, on ne déplace pas.
+          await completerAffaire(affaire, e);
+          // La fiche de Prospection et l'affaire sont la même entreprise mais n'étaient
+          // pas reliées : on les relie, la fiche quitte la Prospection et son historique
+          // s'affiche sur l'affaire. Seulement si aucune autre fiche ne tient déjà l'affaire.
+          if (prospect && !prospect.converted_client_id && !existantes.some((x) => x.converted_client_id === affaire.id)) {
+            const { error } = await supabaseAdmin
+              .from("admin_prospects")
+              .update({ converted_client_id: affaire.id, converted_at: new Date().toISOString() })
+              .eq("id", prospect.id);
+            if (error) resultat.echecs.push(`${qui} : lien vers l’affaire non posé (${error.message})`);
+          }
+          if (!existante) resultat.completees.push(e.nom);
           continue;
         }
+
+        if (!prospect || (!versLePipeline && (!e.avancement || !pipelineId))) continue;
+        const ou = destination(e);
+        if (!ou) {
+          resultat.echecs.push(`${qui} : pas de pipeline ou de colonne où la ranger, la fiche reste en Prospection`);
+          continue;
+        }
+        const campagne = e.lignes.find((l) => l.journees != null || l.tarif != null);
         const client: Client = {
-          ...clientDepuisProspect(prospect, colonnePour(e.avancement, colonnes)!, pipelineId),
+          ...clientDepuisProspect(prospect, ou.colonne, ou.pipeline),
+          ...(campagne?.journees != null && campagne.journees > 0 ? { jours: campagne.journees } : {}),
+          ...(campagne?.tarif != null && campagne.tarif > 0 ? { tarif: campagne.tarif } : {}),
+          ...(!prospect.city && principal.ville ? { ville: principal.ville } : {}),
           aRepondu: e.avancement === "repondu",
-          contacts: avecContact.map((l) => ({
-            id: uid(),
-            name: nomInterlocuteur(l)!,
-            prenom: l.interlocuteur!.prenom,
-            nom: l.interlocuteur!.nom,
-            role: l.fonction || "Contact",
-            email: l.email || "—",
-            tel: l.telephone || "—",
-          })),
+          contacts: avecContact.length
+            ? avecContact.map((l) => ({
+                id: uid(),
+                name: nomInterlocuteur(l)!,
+                prenom: l.interlocuteur!.prenom,
+                nom: l.interlocuteur!.nom,
+                role: l.fonction || "Contact",
+                email: l.email || "—",
+                tel: l.telephone || "—",
+              }))
+            : contactDeLaFiche(prospect),
         };
         if (!(await addClient(client))) {
           resultat.echecs.push(`${qui} : l’affaire n’a pas pu être créée, la fiche reste en Prospection`);
           continue;
         }
-        presents.add(prospect.name.trim().toLowerCase());
         // Le lien se pose après l'affaire : c'est lui qui y reporte le commercial (0039).
         const { error } = await supabaseAdmin
           .from("admin_prospects")
           .update({
             converted_client_id: client.id,
             converted_at: new Date().toISOString(),
-            status: e.avancement === "contacte" ? "contacte" : "repondu",
+            status: e.avancement === "repondu" ? "repondu" : "contacte",
           })
           .eq("id", prospect.id);
         if (error) resultat.echecs.push(`${qui} : lien vers l’affaire non posé (${error.message})`);
@@ -270,13 +377,70 @@ export default function ImportProspection({
     }
     setAvance(null);
     setBilan(resultat);
+    await rafraichir();
     await onFini();
+  };
+
+  /** Le fichier ne nomme personne : l'interlocuteur déjà sur la fiche suit l'affaire. */
+  const contactDeLaFiche = (p: Prospect): Client["contacts"] => {
+    const c = contactDepuisProspect(p);
+    if (!c) return [];
+    return [{
+      id: uid(),
+      name: [c.prenom, c.nom].filter(Boolean).join(" "),
+      prenom: c.prenom,
+      nom: c.nom,
+      role: c.role || "Contact",
+      email: c.email || "—",
+      tel: p.contact_phone || "—",
+    }];
+  };
+
+  /**
+   * Une affaire déjà au Pipeline reçoit ce qui lui manque : interlocuteurs nouveaux,
+   * cases vides des connus, secteur, ville, commercial, campagne encore à zéro.
+   */
+  const completerAffaire = async (affaire: Client, e: EntrepriseImportee): Promise<void> => {
+    const { ajouts, completes } = contactsACompleter(affaire.contacts, e.lignes);
+    for (const a of ajouts) {
+      const { error } = await supabaseAdmin.from("admin_client_contacts").insert({
+        id: uid(),
+        client_id: affaire.id,
+        name: [a.prenom, a.nom].filter(Boolean).join(" "),
+        prenom: a.prenom || null,
+        nom: a.nom || null,
+        role: a.role,
+        email: a.email,
+        tel: a.tel,
+      });
+      if (error) throw new Error(error.message);
+    }
+    for (const c of completes) {
+      const { error } = await supabaseAdmin.from("admin_client_contacts").update(c.champs).eq("id", c.id);
+      if (error) throw new Error(error.message);
+    }
+    const l = e.lignes[0];
+    const campagne = e.lignes.find((x) => x.journees != null || x.tarif != null);
+    const patch: Record<string, unknown> = {};
+    if (!affaire.secteur && l.secteur !== "autre") patch.secteur = l.secteur;
+    if (!affaire.ville && e.lignes.find((x) => x.ville)) patch.ville = e.lignes.find((x) => x.ville)!.ville;
+    if (!affaire.referent && commercial) patch.referent = commercial;
+    if (!affaire.tarif && campagne?.tarif) patch.tarif = campagne.tarif;
+    // 1 journée sans tarif, c'est la campagne posée d'office à l'entrée au Pipeline : vide.
+    const joursVides = !affaire.jours || (affaire.jours === 1 && !affaire.tarif);
+    if (joursVides && campagne?.journees && campagne.journees > 0) patch.jours = campagne.journees;
+    if (Object.keys(patch).length) {
+      const { error } = await supabaseAdmin.from("admin_clients").update(patch).eq("id", affaire.id);
+      if (error) throw new Error(error.message);
+    }
   };
 
   return (
     <Modal onClose={avance ? () => {} : onClose} width={600}>
       <div className="mb-3 flex items-start justify-between gap-4">
-        <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Importer un fichier de prospection</h2>
+        <h2 className="font-display text-xl font-semibold text-avisdoc-ink">
+          {versLePipeline ? "Importer dans le Pipeline" : "Importer un fichier de prospection"}
+        </h2>
         {!avance && (
           <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-muted-foreground hover:text-avisdoc-ink">
             <X className="size-5" />
@@ -312,8 +476,8 @@ export default function ImportProspection({
           </p>
           {bilan.completees.length > 0 && (
             <p className="text-muted-foreground">
-              Déjà en Prospection, complétée{bilan.completees.length > 1 ? "s" : ""} sans être recréée
-              {bilan.completees.length > 1 ? "s" : ""} : {bilan.completees.join(", ")}.
+              Déjà connue{bilan.completees.length > 1 ? "s" : ""}, complétée{bilan.completees.length > 1 ? "s" : ""} là où il manquait
+              quelque chose, sans rien écraser : {bilan.completees.join(", ")}.
             </p>
           )}
           {bilan.echecs.length > 0 && (
@@ -335,9 +499,21 @@ export default function ImportProspection({
             Une ligne par entreprise. Partez du modèle : ses colonnes sont reconnues par leur nom. Les dates de contact, de
             relance et de rendez-vous et les commentaires s’inscrivent dans l’historique de chaque fiche.
           </p>
+          {versLePipeline ? (
+            <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+              Toutes les entreprises du fichier entrent au Pipeline. Les colonnes{" "}
+              <span className="font-semibold text-avisdoc-ink">Pipeline</span> et{" "}
+              <span className="font-semibold text-avisdoc-ink">Colonne</span> (celles de l’export) disent où ; à défaut,
+              l’Avancement, sinon la première colonne du pipeline choisi.
+            </p>
+          ) : (
+            <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+              La colonne <span className="font-semibold text-avisdoc-ink">Avancement</span> ({AVANCEMENTS.join(", ")}) range
+              l’entreprise dans un pipeline ; vide, elle reste en Prospection.
+            </p>
+          )}
           <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            La colonne <span className="font-semibold text-avisdoc-ink">Avancement</span> ({AVANCEMENTS.join(", ")}) range
-            l’entreprise dans un pipeline ; vide, elle reste en Prospection.
+            Un fichier déjà importé peut revenir : rien n’est mis en double, seul ce qui manque est ajouté.
           </p>
           <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
             <button type="button" onClick={() => fichierRef.current?.click()} className={boutonPrincipal}>
@@ -361,13 +537,16 @@ export default function ImportProspection({
                 {LIBELLE[a]} : <span className="font-semibold text-avisdoc-ink">{compte[a]}</span>
               </li>
             ))}
-            <li>
-              Sans avancement (restent en Prospection) : <span className="font-semibold text-avisdoc-ink">{compte.sans}</span>
-            </li>
+            {!versLePipeline && (
+              <li>
+                Sans avancement (restent en Prospection) : <span className="font-semibold text-avisdoc-ink">{compte.sans}</span>
+              </li>
+            )}
           </ul>
           {compte.dejaLa.length > 0 && (
             <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-[12.5px] text-muted-foreground">
-              Déjà en Prospection, elles seront complétées sans être recréées : {compte.dejaLa.join(", ")}.
+              Déjà connues : elles ne seront pas recréées. Seul ce qui leur manque sera ajouté (fiche, interlocuteurs,
+              historique), et une affaire déjà au Pipeline reste dans sa colonne : {compte.dejaLa.join(", ")}.
             </p>
           )}
           {inconnus.length > 0 && (
@@ -379,7 +558,7 @@ export default function ImportProspection({
           {versPipeline > 0 && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <SectionLabel>Pipeline</SectionLabel>
+                <SectionLabel>{versLePipeline ? "Pipeline, si le fichier n’en dit pas" : "Pipeline"}</SectionLabel>
                 <select value={pipelineId} onChange={(e) => choisirPipeline(e.target.value)} className={cn(champCls, "mt-1")}>
                   <option value="">Choisir…</option>
                   {pipelines.map((p) => (
