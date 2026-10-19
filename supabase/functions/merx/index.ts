@@ -625,20 +625,18 @@ Deno.serve(async (req: Request) => {
           {
             name: "lancer_recherche",
             description:
-              "Lance une recherche d'entreprises à prospecter. À appeler SEULEMENT après que le commercial a validé ta reformulation de sa demande. Pour une société précise (« les agences Vinci »), passe son nom dans « entreprise » : seules ses agences seront cherchées, jamais d'autres entreprises.",
+              "Lance une recherche d'entreprises : tout de suite pour une demande du panneau ou une demande claire ; après son « oui » pour une demande floue que tu as reformulée. type « societe » : les agences d'une société nommée, elles seules. type « metier » : des entreprises d'un métier.",
             inputSchema: {
               type: "object",
               additionalProperties: false,
-              required: ["demande"],
+              required: ["type"],
               properties: {
-                demande: {
-                  type: "string",
-                  description: "La demande validée, en une phrase : secteur, zone, taille. Pour une société précise : la zone seulement (vide = toute la France).",
-                },
-                entreprise: {
-                  type: "string",
-                  description: "Le nom de la société dont on veut les agences, quand le commercial en nomme une. Absent pour une recherche par métier.",
-                },
+                type: { type: "string", enum: ["societe", "metier"], description: "« societe » : une société nommée. « metier » : un métier." },
+                societe: { type: "string", description: "Pour type « societe » : le nom de la société, tel que le commercial l'a dit." },
+                metier: { type: "string", description: "Pour type « metier » : le métier et la taille, en une phrase (« entreprises de BTP de plus de 50 salariés »)." },
+                zone: { type: "string", description: "La zone dite par le commercial (« Bretagne », « Rennes »). VIDE = toute la France." },
+                nombre: { type: "number", description: "Combien de fiches NOUVELLES ajouter : 100 par défaut, 300 au plus." },
+                claire: { type: "boolean", description: "Vrai si la demande, écrite par le commercial, était claire et que tu la lances sans la faire valider." },
               },
             },
           },
@@ -667,11 +665,33 @@ Deno.serve(async (req: Request) => {
         ],
         runTool: async (name, input) => {
           if (name === "lancer_recherche") {
-            const entreprise = String((input as { entreprise?: string })?.entreprise ?? "").trim();
-            const zone = String((input as { demande?: string })?.demande ?? "").trim();
-            // Une société précise : la demande porte son nom, que la recherche lit tel quel
-            // (agent.ts, demandeSociete) — il ne doit jamais devenir un métier.
-            const demande = entreprise ? demandeSociete(entreprise, zone) : zone || message;
+            // La validation se vérifie ICI, pas seulement dans la consigne : sans un « oui »
+            // du commercial juste après une reformulation de Merx, rien ne part (19/10).
+            // Trois cas acceptés (Olivier, 19/10) : la demande vient du panneau ; Merx la
+            // déclare claire ; ou le commercial a dit « oui » après une reformulation.
+            const p = (input ?? {}) as { type?: string; societe?: string; metier?: string; zone?: string; nombre?: number; claire?: boolean };
+            const derniereDeMerx = [...history].reverse().find((m) => m.role === "assistant")?.content ?? "";
+            const oui = /^\s*(oui|ouais|yes|ok|okay|d'?accord|vas[- ]y|go|lance|valid|parfait|exact|c'?est (bien )?(ça|ca|bon)|tout à fait|absolument)\b/i.test(message);
+            const duPanneau = message.startsWith("Recherche du panneau :");
+            const suite = /\b(suivant|suivantes|encore|plus de fiches|mets[- ]m'en|\d{3})\b/i.test(message);
+            if (!duPanneau && !p.claire && !suite && !(oui && derniereDeMerx.includes("?"))) {
+              return "Pas encore validé. Si la demande est claire, relance avec « claire » = vrai ; sinon reformule-la en une phrase et demande « Est-ce bien ce que vous cherchez ? ».";
+            }
+            const nombre = Math.min(300, Math.max(1, Math.round(Number(p.nombre) || 100)));
+            const zone = String(p.zone ?? "").trim();
+            let demande: string;
+            if (p.type === "societe") {
+              const societe = String(p.societe ?? "").trim();
+              if (!societe) return "Recherche refusée : le nom de la société manque.";
+              // Le nom de la société ne doit jamais devenir un métier (agent.ts, demandeSociete).
+              demande = demandeSociete(societe, zone, nombre);
+            } else if (p.type === "metier") {
+              const metier = String(p.metier ?? "").trim();
+              if (!metier) return "Recherche refusée : le métier manque. Demande-lui quel métier il vise.";
+              demande = `${metier}${zone ? ` — ${zone}` : " — dans toute la France"}${nombre !== 100 ? ` (${nombre} fiches)` : ""}`;
+            } else {
+              return "Recherche refusée : précise « type » = « societe » ou « metier ».";
+            }
             const { data, error } = await sb
               .from("admin_merx_demandes")
               .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email })
@@ -679,7 +699,7 @@ Deno.serve(async (req: Request) => {
               .single();
             if (error) return `La recherche n'a pas pu être enregistrée : ${error.message}`;
             demandeId = data.id;
-            return `Recherche enregistrée : « ${demande} ». Elle est en cours ; ses résultats arriveront dans Prospects.`;
+            return `Recherche enregistrée : « ${demande} ». Elle est en cours ; ses résultats arriveront dans Prospection.`;
           }
 
           if (name === "lire_fiche") {

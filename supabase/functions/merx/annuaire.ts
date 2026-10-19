@@ -224,6 +224,8 @@ export interface Criteria {
   departments: string[];
   /** Effectif minimum de l'entreprise, en salariés. */
   minHeadcount?: number | null;
+  /** Effectif maximum (« de 20 à 249 »), en salariés. */
+  maxHeadcount?: number | null;
 }
 
 /** Ce que rend une recherche : les entreprises retenues, et celles qui ne sont plus là. */
@@ -262,7 +264,12 @@ const PER_PAGE = 25; // maximum autorisé par l'annuaire
  * On pagine jusqu'à `max` : au-delà, le commercial ne traite plus, et chaque page est
  * un appel de plus. L'annuaire limite le débit, d'où l'attente entre deux pages.
  */
-export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchResult> {
+/**
+ * `dejaConnues` : les SIREN déjà dans les fiches. Elles sont sautées SANS compter, et l'on
+ * continue de tourner les pages : « les 100 suivantes » va vraiment plus loin dans la
+ * liste au lieu de relire le même début (audit du 19/10). Quarante pages au plus.
+ */
+export async function searchByCriteria(c: Criteria, max = 100, dejaConnues: Set<string> = new Set()): Promise<SearchResult> {
   const found: Found[] = [];
   let ignores = 0;
   let totalZone = 0;
@@ -274,8 +281,8 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
     if (c.nafCodes?.length) p.set("activite_principale", c.nafCodes.join(","));
     else if (c.section) p.set("section_activite_principale", c.section);
     if (c.departments.length) p.set("departement", c.departments.join(","));
-    if (avecEffectif && c.minHeadcount) {
-      const bands = bandsFrom(c.minHeadcount);
+    if (avecEffectif && (c.minHeadcount || c.maxHeadcount)) {
+      const bands = bandsFrom(c.minHeadcount ?? 0).filter((b) => !c.maxHeadcount || BAND_FLOOR[b] <= c.maxHeadcount);
       if (bands.length) p.set("tranche_effectif_salarie", bands.join(","));
     }
     return p;
@@ -299,14 +306,19 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
 
   const vus = new Set<string>();
   /** Retenir une page de résultats. Rend false quand le quota est atteint. */
-  const retenir = (results: any[]): boolean => {
+  /** `tailleInconnueSeulement` : la seconde passe, sans filtre d'effectif, ne fait entrer QUE
+   *  les entreprises dont l'annuaire ne publie pas la taille — jamais une plus petite. */
+  const retenir = (results: any[], tailleInconnueSeulement = false): boolean => {
     for (const r of results) {
-      if (vus.has(r.siren)) continue;
-      vus.add(r.siren);
+      if (vus.has(r.siren) || dejaConnues.has(String(r.siren))) continue;
       const company = toCompany(r);
+      if (tailleInconnueSeulement && company.headcountBand && company.headcountBand !== "NN") continue;
+      vus.add(r.siren);
       const tous = ((r.matching_etablissements ?? []) as any[]).map(toEstablishment);
-      const ouverts = tous.filter((e) => e.active);
-      if (c.departments.length && tous.length > 0 && ouverts.length === 0) {
+      const ouverts = tous.filter((e) => e.active && (!c.departments.length || (e.department !== null && c.departments.includes(e.department))));
+      // Une zone demandée : il faut un établissement ouvert DANS la zone. Sans lui, on
+      // n'affiche pas le siège d'ailleurs à sa place (audit du 19/10).
+      if (c.departments.length && ouverts.length === 0) {
         ignores++;
         continue;
       }
@@ -317,7 +329,7 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
   };
 
   // D'abord celles qui répondent strictement à la demande.
-  for (let page = 1; page <= Math.ceil(max / PER_PAGE); page++) {
+  for (let page = 1; page <= Math.min(40, Math.ceil((max + dejaConnues.size) / PER_PAGE)); page++) {
     const data = await interroger(params(page, true));
     if (page === 1) totalQualifiees = data?.total_results ?? 0;
     if (!data?.results?.length) break;
@@ -329,12 +341,12 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
   // taille. Elles ne sont pas plus petites : l'annuaire ne les renseigne pas. Le
   // commercial préfère cinq cents fiches à qualifier que cinq fiches et deux minutes
   // d'attente — et il saura d'où vient la différence.
-  if (c.minHeadcount && found.length < max) {
-    for (let page = 1; page <= Math.ceil(max / PER_PAGE); page++) {
+  if ((c.minHeadcount || c.maxHeadcount) && found.length < max) {
+    for (let page = 1; page <= Math.min(40, Math.ceil((max + dejaConnues.size) / PER_PAGE)); page++) {
       const data = await interroger(params(page, false));
       if (page === 1) totalZone = data?.total_results ?? 0;
       if (!data?.results?.length) break;
-      if (!retenir(data.results)) break;
+      if (!retenir(data.results, true)) break;
       if (page >= (data.total_pages ?? 1)) break;
     }
   } else {
@@ -345,8 +357,6 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
   return { found, ignores, totalZone: Math.max(totalZone, totalQualifiees), totalQualifiees, sansEffectifPublie };
 }
 
-function __inutilise() {  return { found, ignores };
-}
 
 // ── Les agences d'une société nommée ─────────────────────────────────────────
 //
@@ -364,21 +374,34 @@ export const TOUS_DEPARTEMENTS: string[] = [
   "2A", "2B", "971", "972", "973", "974", "976",
 ];
 
-const motsDe = (t: string) =>
-  t
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+/** Les mots d'un nom : sans accents ni ligatures, sigles à points recollés (S.N.C.F. → sncf). */
+const motsDe = (t: string) => {
+  let x = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/œ/gi, "oe").replace(/æ/gi, "ae").toLowerCase();
+  // « s.n.c.f. » → « sncf » : on recolle les lettres isolées séparées par des points.
+  for (let i = 0; i < 6; i++) x = x.replace(/\b([a-z0-9])\.([a-z0-9])\b/g, "$1$2");
+  return x.split(/[^a-z0-9]+/).filter(Boolean);
+};
 
-/** Le nom demandé est-il bien celui de cette société ? Tous ses mots, en mots entiers. */
+/** Ce qu'on ne demande jamais de retrouver dans le nom : la forme juridique, « groupe ». */
+const FORMES = new Set(["sa", "sas", "sasu", "sarl", "eurl", "snc", "sca", "sci", "scop", "se", "groupe", "group", "ste", "societe"]);
+
+/**
+ * Le nom demandé est-il bien celui de cette société ? Il doit OUVRIR son nom (ou être son
+ * sigle) : « Vinci » prend VINCI CONSTRUCTION FRANCE, mais pas COMMUNE D'ORANGE pour
+ * « Orange » ni HOTEL DE LA POSTE pour « La Poste » (tests sur l'annuaire réel, 19/10).
+ * La forme juridique de la demande (« Vinci SA », « Groupe Colas ») ne compte pas.
+ */
 export function porteLeNom(demande: string, r: { nom_complet?: string; nom_raison_sociale?: string; sigle?: string | null }): boolean {
-  const cherches = motsDe(demande).filter((m) => m.length >= 2 || /\d/.test(m));
+  const cherches = motsDe(demande).filter((m) => !FORMES.has(m));
   if (!cherches.length) return false;
+  const colle = cherches.join("");
   return [r.nom_complet, r.nom_raison_sociale, r.sigle].some((n) => {
-    const mots = new Set(motsDe(n ?? ""));
-    return cherches.every((m) => mots.has(m));
+    const mots = motsDe(n ?? "").filter((m, i) => i > 0 || !FORMES.has(m));
+    if (!mots.length) return false;
+    const debut = mots.slice(0, cherches.length);
+    // Mot à mot au début du nom, ou collé (« La Poste » / LAPOSTE).
+    // Collé, mais en mots entiers : LAPOSTE pour « La Poste », jamais VINCIER pour « Vinci ».
+    return cherches.every((m, i) => debut[i] === m) || mots.some((_, k) => mots.slice(0, k + 1).join("") === colle);
   });
 }
 
@@ -401,11 +424,16 @@ export async function agencesDe(nom: string, departements: string[], budgetMs: n
       try {
         const res = await fetch(`${BASE}/search?${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         if (res.status === 429 && attempt < RETRIES_429 + 2) {
-          await new Promise((r) => setTimeout(r, 1_100));
+          await new Promise((r) => setTimeout(r, 1_000 * (Number(res.headers.get("retry-after")) || 1.1)));
           continue;
         }
         return res.ok ? await res.json() : null;
       } catch {
+        // Une coupure réseau se retente (deux fois) : une seule faisait tout échouer.
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 700));
+          continue;
+        }
         return null;
       }
     }
@@ -445,6 +473,8 @@ export async function agencesDe(nom: string, departements: string[], budgetMs: n
         if (etabs.length >= 10) tronquee = true;
         for (const e of etabs) {
           const local = toEstablishment(e);
+          // Le siège n'est pas une agence (audit du 19/10).
+          if (local.isHeadOffice || local.siret === r.siege?.siret) continue;
           if (!local.active || local.department !== d || vus.has(local.siret)) continue;
           vus.add(local.siret);
           const societe = toCompany(r);
@@ -453,6 +483,8 @@ export async function agencesDe(nom: string, departements: string[], budgetMs: n
         }
       }
       if (page >= (rep.total_pages ?? 1)) return;
+      // Quatre pages lues et il en reste : la liste de ce département n'est pas complète.
+      if (page === 4) incomplete = true;
     }
   };
 

@@ -15,7 +15,9 @@ import {
   marquerTentative,
   getProspectForEnrichment,
   loadProspect,
+  identitesConnues,
   insertLightProspects,
+  nomReduit,
   listFoundNames,
   saveEnrichment,
   type Demande,
@@ -53,7 +55,7 @@ function enClair(message: string): string {
   // Un dépassement, c'est presque toujours un périmètre trop vaste. Le dire, plutôt
   // que d'annoncer un nombre de secondes qui n'apprend rien.
   if (/pas de réponse en/i.test(message)) {
-    return "la recherche était trop large pour aboutir : reprenez-la sur un seul département, ou un seul métier.";
+    return "la recherche était trop large pour aboutir : reprenez-la sur une région ou une ville, ou un seul métier.";
   }
   if (/ANTHROPIC_API_KEY/i.test(message)) return "la clé du modèle n'est pas configurée sur le projet.";
   // Une erreur inattendue reste consignée telle quelle dans la demande (écran Coûts) ; ici, on reste lisible.
@@ -129,7 +131,7 @@ const department = (code: string) => (/^(\d{2}|2A|2B|97\d)$/.test(code.trim()) ?
  */
 async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void): Promise<Criteria | null> {
   try {
-    const out = await complete<{ section: string; codes_naf: string[]; departements: string[]; effectif_min: number }>(
+    const out = await complete<{ section: string; codes_naf: string[]; departements: string[]; effectif_min: number; effectif_max: number }>(
       `Demande du commercial : ${demande}`,
       CRITERES_SCHEMA as unknown as Record<string, unknown>,
       { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
@@ -141,7 +143,13 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
     // vide vaut « toute la France » — le registre accepte de chercher sans zone, et
     // une région n'est rien d'autre qu'une poignée de départements.
     if (!nafCodes.length && !section) return null;
-    return { section, nafCodes, departments, minHeadcount: out.effectif_min > 0 ? out.effectif_min : null };
+    return {
+      section,
+      nafCodes,
+      departments,
+      minHeadcount: out.effectif_min > 0 ? out.effectif_min : null,
+      maxHeadcount: out.effectif_max > 0 ? out.effectif_max : null,
+    };
   } catch {
     return null; // le registre est un bonus : s'il échoue, la recherche web prend le relais
   }
@@ -162,8 +170,10 @@ async function lireLesCriteres(demande: string, onUsage: (u: LlmUsage) => void):
  * six à neuf : promettre le premier chiffre à un commercial, c'est lui faire préparer
  * une campagne de dépistage pour une agence de huit personnes.
  */
-function populationDuSite(local: Establishment, c: Found) {
+function populationDuSite(local: Establishment, c: Found, parAgence = false) {
   const duSite = local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : null;
+  // Une agence : son effectif à elle, ou rien — jamais celui du groupe (audit du 19/10).
+  if (parAgence) return populationScore(duSite, true, local.headcountYear, local.employeur);
   return duSite
     ? populationScore(duSite, true, local.headcountYear, local.employeur)
     : populationScore(c.headcountBand, false, c.headcountYear, local.employeur);
@@ -189,6 +199,14 @@ function memeAdresse(local: Establishment, google: string | null): boolean {
   const ville = new Set(motsAdresse(local.city ?? ""));
   const voie = r.filter((m) => m.length >= 4 && !/^\d+$/.test(m) && !MOTS_VIDES.has(m) && !ville.has(m));
   return voie.length === 0 || voie.some((m) => g.includes(m));
+}
+
+/** Le nom que Google donne porte-t-il un mot distinctif du nom de la société ? */
+function memeNom(societe: string, google: string | null): boolean {
+  if (!google) return false;
+  const formes = new Set(["sa", "sas", "sasu", "sarl", "eurl", "snc", "sci", "groupe", "group", "france", "societe", "ste", "et", "de", "des", "du", "la", "le", "les"]);
+  const g = new Set(motsAdresse(google));
+  return motsAdresse(societe).filter((m) => m.length >= 3 && !formes.has(m)).some((m) => g.has(m));
 }
 
 /** La clé d'un lieu Google : l'établissement visé, sinon l'entreprise. */
@@ -287,7 +305,7 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
     // Une agence ne garde la fiche Google que si c'est bien SON adresse : sinon c'est le
     // standard du siège ou d'une autre agence, et l'on préfère ne rien mettre (19/10).
     const trouveParGoogle = lieux.get(cleLieu(c)) ?? null;
-    const lieu = parAgence && trouveParGoogle && !memeAdresse(local, trouveParGoogle.adresse) ? null : trouveParGoogle;
+    const lieu = parAgence && trouveParGoogle && !(memeAdresse(local, trouveParGoogle.adresse) && memeNom(c.name, trouveParGoogle.nom)) ? null : trouveParGoogle;
     const pap = pappers.get(c.siren) ?? null;
     const lu = sites.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
@@ -296,12 +314,14 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
     // Ce que l'entreprise publie elle-même passe devant. Une agence : son seul standard.
     const telephone = parAgence ? (lieu?.telephone ?? null) : (lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null);
     const courriel = parAgence ? null : (lu?.emails[0] ?? pap?.email ?? null);
-    const site = lu?.readOn ?? pap?.site ?? lieu?.site ?? null;
+    // Une agence : seul le site que Pappers rattache à SON SIREN — un domaine deviné
+    // pourrait être celui d'une autre société (audit du 19/10).
+    const site = parAgence ? (pap?.site ?? null) : (lu?.readOn ?? pap?.site ?? lieu?.site ?? null);
 
     const score: Score = {
       // Étape 2 — la pertinence, que le registre suffit à établir.
       exposition: expositionScore(metier.soleil, metier.pourquoi, source),
-      population: populationDuSite(local, c),
+      population: populationDuSite(local, c, parAgence),
       peau: peauScore(metier.affinite, metier.pourquoi, source),
       deploiement: deploiementScore(c.openEstablishments),
       // Étape 3 — ce que l'État publie déjà de leurs démarches, gratuitement.
@@ -351,13 +371,15 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
       // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
       // Une agence garde son SIRET d'établissement et la marque « agence » : un
       // approfondissement ou une complétion n'y remettra pas le siège (db.ts).
-      registre: parAgence ? { ...c.registre, siret: local.siret, agence: true } : c.registre,
+      // Les chiffres et la position du groupe ne sont pas ceux de l'agence : on ne les garde pas.
+      registre: parAgence ? { ...c.registre, finances: null, coordonnees: null, siret: local.siret, agence: true } : c.registre,
       // Si le registre dit que l'établissement n'emploie personne, on n'écrit pas
       // l'effectif du groupe à sa place : ce serait afficher mille cinq cents salariés
       // sur un siège vide.
-      headcountBand: !local.employeur ? null : local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : c.headcountBand,
-      headcountYear: local.headcountYear ?? c.headcountYear,
-      openEstablishments: c.openEstablishments,
+      // Une agence : son effectif publié, sinon rien (pas celui du groupe).
+      headcountBand: !local.employeur ? null : local.headcountBand && local.headcountBand !== "NN" ? local.headcountBand : parAgence ? null : c.headcountBand,
+      headcountYear: parAgence ? (local.headcountBand && local.headcountBand !== "NN" ? local.headcountYear : null) : (local.headcountYear ?? c.headcountYear),
+      openEstablishments: parAgence ? null : c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
       sources: [source, lieu?.source, pap?.source].filter(Boolean) as string[],
       // La note de fiabilité n'a de sens que depuis que la fiche est remplie : le
@@ -521,28 +543,45 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
 }
 
 /** Les départements d'une zone dite en clair (« en Alsace », « autour de Toulouse »). */
+const nuVille = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+const ZONE_SYSTEM = `Tu traduis une zone de France dite en clair par un commercial.
+Rends ses départements (codes : 01 à 95, 2A, 2B, 971 à 976) et, si c'est une ville ou une commune précise, son nom dans « ville ».
+- Une région : tous ses départements, « ville » vide.
+- Un département (nom ou numéro) : lui seul, « ville » vide.
+- Une ville : son département, et son nom dans « ville ».
+- Toute la France, ou rien de précis : liste vide, « ville » vide.
+Ne réponds que par le JSON demandé.`;
+const ZONE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["departements", "ville"],
+  properties: { departements: { type: "array", items: { type: "string" } }, ville: { type: "string" } },
+};
+
 /**
- * Rend les départements de la zone ; une liste VIDE veut dire « toute la France » (c'est
- * ce que répond le traducteur pour une zone nationale, CRITERES_SYSTEM) ; `null` veut dire
- * qu'on n'a pas pu traduire (appel en échec) — et alors seulement on ne cherche pas.
+ * La zone d'une recherche d'agences : ses départements, et sa ville si c'en est une.
+ * Liste VIDE = toute la France. `null` = on n'a pas pu la comprendre — et alors
+ * seulement on ne cherche pas.
  */
-async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise<string[] | null> {
+async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise<{ departements: string[]; ville: string } | null> {
   // « France », « France entière », « toute la France », « national », « partout » : pas
   // besoin du modèle. C'est ce qu'il avait mal compris le 19/10 (« Vinci, France entière »).
   const z = zone.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
-  if (/metropol/.test(z) && /france|hexagone/.test(z)) return TOUS_DEPARTEMENTS.filter((d) => !d.startsWith("97"));
-  if (/^(en |dans |sur )?(toute (la )?)?(la )?france( entiere)?$|^(partout|national|nationale|tout le territoire|toutes regions|toutes les regions)$/.test(z)) return [];
+  if (/metropol/.test(z) && /france|hexagone/.test(z)) return { departements: TOUS_DEPARTEMENTS.filter((d) => !d.startsWith("97")), ville: "" };
+  if (/^(en |dans |sur )?(toute (la )?)?(la )?france( entiere)?$|^(partout|national|nationale|tout le territoire|toutes regions|toutes les regions)$/.test(z)) return { departements: [], ville: "" };
   try {
-    const out = await complete<{ departements: string[] }>(
-      // Le même traducteur que pour une recherche par métier : seule la zone nous sert ici.
-      `Demande du commercial : entreprises de toute activité — ${zone}`,
-      CRITERES_SCHEMA as unknown as Record<string, unknown>,
-      { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
-    );
-    const deps = (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
+    const out = await complete<{ departements: string[]; ville: string }>(`Zone : ${zone}`, ZONE_SCHEMA as unknown as Record<string, unknown>, {
+      usage: "recherche",
+      system: ZONE_SYSTEM,
+      onUsage,
+      timeoutMs: 25_000,
+    });
+    const departements = (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
     // Une zone qui n'est pas nationale (reconnue plus haut) et qui ne donne aucun
     // département est une zone mal comprise : on ne la change pas en « toute la France ».
-    return deps.length ? deps : null;
+    return departements.length ? { departements, ville: (out.ville ?? "").trim() } : null;
   } catch {
     return null;
   }
@@ -552,11 +591,18 @@ async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise
  * La demande « les agences de telle société », telle que le chat l'écrit (index.ts) et
  * que la recherche la relit. Lisible tel quel dans l'historique et le CAP.
  */
-export const demandeSociete = (nom: string, zone: string) => `Agences de « ${nom.trim()} »${zone.trim() ? ` — ${zone.trim()}` : " — toute la France"}`;
+export const demandeSociete = (nom: string, zone: string, nombre = 100) =>
+  `Agences de « ${nom.trim()} »${zone.trim() ? ` — ${zone.trim()}` : " — toute la France"}${nombre !== 100 ? ` (${nombre} fiches)` : ""}`;
 const SOCIETE = /^Agences de « (.+?) » — (.*)$/s;
+/** « … (200 fiches) » : combien de fiches nouvelles la demande veut. 100 par défaut. */
+export const nombreDe = (demande: string): number => {
+  const m = demande.match(/\((\d{1,3}) fiches\)\s*$/);
+  return m ? Math.min(300, Math.max(1, Number(m[1]))) : REGISTRE_MAX;
+};
+const sansNombre = (t: string) => t.replace(/\s*\(\d{1,3} fiches\)\s*$/, "");
 /** Le nom de la société d'une demande d'agences, ou null pour une recherche par métier. */
 export const societeDe = (demande: string): { nom: string; zone: string } | null => {
-  const m = demande.match(SOCIETE);
+  const m = sansNombre(demande).match(SOCIETE);
   return m ? { nom: m[1], zone: m[2] === "toute la France" ? "" : m[2] } : null;
 };
 
@@ -566,42 +612,70 @@ export const societeDe = (demande: string): { nom: string; zone: string } | null
  * PROPOSE d'élargir ; c'est le commercial qui décide.
  */
 async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, zone: string, onUsage: (u: LlmUsage) => void) {
-  // La zone seule se traduit en départements ; sans zone, toute la France. Une zone
-  // qu'on n'a pas su traduire ne se devine pas : on cherche partout, et on le dit.
+  // Sans zone : toute la France. Avec une zone : ses départements, et sa ville si c'en est une.
   const debut = Date.now();
-  const traduits = zone ? await lireLaZone(zone, onUsage) : [];
-  // Une zone qu'on n'a pas PU traduire (appel en échec) ne devient pas « toute la
-  // France » : ce serait élargir sans son accord. Une liste vide, elle, EST la France.
-  if (traduits === null) {
-    return { found: 0, message: `Je n’ai pas su traduire « ${zone} » en départements : je n’ai rien cherché. Redites-moi la zone (une région, un département, une ville).` };
+  const lue = zone ? await lireLaZone(zone, onUsage) : { departements: [], ville: "" };
+  // Une zone qu'on n'a pas PU comprendre ne devient pas « toute la France » : ce serait
+  // élargir sans son accord. On s'arrête et on le dit.
+  if (lue === null) {
+    return { found: 0, message: `Je n’ai pas compris la zone « ${zone} ». Redites-la-moi (une région ou une ville), ou rien pour toute la France.` };
   }
-  const departements = traduits.length ? traduits : TOUS_DEPARTEMENTS;
-  const ou = traduits.length ? zone : "toute la France";
-  const { agences, societes, tronquee, incomplete, echecs } = await agencesDe(nom, departements, 35_000);
-  if (agences.length === 0 && echecs > 0) {
-    throw new Error("l’annuaire des entreprises n’a pas répondu pour une partie des départements");
+  const departements = lue.departements.length ? lue.departements : TOUS_DEPARTEMENTS;
+  const ou = lue.departements.length ? `à ${lue.ville || zone}`.replace(/^à (en|dans) /i, "$1 ") : "dans toute la France";
+  const resultat = await agencesDe(nom, departements, 35_000);
+  if (resultat.agences.length === 0 && resultat.echecs > 0) {
+    throw new Error("l’annuaire des entreprises n’a pas répondu ; relancez dans quelques minutes");
   }
-  const proposer =
-    `Voulez-vous que j’élargisse la recherche à d’autres entreprises comparables à ${nom} (même métier, ${ou}) ? ` +
-    "Je ne les ajouterai que si vous me le confirmez.";
+  // Une ville : ses agences à elle. S'il n'y en a pas, on le dit, sans élargir de soi-même.
+  let agences = resultat.agences;
+  if (lue.ville) {
+    const v = nuVille(lue.ville);
+    const dansLaVille = agences.filter((a) => {
+      const c = nuVille(a.localSites[0]?.city ?? "");
+      return c === v || c.startsWith(`${v} `);
+    });
+    if (dansLaVille.length === 0 && agences.length > 0) {
+      return {
+        found: 0,
+        message:
+          `Je n’ai trouvé aucune agence de ${nom} à ${lue.ville} même. Il y en a ${agences.length} autour : ` +
+          "voulez-vous que je les ajoute ? Je n’ajoute rien sans votre accord.",
+      };
+    }
+    agences = dansLaVille;
+  }
+  const nombre = nombreDe(req.request);
+  const proposer = `Voulez-vous que j’élargisse à d’autres entreprises comparables à ${nom} (même métier, ${ou}) ? Je ne les ajouterai que si vous me le confirmez.`;
+  const partiel = resultat.tronquee || resultat.incomplete;
   if (agences.length === 0) {
     return {
       found: 0,
-      message: `Aucune agence ouverte de « ${nom} » au registre officiel (${ou}). Je n’ai ajouté aucune autre entreprise.\n\n${proposer}`,
+      message: `${partiel ? "Dans la partie que j’ai pu parcourir, je n’ai" : "Je n’ai"} trouvé aucune agence ouverte de ${nom} ${ou}. Je n’ai ajouté aucune autre entreprise.\n\n${proposer}`,
     };
   }
-  const retenues = agences.slice(0, REGISTRE_MAX);
+  // Celles qu'on a déjà ne repassent pas par l'enrichissement payant : « les 100
+  // suivantes » prend les suivantes, pas les mêmes.
+  const connues = await identitesConnues(sb);
+  const nouvelles = agences.filter(
+    (a) =>
+      !connues.sirets.has((a.localSites[0]?.siret ?? "").replace(/\D/g, "")) &&
+      // Une agence déjà en fiche sans SIRET (créée avant le 19/10) se reconnaît à son nom et sa ville.
+      !connues.nomsVilles.has(`${nomReduit(a.name)}|${nomReduit(a.localSites[0]?.city ?? "")}`),
+  );
+  const retenues = nouvelles.slice(0, nombre);
   // Le temps qui reste pour les sites, sous le budget de la fonction (Places et
   // l'insertion passent aussi dedans) : jamais plus que pour une recherche par métier.
   const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
   const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)), true);
   const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
+  const deja = agences.length - nouvelles.length + (fiches.length - inserted);
+  const restantes = nouvelles.length - retenues.length;
   const constat = [
-    `${agences.length} agence${agences.length > 1 ? "s" : ""} ouverte${agences.length > 1 ? "s" : ""} de « ${nom} » au registre officiel (${ou}), sociétés : ${societes.slice(0, 6).join(", ")}${societes.length > 6 ? "…" : ""}`,
-    retenues.length > inserted ? `${retenues.length - inserted} déjà dans vos fiches` : null,
-    agences.length > REGISTRE_MAX ? `seules les ${REGISTRE_MAX} premières ont été ajoutées : précisez une région pour la suite` : null,
-    tronquee ? "dans certains départements, l’annuaire n’en montre que dix par société : il peut en exister d’autres" : null,
-    incomplete ? "tous les départements n’ont pas pu être parcourus (temps ou annuaire indisponible) : relancez par région pour compléter" : null,
+    `J’ai trouvé ${agences.length} agence${agences.length > 1 ? "s" : ""} de ${nom} ${ou}`,
+    `${inserted} ajoutée${inserted > 1 ? "s" : ""} en Prospection`,
+    deja > 0 ? `${deja} que vous aviez déjà` : null,
+    restantes > 0 ? `${restantes} autre${restantes > 1 ? "s" : ""} à ajouter : demandez-moi « les suivantes »` : null,
+    partiel ? "la liste peut être incomplète : précisez une région pour aller plus loin" : null,
   ].filter(Boolean).join(" · ") + ".";
   return { found: inserted, message: `${constat}\n\n${proposer}` };
 }
@@ -628,49 +702,41 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     });
   // Le registre d'abord : deux cents entreprises exactes en une seconde, là où le web
   // en devine sept en deux minutes. Le modèle ne sert plus qu'à lire la demande.
-  const criteres = await lireLesCriteres(req.request, (u) => {
+  const nombre = nombreDe(req.request);
+  const criteres = await lireLesCriteres(sansNombre(req.request), (u) => {
     spent.inputTokens += u.inputTokens;
     spent.outputTokens += u.outputTokens;
     onUsage({ ...spent });
   });
   if (criteres) {
-    const { found: trouvees, ignores, totalZone, totalQualifiees, sansEffectifPublie } = await searchByCriteria(
-      criteres,
-      REGISTRE_MAX,
-    );
+    // On en lit davantage qu'on n'en veut : celles qu'il a déjà sont écartées AVANT
+    // l'enrichissement payant, et « les 100 suivantes » prend vraiment les suivantes.
+    const connues = await identitesConnues(sb);
+    const { found: lues, ignores, totalZone, totalQualifiees, sansEffectifPublie } = await searchByCriteria(criteres, nombre, connues.sirens);
+    // Déjà là sous un autre nom de fichier (client saisi sans SIREN) : on ne repaie pas.
+    const nouvelles = lues.filter((c) => !connues.noms.has(nomReduit(c.name)));
+    const trouvees = nouvelles.slice(0, nombre);
+    // Tout ce que le registre connaît pour cette demande est déjà dans les fiches : on le
+    // dit, sans partir sur le web chercher autre chose.
+    if (trouvees.length === 0 && Math.max(totalZone, totalQualifiees) > 0) {
+      return { found: 0, message: "Toutes les entreprises que je trouve pour cette recherche sont déjà dans vos fiches. Essayez un métier voisin ou une autre zone." };
+    }
     const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
       const deja = fiches.length - inserted;
 
       // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.
-      const pappersUtile = fiches.some((f) => f.contactPhone || f.contactEmail || f.website);
+      // Le bilan dans la langue du commercial (Olivier, 19/10) : ce qui est ajouté, ce
+      // qu'il avait déjà, s'il en reste. Les pannes techniques ne le regardent pas : elles
+      // restent dans la trace de la demande (echecPlaces, echecPappers) pour nous.
+      const total = Math.max(totalZone, totalQualifiees);
       const compte = [
-        `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
-        // Dire d'où vient l'écart : cinq fiches après deux minutes d'attente ont l'air
-        // d'un échec, alors que la zone en compte mille cinq cents dont on ignore
-        // simplement la taille. Le commercial doit pouvoir l'expliquer à son client.
-        totalQualifiees > 0 && totalZone > totalQualifiees * 3
-          ? `${totalZone} dans cette zone, dont ${totalQualifiees} avec un effectif publié correspondant`
-          : null,
-        sansEffectifPublie > 0 ? `${sansEffectifPublie} sans effectif publié — à qualifier` : null,
-          `${fiches.length} entreprise${fiches.length > 1 ? "s" : ""} au registre officiel`,
-          deja > 0 ? `${deja} déjà dans vos fiches` : null,
-          trouvees.length > fiches.length ? `${trouvees.length - fiches.length} d’une activité non reconnue` : null,
-          // Dit, jamais tu : le commercial doit savoir qu'on a écarté des entreprises
-          // qui ne sont plus dans sa zone, sinon il croit la recherche incomplète.
-          ignores > 0 ? `${ignores} écartée${ignores > 1 ? "s" : ""} : plus d’établissement ouvert dans la zone` : null,
-          // Si le standard n'a pas pu être cherché, on le dit : une fiche sans numéro
-          // n'est pas une fatalité, c'est une panne qu'il faut pouvoir réparer.
-          echecPlaces() ? `Google Places : ${echecPlaces()}` : null,
-          echecPappers() ? `Pappers : ${echecPappers()}` : null,
-          // Pappers répond mais ne rend ni téléphone, ni e-mail, ni site : on affiche
-          // ce que la formule souscrite a réellement envoyé, plutôt que de le deviner.
-          !echecPappers() && champsPappers().length > 0 && !pappersUtile
-            ? `Pappers a répondu sans coordonnées — ${["telephone", "email", "site_web"]
-                .map((c) => `${c} ${champsPappers().includes(c) ? "présent mais vide" : "absent de la formule"}`)
-                .join(", ")}`
-            : null,
+        `${inserted} entreprise${inserted > 1 ? "s" : ""} ajoutée${inserted > 1 ? "s" : ""} en Prospection`,
+        deja + (lues.length - nouvelles.length) > 0 ? `${deja + (lues.length - nouvelles.length)} que vous aviez déjà` : null,
+        total > lues.length ? `il y en a environ ${total} en tout` : null,
+        nouvelles.length > trouvees.length || total > lues.length ? "demandez-moi « les suivantes » pour continuer" : null,
+        sansEffectifPublie > 0 ? `${sansEffectifPublie} dont la taille n’est pas connue, à vérifier` : null,
       ].filter(Boolean).join(" · ") + ".";
 
       // Un compteur n'est pas un accompagnement. Merx nomme les meilleures, dit ce qui
@@ -961,6 +1027,15 @@ const NAMES_SHOWN = 10; // noms cités dans le chat ; les autres sont comptés
 
 /** Ce que Merx écrit dans le chat à la fin d'une recherche. */
 export function resultMessage(request: string, result: { found: number; message: string | null }, names: string[]): string {
+  // Agences d'une société : le bilan est déjà écrit pour le commercial ; on y ajoute les noms.
+  if (societeDe(request)) {
+    const shown = names.slice(0, NAMES_SHOWN).map((n) => `• ${n}`).join("\n");
+    const rest = result.found - Math.min(names.length, NAMES_SHOWN);
+    // Le bilan, puis les noms, puis la proposition d'élargir (dernier paragraphe).
+    const [bilan, ...suite] = (result.message ?? "").split("\n\n");
+    const liste = result.found ? shown + (rest > 0 ? `\n… et ${rest} autre${rest > 1 ? "s" : ""}` : "") : "";
+    return [bilan, liste, ...suite].filter(Boolean).join("\n\n");
+  }
   if (!result.found) return `Aucun nouveau prospect pour « ${request} ». ${result.message ?? ""}`.trim();
   const shown = names.slice(0, NAMES_SHOWN);
   const rest = result.found - shown.length;
@@ -968,6 +1043,6 @@ export function resultMessage(request: string, result: { found: number; message:
   return [
     `Trouvé ${result.found} prospect${result.found > 1 ? "s" : ""} pour « ${request} » :`,
     list + (rest > 0 ? `\n… et ${rest} autre${rest > 1 ? "s" : ""}` : ""),
-    `Ils sont dans Prospects.${result.message ? ` ${result.message}` : ""}`,
+    `Ils sont dans Prospection.${result.message ? ` ${result.message}` : ""}`,
   ].join("\n\n");
 }

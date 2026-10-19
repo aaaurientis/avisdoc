@@ -139,13 +139,21 @@ export async function insertLightProspects(
   // Une entreprise déjà connue peut l'être N'IMPORTE OÙ : en prospection, au Pipeline ou
   // au fichier client. La chercher dans les seuls prospects laissait passer les doublons.
   const [enProspection, auPipeline, auFichier] = await Promise.all([
-    sb.from("admin_prospects").select("name, city, siren"),
+    sb.from("admin_prospects").select("name, city, siren, siret:registre->>siret"),
     sb.from("admin_clients").select("company, ville, siren"),
     sb.from("admin_accounts").select("name"),
   ]);
+  // Sans la liste des fiches existantes, on ne sait pas ce qui serait un doublon : on n'écrit rien.
+  const lecture = [enProspection, auPipeline, auFichier].find((r) => r.error)?.error;
+  if (lecture) throw new Error(`Lecture des fiches existantes impossible : ${lecture.message}`);
 
-  const connus: { nom: string; ville: string; siren: string }[] = [
-    ...(enProspection.data ?? []).map((r) => ({ nom: nu(r.name as string), ville: nu((r.city as string) ?? ""), siren: chiffres(r.siren as string) })),
+  const connus: { nom: string; ville: string; siren: string; siret?: string }[] = [
+    ...(enProspection.data ?? []).map((r) => ({
+      nom: nu(r.name as string),
+      ville: nu((r.city as string) ?? ""),
+      siren: chiffres(r.siren as string),
+      siret: chiffres((r as { siret?: string | null }).siret ?? null),
+    })),
     ...(auPipeline.data ?? []).map((r) => ({ nom: nu(r.company as string), ville: nu((r.ville as string) ?? ""), siren: chiffres(r.siren as string) })),
     ...(auFichier.data ?? []).map((r) => ({ nom: nu(r.name as string), ville: "", siren: "" })),
   ];
@@ -155,13 +163,15 @@ export async function insertLightProspects(
    * différentes. Une ville manquante d'un côté ne suffit pas à en faire deux maisons —
    * c'est précisément ce qui avait laissé passer un doublon d'ONETIP.
    */
-  const dejaConnue = (nom: string, ville: string | null, siren: string | null) => {
+  const dejaConnue = (nom: string, ville: string | null, siren: string | null, siret: string | null = null) => {
     const n = nu(nom);
     const v = nu(ville ?? "");
     const s = chiffres(siren);
+    const e = chiffres(siret);
     return connus.some((c) => {
-      // Même nom et même ville (deux villes vides comptent pour la même).
-      if (options.parVille) return c.nom === n && c.ville === v;
+      // Une agence se reconnaît à son SIRET : deux agences d'une même ville sont deux
+      // fiches. Sans SIRET connu de l'autre côté : même nom et même ville.
+      if (options.parVille) return e && c.siret ? c.siret === e : c.nom === n && c.ville === v;
       if (s && c.siren && s === c.siren) return true;
       if (c.nom !== n) return false;
       return !(v && c.ville && v !== c.ville);
@@ -170,8 +180,15 @@ export async function insertLightProspects(
 
   let ajoutes = 0;
   for (const p of prospects) {
-    if (dejaConnue(p.name, p.city, null)) continue;
-    connus.push({ nom: nu(p.name), ville: nu(p.city ?? ""), siren: "" });
+    const siret = options.parVille ? ((p.registre as { siret?: string } | null)?.siret ?? null) : null;
+    if (dejaConnue(p.name, p.city, p.siren ?? null, siret)) continue;
+    // Une autre agence porte déjà ce nom dans cette ville : on la distingue par sa rue
+    // (la base n'admet qu'une fiche par nom et par ville).
+    if (options.parVille && connus.some((c) => c.nom === nu(p.name) && c.ville === nu(p.city ?? ""))) {
+      const rue = ((p.headOffice as { address?: string | null } | null)?.address ?? "").replace(/\s*\d{5}.*$/, "").trim();
+      p.name = rue ? `${p.name} — ${rue}` : `${p.name} — ${siret ?? "autre agence"}`;
+    }
+    connus.push({ nom: nu(p.name), ville: nu(p.city ?? ""), siren: chiffres(p.siren ?? null), siret: chiffres(siret) });
     const ligne = (secteur: string) => ({
       found_by: demandeId,
       owner_email: owner,
@@ -231,6 +248,47 @@ export async function insertLightProspects(
   }
   return ajoutes;
 }
+
+/** Toutes les lignes d'une lecture, page par page : le serveur n'en rend que mille d'un coup. */
+async function toutLire<T>(lire: (de: number, a: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const tout: T[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await lire(de, de + 999);
+    if (error) throw new Error(`Lecture des fiches existantes impossible : ${error.message}`);
+    tout.push(...(data ?? []));
+    if (!data || data.length < 1000) return tout;
+  }
+}
+
+/**
+ * Ce qui est déjà dans les fiches — entreprises (SIREN), établissements (SIRET), et noms
+ * (avec ville quand on l'a) — pour ne pas payer d'enrichissement sur ce qu'on a déjà, et
+ * pour que « les 100 suivantes » prenne vraiment les suivantes.
+ */
+export async function identitesConnues(sb: SupabaseClient): Promise<{ sirens: Set<string>; sirets: Set<string>; noms: Set<string>; nomsVilles: Set<string> }> {
+  const [p, c, a] = await Promise.all([
+    toutLire<{ name: string; city: string | null; siren: string | null; siret: string | null }>((de, j) => sb.from("admin_prospects").select("name, city, siren, siret:registre->>siret").range(de, j)),
+    toutLire<{ company: string; ville: string | null; siren: string | null }>((de, j) => sb.from("admin_clients").select("company, ville, siren").range(de, j)),
+    toutLire<{ name: string }>((de, j) => sb.from("admin_accounts").select("name").range(de, j)),
+  ]);
+  const chiffres = (t: unknown) => String(t ?? "").replace(/\D/g, "");
+  return {
+    sirens: new Set([...p.map((r) => chiffres(r.siren)), ...c.map((r) => chiffres(r.siren))].filter(Boolean)),
+    sirets: new Set(p.map((r) => chiffres(r.siret)).filter(Boolean)),
+    noms: new Set([...p.map((r) => nomReduit(r.name)), ...c.map((r) => nomReduit(r.company)), ...a.map((r) => nomReduit(r.name))]),
+    nomsVilles: new Set([...p.map((r) => `${nomReduit(r.name)}|${nomReduit(r.city ?? "")}`), ...c.map((r) => `${nomReduit(r.company)}|${nomReduit(r.ville ?? "")}`)]),
+  };
+}
+
+/** Le nom réduit des doublons (le même que insertLightProspects) : sans accents, ponctuation, forme juridique. */
+export const nomReduit = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(sarl|sas|sasu|eurl|sa|sci|scop|snc|earl|gaec|ets|etablissements?)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 export async function listFoundNames(sb: SupabaseClient, demandeId: string, avecVille = false): Promise<string[]> {
   const { data } = await sb.from("admin_prospects").select("name, city").eq("found_by", demandeId).order("score_total", { ascending: false });
@@ -375,7 +433,7 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
   // du site national (Olivier, 19/10). Son SIRET et sa marque « agence » restent.
   const registre = a.registre as { agence?: boolean; siret?: string } | null;
   if (registre?.agence) {
-    for (const k of ["head_office", "leaders", "contact_name", "contact_role", "contact_email", "contact_phone", "contact_source", "site_contacts", "personnes"]) delete patch[k];
+    for (const k of ["head_office", "leaders", "contact_name", "contact_role", "contact_email", "contact_phone", "contact_source", "site_contacts", "personnes", "headcount_band", "headcount_year", "open_establishments"]) delete patch[k];
     if (patch.registre && typeof patch.registre === "object") patch.registre = { ...(patch.registre as object), siret: registre.siret, agence: true };
     return;
   }
