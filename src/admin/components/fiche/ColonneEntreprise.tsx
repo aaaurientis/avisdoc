@@ -29,21 +29,28 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
       {texte}
     </a>
   );
+  // Le standard : saisi à la main, il est rangé avec les numéros du site ; trouvé par
+  // Merx, c'est le contact de la fiche.
+  const telephone = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
+  const email = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
+  const chef = p.leaders?.[0];
   const candidates: { label: string; valeur: ReactNode | null | undefined }[] = [
+    { label: "Dirigeant", valeur: chef ? [chef.name, chef.role].filter(Boolean).join(" — ") : null },
+    { label: "Adresse", valeur: p.head_office?.address ?? null },
     { label: "Activité", valeur: p.activity },
     { label: "Effectif", valeur: effectif },
     { label: "Établissements", valeur: p.open_establishments ?? null },
     { label: typeof ca === "number" ? `Chiffre d’affaires ${annee}` : "Chiffre d’affaires", valeur: typeof ca === "number" ? euros(ca) : null },
     { label: "Site", valeur: p.website ? lien(p.website, p.website.replace(/^https?:\/\//, "").replace(/\/$/, "")) : null },
-    { label: "Téléphone", valeur: p.contact_phone ? <a href={`tel:${p.contact_phone.replace(/\s/g, "")}`} className="text-avisdoc-teal">{p.contact_phone}</a> : null },
-    { label: "E-mail", valeur: p.contact_email ? <a href={`mailto:${p.contact_email}`} className="break-all text-avisdoc-teal">{p.contact_email}</a> : null },
+    { label: "Téléphone", valeur: telephone ? <a href={`tel:${telephone.replace(/\s/g, "")}`} className="text-avisdoc-teal">{telephone}</a> : null },
+    { label: "E-mail", valeur: email ? <a href={`mailto:${email}`} className="break-all text-avisdoc-teal">{email}</a> : null },
   ];
   const vide = (v: ReactNode | null | undefined) => v === null || v === undefined || v === "";
   return {
     lignes: candidates.filter((c) => !vide(c.valeur)).map((c) => ({ label: c.label, valeur: c.valeur })),
     manquants: [
       ...candidates.filter((c) => vide(c.valeur)).map((c) => c.label),
-      ...(p.contact_name ? [] : ["Interlocuteur"]),
+      ...(p.contact_name || p.personnes?.length ? [] : ["Interlocuteur"]),
       ...(p.siren ? [] : ["SIREN"]),
     ],
   };

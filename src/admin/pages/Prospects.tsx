@@ -343,7 +343,9 @@ export default function Prospects() {
   useEffect(() => {
     let vivant = true;
     const enRetard = prospects
-      .filter((p) => !p.converted_client_id && !p.contact_phone && !p.website && !p.completed_at && !dejaTentees.current.has(p.id))
+      // Seulement les fiches trouvées par Merx : une fiche saisie ou importée est celle du
+      // commercial, rien n'y entre sans qu'il le demande (Olivier, 19/10).
+      .filter((p) => p.found_by && !p.converted_client_id && !p.contact_phone && !p.website && !p.completed_at && !dejaTentees.current.has(p.id))
       .sort((a, b) => (b.score_total ?? -1) - (a.score_total ?? -1))
       .slice(0, 12);
     if (enRetard.length === 0) return;
@@ -409,7 +411,8 @@ export default function Prospects() {
         await supabaseAdmin.from("admin_prospects").update({ opened_at: new Date().toISOString() }).eq("id", p.id);
         setProspects((prev) => prev.map((x) => (x.id === p.id ? { ...x, opened_at: new Date().toISOString() } : x)));
       }
-      if (!p.contact_phone || !p.website) {
+      // Le standard n'est cherché que pour une fiche trouvée par Merx (voir plus haut).
+      if (p.found_by && (!p.contact_phone || !p.website)) {
         const complete = await completerStandard(p);
         if (complete) await charger();
       }
