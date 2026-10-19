@@ -3,8 +3,10 @@
 // Ceux que Merx a trouvés et ceux qu'on a saisis à la main se lisent pareil : nom,
 // fonction, coordonnées. Une piste dont la source ne fait pas foi reste « à confirmer ».
 
-import { useState } from "react";
-import { Mail, Phone, Plus, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, Mail, Phone, Plus, Smartphone, Sparkles, X } from "lucide-react";
+import { useAuth } from "../../auth/AuthContext";
+import { COUT_FE, demanderFE, demandesFE, enCoursFE, type DemandeFE } from "../../lib/fullenrich";
 import { SectionLabel } from "../ui";
 import { confirmer } from "../Confirmation";
 import { cn } from "@/lib/utils";
@@ -26,13 +28,66 @@ export default function Interlocuteurs({
   personnes,
   onAjouter,
   onRetirer,
+  fullenrich,
 }: {
   personnes: PersonneFiche[];
   onAjouter?: (p: { prenom: string; nom: string; role: string; email: string }) => void;
   onRetirer?: (id: string) => void;
+  /** FullEnrich sur cette fiche : sa fiche d'entreprise, si le mobile est permis (vrai client), et que relire quand un résultat arrive. */
+  fullenrich?: { prospectId: string; mobile: boolean; onResultat: () => void };
 }) {
   const [saisie, setSaisie] = useState({ prenom: "", nom: "", role: "", email: "" });
   const [ouvert, setOuvert] = useState(false);
+  const { user } = useAuth();
+  const [demandes, setDemandes] = useState<DemandeFE[]>([]);
+  const [envoi, setEnvoi] = useState<string | null>(null);
+  const [souci, setSouci] = useState<string | null>(null);
+  const prospectId = fullenrich?.prospectId;
+  const onResultat = fullenrich?.onResultat;
+
+  const relire = useCallback(async () => {
+    if (!prospectId) return;
+    const avant = demandes.filter(enCoursFE).length;
+    const d = await demandesFE(prospectId);
+    setDemandes(d);
+    // Un résultat vient d'arriver : la fiche se relit pour montrer les e-mails trouvés.
+    if (avant > d.filter(enCoursFE).length) onResultat?.();
+  }, [prospectId, demandes, onResultat]);
+
+  useEffect(() => {
+    void relire();
+    // Seulement au changement de fiche ; le suivi se fait ci-dessous.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prospectId]);
+
+  // Tant qu'une demande est en cours, on regarde toutes les 20 secondes.
+  useEffect(() => {
+    if (!demandes.some(enCoursFE)) return;
+    const t = setInterval(() => void relire(), 20_000);
+    return () => clearInterval(t);
+  }, [demandes, relire]);
+
+  const demander = async (kind: "contacts" | "contacts_plus" | "mobile", personne?: string) => {
+    if (!prospectId || envoi) return;
+    const cout = kind === "mobile" ? COUT_FE.mobile : COUT_FE.plus;
+    const titre = kind === "mobile" ? `Chercher le mobile de ${personne} ?` : kind === "contacts" ? "Chercher 2 contacts ?" : "Chercher 2 autres contacts ?";
+    if (!(await confirmer({ titre, message: `FullEnrich, ${cout}. Le résultat arrive en une à deux minutes.`, action: "Chercher" }))) return;
+    setEnvoi(kind === "mobile" ? `mobile:${personne}` : kind);
+    setSouci(null);
+    try {
+      await demanderFE(prospectId, kind, user?.email ?? "", personne);
+      await relire();
+    } catch (e) {
+      setSouci(e instanceof Error ? e.message : "La demande n’a pas pu partir.");
+    } finally {
+      setEnvoi(null);
+    }
+  };
+
+  const premiere = demandes.find((d) => d.kind === "contacts");
+  const plus = demandes.find((d) => d.kind === "contacts_plus");
+  const mobileDe = (nom: string) => demandes.find((d) => d.kind === "mobile" && d.personne?.trim().toLowerCase() === nom.trim().toLowerCase());
+  const etat = [premiere, plus].filter((d): d is DemandeFE => Boolean(d));
 
   const ajouter = () => {
     if (!onAjouter || (!saisie.prenom.trim() && !saisie.nom.trim())) return;
@@ -53,6 +108,19 @@ export default function Interlocuteurs({
       </div>
 
       {personnes.length === 0 && !ouvert && <p className="text-[13px] text-muted-foreground">Aucun interlocuteur connu pour l’instant.</p>}
+
+      {/* Ce que FullEnrich fait, ou a dit, sur cette fiche. */}
+      {etat.map((d) =>
+        enCoursFE(d) ? (
+          <p key={d.id} className="mb-2 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" /> FullEnrich cherche 2 interlocuteurs et leur e-mail…
+          </p>
+        ) : d.message ? (
+          <p key={d.id} className={cn("mb-2 text-[12.5px]", d.statut === "bloque" ? "font-semibold text-amber-700" : "text-muted-foreground")}>
+            {d.message}
+          </p>
+        ) : null,
+      )}
 
       <div className="space-y-2">
         {personnes.map((q) => (
@@ -77,6 +145,27 @@ export default function Interlocuteurs({
                   )}
                 </div>
               )}
+              {/* Le mobile : vrai client seulement, à la demande. */}
+              {fullenrich?.mobile && !q.telephone && (() => {
+                const m = mobileDe(q.nom);
+                if (m && enCoursFE(m))
+                  return (
+                    <span className="mt-1 inline-flex items-center gap-1 text-[12px] text-muted-foreground">
+                      <Loader2 className="size-3 animate-spin" /> Mobile en cours de recherche…
+                    </span>
+                  );
+                if (m) return m.message ? <span className="mt-1 block text-[12px] text-muted-foreground">{m.message}</span> : null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => void demander("mobile", q.nom)}
+                    disabled={envoi !== null}
+                    className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-avisdoc-teal disabled:opacity-50"
+                  >
+                    {envoi === `mobile:${q.nom}` ? <Loader2 className="size-3 animate-spin" /> : <Smartphone className="size-3.5" />} Chercher son mobile
+                  </button>
+                );
+              })()}
               {q.source && (
                 <a href={q.source} target="_blank" rel="noreferrer" className="mt-0.5 block text-[11.5px] text-muted-foreground underline-offset-2 hover:underline">
                   trouvé sur {hote(q.source)}
@@ -98,6 +187,20 @@ export default function Interlocuteurs({
           </div>
         ))}
       </div>
+
+      {/* Une fiche saisie à la main n'a pas eu sa première recherche : elle se demande ici. */}
+      {fullenrich && (!premiere || (!enCoursFE(premiere) && !plus)) && (
+        <button
+          type="button"
+          onClick={() => void demander(premiere ? "contacts_plus" : "contacts")}
+          disabled={envoi !== null}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
+        >
+          {envoi === "contacts_plus" || envoi === "contacts" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}{" "}
+          {premiere ? "Chercher 2 autres contacts" : "Chercher 2 contacts"}
+        </button>
+      )}
+      {souci && <p className="mt-2 text-[12.5px] font-semibold text-rose-700">{souci}</p>}
 
       {ouvert && onAjouter && (
         <div className="mt-2 flex flex-wrap gap-2 rounded-xl border border-border p-2.5">

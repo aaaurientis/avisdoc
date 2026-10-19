@@ -290,6 +290,20 @@ export const nomReduit = (t: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+/**
+ * Les fiches d'une recherche entrent dans la file FullEnrich : 2 interlocuteurs et leur
+ * e-mail chacune (Olivier, 19/10). La fonction « fullenrich » les traite, dans le
+ * plafond du mois. Si la table n'existe pas encore (migration 0072 pas collée), on
+ * n'empêche pas la recherche d'aboutir : on le signale seulement.
+ */
+export async function demanderContacts(sb: SupabaseClient, demandeId: string, par: string): Promise<boolean> {
+  const { data } = await sb.from("admin_prospects").select("id").eq("found_by", demandeId);
+  const ids = (data ?? []).map((r: { id: string }) => r.id);
+  if (!ids.length) return true;
+  const { error } = await sb.from("admin_fullenrich").insert(ids.map((id: string) => ({ prospect_id: id, kind: "contacts", demande_par: par })));
+  return !error;
+}
+
 export async function listFoundNames(sb: SupabaseClient, demandeId: string, avecVille = false): Promise<string[]> {
   const { data } = await sb.from("admin_prospects").select("name, city").eq("found_by", demandeId).order("score_total", { ascending: false });
   return (data ?? []).map((r: { name: string; city: string | null }) => (avecVille && r.city ? `${r.name} — ${r.city}` : r.name));

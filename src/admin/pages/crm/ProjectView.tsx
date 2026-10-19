@@ -436,6 +436,7 @@ export default function ProjectView({
                 personnes={interlocuteurs}
                 onAjouter={(x) => addProjectContact(client.id, x)}
                 onRetirer={(id) => removeProjectContact(client.id, id)}
+                fullenrich={origine ? { prospectId: origine.id, mobile: true, onResultat: () => void chargerOrigine() } : undefined}
               />
             }
             etablissement={origine ? etablissementDe(origine).lignes : ceQueSaitLAffaire}

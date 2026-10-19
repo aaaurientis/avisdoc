@@ -18,6 +18,7 @@ import {
   identitesConnues,
   insertLightProspects,
   nomReduit,
+  demanderContacts,
   listFoundNames,
   saveEnrichment,
   type Demande,
@@ -668,6 +669,7 @@ async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, z
   const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
   const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)), true);
   const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
+  if (inserted) await demanderContacts(sb, req.id, req.requestedBy);
   const deja = agences.length - nouvelles.length + (fiches.length - inserted);
   const restantes = nouvelles.length - retenues.length;
   const constat = [
@@ -724,6 +726,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
+      if (inserted) await demanderContacts(sb, req.id, req.requestedBy);
       const deja = fiches.length - inserted;
 
       // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.

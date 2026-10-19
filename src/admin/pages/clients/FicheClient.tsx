@@ -323,6 +323,16 @@ export default function FicheClient({
                 personnes={interlocuteurs}
                 onAjouter={affaire ? (x) => addProjectContact(affaire.id, x) : undefined}
                 onRetirer={affaire ? (id) => removeProjectContact(affaire.id, id) : undefined}
+                fullenrich={
+                  origine
+                    ? {
+                        prospectId: origine.id,
+                        mobile: true,
+                        onResultat: () =>
+                          void supabaseAdmin.from("admin_prospects").select("*").eq("id", origine.id).maybeSingle().then(({ data }) => data && setOrigine(data as Prospect)),
+                      }
+                    : undefined
+                }
               />
             }
             etablissement={ceQueSaitLeClient}
