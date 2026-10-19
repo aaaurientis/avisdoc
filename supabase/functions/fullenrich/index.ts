@@ -163,9 +163,13 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
   // des intitulés en français (« DRH », « Responsable QSE ») ne ramenaient personne
   // (19/10, 58 fiches sur 58). Une recherche qui ne rend personne ne coûte rien : on
   // élargit donc par paliers, du plus précis au plus large.
-  const societe = domaine
-    ? { current_company_domains: [{ value: domaine, exact_match: true, exclude: false }] }
-    : { current_company_names: [{ value: nomSocieteDe(p), exact_match: false, exclude: false }] };
+  // Essai réel du 19/10 : par le NOM, « COLAS FRANCE » rend les RH de Colas France en
+  // Normandie et « Bouygues Immobilier » son DRH ; par le SITE, colas.com rendait Mayotte
+  // et le Moyen-Orient (toutes les filiales du monde), bouygues-immobilier.com personne.
+  // Le nom d'abord, en France ; le site seulement en dernier recours.
+  const parNom = { current_company_names: [{ value: nomSocieteDe(p), exact_match: false, exclude: false }] };
+  const parSite = domaine ? { current_company_domains: [{ value: domaine, exact_match: true, exclude: false }] } : null;
+  const enFrance = { person_locations: [{ value: "France", exact_match: false, exclude: false }] };
   const v = (xs: string[]) => xs.map((value) => ({ value, exclude: false }));
   // Les intitulés tels que les gens les écrivent sur leur profil : en français pour la
   // plupart des salariés en France, en anglais dans les grands groupes.
@@ -175,10 +179,10 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
   const ville = p.registre?.agence && p.city ? { person_locations: [{ value: p.city, exact_match: false, exclude: false }] } : null;
   const paliers: Record<string, unknown>[] = [
     // Une agence : d'abord les gens de SA ville.
-    ...(ville ? [{ ...societe, ...titres, ...ville }] : []),
-    { ...societe, ...titres },
-    { ...societe, ...fonctions, ...niveaux },
-    { ...societe, ...niveaux },
+    ...(ville ? [{ ...parNom, ...titres, ...ville }] : []),
+    { ...parNom, ...titres, ...enFrance },
+    { ...parNom, ...fonctions, ...niveaux, ...enFrance },
+    ...(parSite ? [{ ...parSite, ...titres, ...enFrance }] : []),
   ];
   let r: any = null;
   let credits = 0;
