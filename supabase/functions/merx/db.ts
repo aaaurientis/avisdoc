@@ -114,7 +114,14 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
  */
 const secteurSur = (secteur: string): string => secteur.trim() || "Non précisé";
 
-export async function insertLightProspects(sb: SupabaseClient, demandeId: string, owner: string, prospects: LightProspect[]): Promise<number> {
+export async function insertLightProspects(
+  sb: SupabaseClient,
+  demandeId: string,
+  owner: string,
+  prospects: LightProspect[],
+  /** Agences d'une société : connue seulement si MÊME nom ET MÊME ville (sinon c'est une autre agence). */
+  options: { parVille?: boolean } = {},
+): Promise<number> {
   if (!prospects.length) return 0;
 
   // On compare sur un nom RÉDUIT : sans accents, sans ponctuation, sans forme juridique.
@@ -153,6 +160,8 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
     const v = nu(ville ?? "");
     const s = chiffres(siren);
     return connus.some((c) => {
+      // Même nom et même ville (deux villes vides comptent pour la même).
+      if (options.parVille) return c.nom === n && c.ville === v;
       if (s && c.siren && s === c.siren) return true;
       if (c.nom !== n) return false;
       return !(v && c.ville && v !== c.ville);
@@ -223,9 +232,9 @@ export async function insertLightProspects(sb: SupabaseClient, demandeId: string
   return ajoutes;
 }
 
-export async function listFoundNames(sb: SupabaseClient, demandeId: string): Promise<string[]> {
-  const { data } = await sb.from("admin_prospects").select("name").eq("found_by", demandeId).order("score_total", { ascending: false });
-  return (data ?? []).map((r: { name: string }) => r.name);
+export async function listFoundNames(sb: SupabaseClient, demandeId: string, avecVille = false): Promise<string[]> {
+  const { data } = await sb.from("admin_prospects").select("name, city").eq("found_by", demandeId).order("score_total", { ascending: false });
+  return (data ?? []).map((r: { name: string; city: string | null }) => (avecVille && r.city ? `${r.name} — ${r.city}` : r.name));
 }
 
 export interface ProspectToEnrich {
@@ -356,8 +365,9 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
     .maybeSingle();
   // Sans pouvoir relire la fiche, on n'écrit pas : écraser la saisie serait pire.
   if (error) throw new Error(`Fiche illisible avant enrichissement : ${error.message}`);
-  if (!avant || (avant as Record<string, unknown>).found_by) return;
-  const a = avant as Record<string, unknown>;
+  // Colonnes choisies à l'exécution : le type de la ligne n'est pas connu d'avance.
+  const a = avant as unknown as Record<string, unknown> | null;
+  if (!a || a.found_by) return;
   // Le siège : on complète ses cases vides (une ville seule n'empêche pas d'ajouter l'adresse).
   if (patch.head_office && a.head_office && typeof a.head_office === "object") {
     const av = a.head_office as Record<string, unknown>;

@@ -5,7 +5,7 @@
 // Budget : une edge function Supabase tient 150 s (400 s en payant) ; on se borne à 120 s pour finir proprement.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { headcountLabel, lookup, searchByCriteria, type Company, type Criteria, type Establishment, type Found } from "./annuaire.ts";
+import { agencesDe, headcountLabel, lookup, searchByCriteria, TOUS_DEPARTEMENTS, type Company, type Criteria, type Establishment, type Found } from "./annuaire.ts";
 import {
   appendConversationMessage,
   claimRequest,
@@ -169,7 +169,10 @@ function populationDuSite(local: Establishment, c: Found) {
     : populationScore(c.headcountBand, false, c.headcountYear, local.employeur);
 }
 
-async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
+/** La clé d'un lieu Google : l'établissement visé, sinon l'entreprise. */
+const cleLieu = (c: Found) => c.localSites[0]?.siret ?? c.siren;
+
+async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<LightProspect[]> {
   // Le standard, l'adresse exacte et le site officiel de toutes les entreprises d'un
   // coup. Sans cela la recherche rendait des fiches sans un numéro à composer — moins
   // utiles qu'une recherche Google, et personne n'en faisait rien.
@@ -178,8 +181,9 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
   // parfois l'adresse électronique. Aucune ne suffit seule, et l'une comme l'autre peut
   // échouer sans conséquence — ce qui manque sera dit, plus jamais tu.
   const [lieux, pappers] = await Promise.all([
-    chercherLieux(trouvees.map((c) => ({ cle: c.siren, nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city }))),
-    chercherPappersEnLot(trouvees.map((c) => c.siren).filter(Boolean)),
+    // Une clé par établissement : les agences d'une même société ont chacune leur standard.
+    chercherLieux(trouvees.map((c) => ({ cle: cleLieu(c), nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city }))),
+    chercherPappersEnLot([...new Set(trouvees.map((c) => c.siren).filter(Boolean))]),
   ]);
 
   // Les sites officiels : devinés, puis lus. C'est là que sont les adresses
@@ -196,7 +200,9 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
   // Vingt de front, et quatre-vingt-dix secondes : de quoi couvrir une recherche
   // entière. Le commercial ne doit pas avoir à cliquer fiche par fiche pour obtenir un
   // numéro — ce qui est trouvable l'est à la recherche, pas sur demande.
-  const BUDGET_SITES_MS = 90_000;
+  const BUDGET_SITES_MS = budgetSitesMs;
+  /** Les sociétés dont on a déjà cherché le site, trouvé ou non : une seule tentative chacune. */
+  const tentees = new Set<string>();
   const DE_FRONT = 20;
   // Les meilleures d'abord : si le temps manque, ce sont celles-là qui auront leurs
   // coordonnées, pas les dernières de la liste.
@@ -205,10 +211,11 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
     return poids(b) - poids(a);
   });
   for (let i = 0; i < parPotentiel.length && Date.now() - debutSites < BUDGET_SITES_MS; i += DE_FRONT) {
-    const vague = parPotentiel.slice(i, i + DE_FRONT);
+    // Un site par société : ses agences le partagent, inutile de le lire cent fois.
+    const vague = parPotentiel.slice(i, i + DE_FRONT).filter((c) => !tentees.has(c.siren) && tentees.add(c.siren));
     await Promise.all(
       vague.map(async (c) => {
-        const connu = pappers.get(c.siren)?.site ?? lieux.get(c.siren)?.site ?? (await devinerSite(c.name));
+        const connu = pappers.get(c.siren)?.site ?? lieux.get(cleLieu(c))?.site ?? (await devinerSite(c.name));
         if (!connu) return;
         // Lecture rapide : la page d'accueil, le contact et les mentions légales.
         // Dix-neuf pages pour cent entreprises dépasseraient le budget de la fonction.
@@ -241,7 +248,7 @@ async function versFiches(trouvees: Found[]): Promise<LightProspect[]> {
     // est la seule que le registre suffise à établir. Maturité prévention et
     // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
-    const lieu = lieux.get(c.siren) ?? null;
+    const lieu = lieux.get(cleLieu(c)) ?? null;
     const pap = pappers.get(c.siren) ?? null;
     const lu = sites.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
@@ -469,7 +476,82 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
   };
 }
 
+/** Les départements d'une zone dite en clair (« en Alsace », « autour de Toulouse »). */
+async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise<string[]> {
+  try {
+    const out = await complete<{ departements: string[] }>(
+      // Le même traducteur que pour une recherche par métier : seule la zone nous sert ici.
+      `Demande du commercial : entreprises de toute activité — ${zone}`,
+      CRITERES_SCHEMA as unknown as Record<string, unknown>,
+      { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
+    );
+    return (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * La demande « les agences de telle société », telle que le chat l'écrit (index.ts) et
+ * que la recherche la relit. Lisible tel quel dans l'historique et le CAP.
+ */
+export const demandeSociete = (nom: string, zone: string) => `Agences de « ${nom.trim()} »${zone.trim() ? ` — ${zone.trim()}` : " — toute la France"}`;
+const SOCIETE = /^Agences de « (.+?) » — (.*)$/s;
+/** Le nom de la société d'une demande d'agences, ou null pour une recherche par métier. */
+export const societeDe = (demande: string): { nom: string; zone: string } | null => {
+  const m = demande.match(SOCIETE);
+  return m ? { nom: m[1], zone: m[2] === "toute la France" ? "" : m[2] } : null;
+};
+
+/**
+ * Les agences d'une société nommée — elles seules (Olivier, 19/10). Jamais de repli
+ * sur le métier : si la société n'a pas d'agence dans la zone, on le dit, et on
+ * PROPOSE d'élargir ; c'est le commercial qui décide.
+ */
+async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, zone: string, onUsage: (u: LlmUsage) => void) {
+  // La zone seule se traduit en départements ; sans zone, toute la France. Une zone
+  // qu'on n'a pas su traduire ne se devine pas : on cherche partout, et on le dit.
+  const debut = Date.now();
+  const traduits = zone ? await lireLaZone(zone, onUsage) : [];
+  // Une zone qu'on n'a pas su traduire ne devient pas « toute la France » : ce serait
+  // élargir sans son accord. On s'arrête et on le dit.
+  if (zone && !traduits.length) {
+    return { found: 0, message: `Je n’ai pas su traduire « ${zone} » en départements : je n’ai rien cherché. Redites-moi la zone (une région, un département, une ville).` };
+  }
+  const departements = traduits.length ? traduits : TOUS_DEPARTEMENTS;
+  const ou = zone || "toute la France";
+  const { agences, societes, tronquee, incomplete, echecs } = await agencesDe(nom, departements, 35_000);
+  if (agences.length === 0 && echecs > 0) {
+    throw new Error("l’annuaire des entreprises n’a pas répondu pour une partie des départements");
+  }
+  const proposer =
+    `Voulez-vous que j’élargisse la recherche à d’autres entreprises comparables à ${nom} (même métier, ${ou}) ? ` +
+    "Je ne les ajouterai que si vous me le confirmez.";
+  if (agences.length === 0) {
+    return {
+      found: 0,
+      message: `Aucune agence ouverte de « ${nom} » au registre officiel (${ou}). Je n’ai ajouté aucune autre entreprise.\n\n${proposer}`,
+    };
+  }
+  const retenues = agences.slice(0, REGISTRE_MAX);
+  // Le temps qui reste pour les sites, sous le budget de la fonction (Places et
+  // l'insertion passent aussi dedans) : jamais plus que pour une recherche par métier.
+  const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
+  const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)));
+  const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
+  const constat = [
+    `${agences.length} agence${agences.length > 1 ? "s" : ""} ouverte${agences.length > 1 ? "s" : ""} de « ${nom} » au registre officiel (${ou}), sociétés : ${societes.slice(0, 6).join(", ")}${societes.length > 6 ? "…" : ""}`,
+    retenues.length > inserted ? `${retenues.length - inserted} déjà dans vos fiches` : null,
+    agences.length > REGISTRE_MAX ? `seules les ${REGISTRE_MAX} premières ont été ajoutées : précisez une région pour la suite` : null,
+    tronquee ? "dans certains départements, l’annuaire n’en montre que dix par société : il peut en exister d’autres" : null,
+    incomplete ? "tous les départements n’ont pas pu être parcourus (temps ou annuaire indisponible) : relancez par région pour compléter" : null,
+  ].filter(Boolean).join(" · ") + ".";
+  return { found: inserted, message: `${constat}\n\n${proposer}` };
+}
+
 async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage) => void) {
+  const societe = societeDe(req.request);
+  if (societe) return runSearchSociete(sb, req, societe.nom, societe.zone, onUsage);
   const started = Date.now();
   let urls: string[] = [];
   const spent: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
@@ -801,7 +883,8 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",
-        content: resultMessage(req.request, result, await listFoundNames(sb, req.id)),
+        // Des agences d'une même société ne se distinguent que par leur ville.
+        content: resultMessage(req.request, result, await listFoundNames(sb, req.id, Boolean(societeDe(req.request)))),
       });
     }
   } catch (e) {
