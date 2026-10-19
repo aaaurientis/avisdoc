@@ -36,6 +36,10 @@ verify_jwt = false
 [functions.recap-du-soir]
 verify_jwt = false
 
+# FullEnrich (cron chaque minute) : protégée par un secret en base (migration 0072).
+[functions.fullenrich]
+verify_jwt = false
+
 # Devis Qonto — admin @avisdoc.fr vérifié dans la fonction ; clé Qonto côté serveur.
 [functions.qonto]
 verify_jwt = true
