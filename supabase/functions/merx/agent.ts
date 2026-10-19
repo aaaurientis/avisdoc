@@ -169,10 +169,39 @@ function populationDuSite(local: Establishment, c: Found) {
     : populationScore(c.headcountBand, false, c.headcountYear, local.employeur);
 }
 
+/** Mots d'une adresse qui ne la distinguent pas d'une autre. */
+const MOTS_VIDES = new Set(["rue", "avenue", "av", "boulevard", "bd", "chemin", "route", "place", "allee", "impasse", "quai", "cours", "zone", "za", "zi", "zac", "parc", "rond", "point", "lieu", "dit", "france", "cedex", "bis", "ter"]);
+const motsAdresse = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/**
+ * L'adresse que Google rend est-elle celle de l'établissement au registre ? Même code
+ * postal, même numéro dans la voie s'il y en a un, et au moins un mot du nom de la voie.
+ */
+function memeAdresse(local: Establishment, google: string | null): boolean {
+  if (!google || !local.address) return false;
+  const g = motsAdresse(google);
+  const r = motsAdresse(local.address);
+  const cp = local.postalCode ?? r.find((m) => /^\d{5}$/.test(m)) ?? null;
+  if (!cp || !g.includes(cp)) return false;
+  const numero = r.find((m) => /^\d{1,4}$/.test(m));
+  if (numero && !g.includes(numero)) return false;
+  const ville = new Set(motsAdresse(local.city ?? ""));
+  const voie = r.filter((m) => m.length >= 4 && !/^\d+$/.test(m) && !MOTS_VIDES.has(m) && !ville.has(m));
+  return voie.length === 0 || voie.some((m) => g.includes(m));
+}
+
 /** La clé d'un lieu Google : l'établissement visé, sinon l'entreprise. */
 const cleLieu = (c: Found) => c.localSites[0]?.siret ?? c.siren;
 
-async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<LightProspect[]> {
+/**
+ * `parAgence` : chaque entrée est UNE AGENCE d'une société (« les agences Bouygues
+ * Immobilier »). Sa fiche ne porte alors que ce qui la concerne, elle : l'adresse de
+ * l'agence au registre, le standard de l'agence trouvé par Google à son adresse. Ni le
+ * siège, ni le dirigeant du groupe, ni les numéros lus sur le site national — Olivier,
+ * 19/10 : « s'il n'y a pas, tu mets rien ». Le site internet, lui, est celui de la société.
+ */
+async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence = false): Promise<LightProspect[]> {
   // Le standard, l'adresse exacte et le site officiel de toutes les entreprises d'un
   // coup. Sans cela la recherche rendait des fiches sans un numéro à composer — moins
   // utiles qu'une recherche Google, et personne n'en faisait rien.
@@ -182,7 +211,14 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<Li
   // échouer sans conséquence — ce qui manque sera dit, plus jamais tu.
   const [lieux, pappers] = await Promise.all([
     // Une clé par établissement : les agences d'une même société ont chacune leur standard.
-    chercherLieux(trouvees.map((c) => ({ cle: cleLieu(c), nom: c.name, ville: (c.localSites[0] ?? c.headOffice).city }))),
+    // Une agence : on donne à Google son adresse exacte au registre, pas seulement la ville.
+    chercherLieux(
+      trouvees.map((c) => ({
+        cle: cleLieu(c),
+        nom: c.name,
+        ville: parAgence ? (c.localSites[0]?.address ?? c.localSites[0]?.city ?? null) : (c.localSites[0] ?? c.headOffice).city,
+      })),
+    ),
     chercherPappersEnLot([...new Set(trouvees.map((c) => c.siren).filter(Boolean))]),
   ]);
 
@@ -248,15 +284,18 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<Li
     // est la seule que le registre suffise à établir. Maturité prévention et
     // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
-    const lieu = lieux.get(cleLieu(c)) ?? null;
+    // Une agence ne garde la fiche Google que si c'est bien SON adresse : sinon c'est le
+    // standard du siège ou d'une autre agence, et l'on préfère ne rien mettre (19/10).
+    const trouveParGoogle = lieux.get(cleLieu(c)) ?? null;
+    const lieu = parAgence && trouveParGoogle && !memeAdresse(local, trouveParGoogle.adresse) ? null : trouveParGoogle;
     const pap = pappers.get(c.siren) ?? null;
     const lu = sites.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
     // une en publient un, et nous ne l'affichions pas. Pappers complète quand il a mieux.
-    const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
-    // Ce que l'entreprise publie elle-même passe devant.
-    const telephone = lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null;
-    const courriel = lu?.emails[0] ?? pap?.email ?? null;
+    const dirigeant = parAgence ? null : (c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null));
+    // Ce que l'entreprise publie elle-même passe devant. Une agence : son seul standard.
+    const telephone = parAgence ? (lieu?.telephone ?? null) : (lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null);
+    const courriel = parAgence ? null : (lu?.emails[0] ?? pap?.email ?? null);
     const site = lu?.readOn ?? pap?.site ?? lieu?.site ?? null;
 
     const score: Score = {
@@ -302,12 +341,17 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<Li
       contactRole: dirigeant?.role ?? null,
       contactPhone: telephone,
       contactEmail: courriel,
-      siteContacts: lu,
-      contactSource: pap?.source ?? lieu?.source ?? null,
-      headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
-      leaders: c.leaders,
+      siteContacts: parAgence ? null : lu,
+      contactSource: parAgence ? (lieu?.telephone ? lieu.source : null) : (pap?.source ?? lieu?.source ?? null),
+      // Une agence : SON adresse au registre (jamais celle du siège).
+      headOffice: parAgence
+        ? { address: local.address, city: local.city, department: local.department }
+        : { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
+      leaders: parAgence ? null : c.leaders,
       // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
-      registre: c.registre,
+      // Une agence garde son SIRET d'établissement et la marque « agence » : un
+      // approfondissement ou une complétion n'y remettra pas le siège (db.ts).
+      registre: parAgence ? { ...c.registre, siret: local.siret, agence: true } : c.registre,
       // Si le registre dit que l'établissement n'emploie personne, on n'écrit pas
       // l'effectif du groupe à sa place : ce serait afficher mille cinq cents salariés
       // sur un siège vide.
@@ -332,7 +376,7 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000): Promise<Li
           dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
           email: courriel,
           telephone,
-          telephoneRecoupe: [lu?.phones[0], pap?.telephone, lieu?.telephone].filter(Boolean).length >= 2,
+          telephoneRecoupe: parAgence ? false : [lu?.phones[0], pap?.telephone, lieu?.telephone].filter(Boolean).length >= 2,
         }),
       ),
       score,
@@ -537,7 +581,7 @@ async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, z
   // Le temps qui reste pour les sites, sous le budget de la fonction (Places et
   // l'insertion passent aussi dedans) : jamais plus que pour une recherche par métier.
   const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
-  const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)));
+  const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)), true);
   const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
   const constat = [
     `${agences.length} agence${agences.length > 1 ? "s" : ""} ouverte${agences.length > 1 ? "s" : ""} de « ${nom} » au registre officiel (${ou}), sociétés : ${societes.slice(0, 6).join(", ")}${societes.length > 6 ? "…" : ""}`,

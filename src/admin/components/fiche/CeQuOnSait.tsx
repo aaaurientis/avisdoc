@@ -88,7 +88,7 @@ export default function CeQuOnSait({
             <>
           {p.legal_name && <Ligne label="Raison sociale">{p.legal_name}</Ligne>}
           {p.siren && <Ligne label="SIREN">{p.siren}</Ligne>}
-          {p.registre?.siret && <Ligne label="SIRET du siège">{p.registre.siret}</Ligne>}
+          {p.registre?.siret && <Ligne label={p.registre.agence ? "SIRET de l’agence" : "SIRET du siège"}>{p.registre.siret}</Ligne>}
           {effectif && (
             <Ligne label="Effectif">
               {effectif}
@@ -97,7 +97,7 @@ export default function CeQuOnSait({
           )}
           {p.open_establishments !== null && <Ligne label="Établissements ouverts">{p.open_establishments}</Ligne>}
           {siege && (siege.address || siege.city) && (
-            <Ligne label="Siège">{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
+            <Ligne label={p.registre?.agence ? "Agence" : "Siège"}>{[siege.address, siege.city].filter(Boolean).join(", ")}</Ligne>
           )}
           {p.leaders && p.leaders.length > 0 && (
             <Ligne label="Dirigeants">

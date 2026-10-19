@@ -192,6 +192,8 @@ export default function PanneauRecherche({
   /** Reçoit la demande rédigée : le reste du chemin ne change pas. */
   onChercher: (demande: string) => void;
 }) {
+  /** Une société précise : on cherche ses agences, elles seules (Olivier, 19/10). */
+  const [societe, setSociete] = useState("");
   const [secteur, setSecteur] = useState("");
   const [secteurLibre, setSecteurLibre] = useState("");
   const [ou, setOu] = useState("");
@@ -237,10 +239,12 @@ export default function PanneauRecherche({
     });
 
   const quoi = (secteur === "autre" ? secteurLibre : secteur).trim();
-  const pret = quoi.length > 1 && !occupe;
+  const pret = (quoi.length > 1 || societe.trim().length > 1) && !occupe;
 
   /** La demande, écrite comme le commercial l'aurait dite. */
   const rediger = (): string => {
+    // Une société nommée : ses agences, dans la zone. Le secteur et la taille ne servent pas.
+    if (societe.trim()) return `Les agences de la société ${societe.trim()} ${ou.trim() ? `en ${ou.trim()}` : "dans toute la France"}.`;
     const morceaux = [`Entreprises du secteur ${quoi}`];
     if (ou.trim()) morceaux.push(`en ${ou.trim()}`);
     else morceaux.push("dans toute la France");
@@ -253,6 +257,7 @@ export default function PanneauRecherche({
   };
 
   const vider = () => {
+    setSociete("");
     setSecteur("");
     setSecteurLibre("");
     setOu("");
@@ -270,6 +275,23 @@ export default function PanneauRecherche({
           vous préférez — ils n’écartent personne.
         </p>
       </div>
+
+      <label className="block">
+        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+          Société ou agence (facultatif)
+        </span>
+        <input
+          value={societe}
+          onChange={(e) => setSociete(e.target.value)}
+          placeholder="Bouygues Immobilier, Colas…"
+          className={cn(champCls, "mt-1")}
+        />
+        {societe.trim() && (
+          <span className="mt-1 block text-[11.5px] leading-snug text-muted-foreground">
+            Merx cherchera les agences de cette société seulement, dans la zone choisie ; le secteur et la taille ne servent pas.
+          </span>
+        )}
+      </label>
 
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
@@ -427,7 +449,7 @@ export default function PanneauRecherche({
           {occupe ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           Chercher
         </button>
-        {(quoi || ou || taille || poste || marqueurs.size > 0) && (
+        {(societe || quoi || ou || taille || poste || marqueurs.size > 0) && (
           <button
             type="button"
             onClick={vider}

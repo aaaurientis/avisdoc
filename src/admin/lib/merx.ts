@@ -225,6 +225,8 @@ export interface Prospect {
     idcc?: string[];
     tva?: string | null;
     etablissements?: number | null;
+    /** Fiche d'une AGENCE (recherche « les agences de X ») : adresse et SIRET sont les siens. */
+    agence?: boolean;
   } | null;
   /** Le dossier commercial monté par Merx à l'approfondissement (migration 0033). */
   dossier: Dossier | null;

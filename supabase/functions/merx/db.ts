@@ -360,14 +360,26 @@ const rempliTot = (v: unknown) =>
 async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<string, unknown>): Promise<void> {
   const { data: avant, error } = await sb
     .from("admin_prospects")
-    .select(`found_by, personnes, site_contacts, ${SAISIS.join(", ")}`)
+    .select(`found_by, personnes, site_contacts, registre, ${SAISIS.join(", ")}`)
     .eq("id", id)
     .maybeSingle();
   // Sans pouvoir relire la fiche, on n'écrit pas : écraser la saisie serait pire.
   if (error) throw new Error(`Fiche illisible avant enrichissement : ${error.message}`);
   // Colonnes choisies à l'exécution : le type de la ligne n'est pas connu d'avance.
   const a = avant as unknown as Record<string, unknown> | null;
-  if (!a || a.found_by) return;
+  if (!a) return;
+
+  // Une AGENCE d'une société (recherche « les agences de X ») : l'approfondissement et la
+  // complétion lisent la société entière, donc son siège. Rien de ce qui est propre au
+  // siège n'entre sur la fiche de l'agence — adresse, dirigeant, standard, personnes
+  // du site national (Olivier, 19/10). Son SIRET et sa marque « agence » restent.
+  const registre = a.registre as { agence?: boolean; siret?: string } | null;
+  if (registre?.agence) {
+    for (const k of ["head_office", "leaders", "contact_name", "contact_role", "contact_email", "contact_phone", "contact_source", "site_contacts", "personnes"]) delete patch[k];
+    if (patch.registre && typeof patch.registre === "object") patch.registre = { ...(patch.registre as object), siret: registre.siret, agence: true };
+    return;
+  }
+  if (a.found_by) return;
   // Le siège : on complète ses cases vides (une ville seule n'empêche pas d'ajouter l'adresse).
   if (patch.head_office && a.head_office && typeof a.head_office === "object") {
     const av = a.head_office as Record<string, unknown>;
