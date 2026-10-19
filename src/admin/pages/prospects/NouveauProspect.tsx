@@ -5,7 +5,8 @@
 // lui demande depuis la fiche, avec « Enrichir par Merx ».
 
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal } from "../../components/ui";
@@ -13,6 +14,7 @@ import FormulaireFiche from "../../components/fiche/FormulaireFiche";
 import { chargerMembres } from "../../lib/membres";
 import { colonnesProspect, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, saisieDepuisProspect, type FicheSaisie } from "../../lib/fiche-saisie";
 import type { Prospect } from "../../lib/merx";
+import { lancerApprofondissement } from "../../lib/merx-appels";
 
 export default function NouveauProspect({
   fiche,
@@ -31,25 +33,33 @@ export default function NouveauProspect({
   const [initiale] = useState(saisie);
   const fermer = () => void fermerSiRienAPerdre(initiale, saisie, onClose);
   const [membres, setMembres] = useState<string[]>([]);
-  const [envoi, setEnvoi] = useState(false);
+  const [envoi, setEnvoi] = useState<false | "simple" | "merx">(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   useEffect(() => {
     void chargerMembres().then(setMembres);
   }, []);
 
-  const enregistrer = async () => {
+  /** `avecMerx` : la fiche enregistrée, Merx est lancé dessus (Olivier, 19/10). */
+  const enregistrer = async (avecMerx = false) => {
     if (envoi) return;
     const souci = erreurSaisie(saisie);
     if (souci) return setErreur(souci);
-    setEnvoi(true);
+    setEnvoi(avecMerx ? "merx" : "simple");
     setErreur(null);
     try {
       const valeurs = colonnesProspect(saisie, fiche);
-      const { error } = fiche
-        ? await supabaseAdmin.from("admin_prospects").update(valeurs).eq("id", fiche.id)
-        : await supabaseAdmin.from("admin_prospects").insert({ ...valeurs, owner_email: user?.email ?? "" });
+      const { data, error } = fiche
+        ? await supabaseAdmin.from("admin_prospects").update(valeurs).eq("id", fiche.id).select("id").single()
+        : await supabaseAdmin.from("admin_prospects").insert({ ...valeurs, owner_email: user?.email ?? "" }).select("id").single();
       if (error) throw new Error(error.message);
+      if (avecMerx && data?.id) {
+        // La fiche est enregistrée quoi qu'il arrive : si Merx ne peut pas partir, on le
+        // dit et on ferme (rester ouvert inviterait à créer la fiche une seconde fois).
+        await lancerApprofondissement(data.id as string).catch((e) =>
+          toast.error(`Fiche enregistrée, mais Merx n’a pas pu être lancé (${e instanceof Error ? e.message : "erreur"}). Relancez-le depuis la fiche.`),
+        );
+      }
       await onCree();
       onClose();
     } catch (e) {
@@ -88,12 +98,23 @@ export default function NouveauProspect({
         <button
           type="button"
           onClick={() => void enregistrer()}
-          disabled={envoi}
+          disabled={Boolean(envoi)}
           className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
         >
-          {envoi && <Loader2 className="size-4 animate-spin" />}
+          {envoi === "simple" && <Loader2 className="size-4 animate-spin" />}
           {fiche ? "Enregistrer" : "Ajouter le prospect"}
         </button>
+        {!fiche && (
+          <button
+            type="button"
+            onClick={() => void enregistrer(true)}
+            disabled={Boolean(envoi)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60"
+          >
+            {envoi === "merx" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            Ajouter et enrichir par Merx
+          </button>
+        )}
         <button type="button" onClick={fermer} className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-avisdoc-ink">
           Annuler
         </button>

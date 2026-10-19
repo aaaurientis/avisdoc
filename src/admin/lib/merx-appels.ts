@@ -19,6 +19,15 @@ async function appeler<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 /**
+ * Lance l'approfondissement et rend la main dès que la demande est enregistrée, sans
+ * attendre qu'elle aboutisse : sert à « créer et enrichir », où l'on ferme aussitôt la
+ * fenêtre. Le serveur travaille quoi qu'il arrive ; la fiche montre « En cours… ».
+ */
+export async function lancerApprofondissement(prospectId: string): Promise<void> {
+  await appeler<{ demandeId?: string }>({ action: "approfondir", prospectId });
+}
+
+/**
  * Va chercher le registre officiel, le site de l'entreprise et les coordonnées publiées.
  *
  * L'appel rend la main dès que la demande est enregistrée ; on attend ensuite qu'elle

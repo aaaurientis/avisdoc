@@ -4,7 +4,7 @@
 // Qonto et l'annuaire ne servent qu'à préremplir, si on veut.
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { Client, PappersResult } from "../../types";
 import { euro, uid, splitAdresse } from "../../lib/format";
@@ -15,6 +15,7 @@ import { chargerMembres } from "../../lib/membres";
 import { TRANCHES } from "../../lib/merx";
 import { colonnesProspect, departementDuCodePostal, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, type FicheSaisie } from "../../lib/fiche-saisie";
 import { champsAffaire, contactsAffaire } from "../../lib/affaire-saisie";
+import { lancerApprofondissement } from "../../lib/merx-appels";
 import { searchPappers } from "../../data/pappers";
 import { useAdminData } from "../../data/AdminDataContext";
 import { devisRepo } from "../../espace/devisRepo";
@@ -54,7 +55,7 @@ export default function NewClientModal({
   // La campagne compte aussi : changer les journées ou le tarif, c'est avoir commencé.
   const fermer = () => void fermerSiRienAPerdre({ saisie: initiale, jours: 2, tarif: 1200 }, { saisie, jours, tarif }, onClose);
   const [membres, setMembres] = useState<string[]>([]);
-  const [envoi, setEnvoi] = useState(false);
+  const [envoi, setEnvoi] = useState<false | "simple" | "merx">(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,13 +123,14 @@ export default function NewClientModal({
     }));
   };
 
-  const create = async () => {
+  /** `avecMerx` : le client créé, Merx est lancé sur sa fiche (Olivier, 19/10). */
+  const create = async (avecMerx = false) => {
     if (envoi) return;
     const souci = erreurSaisie(saisie);
     if (souci) return setErreur(souci);
     const deja = crmClients.find((c) => c.company.trim().toLowerCase() === saisie.nom.trim().toLowerCase());
     if (deja) return setErreur(`${deja.company} est déjà dans le Pipeline, à l’étape « ${deja.stage} ».`);
-    setEnvoi(true);
+    setEnvoi(avecMerx ? "merx" : "simple");
     setErreur(null);
     try {
       const id = uid();
@@ -192,6 +194,9 @@ export default function NewClientModal({
         throw new Error(`Le client est créé au Pipeline, mais sa fiche n’a pas pu lui être reliée (${lien.message}). Ouvrez-le et utilisez « Modifier la fiche ».`);
       }
       if (qontoPick) await devisRepo.lierQonto(id, qontoPick.id);
+      // Merx part sur la fiche ; s'il ne peut pas, le client est créé quand même et
+      // l'on peut relancer depuis la fiche (« Enrichir par Merx »).
+      if (avecMerx) await lancerApprofondissement(fiche.id as string).catch(() => toast.error("Client créé, mais Merx n’a pas pu être lancé : relancez-le depuis la fiche."));
       await rafraichir();
       onCreated(id);
     } catch (e) {
@@ -316,11 +321,20 @@ export default function NewClientModal({
         </button>
         <button
           type="button"
+          onClick={() => void create(true)}
+          disabled={Boolean(envoi) || !saisie.nom.trim()}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-border py-3 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-45"
+        >
+          {envoi === "merx" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          Créer et enrichir par Merx
+        </button>
+        <button
+          type="button"
           onClick={() => void create()}
-          disabled={envoi || !saisie.nom.trim()}
+          disabled={Boolean(envoi) || !saisie.nom.trim()}
           className="ad-btn-accent inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white transition-opacity disabled:opacity-45"
         >
-          {envoi && <Loader2 className="size-4 animate-spin" />}
+          {envoi === "simple" && <Loader2 className="size-4 animate-spin" />}
           Créer le client
         </button>
       </div>
