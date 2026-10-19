@@ -347,3 +347,122 @@ export async function searchByCriteria(c: Criteria, max = 100): Promise<SearchRe
 
 function __inutilise() {  return { found, ignores };
 }
+
+// ── Les agences d'une société nommée ─────────────────────────────────────────
+//
+// « Les agences Colas » n'est pas un métier : chercher les travaux publics de la zone
+// rendait Vinci (Olivier, 19/10). Ici, on ne cherche QUE la société nommée.
+//
+// L'annuaire ne liste pas tous les établissements d'une entreprise d'un coup (dix au
+// plus par réponse, et Colas France en a 431). On l'interroge donc département par
+// département : il rend, pour chaque société du nom, ses établissements de ce
+// département.
+
+/** Les départements de France, outre-mer compris. */
+export const TOUS_DEPARTEMENTS: string[] = [
+  ...Array.from({ length: 95 }, (_, i) => String(i + 1).padStart(2, "0")).filter((d) => d !== "20"),
+  "2A", "2B", "971", "972", "973", "974", "976",
+];
+
+const motsDe = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+/** Le nom demandé est-il bien celui de cette société ? Tous ses mots, en mots entiers. */
+export function porteLeNom(demande: string, r: { nom_complet?: string; nom_raison_sociale?: string; sigle?: string | null }): boolean {
+  const cherches = motsDe(demande).filter((m) => m.length >= 2 || /\d/.test(m));
+  if (!cherches.length) return false;
+  return [r.nom_complet, r.nom_raison_sociale, r.sigle].some((n) => {
+    const mots = new Set(motsDe(n ?? ""));
+    return cherches.every((m) => mots.has(m));
+  });
+}
+
+export interface AgencesTrouvees {
+  agences: Found[];
+  /** Les sociétés du nom retenues (« COLAS FRANCE », « COLAS RAIL »…). */
+  societes: string[];
+  /** Un département rendait dix établissements pour une société : il y en a peut-être plus. */
+  tronquee: boolean;
+  /** Le temps a manqué, ou l'annuaire n'a pas répondu, avant d'avoir vu tous les départements. */
+  incomplete: boolean;
+  /** Combien d'appels à l'annuaire ont échoué. */
+  echecs: number;
+}
+
+export async function agencesDe(nom: string, departements: string[], budgetMs: number): Promise<AgencesTrouvees> {
+  const debut = Date.now();
+  const appeler = async (p: URLSearchParams): Promise<any> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(`${BASE}/search?${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (res.status === 429 && attempt < RETRIES_429 + 2) {
+          await new Promise((r) => setTimeout(r, 1_100));
+          continue;
+        }
+        return res.ok ? await res.json() : null;
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  // Un groupe (GE, ETI) porte-t-il ce nom ? Alors on ne garde que lui : « Colas » est
+  // aussi le nom d'une dizaine de petites entreprises sans rapport avec le groupe.
+  const groupes = await appeler(new URLSearchParams({ q: nom, etat_administratif: "A", per_page: "25", categorie_entreprise: "GE,ETI" }));
+  // Sans cette réponse, on ne sait pas s'il faut écarter les homonymes : on n'invente pas.
+  if (!groupes) throw new Error("l’annuaire des entreprises n’a pas répondu");
+  const seulementLesGroupes = (groupes?.results ?? []).some((r: any) => porteLeNom(nom, r));
+
+  const agences: Found[] = [];
+  const societes = new Set<string>();
+  const vus = new Set<string>();
+  let tronquee = false;
+  let incomplete = false;
+  let echecs = 0;
+
+  const unDepartement = async (d: string) => {
+    for (let page = 1; page <= 4; page++) {
+      if (Date.now() - debut > budgetMs) {
+        incomplete = true;
+        return;
+      }
+      const p = new URLSearchParams({ q: nom, departement: d, etat_administratif: "A", per_page: "25", page: String(page) });
+      if (seulementLesGroupes) p.set("categorie_entreprise", "GE,ETI");
+      const rep = await appeler(p);
+      if (!rep) {
+        echecs++;
+        incomplete = true;
+        return;
+      }
+      for (const r of rep.results ?? []) {
+        if (!porteLeNom(nom, r)) continue;
+        const etabs: any[] = r.matching_etablissements ?? [];
+        if (etabs.length >= 10) tronquee = true;
+        for (const e of etabs) {
+          const local = toEstablishment(e);
+          if (!local.active || local.department !== d || vus.has(local.siret)) continue;
+          vus.add(local.siret);
+          const societe = toCompany(r);
+          societes.add(societe.name);
+          agences.push({ ...societe, localSites: [local] });
+        }
+      }
+      if (page >= (rep.total_pages ?? 1)) return;
+    }
+  };
+
+  // Quatre départements de front : l'annuaire limite le débit, et chaque refus coûte une seconde.
+  for (let i = 0; i < departements.length; i += 4) {
+    if (Date.now() - debut > budgetMs) {
+      incomplete = true;
+      break;
+    }
+    await Promise.all(departements.slice(i, i + 4).map(unDepartement));
+  }
+  return { agences, societes: [...societes], tronquee, incomplete, echecs };
+}

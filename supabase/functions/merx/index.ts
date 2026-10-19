@@ -20,7 +20,7 @@
 //   supabase secrets set ANTHROPIC_API_KEY=...
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { runAgentTick } from "./agent.ts";
+import { demandeSociete, runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
 import { transcrire } from "./transcription.ts";
 import { chercherTerrain, lireFiche } from "./consulter.ts";
@@ -624,12 +624,22 @@ Deno.serve(async (req: Request) => {
         tools: [
           {
             name: "lancer_recherche",
-            description: "Lance une recherche d'entreprises à prospecter. À appeler dès que le commercial demande de chercher des entreprises, avec sa demande reformulée en une phrase claire (secteur, zone, taille si elle est dite).",
+            description:
+              "Lance une recherche d'entreprises à prospecter. À appeler SEULEMENT après que le commercial a validé ta reformulation de sa demande. Pour une société précise (« les agences Vinci »), passe son nom dans « entreprise » : seules ses agences seront cherchées, jamais d'autres entreprises.",
             inputSchema: {
               type: "object",
               additionalProperties: false,
               required: ["demande"],
-              properties: { demande: { type: "string", description: "La demande, en une phrase : secteur, zone, taille." } },
+              properties: {
+                demande: {
+                  type: "string",
+                  description: "La demande validée, en une phrase : secteur, zone, taille. Pour une société précise : la zone seulement (vide = toute la France).",
+                },
+                entreprise: {
+                  type: "string",
+                  description: "Le nom de la société dont on veut les agences, quand le commercial en nomme une. Absent pour une recherche par métier.",
+                },
+              },
             },
           },
           {
@@ -657,7 +667,11 @@ Deno.serve(async (req: Request) => {
         ],
         runTool: async (name, input) => {
           if (name === "lancer_recherche") {
-            const demande = String((input as { demande?: string })?.demande ?? "").trim() || message;
+            const entreprise = String((input as { entreprise?: string })?.entreprise ?? "").trim();
+            const zone = String((input as { demande?: string })?.demande ?? "").trim();
+            // Une société précise : la demande porte son nom, que la recherche lit tel quel
+            // (agent.ts, demandeSociete) — il ne doit jamais devenir un métier.
+            const demande = entreprise ? demandeSociete(entreprise, zone) : zone || message;
             const { data, error } = await sb
               .from("admin_merx_demandes")
               .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email })
