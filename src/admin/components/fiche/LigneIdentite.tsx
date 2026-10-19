@@ -1,4 +1,5 @@
-// L'identité officielle sous l'en-tête : SIREN, raison sociale, siège. La même ligne
+// L'identité officielle sous l'en-tête : SIREN, raison sociale, siège (ou l'agence,
+// pour une fiche d'agence : head_office porte alors l'adresse de l'agence). La même ligne
 // sur les trois fiches, tirée de la fiche de prospection quand il y en a une.
 
 import type { Prospect } from "../../lib/merx";
