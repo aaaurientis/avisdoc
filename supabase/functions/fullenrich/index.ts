@@ -26,7 +26,7 @@ const FROM = Deno.env.get("RDV_FROM") ?? "AvisDoc <noreply@avisdoc.fr>";
 const API = "https://app.fullenrich.com/api/v2";
 
 /** Qui est prévenu quand le plafond approche ou est atteint. */
-const ALERTE_A = ["arthur@avisdoc.fr", "olivier@avisdoc.fr"];
+const ALERTE_A = ["arthur@avisdoc.fr"];
 
 /** Ce qu'une demande coûtera au plus, pour ne jamais dépasser le plafond. */
 const ESTIMATION: Record<string, number> = { contacts: 2.5, contacts_plus: 2.5, mobile: 10 };
