@@ -81,6 +81,8 @@ begin
 end;
 $$;
 revoke execute on function public.fullenrich_reserver(uuid, numeric, text) from public, anon, authenticated;
+-- Seule la fonction « fullenrich » (rôle de service) peut réserver.
+grant execute on function public.fullenrich_reserver(uuid, numeric, text) to service_role;
 
 insert into public.admin_secrets_internes (cle, valeur)
 values ('fullenrich', replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')),
