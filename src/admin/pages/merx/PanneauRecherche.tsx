@@ -122,12 +122,10 @@ const ZONES = [
 
 /** Les tailles, dites comme un commercial les dit — l'effectif suit entre parenthèses. */
 const TAILLES: { valeur: string; label: string; phrase: string }[] = [
+  // Adaptées à AvisDoc (Olivier, 19/10) : une journée de dépistage ne vise pas une TPE.
   { valeur: "", label: "Toutes tailles", phrase: "" },
-  { valeur: "tpe", label: "TPE — moins de 10 salariés", phrase: "de moins de 10 salariés" },
-  { valeur: "pme50", label: "PME — 10 à 49 salariés", phrase: "de 10 à 49 salariés" },
-  { valeur: "pme", label: "PME — 50 à 249 salariés", phrase: "de plus de 50 salariés" },
-  { valeur: "eti", label: "ETI — 250 à 4 999 salariés", phrase: "de plus de 250 salariés" },
-  { valeur: "ge", label: "Grande entreprise — 5 000 et plus", phrase: "de plus de 5 000 salariés" },
+  { valeur: "pme", label: "20 à 249 salariés", phrase: "de 20 à 249 salariés" },
+  { valeur: "grandes", label: "250 salariés et plus", phrase: "de 250 salariés et plus" },
 ];
 
 /**
@@ -192,7 +190,9 @@ export default function PanneauRecherche({
   /** Reçoit la demande rédigée : le reste du chemin ne change pas. */
   onChercher: (demande: string) => void;
 }) {
-  /** Une société précise : on cherche ses agences, elles seules (Olivier, 19/10). */
+  /** Deux façons de chercher, deux onglets (Olivier, 19/10) : une société, ou un métier. */
+  const [onglet, setOnglet] = useState<"societe" | "metier">("metier");
+  /** Une société précise : on cherche ses agences, elles seules. */
   const [societe, setSociete] = useState("");
   const [secteur, setSecteur] = useState("");
   const [secteurLibre, setSecteurLibre] = useState("");
@@ -239,13 +239,17 @@ export default function PanneauRecherche({
     });
 
   const quoi = (secteur === "autre" ? secteurLibre : secteur).trim();
-  const pret = (quoi.length > 1 || societe.trim().length > 1) && !occupe;
+  const pret = (onglet === "societe" ? societe.trim().length > 1 : quoi.length > 1) && !occupe;
 
-  /** La demande, écrite comme le commercial l'aurait dite. */
-  const rediger = (): string => {
-    // Une société nommée : ses agences, dans la zone. Le secteur et la taille ne servent pas.
-    if (societe.trim()) return `Les agences de la société ${societe.trim()} ${ou.trim() ? `en ${ou.trim()}` : "dans toute la France"}.`;
-    const morceaux = [`Entreprises du secteur ${quoi}`];
+  /**
+   * La demande, écrite comme le commercial l'aurait dite. Elle commence par « Recherche
+   * du panneau : » : Merx sait qu'elle est déjà validée et la lance sans redemander.
+   */
+  const rediger = (): string => `Recherche du panneau : ${phrase()}`;
+  const phrase = (): string => {
+    // Une société nommée : ses agences, dans la zone.
+    if (onglet === "societe") return `les agences de la société ${societe.trim()} ${ou.trim() ? `en ${ou.trim()}` : "dans toute la France"}.`;
+    const morceaux = [`entreprises du secteur ${quoi}`];
     if (ou.trim()) morceaux.push(`en ${ou.trim()}`);
     else morceaux.push("dans toute la France");
     const t = TAILLES.find((x) => x.valeur === taille)?.phrase;
@@ -270,15 +274,30 @@ export default function PanneauRecherche({
     <div className="flex min-h-0 flex-col gap-3">
       <div>
         <SectionLabel>Ce que vous cherchez</SectionLabel>
-        <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
-          Les menus décident qui entre dans la liste. Les boutons font seulement remonter ce que
-          vous préférez — ils n’écartent personne.
-        </p>
+        <div className="mt-1.5 inline-flex rounded-full border border-border p-0.5" role="tablist">
+          {(["societe", "metier"] as const).map((o) => (
+            <button
+              key={o}
+              type="button"
+              role="tab"
+              aria-selected={onglet === o}
+              onClick={() => setOnglet(o)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-[12.5px] font-bold transition-colors",
+                onglet === o ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink",
+              )}
+            >
+              {o === "societe" ? "Par société" : "Par métier"}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {onglet === "societe" && (
+        <>
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-          Société ou agence (facultatif)
+          Nom de la société
         </span>
         <input
           value={societe}
@@ -286,13 +305,16 @@ export default function PanneauRecherche({
           placeholder="Bouygues Immobilier, Colas…"
           className={cn(champCls, "mt-1")}
         />
-        {societe.trim() && (
-          <span className="mt-1 block text-[11.5px] leading-snug text-muted-foreground">
-            Merx cherchera les agences de cette société seulement, dans la zone choisie ; le secteur et la taille ne servent pas.
-          </span>
-        )}
+        <span className="mt-1 block text-[11.5px] leading-snug text-muted-foreground">
+          Merx cherche ses agences, et elles seules : une fiche par agence.
+        </span>
       </label>
 
+        </>
+      )}
+
+      {onglet === "metier" && (
+        <>
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
           Secteur d’activité
@@ -322,6 +344,9 @@ export default function PanneauRecherche({
         />
       )}
 
+        </>
+      )}
+
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
           Où — tapez ou choisissez
@@ -330,7 +355,7 @@ export default function PanneauRecherche({
           value={ou}
           onChange={(e) => setOu(e.target.value)}
           list="zones-merx"
-          placeholder="Région, département, ville… vide = toute la France"
+          placeholder="Région ou ville… vide = toute la France"
           className={cn(champCls, "mt-1")}
         />
         <datalist id="zones-merx">
@@ -340,6 +365,8 @@ export default function PanneauRecherche({
         </datalist>
       </label>
 
+      {onglet === "metier" && (
+        <>
       <label className="block">
         <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">Taille</span>
         <select value={taille} onChange={(e) => setTaille(e.target.value)} className={cn(champCls, "mt-1")}>
@@ -438,6 +465,9 @@ export default function PanneauRecherche({
           )}
         </div>
       </div>
+
+        </>
+      )}
 
       <div className="mt-1 flex items-center gap-2">
         <button

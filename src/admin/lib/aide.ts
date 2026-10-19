@@ -40,9 +40,10 @@ export const ECRANS: EcranAide[] = [
     to: "/merx",
     resume: "Votre agent de prospection : vous lui dites ce que vous cherchez, il trouve les entreprises, les note et les range dans Prospection.",
     points: [
-      "Écrivez votre demande (« Des entreprises de travaux publics en Gironde… ») ou remplissez le panneau « Ce que vous cherchez » puis « Chercher ».",
+      "Écrivez votre demande (« Des entreprises de travaux publics en Gironde… ») ou utilisez le panneau « Ce que vous cherchez » : onglet « Par société » ou « Par métier », puis « Chercher ».",
       "Les menus (secteur, lieu, taille, interlocuteur) décident qui entre dans la liste. Les boutons de « Ce qu'on préfère » font seulement remonter ce que vous préférez : ils n'écartent personne.",
-      "Merx reformule d'abord votre demande en une phrase et vous demande si c'est bien ce que vous cherchez : la recherche ne part qu'après votre « oui ».",
+      "Une demande faite avec le panneau, ou une demande claire, part tout de suite. Une demande floue, Merx la reformule en une phrase et attend votre « oui ».",
+      "Merx ajoute 100 fiches nouvelles par recherche ; demandez « les suivantes », ou « mets-m'en 200 » (300 au plus) : il n'ajoute jamais une fiche que vous avez déjà.",
       "Une recherche demande une à deux minutes. Merx part du registre officiel des entreprises (100 au plus) et écarte celles déjà connues en Prospection, au Pipeline ou dans Clients.",
       "Une société précise (« les agences Vinci en Gironde ») : Merx ne cherche que ses agences, une fiche par ville. À la fin, il vous propose d'élargir à des entreprises comparables, sans rien ajouter avant votre accord.",
       "Le micro permet de dicter sa question (une minute au plus).",
@@ -165,11 +166,11 @@ export const QUESTIONS: ThemeAide[] = [
     questions: [
       {
         question: "Comment demander à Merx de trouver des entreprises ?",
-        reponse: "Dans Merx, écrivez ce que vous cherchez comme à un collègue (« des transporteurs de plus de 50 salariés en Bretagne »), ou remplissez le panneau « Ce que vous cherchez » puis cliquez sur « Chercher ». Merx vous renvoie votre demande en une phrase : répondez « oui » (ou corrigez) et la recherche part. Comptez une à deux minutes : les fiches arrivent dans Prospection.",
+        reponse: "Dans Merx, écrivez ce que vous cherchez comme à un collègue (« des transporteurs de plus de 50 salariés en Bretagne »), ou remplissez le panneau « Ce que vous cherchez » puis cliquez sur « Chercher ». Une demande claire part tout de suite ; si elle est floue, Merx vous la renvoie en une phrase : répondez « oui » (ou corrigez) et la recherche part. Comptez une à deux minutes : les fiches arrivent dans Prospection.",
       },
       {
         question: "Comment avoir toutes les agences d'une société (Vinci, Colas…) ?",
-        reponse: "Demandez-le à Merx : « les agences Colas en Gironde », ou sans lieu pour toute la France. Après votre « oui », il ne cherche que les agences ouvertes de cette société au registre officiel, une fiche par ville, jamais d'autre entreprise. À la fin, il vous propose d'élargir à des entreprises comparables : c'est vous qui acceptez ou non.",
+        reponse: "Demandez-le à Merx (« les agences Colas en Gironde », ou sans lieu pour toute la France), ou onglet « Par société » du panneau. Il ne cherche que les agences ouvertes de cette société, une fiche par agence, avec l'adresse et le téléphone de l'agence (rien s'il ne les trouve pas), jamais le siège ni une autre entreprise. À la fin, il vous propose d'élargir à des entreprises comparables : c'est vous qui acceptez ou non.",
       },
       {
         question: "Merx va-t-il me redonner des entreprises que l'équipe connaît déjà ?",
