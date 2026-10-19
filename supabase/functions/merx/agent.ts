@@ -530,7 +530,8 @@ async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise
   // « France », « France entière », « toute la France », « national », « partout » : pas
   // besoin du modèle. C'est ce qu'il avait mal compris le 19/10 (« Vinci, France entière »).
   const z = zone.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
-  if (/^(en |dans |sur )?(toute (la )?)?(la )?france( entiere| metropolitaine)?$|^(partout|national|nationale|tout le territoire|toutes regions|toutes les regions)$/.test(z)) return [];
+  if (/metropol/.test(z) && /france|hexagone/.test(z)) return TOUS_DEPARTEMENTS.filter((d) => !d.startsWith("97"));
+  if (/^(en |dans |sur )?(toute (la )?)?(la )?france( entiere)?$|^(partout|national|nationale|tout le territoire|toutes regions|toutes les regions)$/.test(z)) return [];
   try {
     const out = await complete<{ departements: string[] }>(
       // Le même traducteur que pour une recherche par métier : seule la zone nous sert ici.
@@ -538,7 +539,10 @@ async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise
       CRITERES_SCHEMA as unknown as Record<string, unknown>,
       { usage: "recherche", system: CRITERES_SYSTEM, onUsage, timeoutMs: 25_000 },
     );
-    return (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
+    const deps = (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
+    // Une zone qui n'est pas nationale (reconnue plus haut) et qui ne donne aucun
+    // département est une zone mal comprise : on ne la change pas en « toute la France ».
+    return deps.length ? deps : null;
   } catch {
     return null;
   }
