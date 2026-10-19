@@ -332,6 +332,69 @@ export async function marquerTentative(sb: SupabaseClient, id: string): Promise<
   await sb.from("admin_prospects").update({ completed_at: new Date().toISOString() }).eq("id", id);
 }
 
+/**
+ * Une fiche saisie à la main (sans demande Merx d'origine) appartient au commercial.
+ *
+ * Olivier, 19/10 : « c'est mon prospect, il est sous ma responsabilité ». Quand il
+ * demande à Merx de l'enrichir, Merx remplit ce qui est VIDE et ajoute ce qu'il
+ * trouve en plus (interlocuteurs, numéros), mais ne remplace rien de ce qui a été
+ * saisi. Une fiche trouvée par Merx, elle, se met à jour comme avant.
+ */
+const SAISIS = [
+  "siren", "legal_name", "headcount_band", "head_office", "leaders", "website",
+  "contact_name", "contact_role", "contact_email", "contact_phone", "contact_source",
+] as const;
+
+const rempliTot = (v: unknown) =>
+  v !== null && v !== undefined && !(typeof v === "string" && !v.trim()) && !(Array.isArray(v) && v.length === 0);
+
+async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<string, unknown>): Promise<void> {
+  const { data: avant, error } = await sb
+    .from("admin_prospects")
+    .select(`found_by, personnes, site_contacts, ${SAISIS.join(", ")}`)
+    .eq("id", id)
+    .maybeSingle();
+  // Sans pouvoir relire la fiche, on n'écrit pas : écraser la saisie serait pire.
+  if (error) throw new Error(`Fiche illisible avant enrichissement : ${error.message}`);
+  if (!avant || (avant as Record<string, unknown>).found_by) return;
+  const a = avant as Record<string, unknown>;
+  // Le siège : on complète ses cases vides (une ville seule n'empêche pas d'ajouter l'adresse).
+  if (patch.head_office && a.head_office && typeof a.head_office === "object") {
+    const av = a.head_office as Record<string, unknown>;
+    const nv = patch.head_office as Record<string, unknown>;
+    const fusion: Record<string, unknown> = { ...nv };
+    for (const [k, v] of Object.entries(av)) if (rempliTot(v)) fusion[k] = v;
+    patch.head_office = fusion;
+    a.head_office = null; // traité ici : ne pas le retirer plus bas
+  }
+  for (const k of SAISIS) if (k in patch && rempliTot(a[k])) delete patch[k];
+  // Le contact saisi garde sa source : on ne la remplace que si on a posé le contact.
+  if (!("contact_name" in patch) && !("contact_email" in patch) && !("contact_phone" in patch)) delete patch.contact_source;
+
+  // Les interlocuteurs : ceux du commercial d'abord — Merx ne fait que remplir leurs
+  // cases vides —, puis ceux que Merx a trouvés en plus.
+  if (Array.isArray(patch.personnes) && Array.isArray(a.personnes) && a.personnes.length) {
+    type P = Record<string, unknown> & { nom: string };
+    const trouves = new Map((patch.personnes as P[]).map((q) => [q.nom.trim().toLowerCase(), q]));
+    const connus = (a.personnes as P[]).map((q) => {
+      const m = trouves.get(q.nom.trim().toLowerCase());
+      if (!m) return q;
+      const plus: Record<string, unknown> = {};
+      for (const k of ["fonction", "email", "telephone", "mobile"]) if (!rempliTot(q[k]) && rempliTot(m[k])) plus[k] = m[k];
+      return { ...q, ...plus };
+    });
+    const noms = new Set(connus.map((q) => q.nom.trim().toLowerCase()));
+    patch.personnes = [...connus, ...(patch.personnes as P[]).filter((q) => !noms.has(q.nom.trim().toLowerCase()))];
+  }
+  // Les numéros et adresses : ceux du commercial d'abord (le standard est le premier).
+  if (patch.site_contacts && a.site_contacts) {
+    const av = a.site_contacts as { emails?: string[]; phones?: string[]; equipe?: string[]; readOn?: string };
+    const nv = patch.site_contacts as typeof av;
+    const unir = (x?: string[], y?: string[]) => [...new Set([...(x ?? []), ...(y ?? [])])];
+    patch.site_contacts = { emails: unir(av.emails, nv.emails), phones: unir(av.phones, nv.phones), equipe: unir(av.equipe, nv.equipe), readOn: av.readOn ?? nv.readOn };
+  }
+}
+
 export async function completeProspect(
   sb: SupabaseClient,
   id: string,
@@ -380,6 +443,7 @@ export async function completeProspect(
   // repartait indéfiniment — 4 662 appels pour 255 fiches le 30 septembre
   // (migration 0052).
   patch.completed_at = new Date().toISOString();
+  await garderLaSaisie(sb, id, patch);
   const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -449,6 +513,7 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   // repartait indéfiniment — 4 662 appels pour 255 fiches le 30 septembre
   // (migration 0052).
   patch.completed_at = new Date().toISOString();
+  await garderLaSaisie(sb, id, patch);
   const { error } = await sb.from("admin_prospects").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }

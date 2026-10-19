@@ -5,7 +5,7 @@
 // avec ce que Merx a trouvé, et la fiche reste ouverte.
 
 import { useCallback, useMemo, useState } from "react";
-import { Loader2, PenLine, Search, Trash2 } from "lucide-react";
+import { Loader2, PenLine, Search, Sparkles, Trash2 } from "lucide-react";
 import { useAdminData } from "../../data/AdminDataContext";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
@@ -124,11 +124,13 @@ export default function ProspectFiche({
   const jalons = useMemo<Jalon[]>(
     () =>
       ([
-        { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at },
+        p.found_by
+          ? { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at }
+          : { libelle: "Fiche créée à la main", au: p.created_at },
         p.enriched_at ? { libelle: "Fiche approfondie", au: p.enriched_at } : null,
         p.converted_at ? { libelle: "Passée au Pipeline", au: p.converted_at } : null,
       ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
-    [demandeOrigine, p.created_at, p.enriched_at, p.converted_at],
+    [demandeOrigine, p.found_by, p.created_at, p.enriched_at, p.converted_at],
   );
 
   const personnes = personnesDuProspect(p);
@@ -160,7 +162,7 @@ export default function ProspectFiche({
             />
           }
           referent={<ChoixReferent quoi="prospect" id={p.id} />}
-          inscrite={`Trouvée le ${quandCourt(p.created_at)}${p.found_by ? " par Merx" : ""}`}
+          inscrite={p.found_by ? `Trouvée le ${quandCourt(p.created_at)} par Merx` : `Créée à la main le ${quandCourt(p.created_at)}`}
           interlocuteurs={<Interlocuteurs personnes={personnes} />}
           etablissement={lignes}
           manquants={manquants}
@@ -174,11 +176,28 @@ export default function ProspectFiche({
       actif={onglet}
       onOnglet={setOnglet}
       enHaut={
-        onModifier && (
-          <button type="button" onClick={() => onModifier(p)} className="h-[34px] rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
-            Modifier la fiche
-          </button>
-        )
+        <>
+          {/* Une fiche saisie à la main n'est enrichie par Merx que sur demande (19/10). */}
+          {!p.found_by && (
+            <button
+              type="button"
+              onClick={() => {
+                setOnglet("dossier");
+                void lancer("approfondir");
+              }}
+              disabled={enCours !== null}
+              className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal disabled:opacity-60"
+            >
+              {enCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              {enCours === "approfondir" ? "Merx enrichit…" : "Enrichir par Merx"}
+            </button>
+          )}
+          {onModifier && (
+            <button type="button" onClick={() => onModifier(p)} className="h-[34px] rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
+              Modifier la fiche
+            </button>
+          )}
+        </>
       }
       message={erreur && <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreur}</p>}
       onClose={onClose}

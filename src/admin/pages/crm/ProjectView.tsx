@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Lock, Minus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Loader2, Lock, Minus, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import type { Client, Stage } from "../../types";
 import { euro, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -31,6 +31,10 @@ import { quandCourt } from "../../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
+import FormulaireFiche from "../../components/fiche/FormulaireFiche";
+import { chargerMembres } from "../../lib/membres";
+import { colonnesProspect, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, type FicheSaisie } from "../../lib/fiche-saisie";
+import { champsAffaire, saisieDepuisAffaire, synchroniserContacts } from "../../lib/affaire-saisie";
 import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
 
 const inputCls =
@@ -102,9 +106,23 @@ export default function ProjectView({
 
   // « ?modifier=1 » : le crayon d'une carte ouvre la fiche prête à être corrigée.
   const [chercheur] = useSearchParams();
-  const [editing, setEditing] = useState(chercheur.get("modifier") === "1");
+  // Ouvert par « ?modifier=1 » : la fenêtre attend que la fiche d'entreprise soit lue
+  // (sinon elle partirait vide, et l'enregistrer effacerait ce que la fiche savait).
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ company: "", siren: "", naf: "", rue: "", cp: "", ville: "", pipelineId: "", stage: "", secteur: "", referent: "", aRepondu: false });
   const [ndName, setNdName] = useState("");
+  /** La fiche complète en cours de correction (Modifier). */
+  const [saisie, setSaisie] = useState<FicheSaisie>(FICHE_VIDE);
+  const [saisieInitiale, setSaisieInitiale] = useState<FicheSaisie>(FICHE_VIDE);
+  const [draftInitial, setDraftInitial] = useState<typeof draft | null>(null);
+  // Le pipeline, la colonne et « A répondu » comptent aussi : les changer, c'est avoir commencé.
+  const fermerEdition = () => void fermerSiRienAPerdre({ saisie: saisieInitiale, draft: draftInitial }, { saisie, draft }, () => setEditing(false));
+  const [membres, setMembres] = useState<string[]>([]);
+  const [enregistrement, setEnregistrement] = useState(false);
+  const [erreurEdition, setErreurEdition] = useState<string | null>(null);
+  useEffect(() => {
+    void chargerMembres().then(setMembres);
+  }, []);
 
   const total = client.jours * client.tarif;
 
@@ -120,6 +138,8 @@ export default function ProjectView({
   };
 
   const [origine, setOrigine] = useState<Prospect | null>(null);
+  /** La fiche d'entreprise a été lue (ou on sait qu'il n'y en a pas). */
+  const [origineLue, setOrigineLue] = useState(false);
   const [nbAVenir, setNbAVenir] = useState(0);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
   const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
@@ -133,8 +153,10 @@ export default function ProjectView({
 
   /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
   const chargerOrigine = useCallback(async () => {
-    const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("converted_client_id", client.id).maybeSingle();
+    const { data, error } = await supabaseAdmin.from("admin_prospects").select("*").eq("converted_client_id", client.id).maybeSingle();
+    if (error) return;
     setOrigine((data as Prospect) ?? null);
+    setOrigineLue(true);
   }, [client.id]);
 
   useEffect(() => {
@@ -164,7 +186,7 @@ export default function ProjectView({
   const jalons = useMemo<Jalon[]>(
     () =>
       ([
-        origine ? { libelle: "Trouvée par Merx", au: origine.created_at } : null,
+        origine?.found_by ? { libelle: "Trouvée par Merx", au: origine.created_at } : null,
         origine?.enriched_at ? { libelle: "Fiche approfondie", au: origine.enriched_at } : null,
         origine?.converted_at ? { libelle: "Passée au Pipeline", au: origine.converted_at } : null,
       ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
@@ -260,30 +282,97 @@ export default function ProjectView({
   }, [client.id]);
 
   const startEdit = () => {
+    if (!origineLue) return;
     // Prérempli : CP / ville depuis les colonnes dédiées, à défaut découpage de l'adresse.
     const p = splitAdresse(client.adresse);
-    setDraft({
+    const draftDepart = {
       company: client.company, siren: client.siren, naf: client.naf,
       rue: p.rue, cp: client.codePostal || p.cp, ville: client.ville || p.ville,
       pipelineId: client.pipelineId, stage: client.stage, secteur: client.secteur ?? "",
       referent: client.referent ?? "", aRepondu: Boolean(client.aRepondu),
-    });
+    };
+    setDraft(draftDepart);
+    setDraftInitial(draftDepart);
+    const depart = saisieDepuisAffaire(client, origine);
+    setSaisie(depart);
+    setSaisieInitiale(depart);
+    setErreurEdition(null);
     setEditing(true);
   };
-  const saveEdit = () => {
-    updateClientFields(client.id, {
-      company: draft.company, siren: draft.siren, naf: draft.naf,
-      adresse: joinAdresse(draft.rue, draft.cp, draft.ville),
-      codePostal: draft.cp.trim(), ville: draft.ville.trim(),
-      // Changer de tableau, c'est aussi changer de colonne : celles d'un pipeline
-      // n'existent pas dans l'autre. Le menu ci-dessous ne propose jamais une
-      // colonne qui n'appartient pas au pipeline retenu.
-      pipelineId: draft.pipelineId, stage: draft.stage, secteur: draft.secteur || null,
-      referent: draft.referent || null,
-      // Envoyée seulement si elle change : la colonne naît avec la migration 0065.
-      ...(draft.aRepondu !== Boolean(client.aRepondu) ? { aRepondu: draft.aRepondu } : {}),
-    });
-    setEditing(false);
+  const ouvertParLien = useRef(false);
+  useEffect(() => {
+    if (ouvertParLien.current || !origineLue || chercheur.get("modifier") !== "1") return;
+    ouvertParLien.current = true;
+    startEdit();
+    // Une seule fois, dès que la fiche est lue.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origineLue]);
+
+  /**
+   * Enregistrer la fiche complète : la ligne du Pipeline, ses interlocuteurs, et la
+   * fiche d'entreprise qui porte le reste. Une affaire qui n'en avait pas en reçoit
+   * une, saisie à la main : Merx n'y touche pas tant qu'on ne le lui demande pas.
+   */
+  const saveEdit = async () => {
+    if (enregistrement) return;
+    const souci = erreurSaisie(saisie);
+    if (souci) return setErreurEdition(souci);
+    setEnregistrement(true);
+    setErreurEdition(null);
+    try {
+      if (origine) {
+        const { error } = await supabaseAdmin.from("admin_prospects").update(colonnesProspect(saisie, origine)).eq("id", origine.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabaseAdmin.from("admin_prospects").insert({
+          ...colonnesProspect(saisie),
+          owner_email: user?.email ?? "",
+          status: "contacte",
+          converted_client_id: client.id,
+          converted_at: new Date().toISOString(),
+        });
+        if (error)
+          throw new Error(
+            /duplicate key|unique/i.test(error.message)
+              ? "Une fiche de Prospection porte déjà ce nom dans cette ville : changez le nom, ou supprimez le doublon."
+              : error.message,
+          );
+      }
+      await synchroniserContacts(client.id, client.contacts, saisie);
+      // Écrit et attendu ici (et non en arrière-plan) : une erreur doit s'afficher
+      // dans la fenêtre, pas se perdre après sa fermeture.
+      const a = champsAffaire(saisie);
+      const { error: ecriture } = await supabaseAdmin
+        .from("admin_clients")
+        .update({
+          company: a.company,
+          siren: a.siren,
+          adresse: a.adresse,
+          code_postal: a.codePostal || null,
+          ville: a.ville || null,
+          secteur: a.secteur,
+          effectif: a.effectif,
+          // Changer de tableau, c'est aussi changer de colonne : celles d'un pipeline
+          // n'existent pas dans l'autre. Le menu ci-dessous ne propose jamais une
+          // colonne qui n'appartient pas au pipeline retenu.
+          pipeline_id: draft.pipelineId,
+          stage: draft.stage,
+          // Le commercial d'un pipeline assigné, s'il a changé de tableau ; sinon celui de la fiche.
+          referent: (draft.pipelineId !== client.pipelineId ? draft.referent : saisie.referent) || null,
+          // Envoyée seulement si elle change : la colonne naît avec la migration 0065.
+          ...(draft.aRepondu !== Boolean(client.aRepondu) ? { a_repondu: draft.aRepondu } : {}),
+        })
+        .eq("id", client.id);
+      if (ecriture) throw new Error(ecriture.message);
+      await rafraichir();
+      await chargerOrigine();
+      setRelire((n) => n + 1);
+      setEditing(false);
+    } catch (e) {
+      setErreurEdition(e instanceof Error ? e.message : "L’enregistrement a échoué.");
+    } finally {
+      setEnregistrement(false);
+    }
   };
 
   /** Les colonnes du pipeline en cours de sélection dans le formulaire. */
@@ -362,9 +451,26 @@ export default function ProjectView({
         actif={tab}
         onOnglet={setTab}
         enHaut={
-          <button type="button" onClick={startEdit} className={btnOutline}>
-            <Pencil className="size-3.5" /> Modifier la fiche
-          </button>
+          <>
+            {/* Une fiche saisie à la main n'est enrichie par Merx que sur demande (19/10). */}
+            {!origine?.found_by && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("dossier");
+                  void (origine ? demanderAMerx("approfondir") : confierAMerx());
+                }}
+                disabled={merxEnCours !== null}
+                className={cn(btnOutline, "disabled:opacity-60")}
+              >
+                {merxEnCours === "approfondir" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                {merxEnCours === "approfondir" ? "Merx enrichit…" : "Enrichir par Merx"}
+              </button>
+            )}
+            <button type="button" onClick={startEdit} disabled={!origineLue} className={cn(btnOutline, "disabled:opacity-60")}>
+              <Pencil className="size-3.5" /> Modifier la fiche
+            </button>
+          </>
         }
         message={
           merxErreur ? <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{merxErreur}</p> : undefined
@@ -453,64 +559,13 @@ export default function ProjectView({
 
       {/* Modifier : la même fenêtre que sur les autres fiches, par-dessus la fiche. */}
       {editing && (
-        <Modal onClose={() => setEditing(false)} width={600}>
-          <h2 className="mb-4 font-display text-xl font-semibold text-avisdoc-ink">Modifier {client.company}</h2>
+        <Modal onClose={fermerEdition} width={640}>
+          <h2 className="mb-1 font-display text-xl font-semibold text-avisdoc-ink">Modifier {client.company}</h2>
+          <p className="mb-4 text-[13px] text-muted-foreground">
+            Toute la fiche se corrige ici. Les actions, passées ou à venir, se corrigent en les ouvrant dans l’onglet Actions.
+          </p>
           <div className="flex flex-col gap-2">
-            <input
-              className={cn(inputCls, "font-semibold")}
-              placeholder="Raison sociale"
-              value={draft.company}
-              onChange={(e) => setDraft({ ...draft, company: e.target.value })}
-            />
-            <div className="flex flex-wrap gap-2">
-              <input
-                className={cn(inputCls, "w-[130px]")}
-                placeholder="SIREN"
-                value={draft.siren}
-                onChange={(e) => setDraft({ ...draft, siren: e.target.value })}
-              />
-              <input
-                className={cn(inputCls, "min-w-0 flex-1")}
-                placeholder="Activité (NAF)"
-                value={draft.naf}
-                onChange={(e) => setDraft({ ...draft, naf: e.target.value })}
-              />
-            </div>
-            {/* Le secteur sert à filtrer le Pipeline en travers des commerciaux.
-                Repris du prospect quand l'affaire en vient, corrigeable ici. */}
-            <select
-              value={draft.secteur}
-              onChange={(e) => setDraft({ ...draft, secteur: e.target.value })}
-              aria-label="Secteur de l’affaire"
-              className={inputCls}
-            >
-              <option value="">Secteur — non précisé</option>
-              {SECTEURS.map((sec) => (
-                <option key={sec.id} value={sec.id}>
-                  {sec.label}
-                </option>
-              ))}
-            </select>
-            <input
-              className={inputCls}
-              placeholder="Adresse (n° et voie)"
-              value={draft.rue}
-              onChange={(e) => setDraft({ ...draft, rue: e.target.value })}
-            />
-            <div className="flex flex-wrap gap-2">
-              <input
-                className={cn(inputCls, "w-[110px]")}
-                placeholder="Code postal"
-                value={draft.cp}
-                onChange={(e) => setDraft({ ...draft, cp: e.target.value })}
-              />
-              <input
-                className={cn(inputCls, "min-w-0 flex-1")}
-                placeholder="Ville"
-                value={draft.ville}
-                onChange={(e) => setDraft({ ...draft, ville: e.target.value })}
-              />
-            </div>
+            <FormulaireFiche valeur={saisie} onChange={setSaisie} membres={membres} />
 
             {/* Déplacer l'affaire. Une affaire n'est que dans un seul tableau : la
                 sortir d'ici, c'est la poser ailleurs, sur une colonne de là-bas. */}
@@ -558,11 +613,19 @@ export default function ProjectView({
               A répondu
             </label>
           </div>
+          {erreurEdition && <p className="mt-4 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{erreurEdition}</p>}
           <div className="mt-5 flex gap-2 border-t border-border pt-4">
-            <button type="button" onClick={saveEdit} className={btnAccent} style={{ padding: "10px 20px" }}>
+            <button
+              type="button"
+              onClick={() => void saveEdit()}
+              disabled={enregistrement}
+              className={cn(btnAccent, "inline-flex items-center gap-1.5 disabled:opacity-60")}
+              style={{ padding: "10px 20px" }}
+            >
+              {enregistrement && <Loader2 className="size-3.5 animate-spin" />}
               Enregistrer
             </button>
-            <button type="button" onClick={() => setEditing(false)} className={btnOutline}>
+            <button type="button" onClick={fermerEdition} className={btnOutline}>
               Annuler
             </button>
           </div>

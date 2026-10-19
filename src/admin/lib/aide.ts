@@ -56,7 +56,8 @@ export const ECRANS: EcranAide[] = [
     points: [
       "Colonnes : Créée · Entreprise · Secteur · Activité · Ville · Interlocuteur · Salariés · Note · Consigne · Fiabilité · Approfondie. Un clic sur un titre de colonne trie.",
       "« Nouveau » signale une fiche jamais ouverte. Dans « Approfondie » : « À approfondir », « En cours… », « Terminé » (pas encore relue) ou la date.",
-      "« Ajouter un prospect » pour une saisie à la main, « Importer » pour un fichier Excel, « Exporter » pour récupérer la liste affichée.",
+      "« Ajouter un prospect » ouvre une fiche complète à remplir (seul le nom est obligatoire), « Importer » pour un fichier Excel, « Exporter » pour récupérer la liste affichée.",
+      "Une fiche ajoutée à la main ou importée n'est jamais complétée d'office par Merx : c'est vous qui cliquez sur « Enrichir par Merx » si vous le voulez.",
       "Cochez des fiches pour « Compléter » (registre et Pappers), « Approfondir » (durée et coût annoncés avant), « Écrire à » (votre messagerie, en copie cachée) ou « Supprimer ».",
       "Une fiche disparaît de la Prospection dès qu'elle passe au Pipeline.",
       "Quand la liste est plus large que l'écran, une barre de défilement sous les filtres la fait glisser de côté.",
@@ -72,6 +73,7 @@ export const ECRANS: EcranAide[] = [
       "Actions : « Noter : + Appel · + Rendez-vous · + Présentation · + Mail · + Note », et « Autre… » (salon, SMS ou WhatsApp, LinkedIn, devis envoyé).",
       "Chaque action est « À programmer » ou « Déjà fait ». Un appel, un rendez-vous ou une présentation faits demandent « Ça a donné quoi ? ».",
       "« ✦ Où on en est » : Merx résume toutes les actions de la fiche.",
+      "« Modifier la fiche » corrige tout : l'entreprise, le dirigeant, les interlocuteurs, qui la suit. Une action, passée ou à venir, se corrige en l'ouvrant.",
       "Dossier : « Approfondir la fiche » fait travailler Merx une bonne minute ; il prépare ce qu'il faut savoir avant d'appeler, les arguments, les objections, ce qu'on peut proposer.",
       "Devis (affaire et client) : la proposition (journées × tarif) et le devis Qonto se débloquent à l'étape « Proposition ».",
     ],
@@ -87,7 +89,7 @@ export const ECRANS: EcranAide[] = [
       "Chaque pipeline a ses colonnes et peut être assigné à un commercial ; « Général » montre toutes les affaires. Aucun pipeline n'est privé.",
       "« Colonnes » renomme, déplace ou supprime les colonnes : le changement vaut pour toute l'équipe.",
       "Sur une carte, les pastilles montrent les actions à venir : orange dans les 24 h, rouge si en retard.",
-      "« Nouveau client » crée une affaire à partir de Qonto ou du registre (raison sociale ou SIREN).",
+      "« Nouveau client » ouvre une fiche complète à remplir ; le SIREN est facultatif. Qonto ou l'annuaire des entreprises peuvent la préremplir.",
       "« Exporter » donne un fichier Excel des affaires affichées (une ligne par interlocuteur, avec pipeline, colonne, journées et tarif) ; « Importer » fait entrer un fichier au Pipeline.",
       "La barre de défilement sous les filtres fait glisser le tableau de côté, sans descendre tout en bas.",
     ],
@@ -169,7 +171,7 @@ export const QUESTIONS: ThemeAide[] = [
       },
       {
         question: "Comment ajouter une entreprise moi-même ?",
-        reponse: "Dans Prospection, « Ajouter un prospect ». Seul le nom de l'entreprise est obligatoire.",
+        reponse: "Dans Prospection, « Ajouter un prospect » ; au Pipeline, « Nouveau client ». Une fiche complète s'ouvre : l'entreprise, son standard, son dirigeant, les interlocuteurs avec leur poste, qui la suit. Seul le nom est obligatoire, le SIREN est facultatif.",
       },
       {
         question: "Comment importer mon fichier Excel ?",
@@ -226,8 +228,12 @@ export const QUESTIONS: ThemeAide[] = [
         reponse: "Il entre au Pipeline (sauf pour une simple note) : en « Contacté » si l'action est faite, en « RDV » pour un rendez-vous, sinon en première colonne. Il quitte alors la Prospection.",
       },
       {
-        question: "Puis-je modifier ou effacer un compte rendu ?",
-        reponse: "Non : l'historique ne se modifie pas. Ouvrez l'action et ajoutez une précision en dessous ; elle s'ajoute avec la date et votre prénom.",
+        question: "Puis-je corriger une action déjà faite ?",
+        reponse: "Oui. Ouvrez-la dans l'historique de la fiche : la date, ce que ça a donné, avec qui et le compte rendu se corrigent, puis « Enregistrer ». Une action à venir se déplace ou s'annule de la même façon.",
+      },
+      {
+        question: "Merx va-t-il modifier une fiche que j'ai saisie ?",
+        reponse: "Non, pas tant que vous ne le lui demandez pas. Le bouton « Enrichir par Merx », en haut de la fiche, le fait travailler : il remplit ce qui est vide et ajoute ce qu'il trouve en plus, sans rien remplacer de ce que vous avez écrit.",
       },
       {
         question: "Un rendez-vous est annulé : que faire ?",
