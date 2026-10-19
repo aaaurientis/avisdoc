@@ -160,7 +160,8 @@ export default function NewClientModal({
         secteur: saisie.secteur || null,
         stage: etapeDepart,
         pipelineId,
-        jours: jours || 1,
+        // 0 journée : client nouveau, campagne pas encore décidée (Olivier, 19/10).
+        jours: Math.max(0, jours || 0),
         tarif: tarif || 0,
         depistes: 0,
         orientes: 0,
@@ -295,7 +296,7 @@ export default function NewClientModal({
       <section className="mt-4 border-t border-border pt-4">
         <SectionLabel className="mb-2.5">La campagne envisagée</SectionLabel>
         <div className="flex flex-wrap items-center gap-2.5">
-          <input type="number" min={1} value={jours} onChange={(e) => setJours(parseInt(e.target.value, 10) || 0)} aria-label="Journées" className={cn(inputCls, "w-16")} />
+          <input type="number" min={0} value={jours} onChange={(e) => setJours(Math.max(0, parseInt(e.target.value, 10) || 0))} aria-label="Journées" className={cn(inputCls, "w-16")} />
           <span className="text-[12.5px] text-muted-foreground">journées ×</span>
           <input type="number" min={0} step={50} value={tarif} onChange={(e) => setTarif(parseInt(e.target.value, 10) || 0)} aria-label="Tarif par journée" className={cn(inputCls, "w-[90px]")} />
           <span className="text-[12.5px] text-muted-foreground">€/jour =</span>
