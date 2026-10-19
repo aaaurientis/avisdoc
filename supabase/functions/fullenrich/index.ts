@@ -28,6 +28,15 @@ const API = "https://app.fullenrich.com/api/v2";
 /** Qui est prévenu quand le plafond approche ou est atteint. */
 const ALERTE_A = ["arthur@avisdoc.fr"];
 
+/** Les postes qui décident d'une journée de dépistage, en français et en anglais. */
+const TITRES = [
+  "DRH", "Directeur des ressources humaines", "Directrice des ressources humaines", "Responsable des ressources humaines",
+  "Responsable RH", "Chargé RH", "HR Director", "Head of HR", "HR Manager", "HR Business Partner",
+  "Responsable QSE", "Responsable HSE", "Responsable QHSE", "Responsable sécurité", "Responsable prévention", "HSE Manager", "QHSE Manager", "Health and Safety Manager",
+  "Directeur d'agence", "Directrice d'agence", "Responsable d'agence", "Chef d'agence", "Branch Manager",
+  "Directeur général", "Directrice générale", "Gérant", "Gérante", "General Manager", "CEO",
+];
+
 /** Ce qu'une demande coûtera au plus, pour ne jamais dépasser le plafond. */
 const ESTIMATION: Record<string, number> = { contacts: 2.5, contacts_plus: 2.5, mobile: 10 };
 
@@ -123,6 +132,24 @@ const domaineDe = (site: string | null): string | null => {
   }
 };
 
+/**
+ * Le dirigeant de la fiche (registre, ou contact principal posé par Merx), s'il n'a pas
+ * encore d'e-mail. « Jean Pierre MARTIN » : le nom est la partie en capitales. Une
+ * société dirigeante (« HOLDING DUPONT SAS ») n'est pas une personne : on l'écarte.
+ */
+function dirigeantDe(p: any): { prenom: string; nom: string; complet: string } | null {
+  const complet = String(p.leaders?.[0]?.name ?? p.contact_name ?? "").trim();
+  if (!complet || /\b(sas|sasu|sarl|sa|sci|eurl|holding|groupe|societe|soci[ée]t[ée])\b/i.test(complet)) return null;
+  const deja = ((p.personnes ?? []) as { nom: string; email?: string | null }[]).find((q) => q.nom?.trim().toLowerCase() === complet.toLowerCase());
+  if (deja?.email || (p.contact_email && String(p.contact_name ?? "").trim().toLowerCase() === complet.toLowerCase())) return null;
+  const mots = complet.split(/\s+/);
+  if (mots.length < 2) return null;
+  const capitales = mots.filter((m) => m.length > 1 && m === m.toUpperCase());
+  const nom = capitales.length && capitales.length < mots.length ? capitales.join(" ") : mots[mots.length - 1];
+  const prenom = mots.filter((m) => !nom.split(" ").includes(m))[0] ?? mots[0];
+  return { prenom, nom, complet };
+}
+
 /** Les personnes que FullEnrich nous a déjà données sur la fiche, pour ne pas les redemander. */
 const dejaSurLaFiche = (p: any): Set<string> =>
   new Set([p.contact_name, ...((p.personnes ?? []) as { nom: string }[]).map((q) => q.nom)].filter(Boolean).map((n: string) => n.trim().toLowerCase()));
@@ -140,12 +167,16 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
     ? { current_company_domains: [{ value: domaine, exact_match: true, exclude: false }] }
     : { current_company_names: [{ value: nomSocieteDe(p), exact_match: false, exclude: false }] };
   const v = (xs: string[]) => xs.map((value) => ({ value, exclude: false }));
+  // Les intitulés tels que les gens les écrivent sur leur profil : en français pour la
+  // plupart des salariés en France, en anglais dans les grands groupes.
+  const titres = { current_position_titles: TITRES.map((value) => ({ value, exact_match: false, exclude: false })) };
   const fonctions = { current_position_job_functions: v(["Human Resources", "Executive & Leadership", "Operations"]) };
   const niveaux = { current_position_seniority_level: v(["Owner", "Founder", "C-level", "Partner", "VP", "Head", "Director", "Manager"]) };
   const ville = p.registre?.agence && p.city ? { person_locations: [{ value: p.city, exact_match: false, exclude: false }] } : null;
   const paliers: Record<string, unknown>[] = [
     // Une agence : d'abord les gens de SA ville.
-    ...(ville ? [{ ...societe, ...fonctions, ...niveaux, ...ville }] : []),
+    ...(ville ? [{ ...societe, ...titres, ...ville }] : []),
+    { ...societe, ...titres },
     { ...societe, ...fonctions, ...niveaux },
     { ...societe, ...niveaux },
   ];
@@ -158,7 +189,14 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
   }
   const deja = dejaSurLaFiche(p);
   const gens = ((r?.people ?? []) as any[]).filter((x) => x.full_name && !deja.has(String(x.full_name).trim().toLowerCase()));
-  if (!gens.length) return { credits, message: "FullEnrich n’a trouvé personne à ces postes pour cette entreprise.", fini: true };
+
+  // Une petite entreprise (un domaine viticole, un artisan) n'a ni DRH ni QSE : la bonne
+  // personne est son dirigeant, que la fiche connaît déjà par le registre. Si la
+  // recherche n'a pas donné 2 personnes, on cherche aussi SON e-mail (19/10).
+  const dirigeant = l.kind === "contacts" && gens.length < 2 ? dirigeantDe(p) : null;
+  if (!gens.length && !dirigeant) {
+    return { credits, message: "FullEnrich n’a trouvé personne pour cette entreprise, et la fiche n’a pas de dirigeant connu.", fini: true };
+  }
 
   // On range tout de suite les personnes (nom, poste) ; l'e-mail arrivera ensuite.
   const nouvelles = gens.map((x) => ({
@@ -181,14 +219,25 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
     method: "POST",
     body: JSON.stringify({
       name: `AvisDoc ${p.name}`,
-      data: gens.map((x) => ({
-        first_name: x.first_name,
-        last_name: x.last_name,
-        ...(domaine ? { domain: domaine } : { company_name: nomSocieteDe(p) }),
-        ...(x.social_profiles?.professional_network?.url ? { linkedin_url: x.social_profiles.professional_network.url } : {}),
-        enrich_fields: ["contact.work_emails"],
-        custom: { nom: String(x.full_name).trim() },
-      })),
+      data: [
+        ...gens.map((x) => ({
+          first_name: x.first_name,
+          last_name: x.last_name,
+          ...(domaine ? { domain: domaine } : { company_name: nomSocieteDe(p) }),
+          ...(x.social_profiles?.professional_network?.url ? { linkedin_url: x.social_profiles.professional_network.url } : {}),
+          enrich_fields: ["contact.work_emails"],
+          custom: { nom: String(x.full_name).trim() },
+        })),
+        ...(dirigeant
+          ? [{
+              first_name: dirigeant.prenom,
+              last_name: dirigeant.nom,
+              ...(domaine ? { domain: domaine } : { company_name: nomSocieteDe(p) }),
+              enrich_fields: ["contact.work_emails"],
+              custom: { nom: dirigeant.complet },
+            }]
+          : []),
+      ],
     }),
   });
   await sb.from("admin_fullenrich").update({ enrichment_id: e.enrichment_id, statut: "enrichissement" }).eq("id", l.id);
@@ -255,6 +304,21 @@ async function lireResultat(sb: SupabaseClient, l: Ligne): Promise<{ credits: nu
     }
     return personnes;
   });
+  // Le dirigeant, s'il est le contact principal de la fiche et pas dans la liste : son
+  // e-mail va dans la case du contact, seulement si elle est vide.
+  for (const d of (r.data ?? []) as any[]) {
+    const nom = String(d.custom?.nom ?? "").trim();
+    const mail = d.contact_info?.most_probable_work_email;
+    if (!nom || !mail?.email || ["INVALID", "INVALID_DOMAIN"].includes(mail.status)) continue;
+    const { data: maj } = await sb
+      .from("admin_prospects")
+      .update({ contact_email: mail.email })
+      .eq("id", l.prospect_id)
+      .ilike("contact_name", nom)
+      .is("contact_email", null)
+      .select("id");
+    if (maj?.length) trouves++;
+  }
   return {
     credits: Number(r.cost?.credits ?? 0),
     message: trouves ? undefined : l.kind === "mobile" ? "Aucun mobile trouvé (rien n’a été facturé)." : "Aucun e-mail trouvé (rien n’a été facturé).",
@@ -267,6 +331,28 @@ Deno.serve(async (req) => {
   const { data: secret } = await sb.from("admin_secrets_internes").select("valeur").eq("cle", "fullenrich").maybeSingle();
   if (!secret?.valeur || req.headers.get("x-secret") !== secret.valeur) return json({ error: "non autorisé" }, 401);
   if (!CLE) return json({ error: "FULLENRICH_API_KEY non configurée" }, 500);
+
+  // Mode « essai » (19/10) : comparer des variantes de recherche sur une vraie entreprise
+  // et rendre ce que FullEnrich répond, sans rien écrire. 2 personnes au plus par
+  // variante (0,25 crédit chacune). Déclenché à la main depuis le SQL Editor.
+  const corps = (await req.json().catch(() => ({}))) as { essai?: { libelle: string; filtres: Record<string, unknown> }[] };
+  if (Array.isArray(corps.essai)) {
+    const sortie = [];
+    for (const t of corps.essai.slice(0, 12)) {
+      try {
+        const r = await appeler("/people/search", { method: "POST", body: JSON.stringify({ limit: 2, ...t.filtres }) });
+        sortie.push({
+          libelle: t.libelle,
+          total: r?.metadata?.total ?? null,
+          credits: r?.metadata?.credits ?? null,
+          personnes: ((r?.people ?? []) as any[]).map((x) => `${x.full_name} — ${x.employment?.current?.title ?? "?"} — ${x.employment?.current?.company?.name ?? "?"}`),
+        });
+      } catch (e) {
+        sortie.push({ libelle: t.libelle, erreur: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return json({ essai: sortie });
+  }
 
   const mois = moisCle();
   const plafond = Number((await reglage(sb, "fullenrich_plafond_mensuel")) ?? 500) || 500;
@@ -289,8 +375,8 @@ Deno.serve(async (req) => {
 
   // Puis lancer ce qui attend, chaque demande réservée dans le plafond AVANT de partir
   // (fonction SQL fullenrich_reserver, un passage à la fois).
-  // Jusqu'à 25 fiches par minute (deux à quatre appels chacune, sous les 60 par minute de FullEnrich).
-  const { data: attente } = await sb.from("admin_fullenrich").select("*").eq("statut", "en_attente").order("created_at").limit(25);
+  // Jusqu'à 12 fiches par minute (jusqu'à cinq appels chacune, sous les 60 par minute de FullEnrich).
+  const { data: attente } = await sb.from("admin_fullenrich").select("*").eq("statut", "en_attente").order("created_at").limit(12);
   let lances = 0;
   for (const l of (attente ?? []) as Ligne[]) {
     const { data: reponse, error: e } = await sb.rpc("fullenrich_reserver", { p_id: l.id, p_cout: ESTIMATION[l.kind] ?? 10, p_mois: mois });
