@@ -32,6 +32,10 @@ verify_jwt = false
 [functions.rappels-actions]
 verify_jwt = false
 
+# Le récap du soir (19 h) : appelé par pg_cron avec un secret, sans jeton d'utilisateur.
+[functions.recap-du-soir]
+verify_jwt = false
+
 # Devis Qonto — admin @avisdoc.fr vérifié dans la fonction ; clé Qonto côté serveur.
 [functions.qonto]
 verify_jwt = true
