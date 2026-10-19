@@ -31,21 +31,6 @@ const ALERTE_A = ["arthur@avisdoc.fr"];
 /** Ce qu'une demande coûtera au plus, pour ne jamais dépasser le plafond. */
 const ESTIMATION: Record<string, number> = { contacts: 2.5, contacts_plus: 2.5, mobile: 10 };
 
-/** Les postes qu'on cherche : ceux qui décident d'une journée de dépistage. */
-const POSTES = [
-  "DRH",
-  "Directeur des ressources humaines",
-  "Responsable des ressources humaines",
-  "Responsable RH",
-  "Responsable QSE",
-  "Responsable HSE",
-  "Responsable sécurité",
-  "Responsable prévention",
-  "Directeur d'agence",
-  "Responsable d'agence",
-  "Directeur général",
-  "Gérant",
-];
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 
@@ -63,6 +48,13 @@ interface Ligne {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** FullEnrich limite à 60 appels par minute : on s'arrête et on reprend au passage suivant. */
+class LimiteDeDebit extends Error {
+  constructor() {
+    super("limite de débit FullEnrich");
+  }
+}
+
 async function appeler(chemin: string, init?: RequestInit): Promise<any> {
   const r = await fetch(`${API}${chemin}`, {
     ...init,
@@ -72,6 +64,7 @@ async function appeler(chemin: string, init?: RequestInit): Promise<any> {
   const corps = await r.json().catch(() => null);
   // « en cours » n'est pas une erreur : on relira au passage suivant.
   if (r.status === 400 && /in_progress/i.test(JSON.stringify(corps))) return { status: "IN_PROGRESS" };
+  if (r.status === 429) throw new LimiteDeDebit();
   if (!r.ok) throw new Error(`FullEnrich ${r.status} : ${JSON.stringify(corps)?.slice(0, 200)}`);
   return corps;
 }
@@ -139,18 +132,30 @@ async function lancerContacts(sb: SupabaseClient, l: Ligne): Promise<{ credits: 
   const { data: p } = await sb.from("admin_prospects").select("*").eq("id", l.prospect_id).maybeSingle();
   if (!p) return { credits: 0, message: "Fiche introuvable.", fini: true };
   const domaine = domaineDe(p.website);
-  const recherche: Record<string, unknown> = {
-    limit: 2,
-    offset: l.kind === "contacts_plus" ? 2 : 0,
-    current_position_titles: POSTES.map((value) => ({ value, exact_match: false, exclude: false })),
-    ...(domaine
-      ? { current_company_domains: [{ value: domaine, exact_match: true, exclude: false }] }
-      : { current_company_names: [{ value: nomSocieteDe(p), exact_match: false, exclude: false }] }),
-    // Une agence : les gens de SA ville, pas ceux du siège.
-    ...(p.registre?.agence && p.city ? { person_locations: [{ value: p.city, exact_match: false, exclude: false }] } : {}),
-  };
-  const r = await appeler("/people/search", { method: "POST", body: JSON.stringify(recherche) });
-  const credits = Number(r?.metadata?.credits ?? 0) || 0.25 * (r?.people?.length ?? 0);
+  // Les postes, dans les catégories que FullEnrich reconnaît (ses listes officielles) :
+  // des intitulés en français (« DRH », « Responsable QSE ») ne ramenaient personne
+  // (19/10, 58 fiches sur 58). Une recherche qui ne rend personne ne coûte rien : on
+  // élargit donc par paliers, du plus précis au plus large.
+  const societe = domaine
+    ? { current_company_domains: [{ value: domaine, exact_match: true, exclude: false }] }
+    : { current_company_names: [{ value: nomSocieteDe(p), exact_match: false, exclude: false }] };
+  const v = (xs: string[]) => xs.map((value) => ({ value, exclude: false }));
+  const fonctions = { current_position_job_functions: v(["Human Resources", "Executive & Leadership", "Operations"]) };
+  const niveaux = { current_position_seniority_level: v(["Owner", "Founder", "C-level", "Partner", "VP", "Head", "Director", "Manager"]) };
+  const ville = p.registre?.agence && p.city ? { person_locations: [{ value: p.city, exact_match: false, exclude: false }] } : null;
+  const paliers: Record<string, unknown>[] = [
+    // Une agence : d'abord les gens de SA ville.
+    ...(ville ? [{ ...societe, ...fonctions, ...niveaux, ...ville }] : []),
+    { ...societe, ...fonctions, ...niveaux },
+    { ...societe, ...niveaux },
+  ];
+  let r: any = null;
+  let credits = 0;
+  for (const filtres of paliers) {
+    r = await appeler("/people/search", { method: "POST", body: JSON.stringify({ limit: 2, offset: l.kind === "contacts_plus" ? 2 : 0, ...filtres }) });
+    credits += Number(r?.metadata?.credits ?? 0) || 0.25 * (r?.people?.length ?? 0);
+    if (r?.people?.length) break;
+  }
   const deja = dejaSurLaFiche(p);
   const gens = ((r?.people ?? []) as any[]).filter((x) => x.full_name && !deja.has(String(x.full_name).trim().toLowerCase()));
   if (!gens.length) return { credits, message: "FullEnrich n’a trouvé personne à ces postes pour cette entreprise.", fini: true };
@@ -269,7 +274,7 @@ Deno.serve(async (req) => {
   // D'abord lire ce qui est parti. Une erreur de lecture se retente au passage suivant ;
   // au bout d'un jour, la demande passe en échec mais GARDE sa réservation (elle a pu
   // être facturée).
-  const { data: enCours } = await sb.from("admin_fullenrich").select("*").eq("statut", "enrichissement").order("created_at").limit(20);
+  const { data: enCours } = await sb.from("admin_fullenrich").select("*").eq("statut", "enrichissement").order("created_at").limit(25);
   for (const l of (enCours ?? []) as Ligne[]) {
     try {
       const r = await lireResultat(sb, l);
@@ -284,7 +289,8 @@ Deno.serve(async (req) => {
 
   // Puis lancer ce qui attend, chaque demande réservée dans le plafond AVANT de partir
   // (fonction SQL fullenrich_reserver, un passage à la fois).
-  const { data: attente } = await sb.from("admin_fullenrich").select("*").eq("statut", "en_attente").order("created_at").limit(20);
+  // Jusqu'à 25 fiches par minute (deux à quatre appels chacune, sous les 60 par minute de FullEnrich).
+  const { data: attente } = await sb.from("admin_fullenrich").select("*").eq("statut", "en_attente").order("created_at").limit(25);
   let lances = 0;
   for (const l of (attente ?? []) as Ligne[]) {
     const { data: reponse, error: e } = await sb.rpc("fullenrich_reserver", { p_id: l.id, p_cout: ESTIMATION[l.kind] ?? 10, p_mois: mois });
@@ -302,6 +308,11 @@ Deno.serve(async (req) => {
         await sb.from("admin_fullenrich").update({ statut: "termine", credits: r.credits, reserve: 0, message: r.message ?? null, traite_le: new Date().toISOString() }).eq("id", l.id);
       }
     } catch (err) {
+      if (err instanceof LimiteDeDebit) {
+        // Trop d'appels cette minute : la demande reprend sa place, sans réservation.
+        await sb.from("admin_fullenrich").update({ statut: "en_attente", reserve: 0, mois: null }).eq("id", l.id).eq("statut", "lancement");
+        break;
+      }
       // La réservation reste : une partie a pu être facturée. Les crédits déjà sûrs sont inscrits.
       await sb.from("admin_fullenrich").update({ statut: "echec", message: err instanceof Error ? err.message : String(err), traite_le: new Date().toISOString() }).eq("id", l.id);
     }
