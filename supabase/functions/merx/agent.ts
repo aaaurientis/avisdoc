@@ -521,7 +521,16 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
 }
 
 /** Les départements d'une zone dite en clair (« en Alsace », « autour de Toulouse »). */
-async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise<string[]> {
+/**
+ * Rend les départements de la zone ; une liste VIDE veut dire « toute la France » (c'est
+ * ce que répond le traducteur pour une zone nationale, CRITERES_SYSTEM) ; `null` veut dire
+ * qu'on n'a pas pu traduire (appel en échec) — et alors seulement on ne cherche pas.
+ */
+async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise<string[] | null> {
+  // « France », « France entière », « toute la France », « national », « partout » : pas
+  // besoin du modèle. C'est ce qu'il avait mal compris le 19/10 (« Vinci, France entière »).
+  const z = zone.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  if (/^(en |dans |sur )?(toute (la )?)?(la )?france( entiere| metropolitaine)?$|^(partout|national|nationale|tout le territoire|toutes regions|toutes les regions)$/.test(z)) return [];
   try {
     const out = await complete<{ departements: string[] }>(
       // Le même traducteur que pour une recherche par métier : seule la zone nous sert ici.
@@ -531,7 +540,7 @@ async function lireLaZone(zone: string, onUsage: (u: LlmUsage) => void): Promise
     );
     return (out.departements ?? []).map((d) => department(d)).filter((d): d is string => d !== null);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -557,13 +566,13 @@ async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, z
   // qu'on n'a pas su traduire ne se devine pas : on cherche partout, et on le dit.
   const debut = Date.now();
   const traduits = zone ? await lireLaZone(zone, onUsage) : [];
-  // Une zone qu'on n'a pas su traduire ne devient pas « toute la France » : ce serait
-  // élargir sans son accord. On s'arrête et on le dit.
-  if (zone && !traduits.length) {
+  // Une zone qu'on n'a pas PU traduire (appel en échec) ne devient pas « toute la
+  // France » : ce serait élargir sans son accord. Une liste vide, elle, EST la France.
+  if (traduits === null) {
     return { found: 0, message: `Je n’ai pas su traduire « ${zone} » en départements : je n’ai rien cherché. Redites-moi la zone (une région, un département, une ville).` };
   }
   const departements = traduits.length ? traduits : TOUS_DEPARTEMENTS;
-  const ou = zone || "toute la France";
+  const ou = traduits.length ? zone : "toute la France";
   const { agences, societes, tronquee, incomplete, echecs } = await agencesDe(nom, departements, 35_000);
   if (agences.length === 0 && echecs > 0) {
     throw new Error("l’annuaire des entreprises n’a pas répondu pour une partie des départements");
