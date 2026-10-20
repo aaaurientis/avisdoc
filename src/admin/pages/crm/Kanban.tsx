@@ -4,6 +4,7 @@ import type { Client, PipelineStage, Stage } from "../../types";
 import { euro } from "../../lib/format";
 import { COLONNE_KANBAN, TONES } from "../../lib/ui-tokens";
 import { Badge } from "../../components/ui";
+import PastilleApprofondie from "../../components/PastilleApprofondie";
 import CaseFiche, { CaseColonne } from "../../components/CaseFiche";
 import PastillesPrevues from "../../components/PastillesPrevues";
 import type { Prevu } from "../../lib/actions-prevues";
@@ -37,7 +38,7 @@ export default function Kanban({
   /** Changement d'étape par glisser-déposer. */
   onDeplacer?: (id: string, stage: Stage) => void;
   /** Ce que Merx avait trouvé, par affaire : la carte dit la même chose qu’en prospection. */
-  origines?: Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>;
+  origines?: Map<string, { score_total: number | null; activity: string | null; rationale: string | null; enriched_at: string | null }>;
   /** Fiches cochées, pour les actions groupées. */
   coches?: Set<string>;
   onCocher?: (id: string) => void;
@@ -159,7 +160,9 @@ export default function Kanban({
 
                   <button type="button" onClick={() => onSelect(c.id)} className="min-w-0 flex-1 text-left">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">{c.company}</div>
+                      <div className="min-w-0 text-[13px] font-semibold leading-snug text-avisdoc-ink">
+                        {c.company} <PastilleApprofondie le={origines?.get(c.id)?.enriched_at} />
+                      </div>
                       {origines?.get(c.id) && (
                         <Badge className={`${tonNote(origines.get(c.id)!.score_total)} shrink-0`}>
                           {origines.get(c.id)!.score_total ?? "—"}

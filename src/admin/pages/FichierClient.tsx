@@ -19,6 +19,7 @@ import { actionsPrevues, type Prevu } from "../lib/actions-prevues";
 import PastillesPrevues from "../components/PastillesPrevues";
 import { COLONNE_KANBAN } from "../lib/ui-tokens";
 import { Badge, Modal, PageHeader, SectionLabel } from "../components/ui";
+import PastilleApprofondie from "../components/PastilleApprofondie";
 import { tonNote } from "../lib/merx";
 import ColonnesClient from "./clients/ColonnesClient";
 import FicheClient from "./clients/FicheClient";
@@ -89,7 +90,7 @@ export default function FichierClient() {
     lignes: Record<string, unknown>[];
     correspondances: Correspondance[];
   } | null>(null);
-  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
+  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null; enriched_at: string | null }>>(
     new Map(),
   );
 
@@ -98,14 +99,14 @@ export default function FichierClient() {
     let vivant = true;
     void supabaseAdmin
       .from("admin_prospects")
-      .select("converted_client_id, score_total, activity, rationale")
+      .select("converted_client_id, score_total, activity, rationale, enriched_at")
       .not("converted_client_id", "is", null)
       .then(({ data }) => {
         if (!vivant || !data) return;
         setOrigines(
           new Map(
-            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null }[]).map(
-              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale }],
+            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null; enriched_at: string | null }[]).map(
+              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale, enriched_at: p.enriched_at }],
             ),
           ),
         );
@@ -463,6 +464,7 @@ export default function FichierClient() {
                       )}
                     >
                       {affiche(a, f) || "—"}
+                      {f.key === "etablissement" && <PastilleApprofondie le={origineDe(a)?.enriched_at} className="ml-1.5" />}
                     </td>
                   ))}
                   <td className="whitespace-nowrap px-2" onClick={(e) => e.stopPropagation()}>
@@ -531,7 +533,9 @@ export default function FichierClient() {
                             libelle={a.name}
                             visible={coches.size > 0}
                           />
-                          <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">{a.name}</div>
+                          <div className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-avisdoc-ink">
+                            {a.name} <PastilleApprofondie le={origineDe(a)?.enriched_at} />
+                          </div>
                           {origineDe(a) && (
                             <Badge className={`${tonNote(origineDe(a)!.score_total)} shrink-0`}>
                               {origineDe(a)!.score_total ?? "—"}

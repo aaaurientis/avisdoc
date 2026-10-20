@@ -7,6 +7,7 @@ import { Notation, TitreColonne } from "../FicheEntreprise";
 import type { NotesFiche } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { effectifLabel } from "../../lib/merx";
+import PastilleApprofondie from "../PastilleApprofondie";
 
 export interface LigneEtablissement {
   label: string;
@@ -190,7 +191,9 @@ export default function ColonneEntreprise({
   const [voirManquants, setVoirManquants] = useState(false);
   return (
     <>
-      <h2 className="pr-10 font-display text-[22px] font-semibold leading-tight text-avisdoc-ink md:pr-0">{titre}</h2>
+      <h2 className="pr-10 font-display text-[22px] font-semibold leading-tight text-avisdoc-ink md:pr-0">
+        {titre} <PastilleApprofondie le={notes?.approfondieLe} className="ml-1 -translate-y-0.5" />
+      </h2>
       {sousTitre && <div className="mt-1 text-[13px] text-muted-foreground">{sousTitre}</div>}
       {identite && <div className="mt-1.5">{identite}</div>}
 

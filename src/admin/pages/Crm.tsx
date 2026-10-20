@@ -144,7 +144,7 @@ export default function Crm() {
       else suivant.add(id);
       return suivant;
     });
-  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null }>>(
+  const [origines, setOrigines] = useState<Map<string, { score_total: number | null; activity: string | null; rationale: string | null; enriched_at: string | null }>>(
     new Map(),
   );
 
@@ -153,14 +153,14 @@ export default function Crm() {
     let vivant = true;
     void supabaseAdmin
       .from("admin_prospects")
-      .select("converted_client_id, score_total, activity, rationale")
+      .select("converted_client_id, score_total, activity, rationale, enriched_at")
       .not("converted_client_id", "is", null)
       .then(({ data }) => {
         if (!vivant || !data) return;
         setOrigines(
           new Map(
-            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null }[]).map(
-              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale }],
+            (data as { converted_client_id: string; score_total: number | null; activity: string | null; rationale: string | null; enriched_at: string | null }[]).map(
+              (p) => [p.converted_client_id, { score_total: p.score_total, activity: p.activity, rationale: p.rationale, enriched_at: p.enriched_at }],
             ),
           ),
         );
