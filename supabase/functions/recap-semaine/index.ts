@@ -118,6 +118,17 @@ interface Echange {
   account_id: string | null;
 }
 
+/** Toutes les lignes, page par page : le serveur n'en rend que 1 000 à la fois, et un total faux ne se voit pas. */
+async function toutLire<T>(page: (de: number, a: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<{ data: T[]; error: null }> {
+  const tout: T[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await page(de, de + 999);
+    if (error) throw new Error(error.message);
+    tout.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) return { data: tout, error: null };
+  }
+}
+
 // --- Le gabarit du mail : tableaux, styles en ligne, polices système. ---
 const POLICE = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;";
 const C = { encre: "#12202f", doux: "#55657a", ligne: "#dde4ea", bleu: "#1f9fd6", bleuPale: "#e6f5fc", corail: "#e2703a", corailPale: "#fdf0e8", vert: "#1b8a5a", vertPale: "#e5f5ec", gris: "#eef2f5" };
@@ -192,16 +203,16 @@ Deno.serve(async (req) => {
       // Daté d'avant, mais noté ou annulé cette semaine : sinon il ne paraîtrait dans aucun récap.
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").lt("au", L).or(`created_at.gte."${L}",traite_le.gte."${L}"`).order("au").limit(2000),
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au"),
-      admin.from("admin_prospects").select("sector").gte("created_at", L).is("deleted_at", null).limit(10000),
+      toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", L).is("deleted_at", null).order("id").range(de, a)),
       admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }),
-      admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).limit(10000),
+      toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).order("created_at").order("id").range(de, a)),
       admin.from("admin_fullenrich").select("credits").gte("created_at", L),
       admin.from("admin_accounts").select("name").gte("created_at", L),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L),
       // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
-      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de"),
+      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de"),
     ]);
     for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
@@ -213,7 +224,7 @@ Deno.serve(async (req) => {
     const aVenir = (prochaine.data ?? []) as Echange[];
 
     // Les sociétés, d'un coup.
-    const toutes = [...dansLaSemaine, ...enRetard, ...aVenir];
+    const toutes = [...dansLaSemaine, ...enRetard, ...aVenir, ...((reportees.data ?? []) as Echange[])];
     const ids = (k: "prospect_id" | "client_id" | "account_id") => [...new Set(toutes.map((e) => e[k]).filter((x): x is string => !!x))];
     const [ps, cs, as] = await Promise.all([
       ids("prospect_id").length ? admin.from("admin_prospects").select("id, name").in("id", ids("prospect_id")) : Promise.resolve({ data: [] }),
