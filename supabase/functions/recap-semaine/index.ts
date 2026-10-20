@@ -156,6 +156,22 @@ const titre = (t: string, chapo?: string) =>
   (chapo ? `<p style="${POLICE}font-size:13px;color:${C.doux};margin:0 0 8px">${chapo}</p>` : "");
 const tableau = (entetes: string, lignes: string[]) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse">${entetes}${lignes.join("")}</table>`;
+/** Le type d'action en pastille de couleur (Olivier, 20/10 : « on va s'habituer avec les pastilles »). */
+const TYPES: Record<string, [string, string]> = {
+  email: ["#e6f5fc", "#0f6f99"],
+  appel: ["#e5f5ec", "#17734b"],
+  rdv: ["#efe9fb", "#5b3fa3"],
+  presentation: ["#fdf0e8", "#b4541f"],
+  sms: ["#eef2f5", "#3d4b5c"],
+  linkedin: ["#e8eef9", "#244f9e"],
+  devis: ["#fbf3d9", "#8a6200"],
+  salon: ["#fbe9ef", "#a3335a"],
+  tache: ["#eef2f5", "#3d4b5c"],
+};
+const pastilleType = (kind: string, libelle: string) => {
+  const [fond, texte] = TYPES[kind] ?? ["#eef2f5", "#3d4b5c"];
+  return `<span style="display:inline-block;background:${fond};color:${texte};font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;white-space:nowrap">${libelle}</span>`;
+};
 const sousTexte = (t: string) => `<br><span style="color:${C.doux};font-size:12px">${t}</span>`;
 
 Deno.serve(async (req) => {
@@ -358,7 +374,7 @@ Deno.serve(async (req) => {
       const avec = e.avec ? ` ${AVEC[e.kind] ?? "avec"} ${echapper(e.avec)}` : "";
       const t = (e.titre ?? "").trim();
       const libre = t && !/^(appel|e-?mail|mail|rendez-vous|présentation|à faire|salon|sms.*|message linkedin|devis.*|note)( prévue?)?$/i.test(t);
-      return `${base}${mode}${avec}${libre ? sousTexte(echapper(t)) : ""}`;
+      return `${pastilleType(e.kind, base)}${mode}${avec}${libre ? sousTexte(echapper(t)) : ""}`;
     };
     /** Les deux premières phrases de la note, telles qu'écrites ; la suite reste dans la fiche. */
     const extrait = (texte: string) => {
