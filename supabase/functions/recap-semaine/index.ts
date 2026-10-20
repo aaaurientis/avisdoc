@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     const LA = lundiDApres.toISOString();
     const COLONNES = "id, kind, titre, au, created_at, prevu, traite_le, resultat, avec, par, detail, rdv_mode, deplace_de, prospect_id, client_id, account_id";
 
-    const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine] = await Promise.all([
+    const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees] = await Promise.all([
       // Ce qui était au planning cette semaine.
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").limit(2000),
       // Daté d'avant, mais noté ou annulé cette semaine : sinon il ne paraîtrait dans aucun récap.
@@ -200,8 +200,10 @@ Deno.serve(async (req) => {
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L),
+      // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
+      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de"),
     ]);
-    for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine]) if (r.error) throw new Error(r.error.message);
+    for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
     // Une action programmée puis faite donne deux lignes : la programmée, close, et la
     // faite. On ne garde que la faite (sauf une annulation, qui est son propre état).
@@ -245,8 +247,10 @@ Deno.serve(async (req) => {
     };
 
     // --- Les chiffres du haut ---
-    // Fait cette semaine, ou noté cette semaine pour une date d'avant : compté une seule fois.
-    const faites = [...dansLaSemaine, ...enRetard].filter((e) => etat(e) === "Fait");
+    // Un vrai contact (pas une tâche interne), fait cette semaine ou noté cette semaine
+    // pour une date d'avant : compté une seule fois par société.
+    const CONTACTS = new Set(["appel", "email", "rdv", "presentation", "sms", "linkedin", "devis"]);
+    const faites = [...dansLaSemaine, ...enRetard].filter((e) => etat(e) === "Fait" && CONTACTS.has(e.kind));
     const contactees = new Set(faites.map(societe).filter((s) => s !== "—")).size;
     const rdvUniques = (rdvDeLaSemaine.data ?? []).length;
     const nbApprofondis = (approfondis.data ?? []).length;
@@ -284,7 +288,13 @@ Deno.serve(async (req) => {
       Date.parse(e.created_at) >= lundi.getTime() ? `noté le ${jourCourt(e.created_at)}` : e.traite_le ? `${e.resultat === "Annulé" ? "annulé" : "clos"} le ${jourCourt(e.traite_le)}` : "";
     const ligneAction = (e: Echange, retardee = false) =>
       `<tr>${td(`${jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
-    const actions = [...dansLaSemaine.map((e) => ligneAction(e)), ...enRetard.map((e) => ligneAction(e, true))];
+    const ligneReportee = (e: Echange) =>
+      `<tr>${td(jourCourt(e.deplace_de!), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille("Déplacé"))}${td(`Reporté au ${jourLong(e.au)}.`, "min-width:240px;line-height:1.5")}</tr>`;
+    const actions = [
+      ...dansLaSemaine.map((e) => ligneAction(e)),
+      ...((reportees.data ?? []) as Echange[]).map(ligneReportee),
+      ...enRetard.map((e) => ligneAction(e, true)),
+    ];
 
     const sectionActions = actions.length
       ? titre("Les actions de la semaine", "Tout ce qui était au planning, et ce que chacun a noté dans la fiche.") +
