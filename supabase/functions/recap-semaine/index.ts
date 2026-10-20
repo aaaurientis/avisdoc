@@ -425,13 +425,17 @@ Deno.serve(async (req) => {
         tableau(`<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("L’action")}${th("Ce qui s’est passé")}</tr>`, actions)
       : titre("Les actions de la semaine") + `<p style="${POLICE}font-size:14px;color:${C.doux};margin:0">Aucune action au planning cette semaine.</p>`;
 
+    // Toujours là, juste sous les actions de la semaine (Olivier, 20/10 : « s'il n'y a
+    // rien, il faut quand même mettre quelque chose ») : les rendez-vous d'abord.
+    const titreSuivante = titre(`La semaine prochaine, du samedi ${dateTitre(plusJours(vendrediJour, 1))} au vendredi ${dateTitre(plusJours(vendrediJour, 7))}`, "Ce qui est déjà programmé.");
+    const aVenirTrie = [...aVenir].sort((a, b) => (a.kind === "rdv" ? 0 : 1) - (b.kind === "rdv" ? 0 : 1) || Date.parse(a.au) - Date.parse(b.au));
     const sectionSuivante = aVenir.length
-      ? titre(`La semaine prochaine, du samedi ${dateTitre(plusJours(vendrediJour, 1))} au vendredi ${dateTitre(plusJours(vendrediJour, 7))}`, "Ce qui est déjà programmé.") +
+      ? (titreSuivante) +
         tableau(
           `<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("L’action")}${th("Quand")}</tr>`,
-          aVenir.map((e) => `<tr>${td(jourCourt(e.au), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(action(e))}${td(passe(e))}</tr>`),
+          aVenirTrie.map((e) => `<tr>${td(jourCourt(e.au), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(action(e))}${td(passe(e))}</tr>`),
         )
-      : "";
+      : titreSuivante + `<p style="${POLICE}font-size:14px;color:${C.doux};margin:0">Rien de programmé pour l’instant.</p>`;
 
     // Prospection, en bref (Olivier, 20/10 : « on peut faire plus simple ») : les recherches,
     // le total des fiches, et les dossiers les mieux notés sous leur nom court.
