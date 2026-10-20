@@ -200,11 +200,21 @@ Deno.serve(async (req) => {
     const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees] = await Promise.all([
       // Ce qui était au planning cette semaine.
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").limit(2000),
-      // Daté d'avant, mais noté ou annulé cette semaine : sinon il ne paraîtrait dans aucun récap.
-      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").lt("au", L).or(`created_at.gte."${L}",traite_le.gte."${L}"`).order("au").limit(2000),
+      // Daté hors de la semaine, mais noté (fait) ou clos cette semaine — un rendez-vous de
+      // novembre annulé aujourd'hui compris : sinon il ne paraîtrait dans aucun récap.
+      admin
+        .from("admin_echanges")
+        .select(COLONNES)
+        .neq("kind", "note")
+        .or(`au.lt."${L}",au.gte."${LS}"`)
+        .or(`and(created_at.gte."${L}",prevu.eq.false),traite_le.gte."${L}"`)
+        .order("au")
+        .limit(2000),
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au"),
       toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", L).is("deleted_at", null).order("id").range(de, a)),
-      admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }),
+      toutLire<{ name: string; city: string | null; sector: string | null; score_total: number | null; rationale: string | null }>((de, a) =>
+        admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
+      ),
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).order("created_at").order("id").range(de, a)),
       admin.from("admin_fullenrich").select("credits").gte("created_at", L),
       admin.from("admin_accounts").select("name").gte("created_at", L),
