@@ -211,6 +211,8 @@ Deno.serve(async (req) => {
     const depuis =
       envoiPrecedent && !isNaN(envoiPrecedent.getTime()) && envoiPrecedent < lundi && lundi.getTime() - envoiPrecedent.getTime() < 10 * 86_400_000 ? envoiPrecedent : lundi;
     const D = depuis.toISOString();
+    // … jusqu'à l'instant réservé (exclu) : deux récaps successifs ne se recouvrent pas.
+    const M = maintenant.toISOString();
     const LS = lundiSuivant.toISOString();
     const LA = lundiDApres.toISOString();
     const COLONNES = "id, kind, titre, au, created_at, prevu, traite_le, resultat, avec, par, detail, rdv_mode, deplace_de, prospect_id, client_id, account_id";
@@ -226,18 +228,18 @@ Deno.serve(async (req) => {
           .select(COLONNES)
           .neq("kind", "note")
           .or(`au.lt."${L}",au.gte."${LS}"`)
-          .or(`and(created_at.gte."${D}",prevu.eq.false),traite_le.gte."${D}"`)
+          .or(`and(created_at.gte."${D}",created_at.lt."${M}",prevu.eq.false),and(traite_le.gte."${D}",traite_le.lt."${M}")`)
           .order("au")
           .order("id")
           .range(de, a),
       ),
       toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au").order("id").range(de, a)),
-      toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", D).is("deleted_at", null).order("id").range(de, a)),
+      toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", D).lt("created_at", M).is("deleted_at", null).order("id").range(de, a)),
       toutLire<{ name: string; city: string | null; sector: string | null; score_total: number | null; rationale: string | null }>((de, a) =>
-        admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", D).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
+        admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", D).lt("enriched_at", M).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
       ),
-      toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", D).order("finished_at").order("id").range(de, a)),
-      toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", D).order("id").range(de, a)),
+      toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", D).lt("finished_at", M).order("finished_at").order("id").range(de, a)),
+      toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", D).lt("traite_le", M).order("id").range(de, a)),
       // Signé cette semaine : la date de signature, pas celle de la saisie.
       // Plus celles du week-end dernier, saisies après l'envoi précédent (jamais deux fois :
       // une signature saisie avant cet envoi y a déjà été comptée).
@@ -246,11 +248,11 @@ Deno.serve(async (req) => {
         .select("name")
         .is("deleted_at", null)
         .or(
-          `and(signed_on.gte.${lundiJour},signed_on.lt.${plusJours(lundiJour, 7)}),and(signed_on.gte.${aParis(depuis).jour},signed_on.lt.${lundiJour},created_at.gte."${D}")`,
+          `and(signed_on.gte.${lundiJour},signed_on.lt.${plusJours(lundiJour, 7)}),and(signed_on.gte.${aParis(depuis).jour},signed_on.lt.${lundiJour},created_at.gte."${D}",created_at.lt."${M}")`,
         ),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
-      toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", D).order("id").range(de, a)),
+      toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", D).lt("created_at", M).order("id").range(de, a)),
       // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
       // (Dépenses et demandes Merx ci-dessus : à la date où le travail s'est TERMINÉ, pour
       // qu'une demande lancée dimanche et finie lundi ne tombe pas entre deux récaps.)
