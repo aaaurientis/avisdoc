@@ -256,7 +256,7 @@ export const QUESTIONS: ThemeAide[] = [
       },
       {
         question: "D'où viennent les interlocuteurs et leurs e-mails ?",
-        reponse: "Après chaque recherche Merx, FullEnrich cherche 2 interlocuteurs utiles par fiche (RH, QSE, direction, responsable d'agence) et leur e-mail pro, en une à deux minutes. Sur la fiche, « Chercher 2 autres contacts » va plus loin, une fois. Sur une fiche au Pipeline ou dans Clients, « Chercher son mobile » trouve le mobile d'une personne. Le coût est annoncé avant chaque clic, rien n'est facturé si rien n'est trouvé, et tout s'arrête au plafond de 500 crédits par mois.",
+        reponse: "Quand vous approfondissez une fiche (« Approfondir » ou « Enrichir par Merx »), FullEnrich ajoute 2 interlocuteurs utiles (RH, QSE, direction, responsable d'agence, ou le gérant d'une petite entreprise) et leur e-mail pro, en une à deux minutes. La prospection, elle, se fait avec Merx seul. Sur la fiche, « Chercher 2 autres contacts » va plus loin, une fois. Sur une fiche au Pipeline ou dans Clients, « Chercher son mobile » trouve le mobile d'une personne. Le coût est annoncé avant chaque clic, rien n'est facturé si rien n'est trouvé, et tout s'arrête au plafond de 500 crédits par mois.",
       },
       {
         question: "Comment désigner le commercial qui suit une fiche ?",

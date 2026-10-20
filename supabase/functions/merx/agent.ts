@@ -18,7 +18,7 @@ import {
   identitesConnues,
   insertLightProspects,
   nomReduit,
-  demanderContacts,
+  contactsALApprofondissement,
   listFoundNames,
   saveEnrichment,
   type Demande,
@@ -669,7 +669,6 @@ async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, z
   const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
   const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)), true);
   const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
-  if (inserted) await demanderContacts(sb, req.id, req.requestedBy);
   const deja = agences.length - nouvelles.length + (fiches.length - inserted);
   const restantes = nouvelles.length - retenues.length;
   const constat = [
@@ -726,7 +725,6 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
       const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
-      if (inserted) await demanderContacts(sb, req.id, req.requestedBy);
       const deja = fiches.length - inserted;
 
       // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.
@@ -1006,6 +1004,9 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
       : req.kind === "completion" ? await runCompletion(sb, req)
       : await runEnrichment(sb, req, onUsage);
     await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage, model: model(modeleDe(req.kind)) });
+    // FullEnrich n'agit qu'à l'APPROFONDISSEMENT, jamais à la prospection (Olivier, 20/10) :
+    // une fois que Merx a approfondi la fiche, il y ajoute ses 2 interlocuteurs et leur e-mail.
+    if (req.kind === "approfondissement" && req.prospectId) await contactsALApprofondissement(sb, req.prospectId, req.requestedBy);
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",
