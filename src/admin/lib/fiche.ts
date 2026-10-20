@@ -87,6 +87,15 @@ function formatMaison(adresses: string[], site: string | null | undefined, noms:
   return { domaine, initiale: forme === "i" };
 }
 
+/** Les adresses que le dossier dit avoir RELEVÉES : pas celles que Merx imagine
+ * (« l'adresse composée serait j.dupont@… »), qui ne prouvent aucun format. */
+function adressesObservees(dossier: unknown): string[] {
+  return JSON.stringify(dossier ?? null)
+    .split(/(?<=[.;!?])\s+|","/)
+    .filter((phrase) => !/serait|compos[ée]|hypoth|dédui|deduit|suppos|probable/i.test(phrase))
+    .flatMap((phrase) => phrase.match(MAIL) ?? []);
+}
+
 /** « Jérôme Valadier » au format « i » → « j.valadier@domaine ». */
 function adresseComposee(nom: string, f: { domaine: string; initiale: boolean }): string | null {
   const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
@@ -153,7 +162,7 @@ export function personnesDuProspect(
   )];
   // Sans site connu, les adresses du dossier (qui cite aussi des tiers) ne comptent pas.
   const f = formatMaison(
-    p.website ? [...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])] : relevees,
+    p.website ? [...relevees, ...adressesObservees(p.dossier)] : relevees,
     p.website,
     [...deja, ...sortie].map((q) => q.nom),
   );
