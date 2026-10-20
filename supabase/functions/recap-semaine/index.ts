@@ -229,14 +229,16 @@ Deno.serve(async (req) => {
       toutLire<{ name: string; city: string | null; sector: string | null; score_total: number | null; rationale: string | null }>((de, a) =>
         admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
       ),
-      toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).order("created_at").order("id").range(de, a)),
-      toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("created_at", L).order("id").range(de, a)),
+      toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", L).order("finished_at").order("id").range(de, a)),
+      toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", L).order("id").range(de, a)),
       // Signé cette semaine : la date de signature, pas celle de la saisie.
       admin.from("admin_accounts").select("name").gte("signed_on", lundiJour).lt("signed_on", plusJours(lundiJour, 7)).is("deleted_at", null),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L).order("id").range(de, a)),
       // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
+      // (Dépenses et demandes Merx ci-dessus : à la date où le travail s'est TERMINÉ, pour
+      // qu'une demande lancée dimanche et finie lundi ne tombe pas entre deux récaps.)
       // Les reports qui ont fait quitter la semaine (historique 0074), un par action.
       toutLire<{ echange_id: string; de: string }>((de, a) => admin.from("admin_echanges_reports").select("echange_id, de").gte("de", L).lt("de", LS).gte("vers", LS).order("de").order("id").range(de, a)),
     ]);
