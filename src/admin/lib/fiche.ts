@@ -32,8 +32,10 @@ export interface PersonneFiche {
   telephone: string | null;
   aConfirmer?: boolean;
   source?: string | null;
-  /** Son adresse composée d'après le format maison relevé, faute d'adresse trouvée : à confirmer. */
-  emailDeduit?: string | null;
+  /** Son adresse à elle, affichée avant `email` quand celui-ci est une adresse de service. */
+  emailPerso?: string | null;
+  /** `emailPerso` composée d'après le format maison, pas relevée : à confirmer. */
+  persoDeduit?: boolean;
 }
 
 /** Les adresses de service, qui ne sont celles de personne (webmaster@, contact@…). */
@@ -122,27 +124,33 @@ export function personnesDuProspect(
   for (const q of p.personnes ?? []) {
     garder({ nom: q.nom, fonction: q.fonction, email: q.email, telephone: q.telephone ?? q.mobile, aConfirmer: !q.sur, source: q.source });
   }
-  // Sans adresse trouvée, l'adresse composée au format maison, marquée « déduite »
-  // (Olivier, 20/10 : « on pourrait lui mettre son adresse Valadier »).
-  const f = formatMaison(
-    [
-      p.contact_email,
-      ...(p.personnes ?? []).map((q) => q.email),
-      ...(p.site_contacts?.emails ?? []),
-      ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? []),
-    ].filter((a): a is string => typeof a === "string" && a.includes("@")),
-    p.website,
-  );
-  // Une adresse de service (prevention@, drh@…) passe après l'adresse de la personne
-  // (Olivier, 20/10 : « privilégiez les adresses des personnes ») : on compose aussi la
-  // sienne quand l'adresse trouvée ne porte pas son nom.
-  if (f)
-    for (const q of sortie) {
-      const famille = sansAccent(q.nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean).slice(1).join("");
-      const nominative = !!q.email && !!famille && sansAccent(q.email.split("@")[0]).replace(/[^a-z]/g, "").includes(famille);
-      if (nominative) continue;
-      const composee = adresseComposee(q.nom, f);
-      if (composee && composee !== q.email?.toLowerCase()) q.emailDeduit = composee;
+  // L'adresse de la personne passe avant toute adresse de service (Olivier, 20/10 :
+  // « privilégiez les adresses des personnes ») : celle relevée sur le site ou par Merx
+  // si elle porte son nom, sinon celle composée au format maison, marquée « déduite ».
+  // (Les adresses citées dans le texte du dossier ne servent qu'au format : Merx y écrit
+  // aussi ses propres déductions, « l'adresse composée serait… ».)
+  const relevees = [...new Set(
+    [p.contact_email, ...(p.personnes ?? []).map((q) => q.email), ...(p.site_contacts?.emails ?? [])]
+      .filter((a): a is string => typeof a === "string" && a.includes("@"))
+      .map((a) => a.trim().toLowerCase()),
+  )];
+  const f = formatMaison([...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])], p.website);
+  const lettres = (a: string) => sansAccent(a.split("@")[0]).replace(/[^a-z]/g, "");
+  for (const q of sortie) {
+    const mots = sansAccent(q.nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
+    if (mots.length < 2) continue;
+    const initiale = mots[0][0];
+    const famille = mots.slice(1).join("").replace(/[^a-z]/g, "");
+    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && lettres(a).includes(famille) && lettres(a)[0] === initiale;
+    if (q.email && porteSonNom(q.email)) continue;
+    const vue = relevees.find(porteSonNom);
+    const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
+    if (!perso || perso === q.email?.toLowerCase()) continue;
+    if (!q.email && vue) q.email = vue;
+    else {
+      q.emailPerso = perso;
+      q.persoDeduit = !vue;
     }
+  }
   return sortie;
 }

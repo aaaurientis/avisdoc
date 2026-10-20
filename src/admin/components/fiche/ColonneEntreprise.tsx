@@ -126,7 +126,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
       .map(chiffres),
   );
   const melsConnus = new Set(
-    [melStandard, ...pers.flatMap((x) => [x.email, x.emailDeduit])].filter((m): m is string => typeof m === "string").map((m) => m.toLowerCase()),
+    [melStandard, ...pers.flatMap((x) => [x.email, x.emailPerso])].filter((m): m is string => typeof m === "string").map((m) => m.toLowerCase()),
   );
   const textes = [
     ...(d.a_retenir ?? []),
