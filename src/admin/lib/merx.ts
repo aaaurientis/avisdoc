@@ -159,9 +159,6 @@ export interface Dossier {
   objections?: { objection: string; reponse: string }[];
   offre?: string;
   a_verifier?: string[];
-  /** Les contacts utiles hors de l'entreprise (voisins, mairie, syndicat…), une ligne
-   * « Nom | rôle | structure | téléphone | e-mail | source » chacun. */
-  autres_contacts?: string[];
 }
 
 export interface Prospect {
