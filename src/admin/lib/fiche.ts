@@ -62,7 +62,7 @@ function formatMaison(adresses: string[], site: string | null | undefined): { do
   const [cle, n] = [...comptes].sort((a, b) => b[1] - a[1])[0] ?? [];
   if (!cle) return null;
   const [domaine, forme] = cle.split("|");
-  if (n! < 2 && !(hote && (hote === domaine || hote.endsWith(`.${domaine}`) || domaine.endsWith(hote)))) return null;
+  if (n! < 2 && !(hote && (hote === domaine || hote.endsWith(`.${domaine}`) || domaine.endsWith(`.${hote}`)))) return null;
   return { domaine, initiale: forme === "i" };
 }
 

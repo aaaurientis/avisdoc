@@ -114,8 +114,9 @@ export interface AutreContact {
  * l'API, 20/10.)
  */
 export function autresContactsDe(p: Prospect | null): AutreContact[] {
-  const d = p?.dossier;
-  if (!p || !d) return [];
+  if (!p) return [];
+  // Sans dossier, le site parle encore : ses contacts s'affichent quand même.
+  const d = p.dossier ?? {};
   // Ce qui est déjà ailleurs dans la colonne (le standard de l'établissement, les
   // interlocuteurs) ne se répète pas ; tout le reste du site et du dossier s'affiche.
   const pers = personnesDuProspect(p);
