@@ -443,13 +443,20 @@ ${sectionDepenses}
 <p style="${POLICE}font-size:12px;color:${C.doux};margin:20px 0 0;border-top:1px solid ${C.ligne};padding-top:12px">Récap envoyé chaque vendredi à 19 h aux associés d’AvisDoc. Il couvre la semaine du lundi 0 h au vendredi 19 h.</p>
 </td></tr></table></td></tr></table></body></html>`;
 
-    const envoi = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: DESTINATAIRES, subject: objet, html }),
-    });
-    if (!envoi.ok) throw new Error(`Resend ${envoi.status} : ${await envoi.text()}`);
-    return json({ ok: true, essai, objet, actions: actions.length, semaineSuivante: aVenir.length });
+    // Un mail par associé, chacun à son seul nom (Olivier, 20/10) : pas d'envoi groupé.
+    const echecs: string[] = [];
+    for (const a of DESTINATAIRES) {
+      const envoi = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM, to: [a], subject: objet, html }),
+      });
+      if (!envoi.ok) echecs.push(`${a} : Resend ${envoi.status} ${await envoi.text()}`);
+    }
+    // Personne ne l'a reçu : on rend la semaine pour que le passage suivant réessaie.
+    // Une partie l'a reçu : on garde la réservation (pas de double envoi) et on le dit.
+    if (echecs.length === DESTINATAIRES.length) throw new Error(echecs.join(" · "));
+    return json({ ok: echecs.length === 0, essai, objet, envoyes: DESTINATAIRES.length - echecs.length, echecs, actions: actions.length, semaineSuivante: aVenir.length });
   } catch (e) {
     await rendre();
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
