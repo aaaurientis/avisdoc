@@ -58,16 +58,6 @@ const QUOI: Record<string, string> = {
   linkedin: "Message LinkedIn",
   devis: "Devis envoyé",
 };
-const COMMENT: Record<string, string> = { appel: "Téléphone", email: "E-mail", sms: "SMS", linkedin: "LinkedIn", devis: "E-mail" };
-const MODE: Record<string, string> = { visio: "Visio", sur_place: "Sur place", chez_client: "Chez le client" };
-const SECTEURS: Record<string, string> = {
-  btp: "Travaux publics et BTP",
-  espaces_verts: "Espaces verts",
-  agriculture: "Agriculture et viticulture",
-  collectivites: "Collectivités",
-  sante_beaute: "Santé et beauté",
-  autre: "Autre",
-};
 
 /** Les prénoms tels qu'on les écrit : l'adresse « stephan.nacer@ » est celle de Stéphane. */
 const PRENOMS: Record<string, string> = { stephan: "Stéphane", irene: "Irène", henry: "Henry", laurent: "Laurent", arthur: "Arthur", olivier: "Olivier" };
@@ -304,14 +294,6 @@ Deno.serve(async (req) => {
       ...((as.data ?? []) as { id: string; name: string }[]).map((x) => [x.id, x.name] as [string, string]),
     ]);
     const societe = (e: Echange) => noms.get(e.prospect_id ?? e.client_id ?? e.account_id ?? "") ?? "—";
-    // L'intitulé d'une action libre (« Préparer la tournée ») ; pas « Appel prévu », qui ne dit rien de plus.
-    const quoi = (e: Echange) => {
-      const base = QUOI[e.kind] ?? e.kind;
-      const t = (e.titre ?? "").trim();
-      const generique = !t || t === base || /^(appel|e-?mail|mail|rendez-vous|présentation|à faire|salon|sms.*|message linkedin|devis.*|note)( prévue?)?$/i.test(t);
-      return generique ? base : `${base}${sousTexte(echapper(t))}`;
-    };
-    const comment = (e: Echange) => (e.rdv_mode ? MODE[e.rdv_mode] ?? e.rdv_mode : COMMENT[e.kind] ?? "—");
     const etat = (e: Echange): string => {
       if (e.resultat === "Annulé") return "Annulé";
       if (!e.prevu || e.traite_le) return "Fait";
@@ -363,13 +345,59 @@ Deno.serve(async (req) => {
       ...(nbSignes ? [tuile(String(nbSignes), nbSignes > 1 ? "clients signés" : "client signé", C.vertPale)] : []),
     ];
 
+    // Chaque ligne se lit seule (Olivier, 20/10 : « pas fait, ça veut dire quoi ? ») :
+    // ce qui était prévu, puis ce qui s'est passé, en toutes lettres.
+    const heureDe = (iso: string) => {
+      const [hh, mm] = new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).split(":");
+      return mm === "00" ? `${Number(hh)} h` : `${Number(hh)} h ${mm}`;
+    };
+    const AVEC: Record<string, string> = { email: "à", appel: "à", sms: "à", linkedin: "à", devis: "à" };
+    const action = (e: Echange) => {
+      const base = QUOI[e.kind] ?? e.kind;
+      const mode = e.rdv_mode ? ` ${({ visio: "en visio", sur_place: "sur place", chez_client: "chez le client" } as Record<string, string>)[e.rdv_mode] ?? ""}` : "";
+      const avec = e.avec ? ` ${AVEC[e.kind] ?? "avec"} ${echapper(e.avec)}` : "";
+      const t = (e.titre ?? "").trim();
+      const libre = t && !/^(appel|e-?mail|mail|rendez-vous|présentation|à faire|salon|sms.*|message linkedin|devis.*|note)( prévue?)?$/i.test(t);
+      return `${base}${mode}${avec}${libre ? sousTexte(echapper(t)) : ""}`;
+    };
+    /** Les deux premières phrases de la note, telles qu'écrites ; la suite reste dans la fiche. */
+    const extrait = (texte: string) => {
+      const propre = texte.trim().replace(/\s+/g, " ");
+      // On ne coupe qu'après un point suivi d'une majuscule : « 2.5 millions », une
+      // adresse ou un lien restent entiers.
+      const phrases = propre.split(/(?<=[.!?…])\s+(?=[A-ZÀ-ÖØ-Þ«"(])/);
+      let court = phrases.slice(0, 2).join(" ").trim();
+      if (court.length > 320) court = `${court.slice(0, 317).replace(/\s+\S*$/, "")}…`;
+      return court.length < propre.length ? `${echapper(court)} <span style="color:${C.doux}">(suite dans la fiche)</span>` : echapper(court);
+    };
+    const passe = (e: Echange) => {
+      const etatDe = etat(e);
+      const report = e.deplace_de ? ` Déplacé du ${jourLong(e.deplace_de)}` : "";
+      // La note d'une action annulée ou à faire (une consigne, une raison) se garde aussi ;
+      // la trace « — Annulé le … » est déjà dite par l'état.
+      const reste = (e.detail ?? "").replace(/^—\s*Annulé le .*$/gm, "").trim();
+      const noteEnPlus = reste ? `<br>${extrait(reste)}` : "";
+      switch (etatDe) {
+        case "Annulé":
+          return `${pastille("Annulé")} le ${jourLong(e.traite_le ?? e.au)}${noteEnPlus}`;
+        case "Pas fait":
+          return `${pastille("Pas fait")} prévu le ${jourLong(e.au)} à ${heureDe(e.au)}, aucun compte rendu noté depuis.${report}${noteEnPlus}`;
+        case "Prévu":
+        case "Déplacé":
+          return `${pastille(etatDe)} le ${jourLong(e.au)} à ${heureDe(e.au)}.${report}${noteEnPlus}`;
+        default: {
+          const res = e.resultat && e.resultat !== "Fait" ? `<strong>Résultat : ${echapper(e.resultat.toLowerCase())}.</strong> ` : "";
+          return `${pastille("Fait")} ${res}${e.detail?.trim() ? extrait(e.detail) : ""}`;
+        }
+      }
+    };
     // Daté d'avant la semaine : on dit pourquoi il est là — noté, ou annulé, cette semaine.
     const pourquoi = (e: Echange) =>
       Date.parse(e.created_at) >= depuis.getTime() ? `noté le ${jourCourt(e.created_at)}` : e.traite_le ? `${e.resultat === "Annulé" ? "annulé" : "clos"} le ${jourCourt(e.traite_le)}` : "";
     const ligneAction = (e: Echange, retardee = false) =>
-      `<tr>${td(`${retardee ? jourLong(e.au) : jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
+      `<tr>${td(`${retardee ? jourLong(e.au) : jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(action(e))}${td(passe(e), "min-width:260px;line-height:1.5")}</tr>`;
     const ligneReportee = (e: Echange) =>
-      `<tr>${td(jourCourt(e.deplace_de!), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille("Déplacé"))}${td(`Reporté au ${jourLong(e.au)}.`, "min-width:240px;line-height:1.5")}</tr>`;
+      `<tr>${td(jourCourt(e.deplace_de!), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(action(e))}${td(`${pastille("Déplacé")} au ${jourLong(e.au)} à ${heureDe(e.au)}.`, "min-width:260px;line-height:1.5")}</tr>`;
     const actions = [
       ...dansLaSemaine.map((e) => ligneAction(e)),
       ...reporteesOuvertes.map(ligneReportee),
@@ -377,60 +405,45 @@ Deno.serve(async (req) => {
     ];
 
     const sectionActions = actions.length
-      ? titre("Les actions de la semaine", "Tout ce qui était au planning, et ce que chacun a noté dans la fiche.") +
-        tableau(`<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("Quoi")}${th("Comment")}${th("Avec")}${th("État")}${th("Résultat ou note")}</tr>`, actions)
+      ? titre("Les actions de la semaine", "Ce qui était prévu, et ce qui s’est passé.") +
+        tableau(`<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("L’action")}${th("Ce qui s’est passé")}</tr>`, actions)
       : titre("Les actions de la semaine") + `<p style="${POLICE}font-size:14px;color:${C.doux};margin:0">Aucune action au planning cette semaine.</p>`;
 
     const sectionSuivante = aVenir.length
       ? titre(`La semaine prochaine, du samedi ${dateTitre(plusJours(vendrediJour, 1))} au vendredi ${dateTitre(plusJours(vendrediJour, 7))}`, "Ce qui est déjà programmé.") +
         tableau(
-          `<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("Quoi")}${th("Comment")}${th("Avec")}${th("État")}</tr>`,
-          aVenir.map((e) => `<tr>${td(jourCourt(e.au), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}</tr>`),
+          `<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("L’action")}${th("Quand")}</tr>`,
+          aVenir.map((e) => `<tr>${td(jourCourt(e.au), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(action(e))}${td(passe(e))}</tr>`),
         )
       : "";
 
-    // Prospection : les recherches, puis les fiches par secteur.
+    // Prospection, en bref (Olivier, 20/10 : « on peut faire plus simple ») : les recherches,
+    // le total des fiches, et les dossiers les mieux notés sous leur nom court.
     const recherches = ((demandes.data ?? []) as { kind: string; request: string | null; found_count: number | null; requested_by: string | null }[]).filter(
       (d) => d.kind === "recherche" && d.request && !d.request.startsWith("Où on en est"),
     );
-    const secteur = (s: string | null) => SECTEURS[(s ?? "").trim()] ?? ((s ?? "").trim() || "Sans secteur");
-    const parSecteur = new Map<string, { nouvelles: number; approfondies: number }>();
-    for (const p of (prospects.data ?? []) as { sector: string | null }[]) {
-      const k = secteur(p.sector);
-      const v = parSecteur.get(k) ?? { nouvelles: 0, approfondies: 0 };
-      v.nouvelles++;
-      parSecteur.set(k, v);
-    }
-    for (const p of (approfondis.data ?? []) as { sector: string | null }[]) {
-      const k = secteur(p.sector);
-      const v = parSecteur.get(k) ?? { nouvelles: 0, approfondies: 0 };
-      v.approfondies++;
-      parSecteur.set(k, v);
-    }
-    const totalNouvelles = [...parSecteur.values()].reduce((s, v) => s + v.nouvelles, 0);
-    const reperes = ((approfondis.data ?? []) as { name: string; city: string | null; rationale: string | null }[]).slice(0, 3);
+    const totalNouvelles = (prospects.data ?? []).length;
+    /** « SI POUR LE TRAITEMENT… (SITREVA) (SITREVA) » → « SITREVA » ; « … (GROUPE NICOLLIN) (SMN) » → « SMN (Groupe Nicollin) ». */
+    const nomCourt = (nom: string) => {
+      const groupes = [...nom.matchAll(/\(([^)]+)\)/g)].map((m) => m[1].trim());
+      const base = nom.replace(/\s*\([^)]*\)/g, "").trim();
+      const groupe = groupes.find((g) => /^groupe\s/i.test(g));
+      const sigle = [...groupes].reverse().find((g) => !/^groupe\s/i.test(g) && g.length <= 20);
+      const court = sigle ?? base;
+      return groupe ? `${court} (${groupe.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, a, b) => a + b.toUpperCase())})` : court;
+    };
+    const reperes = ((approfondis.data ?? []) as { name: string; score_total: number | null }[]).filter((r) => r.score_total !== null).slice(0, 3);
     const sectionProspection =
-      recherches.length || parSecteur.size
-        ? titre("Prospection et approfondissements", "Ce qu’on a cherché, ce qui est entré, ce que Merx a creusé.") +
+      recherches.length || totalNouvelles || nbApprofondis
+        ? titre("Prospection") +
           (recherches.length
-            ? tableau(
-                `<tr>${th("Recherche")}${th("Par")}${th("Trouvées", true)}</tr>`,
-                recherches.map((d) => `<tr>${td(echapper(d.request!.replace(/^Recherche du panneau : /, "")))}${td(prenom(d.requested_by))}${td(String(d.found_count ?? 0), "text-align:right")}</tr>`),
-              )
+            ? `<ul style="${POLICE}font-size:13px;color:${C.encre};margin:0 0 8px;padding-left:18px">${recherches
+                .map((d) => `<li style="margin:0 0 4px">${echapper(d.request!.replace(/^Recherche du panneau : /, ""))} — <strong>${d.found_count ?? 0}</strong> trouvée${(d.found_count ?? 0) > 1 ? "s" : ""} (${prenom(d.requested_by)})</li>`)
+                .join("")}</ul>`
             : "") +
-          (parSecteur.size
-            ? `<div style="height:12px"></div>` +
-              tableau(
-                `<tr>${th("Secteur")}${th("Nouvelles fiches", true)}${th("Approfondies", true)}</tr>`,
-                [
-                  ...[...parSecteur].sort((a, b) => b[1].nouvelles - a[1].nouvelles).map(([k, v]) => `<tr>${td(echapper(k))}${td(String(v.nouvelles), "text-align:right")}${td(String(v.approfondies), "text-align:right")}</tr>`),
-                  `<tr>${td("<strong>Total</strong>", "border-bottom:0")}${td(`<strong>${totalNouvelles}</strong>`, "text-align:right;border-bottom:0")}${td(`<strong>${nbApprofondis}</strong>`, "text-align:right;border-bottom:0")}</tr>`,
-                ],
-              )
-            : "") +
+          `<p style="${POLICE}font-size:13px;color:${C.encre};margin:0 0 6px">${pluriel(totalNouvelles, "nouvelle fiche", "nouvelles fiches")}, ${pluriel(nbApprofondis, "approfondie", "approfondies")}.</p>` +
           (reperes.length
-            ? `<p style="${POLICE}font-size:13px;color:${C.doux};margin:12px 0 4px">Les dossiers les mieux notés de la semaine :</p>` +
-              reperes.map((r) => `<p style="${POLICE}font-size:13px;color:${C.encre};margin:0 0 6px"><strong>${echapper(r.name)}</strong>${r.city ? ` (${echapper(r.city)})` : ""}${r.rationale ? ` : ${echapper(r.rationale.slice(0, 200))}` : ""}</p>`).join("")
+            ? `<p style="${POLICE}font-size:13px;color:${C.encre};margin:0">Les mieux notées : ${reperes.map((r) => `<strong>${echapper(nomCourt(r.name))}</strong> ${r.score_total}/100`).join(" · ")}.</p>`
             : "")
         : "";
 
