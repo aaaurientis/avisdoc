@@ -220,12 +220,14 @@ Deno.serve(async (req) => {
       ),
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).order("created_at").order("id").range(de, a)),
       admin.from("admin_fullenrich").select("credits").gte("created_at", L),
-      admin.from("admin_accounts").select("name").gte("created_at", L),
+      // Signé cette semaine : la date de signature, pas celle de la saisie.
+      admin.from("admin_accounts").select("name").gte("signed_on", lundiJour).lt("signed_on", plusJours(lundiJour, 7)).is("deleted_at", null),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L).order("id").range(de, a)),
       // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
-      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de").order("id").range(de, a)),
+      // Les reports qui ont fait quitter la semaine (historique 0074), un par action.
+      toutLire<{ echange_id: string; de: string }>((de, a) => admin.from("admin_echanges_reports").select("echange_id, de").gte("de", L).lt("de", LS).gte("vers", LS).order("de").order("id").range(de, a)),
     ]);
     for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
@@ -236,8 +238,17 @@ Deno.serve(async (req) => {
     const enRetard = ((retard.data ?? []) as Echange[]).filter(garder);
     const aVenir = (prochaine.data ?? []) as Echange[];
 
+    // Les actions reportées hors de la semaine, encore à faire et toujours plus tard.
+    const quitte = new Map<string, string>();
+    for (const r of (reportees.data ?? []) as { echange_id: string; de: string }[]) if (!quitte.has(r.echange_id)) quitte.set(r.echange_id, r.de);
+    const { data: lesReportees, error: errReportees } = quitte.size
+      ? await admin.from("admin_echanges").select(COLONNES).in("id", [...quitte.keys()]).eq("prevu", true).is("traite_le", null).gte("au", LS)
+      : { data: [], error: null };
+    if (errReportees) throw new Error(errReportees.message);
+    const reporteesOuvertes = ((lesReportees ?? []) as Echange[]).map((e) => ({ ...e, deplace_de: quitte.get(e.id) ?? e.deplace_de }));
+
     // Les sociétés, d'un coup.
-    const toutes = [...dansLaSemaine, ...enRetard, ...aVenir, ...((reportees.data ?? []) as Echange[])];
+    const toutes = [...dansLaSemaine, ...enRetard, ...aVenir, ...reporteesOuvertes];
     const ids = (k: "prospect_id" | "client_id" | "account_id") => [...new Set(toutes.map((e) => e[k]).filter((x): x is string => !!x))];
     const [ps, cs, as] = await Promise.all([
       ids("prospect_id").length ? admin.from("admin_prospects").select("id, name").in("id", ids("prospect_id")) : Promise.resolve({ data: [] }),
@@ -316,7 +327,7 @@ Deno.serve(async (req) => {
       `<tr>${td(jourCourt(e.deplace_de!), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille("Déplacé"))}${td(`Reporté au ${jourLong(e.au)}.`, "min-width:240px;line-height:1.5")}</tr>`;
     const actions = [
       ...dansLaSemaine.map((e) => ligneAction(e)),
-      ...((reportees.data ?? []) as Echange[]).map(ligneReportee),
+      ...reporteesOuvertes.map(ligneReportee),
       ...enRetard.map((e) => ligneAction(e, true)),
     ];
 

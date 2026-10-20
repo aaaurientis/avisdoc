@@ -4,9 +4,10 @@
 -- Olivier, 20/10 : « tous les vendredis soirs, un mail de récap à l'ensemble des
 -- associés d'AvisDoc » (destinataires dans la fonction recap-semaine).
 --
--- 1. « Déplacé » : quand une action programmée change de date, on garde la date
---    qu'elle avait juste avant (`deplace_de`) : le récap de cette semaine-là la montre
---    « Déplacé », même si elle est reportée plusieurs fois.
+-- 1. « Déplacé » : chaque report d'une action programmée est noté (date quittée,
+--    nouvelle date) dans admin_echanges_reports ; `deplace_de` garde la date d'avant le
+--    dernier report. Le récap de chaque semaine quittée montre l'action « Déplacé »,
+--    même reportée plusieurs fois.
 -- 2. Le secret et la tâche planifiée, comme le récap du soir (0071) : la tâche passe
 --    le vendredi à 17 h et à 18 h UTC ; la fonction n'envoie qu'à 19 h à Paris, une
 --    fois par semaine.
@@ -16,14 +17,32 @@
 
 alter table public.admin_echanges add column if not exists deplace_de timestamptz;
 
+create table if not exists public.admin_echanges_reports (
+  id          uuid primary key default gen_random_uuid(),
+  echange_id  uuid not null references public.admin_echanges(id) on delete cascade,
+  de          timestamptz not null,
+  vers        timestamptz not null,
+  le          timestamptz not null default now()
+);
+create index if not exists admin_echanges_reports_de_idx on public.admin_echanges_reports (de);
+
+alter table public.admin_echanges_reports enable row level security;
+drop policy if exists "reports_lecture" on public.admin_echanges_reports;
+create policy "reports_lecture" on public.admin_echanges_reports
+  for select to authenticated using (public.is_avisdoc_user());
+
+-- security definer : le report s'écrit même si l'équipe n'a que la lecture sur l'historique.
 create or replace function public.admin_echanges_deplace()
 returns trigger
 language plpgsql
+security definer
+set search_path = public
 as $$
 begin
   -- Seule une action programmée et pas encore faite se déplace (0073 fige le reste).
   if old.prevu and old.traite_le is null and new.au is distinct from old.au then
     new.deplace_de := old.au;
+    insert into public.admin_echanges_reports (echange_id, de, vers) values (old.id, old.au, new.au);
   end if;
   return new;
 end;
