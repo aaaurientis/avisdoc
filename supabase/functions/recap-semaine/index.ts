@@ -440,7 +440,7 @@ ${sectionSuivante}
 ${sectionProspection}
 ${sectionDepenses}
 <p style="margin:28px 0 0"><a href="${ADMIN}" style="${POLICE}display:inline-block;background:${C.bleu};color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:999px;font-size:14px">Ouvrir l’admin AvisDoc</a></p>
-<p style="${POLICE}font-size:12px;color:${C.doux};margin:20px 0 0;border-top:1px solid ${C.ligne};padding-top:12px">Récap envoyé chaque vendredi à 19 h aux associés d’AvisDoc. Il couvre la semaine du lundi 0 h au vendredi 19 h.</p>
+<p style="${POLICE}font-size:12px;color:${C.doux};margin:20px 0 0;border-top:1px solid ${C.ligne};padding-top:12px">Récap envoyé chaque vendredi à 19 h aux associés d’AvisDoc. Il couvre la semaine du lundi au dimanche : ce qui est prévu ce week-end y figure « Prévu ».</p>
 </td></tr></table></td></tr></table></body></html>`;
 
     // Un mail par associé, chacun à son seul nom (Olivier, 20/10) : pas d'envoi groupé.
