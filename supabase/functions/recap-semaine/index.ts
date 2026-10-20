@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
         admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
       ),
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).order("created_at").order("id").range(de, a)),
-      admin.from("admin_fullenrich").select("credits").gte("created_at", L),
+      toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("created_at", L).order("id").range(de, a)),
       // Signé cette semaine : la date de signature, pas celle de la saisie.
       admin.from("admin_accounts").select("name").gte("signed_on", lundiJour).lt("signed_on", plusJours(lundiJour, 7)).is("deleted_at", null),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
@@ -251,10 +251,19 @@ Deno.serve(async (req) => {
     const toutes = [...dansLaSemaine, ...enRetard, ...aVenir, ...reporteesOuvertes];
     const ids = (k: "prospect_id" | "client_id" | "account_id") => [...new Set(toutes.map((e) => e[k]).filter((x): x is string => !!x))];
     const [ps, cs, as] = await Promise.all([
-      ids("prospect_id").length ? admin.from("admin_prospects").select("id, name").in("id", ids("prospect_id")) : Promise.resolve({ data: [] }),
+      ids("prospect_id").length ? admin.from("admin_prospects").select("id, name, converted_client_id").in("id", ids("prospect_id")) : Promise.resolve({ data: [] }),
       ids("client_id").length ? admin.from("admin_clients").select("id, company").in("id", ids("client_id")) : Promise.resolve({ data: [] }),
-      ids("account_id").length ? admin.from("admin_accounts").select("id, name").in("id", ids("account_id")) : Promise.resolve({ data: [] }),
+      ids("account_id").length ? admin.from("admin_accounts").select("id, name, client_id").in("id", ids("account_id")) : Promise.resolve({ data: [] }),
     ]);
+    // Une même société, qu'elle soit encore prospect, au Pipeline ou cliente : l'affaire la relie.
+    const affaireDe = new Map<string, string>([
+      ...((ps.data ?? []) as { id: string; converted_client_id: string | null }[]).filter((x) => x.converted_client_id).map((x) => [x.id, x.converted_client_id!] as [string, string]),
+      ...((as.data ?? []) as { id: string; client_id: string | null }[]).filter((x) => x.client_id).map((x) => [x.id, x.client_id!] as [string, string]),
+    ]);
+    const identite = (e: Echange) => {
+      const id = e.prospect_id ?? e.client_id ?? e.account_id ?? "";
+      return affaireDe.get(id) ?? id;
+    };
     const noms = new Map<string, string>([
       ...((ps.data ?? []) as { id: string; name: string }[]).map((x) => [x.id, x.name] as [string, string]),
       ...((cs.data ?? []) as { id: string; company: string }[]).map((x) => [x.id, x.company] as [string, string]),
@@ -286,7 +295,7 @@ Deno.serve(async (req) => {
     // pour une date d'avant : compté une seule fois par société.
     const CONTACTS = new Set(["appel", "email", "rdv", "presentation", "sms", "linkedin", "devis"]);
     const faites = [...dansLaSemaine, ...enRetard].filter((e) => etat(e) === "Fait" && CONTACTS.has(e.kind));
-    const contactees = new Set(faites.map(societe).filter((s) => s !== "—")).size;
+    const contactees = new Set(faites.map(identite).filter(Boolean)).size;
     const rdvUniques = (rdvDeLaSemaine.data ?? []).length;
     const nbApprofondis = (approfondis.data ?? []).length;
     const nbSignes = (signes.data ?? []).length;
