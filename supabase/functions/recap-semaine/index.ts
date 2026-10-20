@@ -217,7 +217,8 @@ Deno.serve(async (req) => {
     // Le planning de la semaine court jusqu'au vendredi 19 h (un essai en milieu de
     // semaine montre donc aussi ce qui reste prévu) ; la semaine suivante, sept jours de plus.
     const F = (finSemaine > maintenant ? finSemaine : maintenant).toISOString();
-    const FS = new Date(Date.parse(F) + 7 * 86_400_000).toISOString();
+    // En heure de Paris : une semaine qui passe à l'heure d'hiver ne fait pas 168 heures.
+    const FS = dixNeufHeures(plusJours(vendrediJour, 7)).toISOString();
     const COLONNES = "id, kind, titre, au, created_at, prevu, traite_le, resultat, avec, par, detail, rdv_mode, deplace_de, prospect_id, client_id, account_id";
 
     const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees] = await Promise.all([
