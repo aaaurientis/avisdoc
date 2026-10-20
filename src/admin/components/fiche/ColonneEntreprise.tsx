@@ -59,6 +59,102 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
   };
 }
 
+const TEL = /(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g;
+const MEL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const chiffres = (t: string) => t.replace(/\D/g, "").replace(/^33/, "0");
+
+export interface AutreContact {
+  /** Qui : « Gérard Canuel — maire — Château Adaugusta », ou la phrase du dossier. */
+  qui: string;
+  telephones: string[];
+  emails: string[];
+}
+
+/**
+ * Tous les contacts utiles que l'approfondissement a trouvés hors des interlocuteurs de
+ * l'entreprise : voisins, mairie, syndicat… (Olivier, 20/10 : « toutes les informations
+ * qui permettent de contacter… dans la colonne de gauche »). Les fiches approfondies
+ * depuis le 20/10 les ont rangés à part ; pour les plus anciennes, on relève chaque
+ * numéro et chaque adresse cités dans le texte du dossier, avec la phrase qui les cite.
+ */
+export function autresContactsDe(p: Prospect | null): AutreContact[] {
+  const d = p?.dossier;
+  if (!p || !d) return [];
+  if (d.autres_contacts?.length) {
+    return d.autres_contacts.map((ligne) => {
+      const [nom, role, structure, tel, mel] = ligne.split("|").map((x) => x.trim());
+      return {
+        qui: [nom, role, structure].filter(Boolean).join(" — ") || ligne,
+        telephones: tel ? (tel.match(TEL) ?? [tel]) : [],
+        emails: mel ? (mel.match(MEL) ?? []) : [],
+      };
+    });
+  }
+  // Ce qui est déjà ailleurs dans la colonne ne se répète pas.
+  const connus = new Set(
+    [p.contact_phone, ...(p.site_contacts?.phones ?? []), p.dossier?.fiche_appel?.numero, ...(p.personnes ?? []).map((x) => x.telephone)]
+      .flatMap((t) => (t ?? "").match(TEL) ?? [])
+      .map(chiffres),
+  );
+  const melsConnus = new Set(
+    [p.contact_email, ...(p.site_contacts?.emails ?? []), ...(p.personnes ?? []).map((x) => x.email)].filter(Boolean).map((m) => m!.toLowerCase()),
+  );
+  const textes = [
+    ...(d.a_retenir ?? []),
+    d.qui_aborder,
+    d.accroche,
+    d.fiche_appel?.qui_demander,
+    d.fiche_appel?.si_on_insiste,
+    ...(d.arguments ?? []).flatMap((a) => [a.argument, a.parce_que]),
+    ...(d.objections ?? []).map((o) => o.reponse),
+    d.offre,
+    ...(d.a_verifier ?? []),
+  ].filter((t): t is string => !!t);
+  // Un contact par numéro ou adresse : le nom est ce qui le précède dans la phrase
+  // (« …, Robin Lafugie au 05 57 24 93 38 »), une précision entre parenthèses juste
+  // après lui revient (« … au 05 47 84 06 76 (M. Gérard Canuel, maire…) »).
+  const vus = new Set<string>();
+  const out: AutreContact[] = [];
+  const COORD = new RegExp(`${TEL.source}|${MEL.source}`, "g");
+  for (const texte of textes) {
+    for (const phrase of texte.split(/(?<!\b(?:M|Mme|Mlle|Mr|Dr|St|Ste)\.)(?<=[.;!?])\s+/)) {
+      let debut = 0;
+      let dernier: AutreContact | null = null;
+      for (const m of phrase.matchAll(COORD)) {
+        const coord = m[0];
+        const estMel = coord.includes("@");
+        const cle = estMel ? coord.toLowerCase() : chiffres(coord);
+        let avant = phrase.slice(debut, m.index);
+        debut = m.index + coord.length;
+        const paren = avant.match(/^\s*(\([^)]*\))/);
+        if (paren) {
+          if (dernier) dernier.qui = `${dernier.qui} ${paren[1]}`;
+          avant = avant.slice(paren[0].length);
+        }
+        if (estMel ? melsConnus.has(cle) : connus.has(cle)) continue;
+        if (vus.has(cle)) continue;
+        vus.add(cle);
+        const qui = (avant.split(/[:;,]\s|\s[–—-]\s(?=[a-zé])/).at(-1) ?? "")
+          .replace(/\s*\b(?:au|tél\.?|téléphone|joignable au|par mail|e-mail|mail)\s*:?\s*$/i, "")
+          .replace(/[\s(:–—-]+$/, "")
+          .trim();
+        const nom = qui || "Contact cité dans le dossier";
+        const deja = out.find((c) => c.qui === nom);
+        if (deja) {
+          (estMel ? deja.emails : deja.telephones).push(coord);
+          dernier = deja;
+          continue;
+        }
+        dernier = { qui: nom.length > 160 ? `${nom.slice(0, 157)}…` : nom, telephones: estMel ? [] : [coord], emails: estMel ? [coord] : [] };
+        out.push(dernier);
+      }
+      const reste = phrase.slice(debut).match(/^\s*(\([^)]*\))/);
+      if (reste && dernier) dernier.qui = `${dernier.qui} ${reste[1]}`;
+    }
+  }
+  return out;
+}
+
 export default function ColonneEntreprise({
   titre,
   sousTitre,
@@ -68,6 +164,7 @@ export default function ColonneEntreprise({
   referent,
   inscrite,
   interlocuteurs,
+  autresContacts = [],
   etablissement,
   manquants = [],
   onCompleter,
@@ -83,6 +180,8 @@ export default function ColonneEntreprise({
   /** « Trouvée le 3 oct. par Merx ». */
   inscrite?: string | null;
   interlocuteurs: ReactNode;
+  /** Les contacts utiles hors de l'entreprise : voir autresContactsDe. */
+  autresContacts?: AutreContact[];
   etablissement: LigneEtablissement[];
   manquants?: string[];
   onCompleter?: () => void;
@@ -108,6 +207,33 @@ export default function ColonneEntreprise({
       {inscrite && <div className="mt-1.5 text-[12px] text-muted-foreground">{inscrite}</div>}
 
       <div className="mt-5">{interlocuteurs}</div>
+
+      {autresContacts.length > 0 && (
+        <div className="mb-5">
+          <TitreColonne className="mt-0">Autres contacts utiles</TitreColonne>
+          <div className="divide-y divide-border/70">
+            {autresContacts.map((c, i) => (
+              <div key={i} className="py-1.5 text-[13px] leading-snug">
+                <div className="text-avisdoc-ink">{c.qui}</div>
+                {(c.telephones.length > 0 || c.emails.length > 0) && (
+                  <div className="mt-0.5 flex flex-wrap gap-x-3">
+                    {c.telephones.map((t) => (
+                      <a key={t} href={`tel:${t.replace(/[\s.-]/g, "")}`} className="text-avisdoc-teal">
+                        {t}
+                      </a>
+                    ))}
+                    {c.emails.map((m) => (
+                      <a key={m} href={`mailto:${m}`} className="break-all text-avisdoc-teal">
+                        {m}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {etablissement.length > 0 && (
         <>

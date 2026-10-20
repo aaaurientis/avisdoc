@@ -12,7 +12,7 @@ import { Modal } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
 import FicheEntreprise from "../../components/FicheEntreprise";
 import { notesDe, personnesDuProspect } from "../../lib/fiche";
-import ColonneEntreprise, { etablissementDe } from "../../components/fiche/ColonneEntreprise";
+import ColonneEntreprise, { autresContactsDe, etablissementDe } from "../../components/fiche/ColonneEntreprise";
 import OngletActions from "../../components/fiche/OngletActions";
 import DevisQonto from "../../espace/DevisQonto";
 import { quandCourt } from "../../lib/actions-fiche";
@@ -318,6 +318,7 @@ export default function FicheClient({
             }
             referent={<ChoixReferent quoi="client" id={fiche.id} />}
             inscrite={origine ? `Trouvée le ${quandCourt(origine.created_at)} par Merx` : null}
+            autresContacts={autresContactsDe(origine)}
             interlocuteurs={
               <Interlocuteurs
                 personnes={interlocuteurs}
