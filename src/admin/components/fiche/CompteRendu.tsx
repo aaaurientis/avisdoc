@@ -224,7 +224,8 @@ export default function CompteRendu({
           au: instant(suiteLe, suiteHeure),
           par,
           prevu: true,
-          avec: destinataire,
+          // Depuis une action rouverte, la suite se fait avec la même personne.
+          avec: destinataire ?? (mode === "revoir" ? (existante?.avec ?? null) : null),
           rdvMode: suite === "rdv" ? suiteMode : null,
           rdvLien: suite === "rdv" ? suiteLien : null,
           colonneAvant: suite === "rdv" ? colonneAvant : null,
