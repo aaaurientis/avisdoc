@@ -149,14 +149,16 @@ export function personnesDuProspect(
     return new Set([`${prenom}.${famille}`, `${i}.${famille}`, `${prenom}${famille}`, `${i}${famille}`, `${famille}.${prenom}`, `${famille}${prenom}`, `${prenom}_${famille}`]);
   };
   const local = (a: string) => sansAccent(a.split("@")[0]).replace(/-/g, "");
-  const formes = new Map(sortie.map((q) => [q, formesDe(q.nom)]));
-  // Les contacts saisis (`deja`) comptent aussi : leurs adresses sont à eux, leurs noms
-  // rendent une adresse ambiguë.
-  const toutesFormes = [...formes.values(), ...deja.map((q) => formesDe(q.nom))];
+  // Les contacts saisis (`deja`) en profitent aussi : l'adresse vue sur la fiche prospect
+  // ne disparaît pas au passage au Pipeline. Les appelants les recréent à chaque rendu,
+  // on les complète donc sur place — rien n'est écrit en base.
+  const tous = [...deja, ...sortie];
+  const formes = new Map(tous.map((q) => [q, formesDe(q.nom)]));
+  const toutesFormes = [...formes.values()];
   // Une adresse déjà attribuée à quelqu'un reste à lui ; une adresse qui irait à deux
   // personnes (Jean et Julie Martin, « j.martin@ ») n'est attribuée à aucune.
-  const attribuees = new Set([...sortie, ...deja].map((q) => q.email?.toLowerCase()).filter(Boolean));
-  for (const q of sortie) {
+  const attribuees = new Set(tous.map((q) => q.email?.toLowerCase()).filter(Boolean));
+  for (const q of tous) {
     const f2 = formes.get(q);
     if (!f2) continue;
     const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && f2.has(local(a));
