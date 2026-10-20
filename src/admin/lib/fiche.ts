@@ -32,6 +32,76 @@ export interface PersonneFiche {
   telephone: string | null;
   aConfirmer?: boolean;
   source?: string | null;
+  /** Son adresse à elle, affichée avant `email` quand celui-ci est une adresse de service. */
+  emailPerso?: string | null;
+  /** `emailPerso` composée d'après le format maison, pas relevée : à confirmer. */
+  persoDeduit?: boolean;
+}
+
+/** Les adresses de service, qui ne sont celles de personne (webmaster@, contact@…). */
+export const ADRESSE_GENERIQUE = /^(?:webmaster|contact|contacts|info|infos|accueil|dpo|rgpd|noreply|no-reply|admin|hello|bonjour|support|secretariat|standard)@/i;
+const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+/** Adresses d'un service (drh@, prevention@, dgs@…) : la personne a sûrement aussi la sienne. */
+const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
+/** Messageries grand public : « vignobles.levrier@gmail.com » ne dit rien d'un format maison. */
+const WEBMAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|msn|free|orange|wanadoo|sfr|neuf|laposte|icloud|me|aol|gmx|proton|protonmail|bbox|numericable)\./i;
+/** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
+export const MODELE_ADRESSE = /^(?:prenom|nom|p|n|initiale|x+)(?:[._-](?:prenom|nom|p|n|initiale))*$/i;
+const sansAccent = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/**
+ * Le format maison des adresses d'une entreprise, d'après ses adresses nominatives
+ * relevées (« j.dupont@ », « jean.dupont@ ») : la forme la plus vue, sur le domaine du
+ * site, ou vue au moins deux fois.
+ */
+function formatMaison(adresses: string[], site: string | null | undefined, noms: string[]): { domaine: string; initiale: boolean } | null {
+  const hote = (site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  const comptes = new Map<string, number>();
+  // Une adresse citée deux fois (site et dossier) reste UNE preuve.
+  for (const a of new Set(adresses.map((x) => x.trim().toLowerCase()))) {
+    if (ADRESSE_GENERIQUE.test(a)) continue;
+    const [local, domaine] = a.toLowerCase().split("@");
+    if (!domaine || WEBMAIL.test(domaine) || MODELE_ADRESSE.test(local)) continue;
+    // Site connu : seules les adresses de son domaine disent le format de l'entreprise
+    // (pas celles de la mairie ou du syndicat cités dans le dossier).
+    if (hote && !(hote === domaine || hote.endsWith(`.${domaine}`) || domaine.endsWith(`.${hote}`))) continue;
+    const forme = /^[a-z]\.[a-z-]{2,}$/.test(local) ? "i" : /^[a-z-]{2,}\.[a-z-]{2,}$/.test(local) ? "p" : null;
+    if (forme) comptes.set(`${domaine}|${forme}`, (comptes.get(`${domaine}|${forme}`) ?? 0) + 1);
+  }
+  const [cle, n] = [...comptes].sort((a, b) => b[1] - a[1])[0] ?? [];
+  if (!cle) return null;
+  const [domaine, forme] = cle.split("|");
+  if (!hote && n! < 2) return null;
+  // « jean.dupont@ » ou « dupont.jean@ » ? L'ordre n'est retenu que s'il est confirmé par
+  // une personne connue, et jamais contredit ; sinon on s'abstient (Codex, 20/10).
+  if (forme === "p") {
+    const parties = noms
+      .map((nom) => sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean))
+      .filter((m) => m.length >= 2)
+      .map((m) => ({ prenom: m[0], famille: m.slice(1).join("") }));
+    const locaux = adresses.map((a) => a.toLowerCase()).filter((a) => a.endsWith(`@${domaine}`)).map((a) => a.split("@")[0]);
+    const confirme = parties.some((x) => locaux.includes(`${x.prenom}.${x.famille}`));
+    const contredit = parties.some((x) => locaux.includes(`${x.famille}.${x.prenom}`));
+    if (!confirme || contredit) return null;
+  }
+  return { domaine, initiale: forme === "i" };
+}
+
+/** Les adresses que le dossier dit avoir RELEVÉES : pas celles que Merx imagine
+ * (« l'adresse composée serait j.dupont@… »), qui ne prouvent aucun format. */
+function adressesObservees(dossier: unknown): string[] {
+  return JSON.stringify(dossier ?? null)
+    .split(/(?<=[.;!?])\s+|","/)
+    .filter((phrase) => !/serait|compos[ée]|hypoth|dédui|deduit|suppos|probable/i.test(phrase))
+    .flatMap((phrase) => phrase.match(MAIL) ?? []);
+}
+
+/** « Jérôme Valadier » au format « i » → « j.valadier@domaine ». */
+function adresseComposee(nom: string, f: { domaine: string; initiale: boolean }): string | null {
+  const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
+  if (mots.length < 2) return null;
+  const [prenom, ...reste] = mots;
+  return `${f.initiale ? prenom[0] : prenom}.${reste.join("")}@${f.domaine}`;
 }
 
 /**
@@ -46,19 +116,24 @@ export function personnesDuProspect(
     contact_email: string | null;
     contact_phone: string | null;
     personnes: { nom: string; fonction: string | null; email: string | null; telephone: string | null; mobile: string | null; source: string | null; sur: boolean }[] | null;
+    site_contacts?: { emails?: string[] } | null;
+    dossier?: unknown;
+    website?: string | null;
   } | null | undefined,
   deja: PersonneFiche[] = [],
 ): PersonneFiche[] {
   if (!p) return [];
-  const vus = new Set(deja.map((q) => q.nom.trim().toLowerCase()));
+  // « Jean-Francois » et « Jean-François » sont la même personne.
+  const cleDe = (nom: string) => sansAccent(nom.trim());
+  const vus = new Set(deja.map((q) => cleDe(q.nom)));
   const sortie: PersonneFiche[] = [];
   // Une même personne peut figurer deux fois (contact principal ET personnes trouvées) :
   // on fusionne, en complétant les cases vides — sans quoi le téléphone trouvé par
   // l'approfondissement disparaissait de la colonne (Olivier, 20/10).
   const garder = (q: PersonneFiche) => {
-    const cle = q.nom.trim().toLowerCase();
+    const cle = cleDe(q.nom);
     if (!cle || vus.has(cle)) return;
-    const deja2 = sortie.find((x) => x.nom.trim().toLowerCase() === cle);
+    const deja2 = sortie.find((x) => cleDe(x.nom) === cle);
     if (deja2) {
       deja2.fonction ||= q.fonction;
       deja2.email ||= q.email;
@@ -68,9 +143,69 @@ export function personnesDuProspect(
     }
     sortie.push({ ...q });
   };
-  if (p.contact_name) garder({ nom: p.contact_name, fonction: p.contact_role, email: p.contact_email, telephone: p.contact_phone });
+  // L'adresse générale du site (webmaster@…) n'est celle de personne : elle reste
+  // l'e-mail de l'établissement (Olivier, 20/10, « tu lui mets webmaster »).
+  const email = p.contact_email && !ADRESSE_GENERIQUE.test(p.contact_email) ? p.contact_email : null;
+  if (p.contact_name) garder({ nom: p.contact_name, fonction: p.contact_role, email, telephone: p.contact_phone });
   for (const q of p.personnes ?? []) {
     garder({ nom: q.nom, fonction: q.fonction, email: q.email, telephone: q.telephone ?? q.mobile, aConfirmer: !q.sur, source: q.source });
+  }
+  // L'adresse de la personne passe avant toute adresse de service (Olivier, 20/10 :
+  // « privilégiez les adresses des personnes ») : celle relevée sur le site ou par Merx
+  // si elle porte son nom, sinon celle composée au format maison, marquée « déduite ».
+  // (Les adresses citées dans le texte du dossier ne servent qu'au format : Merx y écrit
+  // aussi ses propres déductions, « l'adresse composée serait… ».)
+  const relevees = [...new Set(
+    [p.contact_email, ...(p.personnes ?? []).map((q) => q.email), ...(p.site_contacts?.emails ?? [])]
+      .filter((a): a is string => typeof a === "string" && a.includes("@"))
+      .map((a) => a.trim().toLowerCase()),
+  )];
+  // Sans site connu, les adresses du dossier (qui cite aussi des tiers) ne comptent pas.
+  const f = formatMaison(
+    p.website ? [...relevees, ...adressesObservees(p.dossier)] : relevees,
+    p.website,
+    [...deja, ...sortie].map((q) => q.nom),
+  );
+  const formesDe = (nom: string): Set<string> | null => {
+    const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
+    if (mots.length < 2) return null;
+    const prenom = mots[0].replace(/[^a-z]/g, "");
+    const i = prenom[0];
+    const famille = mots.slice(1).join("").replace(/[^a-z]/g, "");
+    // Correspondance exacte : « j.martinez@ » n'est pas Jean Martin (Codex, 20/10).
+    return new Set([`${prenom}.${famille}`, `${i}.${famille}`, `${prenom}${famille}`, `${i}${famille}`, `${famille}.${prenom}`, `${famille}${prenom}`, `${prenom}_${famille}`]);
+  };
+  const local = (a: string) => sansAccent(a.split("@")[0]).replace(/-/g, "");
+  // Les contacts saisis (`deja`) en profitent aussi : l'adresse vue sur la fiche prospect
+  // ne disparaît pas au passage au Pipeline. Les appelants les recréent à chaque rendu,
+  // on les complète donc sur place — rien n'est écrit en base.
+  const tous = [...deja, ...sortie];
+  const formes = new Map(tous.map((q) => [q, formesDe(q.nom)]));
+  const toutesFormes = [...formes.values()];
+  // Une adresse déjà attribuée à quelqu'un reste à lui ; une adresse qui irait à deux
+  // personnes (Jean et Julie Martin, « j.martin@ ») n'est attribuée à aucune.
+  const attribuees = new Set(tous.map((q) => q.email?.toLowerCase()).filter(Boolean));
+  for (const q of tous) {
+    const f2 = formes.get(q);
+    if (!f2) continue;
+    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && f2.has(local(a));
+    if (q.email && porteSonNom(q.email)) continue;
+    // Une adresse qui n'est ni générique ni de service est sans doute la sienne (« jd@ ») :
+    // on n'y ajoute rien.
+    if (q.email && !ADRESSE_GENERIQUE.test(q.email) && !ADRESSE_SERVICE.test(q.email)) continue;
+    const vue = relevees.find(
+      (a) => !attribuees.has(a) && porteSonNom(a) && toutesFormes.filter((g) => g?.has(local(a))).length === 1,
+    );
+    const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
+    if (!perso || perso === q.email?.toLowerCase()) continue;
+    // Une adresse déduite qui irait aussi bien à un homonyme n'est donnée à personne.
+    if (!vue && (attribuees.has(perso) || toutesFormes.filter((g) => g?.has(local(perso))).length > 1)) continue;
+    attribuees.add(perso);
+    if (!q.email && vue) q.email = vue;
+    else {
+      q.emailPerso = perso;
+      q.persoDeduit = !vue;
+    }
   }
   return sortie;
 }

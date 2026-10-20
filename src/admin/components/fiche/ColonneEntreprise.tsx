@@ -4,7 +4,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Notation, TitreColonne } from "../FicheEntreprise";
-import type { NotesFiche } from "../../lib/fiche";
+import { MODELE_ADRESSE as MODELE, personnesDuProspect, type NotesFiche, type PersonneFiche } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { effectifLabel } from "../../lib/merx";
 import PastilleApprofondie from "../PastilleApprofondie";
@@ -83,14 +83,16 @@ const TEL = /(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g;
 const MEL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Rien avant la coordonnée que de la ponctuation ou « e-mail » : elle suit la précédente. */
 const debutPhrase = (avant: string) => !/^[\s,;:–—-]*(?:et\s+)?(?:e-mail|mail|tél\.?|ou)?\s*:?\s*$/i.test(avant);
-/** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
-const MODELE = /^(?:prenom|nom|p|n|initiale|x+)(?:[._-](?:prenom|nom|p|n|initiale))*$/i;
 /** « ludovic.lamotte@… » → « Ludovic Lamotte » : le nom que porte une adresse nominative. */
 const nomDeLAdresse = (m: string): string | null => {
   const local = m.split("@")[0];
+  const maj = (x: string) => x.replace(/(^|-)(\p{L})/gu, (_, s, c) => s + c.toUpperCase());
+  // « s.chevalier@… » → « S. Chevalier »
+  if (/^[a-zà-ÿ]\.[a-zà-ÿ-]{2,}$/i.test(local) && !MODELE.test(local)) return `${local[0].toUpperCase()}. ${maj(local.slice(2))}`;
   if (!/^[a-zà-ÿ-]{2,}\.[a-zà-ÿ-]{2,}$/i.test(local)) return null;
-  return local.split(".").map((x) => x.replace(/(^|-)(\p{L})/gu, (_, s, c) => s + c.toUpperCase())).join(" ");
+  return local.split(".").map(maj).join(" ");
 };
+const sansAccent = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const chiffres = (t: string) => t.replace(/\D/g, "").replace(/^33/, "0");
 
 export interface AutreContact {
@@ -109,17 +111,23 @@ export interface AutreContact {
  * (Pas de case à part dans la réponse de Merx : elle rendait son schéma trop gros pour
  * l'API, 20/10.)
  */
-export function autresContactsDe(p: Prospect | null): AutreContact[] {
-  const d = p?.dossier;
-  if (!p || !d) return [];
-  // Ce qui est déjà ailleurs dans la colonne ne se répète pas.
+export function autresContactsDe(p: Prospect | null, affiches?: PersonneFiche[]): AutreContact[] {
+  if (!p) return [];
+  // Sans dossier, le site parle encore : ses contacts s'affichent quand même.
+  const d = p.dossier ?? {};
+  // Ce qui est déjà ailleurs dans la colonne (le standard de l'établissement, les
+  // interlocuteurs) ne se répète pas ; tout le reste du site et du dossier s'affiche.
+  // `affiches` : les interlocuteurs tels que la fiche les montre (saisis + trouvés).
+  const pers = affiches ?? personnesDuProspect(p);
+  const standard = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
+  const melStandard = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
   const connus = new Set(
-    [p.contact_phone, ...(p.site_contacts?.phones ?? []), p.dossier?.fiche_appel?.numero, ...(p.personnes ?? []).map((x) => x.telephone)]
-      .flatMap((t) => (t ?? "").match(TEL) ?? [])
+    [standard, p.dossier?.fiche_appel?.numero, ...pers.map((x) => x.telephone)]
+      .flatMap((t) => (typeof t === "string" ? t : "").match(TEL) ?? [])
       .map(chiffres),
   );
   const melsConnus = new Set(
-    [p.contact_email, ...(p.site_contacts?.emails ?? []), ...(p.personnes ?? []).map((x) => x.email)].filter(Boolean).map((m) => m!.toLowerCase()),
+    [melStandard, ...pers.flatMap((x) => [x.email, x.emailPerso])].filter((m): m is string => typeof m === "string").map((m) => m.toLowerCase()),
   );
   const textes = [
     ...(d.a_retenir ?? []),
@@ -139,6 +147,53 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
   const vus = new Set<string>();
   const out: AutreContact[] = [];
   const COORD = new RegExp(`${TEL.source}|${MEL.source}`, "g");
+  // 1. Les personnes que le site présente (« Responsable commercial Vincent Viti Pôle
+  //    Services v.viti@… Contacter ») : nom, fonction, portable et adresse.
+  for (const extrait of p.site_contacts?.equipe ?? []) {
+    if (typeof extrait !== "string") continue;
+    for (const bloc of extrait.replace(/&#0?38;/g, "&").split(/\bContacter\b/)) {
+      for (const m of bloc.matchAll(MEL)) {
+        const mel = m[0];
+        const cle = mel.toLowerCase();
+        const local = sansAccent(cle.split("@")[0]);
+        if (MODELE.test(local)) continue;
+        // Adresse déjà affichée : on garde quand même un numéro direct encore inconnu.
+        const melNouveau = !vus.has(cle) && !melsConnus.has(cle);
+        const avant = bloc.slice(0, m.index);
+        const mots = avant.trim().split(/\s+/).filter(Boolean);
+        const [ini, fam] = local.includes(".") ? local.split(".") : ["", local];
+        let trouve: { i: number; n: number } | null = null;
+        for (let i = 0; i < mots.length && !trouve; i++) {
+          for (let n = 2; n <= 4 && i + n <= mots.length; n++) {
+            const w = mots.slice(i, i + n);
+            if (!w.every((x) => /^\p{Lu}/u.test(x))) break;
+            const prenom = sansAccent(w[0]);
+            if (ini && !(ini.length === 1 ? prenom[0] === ini : prenom === ini)) continue;
+            if (sansAccent(w.slice(1).join("")).replace(/[^a-z]/g, "") === fam.replace(/[^a-z]/g, "")) {
+              trouve = { i, n };
+              break;
+            }
+          }
+        }
+        const sansDebris = (w: string[]) => w.slice(w.findIndex((x) => /^\p{Lu}/u.test(x)) >= 0 ? w.findIndex((x) => /^\p{Lu}/u.test(x)) : w.length);
+        const telephones = (trouve ? mots.slice(trouve.i + trouve.n).join(" ") : avant).match(TEL)?.filter((t) => !connus.has(chiffres(t)) && !vus.has(chiffres(t))) ?? [];
+        let qui: string;
+        if (trouve) {
+          const role = sansDebris(mots.slice(0, trouve.i)).join(" ");
+          const service = mots.slice(trouve.i + trouve.n).join(" ").replace(TEL, "").replace(/\s+/g, " ").trim();
+          qui = [mots.slice(trouve.i, trouve.i + trouve.n).join(" "), [role, service].filter(Boolean).join(", ")].filter(Boolean).join(" — ");
+        } else {
+          const t = sansDebris(mots).join(" ").replace(TEL, "").replace(/\s+/g, " ").trim();
+          qui = (t.length > 120 ? `…${t.slice(-117)}` : t) || nomDeLAdresse(mel) || "Relevé sur le site";
+        }
+        if (!melNouveau && !telephones.length) continue;
+        vus.add(cle);
+        telephones.forEach((t) => vus.add(chiffres(t)));
+        out.push({ qui, telephones, emails: melNouveau ? [mel] : [] });
+      }
+    }
+  }
+  // 2. Ce que le dossier cite.
   for (const texte of textes) {
     for (const phrase of texte.split(/(?<!\b(?:M|Mme|Mlle|Mr|Dr|St|Ste)\.)(?<=[.;!?])\s+/)) {
       let debut = 0;
@@ -166,14 +221,15 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         const qui = (!dernier || debutPhrase(avant) ? [...morceaux].reverse().find(Boolean) : morceaux.at(-1)) ?? "";
         // « …au 05 47 84 06 76, e-mail x@y.fr » : l'e-mail revient au même contact.
         // Sauf « x@… et ludovic.lamotte@… » : deux adresses nominatives, deux personnes.
-        if (!qui && dernier && !(estMel && nomDeLAdresse(coord) && /^\s*et\s*$/i.test(avant))) {
+        // « c.paulin@…, s.chevalier@… » : une liste d'adresses nominatives, autant de personnes.
+        if (!qui && dernier && !(estMel && nomDeLAdresse(coord) && (/^\s*et\s*$/i.test(avant) || dernier.emails.length > 0))) {
           (estMel ? dernier.emails : dernier.telephones).push(coord);
           continue;
         }
         // Une adresse nominative dit au moins à qui elle est : « d'après x@… et
         // ludovic.lamotte@… » ne donne pas de nom avant, l'adresse le donne (20/10).
         const personne = estMel ? nomDeLAdresse(coord) : null;
-        const nom = personne && (!qui || /^(?:et|ou|d'après|relevée?s?|format)\b/i.test(qui))
+        const nom = personne && (!qui || /^(?:et|ou|d'après|relevée?s?|format)(?=[\s:,]|$)/i.test(qui))
           ? `${personne} — fonction non précisée`
           : qui ? qui.charAt(0).toUpperCase() + qui.slice(1) : "Contact cité dans le dossier";
         const deja = out.find((c) => c.qui === nom);
@@ -188,6 +244,19 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
       const reste = phrase.slice(debut).match(/^\s*(\([^)]*\))/);
       if (reste && dernier) dernier.qui = `${dernier.qui} ${reste[1]}`;
     }
+  }
+  // 3. Le reste de ce que le site publie : aucune adresse ni aucun numéro ne se perd.
+  for (const mel of p.site_contacts?.emails ?? []) {
+    const cle = typeof mel === "string" ? mel.toLowerCase() : "";
+    if (!cle || vus.has(cle) || melsConnus.has(cle) || MODELE.test(cle.split("@")[0])) continue;
+    vus.add(cle);
+    out.push({ qui: nomDeLAdresse(mel) ? `${nomDeLAdresse(mel)} — fonction non précisée` : "Adresse relevée sur le site", telephones: [], emails: [mel] });
+  }
+  for (const tel of p.site_contacts?.phones ?? []) {
+    const cle = typeof tel === "string" ? chiffres(tel) : "";
+    if (!cle || vus.has(cle) || connus.has(cle)) continue;
+    vus.add(cle);
+    out.push({ qui: "Numéro relevé sur le site", telephones: [cle.length === 10 ? cle.replace(/(\d{2})(?=\d)/g, "$1 ") : tel], emails: [] });
   }
   return out;
 }
@@ -249,7 +318,7 @@ export default function ColonneEntreprise({
 
       {autresContacts.length > 0 && (
         <div className="mb-5">
-          <TitreColonne className="mt-0">Autres contacts utiles</TitreColonne>
+          <TitreColonne className="mt-0">Autres contacts trouvés</TitreColonne>
           <div className="divide-y divide-border/70">
             {autresContacts.map((c, i) => (
               <div key={i} className="py-1.5 text-[13px] leading-snug">

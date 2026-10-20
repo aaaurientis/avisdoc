@@ -432,7 +432,7 @@ export default function ProjectView({
               </div>
             }
             inscrite={origine ? `Trouvée le ${quandCourt(origine.created_at)} par Merx` : null}
-            autresContacts={autresContactsDe(origine)}
+            autresContacts={autresContactsDe(origine, interlocuteurs)}
             interlocuteurs={
               <Interlocuteurs
                 personnes={interlocuteurs}

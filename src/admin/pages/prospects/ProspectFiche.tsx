@@ -164,7 +164,7 @@ export default function ProspectFiche({
           }
           referent={<ChoixReferent quoi="prospect" id={p.id} />}
           inscrite={p.found_by ? `Trouvée le ${quandCourt(p.created_at)} par Merx` : `Créée à la main le ${quandCourt(p.created_at)}`}
-            autresContacts={autresContactsDe(p)}
+            autresContacts={autresContactsDe(p, personnes)}
             interlocuteurs={
             // En Prospection, pas de mobile : il est réservé aux vrais clients (19/10).
             <Interlocuteurs personnes={personnes} fullenrich={{ prospectId: p.id, mobile: false, onResultat: () => void onActualiser() }} />
