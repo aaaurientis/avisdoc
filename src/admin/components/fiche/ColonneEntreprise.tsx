@@ -173,7 +173,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         // Une adresse nominative dit au moins à qui elle est : « d'après x@… et
         // ludovic.lamotte@… » ne donne pas de nom avant, l'adresse le donne (20/10).
         const personne = estMel ? nomDeLAdresse(coord) : null;
-        const nom = personne && (!qui || /\b(?:d'après|et|relevée?s?|format)\b/i.test(qui))
+        const nom = personne && (!qui || /^(?:et|ou|d'après|relevée?s?|format)\b/i.test(qui))
           ? `${personne} — fonction non précisée`
           : qui ? qui.charAt(0).toUpperCase() + qui.slice(1) : "Contact cité dans le dossier";
         const deja = out.find((c) => c.qui === nom);
