@@ -984,7 +984,13 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     personnes: personnes.length ? personnes : null,
     siteContacts: site,
     approach: out.angle_approche.trim() || null,
-    dossier: enregistrerDossier(out.dossier),
+    // Les autres contacts utiles (voisins, mairie…) sont rangés avec le dossier : la fiche
+    // les montre dans sa colonne de gauche, à part des interlocuteurs de l'entreprise.
+    dossier: (() => {
+      const d = enregistrerDossier(out.dossier);
+      const autres = (out.autres_contacts ?? []).map((l) => l.trim()).filter(Boolean);
+      return d && autres.length ? { ...d, autres_contacts: autres } : d;
+    })(),
     sources: out.sources.filter(allowed),
     score,
     scoreTotal: total(score),

@@ -24,7 +24,7 @@ import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
 import { notesDe, personnesDuProspect } from "../../lib/fiche";
-import ColonneEntreprise, { etablissementDe } from "../../components/fiche/ColonneEntreprise";
+import ColonneEntreprise, { autresContactsDe, etablissementDe } from "../../components/fiche/ColonneEntreprise";
 import PlacePipeline from "../../components/fiche/PlacePipeline";
 import OngletActions from "../../components/fiche/OngletActions";
 import { quandCourt } from "../../lib/actions-fiche";
@@ -432,6 +432,7 @@ export default function ProjectView({
               </div>
             }
             inscrite={origine ? `Trouvée le ${quandCourt(origine.created_at)} par Merx` : null}
+            autresContacts={autresContactsDe(origine)}
             interlocuteurs={
               <Interlocuteurs
                 personnes={interlocuteurs}
