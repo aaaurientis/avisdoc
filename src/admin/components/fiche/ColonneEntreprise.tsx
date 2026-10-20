@@ -122,7 +122,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
   const standard = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
   const melStandard = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
   const connus = new Set(
-    [standard, p.dossier?.fiche_appel?.numero, ...pers.map((x) => x.telephone), ...(p.personnes ?? []).map((x) => x.mobile)]
+    [standard, p.dossier?.fiche_appel?.numero, ...pers.map((x) => x.telephone)]
       .flatMap((t) => (typeof t === "string" ? t : "").match(TEL) ?? [])
       .map(chiffres),
   );

@@ -51,7 +51,8 @@ const sansAccent = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g,
 function formatMaison(adresses: string[], site: string | null | undefined): { domaine: string; initiale: boolean } | null {
   const hote = (site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
   const comptes = new Map<string, number>();
-  for (const a of adresses) {
+  // Une adresse citée deux fois (site et dossier) reste UNE preuve.
+  for (const a of new Set(adresses.map((x) => x.trim().toLowerCase()))) {
     if (ADRESSE_GENERIQUE.test(a)) continue;
     const [local, domaine] = a.toLowerCase().split("@");
     if (!domaine || WEBMAIL.test(domaine)) continue;
