@@ -31,6 +31,7 @@ import { quandCourt } from "../../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import ChoixReferent from "../../components/ChoixReferent";
 import { confirmer } from "../../components/Confirmation";
+import BarreProgression, { ETAPES_APPROFONDIR } from "../../components/BarreProgression";
 import FormulaireFiche from "../../components/fiche/FormulaireFiche";
 import { chargerMembres } from "../../lib/membres";
 import { colonnesProspect, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, type FicheSaisie } from "../../lib/fiche-saisie";
@@ -508,6 +509,9 @@ export default function ProjectView({
                   {origine?.enriched_at ? `Approfondie le ${quandCourt(origine.enriched_at)}.` : "Merx cherche le registre, le site, les interlocuteurs."}
                 </span>
               </div>
+              {merxEnCours === "approfondir" && (
+                <BarreProgression className="max-w-[520px]" dureeEstimeeS={80} etapes={ETAPES_APPROFONDIR} />
+              )}
               <ApprocheEntreprise origine={origine} />
               <CeQuOnSait prospect={origine} enPlus={ceQueSaitLAffaire} />
               {/* Supprimer, tout en bas du dossier : loin des boutons du quotidien. */}

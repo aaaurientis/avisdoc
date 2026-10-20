@@ -18,26 +18,33 @@ export default function BarreDefilement({ cible }: { cible: HTMLElement | null }
     const b = barre.current;
     if (!zone || !b) return;
 
+    // La mesure ne touche pas à la position (Codex, 20/10) : elle donne à la barre la
+    // MÊME course que le tableau (sa bordure ne compte pas), puis la position se recale
+    // une fois la largeur appliquée, et seulement si l'on ne tient pas la barre.
+    let surLaBarre = false;
     const mesurer = () => {
-      setLargeur(zone.scrollWidth);
-      setUtile(zone.scrollWidth > zone.clientWidth + 1);
-      b.scrollLeft = zone.scrollLeft;
+      const course = zone.scrollWidth - zone.clientWidth;
+      setLargeur(course + (b.clientWidth || zone.clientWidth));
+      setUtile(course > 1);
+      requestAnimationFrame(() => {
+        if (!surLaBarre && Math.abs(b.scrollLeft - zone.scrollLeft) >= 1) b.scrollLeft = zone.scrollLeft;
+      });
     };
-    // Celle qu'on fait défiler mène, l'autre suit — et l'on ignore l'écho que la suiveuse
-    // renvoie. Sans ce verrou, les deux se renvoyaient leur position (arrondis au demi-
-    // pixel) et le tableau tremblait (Olivier, 20/10).
-    let meneuse: "barre" | "zone" | null = null;
-    let relache = 0;
-    const accompagner = (de: "barre" | "zone") => {
-      if (meneuse && meneuse !== de) return;
-      meneuse = de;
-      if (de === "barre") zone.scrollLeft = b.scrollLeft;
-      else b.scrollLeft = zone.scrollLeft;
-      cancelAnimationFrame(relache);
-      relache = requestAnimationFrame(() => requestAnimationFrame(() => (meneuse = null)));
+    // Un seul sens à la fois, décidé par la souris et non par le temps (Olivier, 20/10 :
+    // ça tremblait encore). La barre du haut ne commande le tableau QUE lorsqu'on la
+    // tient ou qu'on la survole ; le reste du temps elle suit, sans jamais renvoyer de
+    // position — il n'y a donc plus d'écho possible entre les deux.
+    const entrer = () => (surLaBarre = true);
+    const sortir = () => (surLaBarre = false);
+    const depuisBarre = () => {
+      if (surLaBarre && Math.abs(zone.scrollLeft - b.scrollLeft) >= 1) zone.scrollLeft = b.scrollLeft;
     };
-    const depuisBarre = () => accompagner("barre");
-    const depuisZone = () => accompagner("zone");
+    const depuisZone = () => {
+      if (!surLaBarre && Math.abs(b.scrollLeft - zone.scrollLeft) >= 1) b.scrollLeft = zone.scrollLeft;
+    };
+    b.addEventListener("pointerenter", entrer);
+    b.addEventListener("pointerdown", entrer);
+    b.addEventListener("pointerleave", sortir);
 
     // La largeur change quand la fenêtre change, mais aussi quand le contenu change
     // (colonnes ajoutées, filtres) : on observe la zone et ce qu'elle contient.
@@ -57,7 +64,9 @@ export default function BarreDefilement({ cible }: { cible: HTMLElement | null }
     return () => {
       taille.disconnect();
       contenu.disconnect();
-      cancelAnimationFrame(relache);
+      b.removeEventListener("pointerenter", entrer);
+      b.removeEventListener("pointerdown", entrer);
+      b.removeEventListener("pointerleave", sortir);
       b.removeEventListener("scroll", depuisBarre);
       zone.removeEventListener("scroll", depuisZone);
     };
@@ -67,7 +76,7 @@ export default function BarreDefilement({ cible }: { cible: HTMLElement | null }
     <div
       ref={barre}
       aria-hidden
-      className={utile ? "ad-barre-defilement sticky top-0 z-10 mb-2 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-background" : "hidden"}
+      className={utile ? "ad-barre-defilement sticky top-0 z-10 mb-2 overflow-x-auto overflow-y-hidden overscroll-x-none bg-background" : "hidden"}
     >
       <div style={{ width: largeur, height: 1 }} />
     </div>

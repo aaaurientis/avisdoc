@@ -424,7 +424,7 @@ export default function FichierClient() {
         </div>
       ) : vue === "liste" ? (
         /* ── Tableau, en lecture seule ── */
-        <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto overscroll-x-none rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[720px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
@@ -493,7 +493,7 @@ export default function FichierClient() {
       ) : (
         /* ── Kanban par secteur ── */
         <div
-          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
+          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
           style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(300px, 380px))` }}
         >
           {secteurs.map((secteur) => {

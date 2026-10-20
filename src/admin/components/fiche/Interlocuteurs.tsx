@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Mail, Phone, Plus, Smartphone, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { COUT_FE, demanderFE, demandesFE, enCoursFE, type DemandeFE } from "../../lib/fullenrich";
+import BarreProgression, { ETAPES_FULLENRICH } from "../BarreProgression";
 import { SectionLabel } from "../ui";
 import { confirmer } from "../Confirmation";
 import { cn } from "@/lib/utils";
@@ -112,9 +113,7 @@ export default function Interlocuteurs({
       {/* Ce que FullEnrich fait, ou a dit, sur cette fiche. */}
       {etat.map((d) =>
         enCoursFE(d) ? (
-          <p key={d.id} className="mb-2 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" /> FullEnrich cherche 2 interlocuteurs et leur e-mail…
-          </p>
+          <BarreProgression key={d.id} className="mb-2.5" dureeEstimeeS={120} etapes={ETAPES_FULLENRICH} />
         ) : d.message ? (
           <p key={d.id} className={cn("mb-2 text-[12.5px]", d.statut === "bloque" ? "font-semibold text-amber-700" : "text-muted-foreground")}>
             {d.message}
