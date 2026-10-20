@@ -41,6 +41,8 @@ export const ADRESSE_GENERIQUE = /^(?:webmaster|contact|contacts|info|infos|accu
 const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Messageries grand public : « vignobles.levrier@gmail.com » ne dit rien d'un format maison. */
 const WEBMAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|msn|free|orange|wanadoo|sfr|neuf|laposte|icloud|me|aol|gmx|proton|protonmail|bbox|numericable)\./i;
+/** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
+export const MODELE_ADRESSE = /^(?:prenom|nom|p|n|initiale|x+)(?:[._-](?:prenom|nom|p|n|initiale))*$/i;
 const sansAccent = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
@@ -55,7 +57,7 @@ function formatMaison(adresses: string[], site: string | null | undefined): { do
   for (const a of new Set(adresses.map((x) => x.trim().toLowerCase()))) {
     if (ADRESSE_GENERIQUE.test(a)) continue;
     const [local, domaine] = a.toLowerCase().split("@");
-    if (!domaine || WEBMAIL.test(domaine)) continue;
+    if (!domaine || WEBMAIL.test(domaine) || MODELE_ADRESSE.test(local)) continue;
     const forme = /^[a-z]\.[a-z-]{2,}$/.test(local) ? "i" : /^[a-z-]{2,}\.[a-z-]{2,}$/.test(local) ? "p" : null;
     if (forme) comptes.set(`${domaine}|${forme}`, (comptes.get(`${domaine}|${forme}`) ?? 0) + 1);
   }
@@ -131,6 +133,16 @@ export function personnesDuProspect(
     ].filter((a): a is string => typeof a === "string" && a.includes("@")),
     p.website,
   );
-  if (f) for (const q of sortie) if (!q.email) q.emailDeduit = adresseComposee(q.nom, f);
+  // Une adresse de service (prevention@, drh@…) passe après l'adresse de la personne
+  // (Olivier, 20/10 : « privilégiez les adresses des personnes ») : on compose aussi la
+  // sienne quand l'adresse trouvée ne porte pas son nom.
+  if (f)
+    for (const q of sortie) {
+      const famille = sansAccent(q.nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean).slice(1).join("");
+      const nominative = !!q.email && !!famille && sansAccent(q.email.split("@")[0]).replace(/[^a-z]/g, "").includes(famille);
+      if (nominative) continue;
+      const composee = adresseComposee(q.nom, f);
+      if (composee && composee !== q.email?.toLowerCase()) q.emailDeduit = composee;
+    }
   return sortie;
 }

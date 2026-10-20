@@ -4,7 +4,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Notation, TitreColonne } from "../FicheEntreprise";
-import { personnesDuProspect, type NotesFiche } from "../../lib/fiche";
+import { MODELE_ADRESSE as MODELE, personnesDuProspect, type NotesFiche } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { effectifLabel } from "../../lib/merx";
 import PastilleApprofondie from "../PastilleApprofondie";
@@ -83,8 +83,6 @@ const TEL = /(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g;
 const MEL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Rien avant la coordonnée que de la ponctuation ou « e-mail » : elle suit la précédente. */
 const debutPhrase = (avant: string) => !/^[\s,;:–—-]*(?:et\s+)?(?:e-mail|mail|tél\.?|ou)?\s*:?\s*$/i.test(avant);
-/** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
-const MODELE = /^(?:prenom|nom|p|n|initiale|x+)(?:[._-](?:prenom|nom|p|n|initiale))*$/i;
 /** « ludovic.lamotte@… » → « Ludovic Lamotte » : le nom que porte une adresse nominative. */
 const nomDeLAdresse = (m: string): string | null => {
   const local = m.split("@")[0];
@@ -157,7 +155,9 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         const mel = m[0];
         const cle = mel.toLowerCase();
         const local = sansAccent(cle.split("@")[0]);
-        if (vus.has(cle) || melsConnus.has(cle) || MODELE.test(local)) continue;
+        if (MODELE.test(local)) continue;
+        // Adresse déjà affichée : on garde quand même un numéro direct encore inconnu.
+        const melNouveau = !vus.has(cle) && !melsConnus.has(cle);
         const avant = bloc.slice(0, m.index);
         const mots = avant.trim().split(/\s+/).filter(Boolean);
         const [ini, fam] = local.includes(".") ? local.split(".") : ["", local];
@@ -185,9 +185,10 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
           const t = sansDebris(mots).join(" ").replace(TEL, "").replace(/\s+/g, " ").trim();
           qui = (t.length > 120 ? `…${t.slice(-117)}` : t) || nomDeLAdresse(mel) || "Relevé sur le site";
         }
+        if (!melNouveau && !telephones.length) continue;
         vus.add(cle);
         telephones.forEach((t) => vus.add(chiffres(t)));
-        out.push({ qui, telephones, emails: [mel] });
+        out.push({ qui, telephones, emails: melNouveau ? [mel] : [] });
       }
     }
   }
