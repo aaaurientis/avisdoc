@@ -31,7 +31,10 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
   );
   // Le standard : saisi à la main, il est rangé avec les numéros du site ; trouvé par
   // Merx, c'est le contact de la fiche.
-  const telephone = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
+  // À défaut, le numéro que l'approfondissement a mis dans la fiche d'appel du dossier
+  // (« Appeler : 05 57 … ») : il doit se voir ici, pas seulement dans le Dossier (20/10).
+  const duDossier = (p.dossier?.fiche_appel?.numero ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0] ?? null;
+  const telephone = (p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone)) ?? duDossier;
   const email = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
   const chef = p.leaders?.[0];
   const candidates: { label: string; valeur: ReactNode | null | undefined }[] = [

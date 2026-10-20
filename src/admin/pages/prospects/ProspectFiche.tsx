@@ -6,6 +6,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Loader2, PenLine, Search, Sparkles, Trash2 } from "lucide-react";
+import BarreProgression, { ETAPES_APPROFONDIR } from "../../components/BarreProgression";
 import { useAdminData } from "../../data/AdminDataContext";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
@@ -233,6 +234,9 @@ export default function ProspectFiche({
                 {p.enriched_at ? `Approfondie le ${quandCourt(p.enriched_at)}.` : "Merx cherche le registre, le site, les interlocuteurs."}
               </span>
             </div>
+            {enCours === "approfondir" && (
+              <BarreProgression className="mt-3 max-w-[520px]" dureeEstimeeS={80} etapes={ETAPES_APPROFONDIR} />
+            )}
             <p className="mt-1.5 text-[12px] text-muted-foreground">
               {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir : {euroDollar(couts.approfondissement.montant)} · écrire un
               e-mail : {euroDollar(couts.email.montant)}.

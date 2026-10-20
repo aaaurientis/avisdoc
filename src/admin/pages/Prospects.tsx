@@ -683,7 +683,7 @@ export default function Prospects() {
         </div>
       ) : (
         /* ── Liste : toutes les fiches d'un coup, triées par note ── */
-        <div ref={setZoneListe} className="overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-card">
+        <div ref={setZoneListe} className="overflow-x-auto overscroll-x-none rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[980px] border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">

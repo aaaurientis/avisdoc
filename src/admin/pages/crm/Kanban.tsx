@@ -73,7 +73,7 @@ export default function Kanban({
     // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
     <div
       ref={zoneRef}
-      className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-contain pb-1"
+      className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
       style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(300px, 380px))` }}
     >
       {stages.map((stage) => {

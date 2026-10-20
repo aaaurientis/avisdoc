@@ -608,6 +608,14 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     score_total: totalFusionne,
     enriched_at: new Date().toISOString(),
   };
+  // Le numéro que Merx met dans la fiche d'appel (« Appeler : 05 57 … ») va aussi dans la
+  // case téléphone quand elle est vide : il doit se voir dans la colonne de la fiche, pas
+  // seulement dans le Dossier (Olivier, 20/10). garderLaSaisie protège ce qui est saisi.
+  if (!patch.contact_phone && dossier && typeof dossier === "object") {
+    const numero = String((dossier as { fiche_appel?: { numero?: string } }).fiche_appel?.numero ?? "");
+    const tel = numero.match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
+    if (tel) patch.contact_phone = tel;
+  }
   for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
   // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
   // rien trouvé n'en trouvera pas davantage la fois suivante, et c'est elle qui

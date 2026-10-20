@@ -52,11 +52,21 @@ export function personnesDuProspect(
   if (!p) return [];
   const vus = new Set(deja.map((q) => q.nom.trim().toLowerCase()));
   const sortie: PersonneFiche[] = [];
+  // Une même personne peut figurer deux fois (contact principal ET personnes trouvées) :
+  // on fusionne, en complétant les cases vides — sans quoi le téléphone trouvé par
+  // l'approfondissement disparaissait de la colonne (Olivier, 20/10).
   const garder = (q: PersonneFiche) => {
     const cle = q.nom.trim().toLowerCase();
     if (!cle || vus.has(cle)) return;
-    vus.add(cle);
-    sortie.push(q);
+    const deja2 = sortie.find((x) => x.nom.trim().toLowerCase() === cle);
+    if (deja2) {
+      deja2.fonction ||= q.fonction;
+      deja2.email ||= q.email;
+      deja2.telephone ||= q.telephone;
+      if (deja2.aConfirmer && !q.aConfirmer) deja2.aConfirmer = false;
+      return;
+    }
+    sortie.push({ ...q });
   };
   if (p.contact_name) garder({ nom: p.contact_name, fonction: p.contact_role, email: p.contact_email, telephone: p.contact_phone });
   for (const q of p.personnes ?? []) {
