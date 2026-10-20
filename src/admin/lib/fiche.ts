@@ -41,6 +41,8 @@ export interface PersonneFiche {
 /** Les adresses de service, qui ne sont celles de personne (webmaster@, contact@…). */
 export const ADRESSE_GENERIQUE = /^(?:webmaster|contact|contacts|info|infos|accueil|dpo|rgpd|noreply|no-reply|admin|hello|bonjour|support|secretariat|standard)@/i;
 const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+/** Adresses d'un service (drh@, prevention@, dgs@…) : la personne a sûrement aussi la sienne. */
+const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
 /** Messageries grand public : « vignobles.levrier@gmail.com » ne dit rien d'un format maison. */
 const WEBMAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|msn|free|orange|wanadoo|sfr|neuf|laposte|icloud|me|aol|gmx|proton|protonmail|bbox|numericable)\./i;
 /** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
@@ -52,7 +54,7 @@ const sansAccent = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g,
  * relevées (« j.dupont@ », « jean.dupont@ ») : la forme la plus vue, sur le domaine du
  * site, ou vue au moins deux fois.
  */
-function formatMaison(adresses: string[], site: string | null | undefined): { domaine: string; initiale: boolean } | null {
+function formatMaison(adresses: string[], site: string | null | undefined, noms: string[]): { domaine: string; initiale: boolean } | null {
   const hote = (site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
   const comptes = new Map<string, number>();
   // Une adresse citée deux fois (site et dossier) reste UNE preuve.
@@ -70,6 +72,18 @@ function formatMaison(adresses: string[], site: string | null | undefined): { do
   if (!cle) return null;
   const [domaine, forme] = cle.split("|");
   if (!hote && n! < 2) return null;
+  // « jean.dupont@ » ou « dupont.jean@ » ? L'ordre n'est retenu que s'il est confirmé par
+  // une personne connue, et jamais contredit ; sinon on s'abstient (Codex, 20/10).
+  if (forme === "p") {
+    const parties = noms
+      .map((nom) => sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean))
+      .filter((m) => m.length >= 2)
+      .map((m) => ({ prenom: m[0], famille: m.slice(1).join("") }));
+    const locaux = adresses.map((a) => a.toLowerCase()).filter((a) => a.endsWith(`@${domaine}`)).map((a) => a.split("@")[0]);
+    const confirme = parties.some((x) => locaux.includes(`${x.prenom}.${x.famille}`));
+    const contredit = parties.some((x) => locaux.includes(`${x.famille}.${x.prenom}`));
+    if (!confirme || contredit) return null;
+  }
   return { domaine, initiale: forme === "i" };
 }
 
@@ -138,7 +152,11 @@ export function personnesDuProspect(
       .map((a) => a.trim().toLowerCase()),
   )];
   // Sans site connu, les adresses du dossier (qui cite aussi des tiers) ne comptent pas.
-  const f = formatMaison(p.website ? [...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])] : relevees, p.website);
+  const f = formatMaison(
+    p.website ? [...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])] : relevees,
+    p.website,
+    [...deja, ...sortie].map((q) => q.nom),
+  );
   const formesDe = (nom: string): Set<string> | null => {
     const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
     if (mots.length < 2) return null;
@@ -163,6 +181,9 @@ export function personnesDuProspect(
     if (!f2) continue;
     const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && f2.has(local(a));
     if (q.email && porteSonNom(q.email)) continue;
+    // Une adresse qui n'est ni générique ni de service est sans doute la sienne (« jd@ ») :
+    // on n'y ajoute rien.
+    if (q.email && !ADRESSE_GENERIQUE.test(q.email) && !ADRESSE_SERVICE.test(q.email)) continue;
     const vue = relevees.find(
       (a) => !attribuees.has(a) && porteSonNom(a) && toutesFormes.filter((g) => g?.has(local(a))).length === 1,
     );
