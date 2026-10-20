@@ -80,3 +80,10 @@
   background: hsl(var(--muted-foreground) / 0.45);
   border-radius: 999px;
 }
+
+/* Olivier, 20/10 : un défilement latéral ne change JAMAIS de page. Sur Mac, glisser à
+   deux doigts vers la gauche au bout d'un tableau déclenchait « page précédente ». */
+html,
+body {
+  overscroll-behavior-x: none;
+}
