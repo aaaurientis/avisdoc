@@ -239,7 +239,15 @@ Deno.serve(async (req) => {
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", D).order("finished_at").order("id").range(de, a)),
       toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", D).order("id").range(de, a)),
       // Signé cette semaine : la date de signature, pas celle de la saisie.
-      admin.from("admin_accounts").select("name").gte("signed_on", lundiJour).lt("signed_on", plusJours(lundiJour, 7)).is("deleted_at", null),
+      // Plus celles du week-end dernier, saisies après l'envoi précédent (jamais deux fois :
+      // une signature saisie avant cet envoi y a déjà été comptée).
+      admin
+        .from("admin_accounts")
+        .select("name")
+        .is("deleted_at", null)
+        .or(
+          `and(signed_on.gte.${lundiJour},signed_on.lt.${plusJours(lundiJour, 7)}),and(signed_on.gte.${aParis(depuis).jour},signed_on.lt.${lundiJour},created_at.gte."${D}")`,
+        ),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", D).order("id").range(de, a)),
