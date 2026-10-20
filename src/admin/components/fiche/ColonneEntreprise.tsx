@@ -165,7 +165,8 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         const morceaux = avant.split(/[:;,]\s|\s[–—-]\s(?=[a-zé])/).map(nettoyer);
         const qui = (!dernier || debutPhrase(avant) ? [...morceaux].reverse().find(Boolean) : morceaux.at(-1)) ?? "";
         // « …au 05 47 84 06 76, e-mail x@y.fr » : l'e-mail revient au même contact.
-        if (!qui && dernier && !(estMel && nomDeLAdresse(coord))) {
+        // Sauf « x@… et ludovic.lamotte@… » : deux adresses nominatives, deux personnes.
+        if (!qui && dernier && !(estMel && nomDeLAdresse(coord) && /^\s*et\s*$/i.test(avant))) {
           (estMel ? dernier.emails : dernier.telephones).push(coord);
           continue;
         }
