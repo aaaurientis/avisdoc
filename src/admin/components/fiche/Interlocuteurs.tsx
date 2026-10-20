@@ -130,11 +130,21 @@ export default function Interlocuteurs({
                 {q.fonction && <span className="text-muted-foreground"> · {q.fonction}</span>}
                 {q.aConfirmer && <span className="ml-2 text-[11.5px] text-amber-700">à confirmer</span>}
               </div>
-              {(q.email || q.telephone) && (
+              {(q.email || q.emailDeduit || q.telephone) && (
                 <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12.5px]">
                   {q.email && (
                     <a href={`mailto:${q.email}`} className="inline-flex items-center gap-1 text-avisdoc-teal underline-offset-2 hover:underline">
                       <Mail className="size-3.5" /> {q.email}
+                    </a>
+                  )}
+                  {!q.email && q.emailDeduit && (
+                    <a
+                      href={`mailto:${q.emailDeduit}`}
+                      title="Adresse composée d’après le format maison de l’entreprise : à confirmer"
+                      className="inline-flex items-center gap-1 text-avisdoc-teal underline-offset-2 hover:underline"
+                    >
+                      <Mail className="size-3.5" /> {q.emailDeduit}
+                      <span className="text-[11px] text-amber-700">déduite, à confirmer</span>
                     </a>
                   )}
                   {q.telephone && (
