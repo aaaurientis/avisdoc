@@ -363,22 +363,28 @@ Deno.serve(async (req) => {
     /** Les deux premières phrases de la note, telles qu'écrites ; la suite reste dans la fiche. */
     const extrait = (texte: string) => {
       const propre = texte.trim().replace(/\s+/g, " ");
-      const phrases = propre.match(/[^.!?]+[.!?]+(\s|$)/g) ?? [propre];
-      let court = phrases.slice(0, 2).join("").trim();
+      // On ne coupe qu'après un point suivi d'une majuscule : « 2.5 millions », une
+      // adresse ou un lien restent entiers.
+      const phrases = propre.split(/(?<=[.!?…])\s+(?=[A-ZÀ-ÖØ-Þ«"(])/);
+      let court = phrases.slice(0, 2).join(" ").trim();
       if (court.length > 320) court = `${court.slice(0, 317).replace(/\s+\S*$/, "")}…`;
       return court.length < propre.length ? `${echapper(court)} <span style="color:${C.doux}">(suite dans la fiche)</span>` : echapper(court);
     };
     const passe = (e: Echange) => {
       const etatDe = etat(e);
       const report = e.deplace_de ? ` Déplacé du ${jourLong(e.deplace_de)}` : "";
+      // La note d'une action annulée ou à faire (une consigne, une raison) se garde aussi ;
+      // la trace « — Annulé le … » est déjà dite par l'état.
+      const reste = (e.detail ?? "").replace(/^—\s*Annulé le .*$/gm, "").trim();
+      const noteEnPlus = reste ? `<br>${extrait(reste)}` : "";
       switch (etatDe) {
         case "Annulé":
-          return `${pastille("Annulé")} le ${jourLong(e.traite_le ?? e.au)}`;
+          return `${pastille("Annulé")} le ${jourLong(e.traite_le ?? e.au)}${noteEnPlus}`;
         case "Pas fait":
-          return `${pastille("Pas fait")} prévu le ${jourLong(e.au)} à ${heureDe(e.au)}, aucun compte rendu noté depuis.${report}`;
+          return `${pastille("Pas fait")} prévu le ${jourLong(e.au)} à ${heureDe(e.au)}, aucun compte rendu noté depuis.${report}${noteEnPlus}`;
         case "Prévu":
         case "Déplacé":
-          return `${pastille(etatDe)} le ${jourLong(e.au)} à ${heureDe(e.au)}.${report}`;
+          return `${pastille(etatDe)} le ${jourLong(e.au)} à ${heureDe(e.au)}.${report}${noteEnPlus}`;
         default: {
           const res = e.resultat && e.resultat !== "Fait" ? `<strong>Résultat : ${echapper(e.resultat.toLowerCase())}.</strong> ` : "";
           return `${pastille("Fait")} ${res}${e.detail?.trim() ? extrait(e.detail) : ""}`;
