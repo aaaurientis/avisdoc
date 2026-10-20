@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
+import PastilleApprofondie from "../components/PastilleApprofondie";
 import { decision, effectifLabel, EXPLICATION_CONSIGNE, EXPLICATION_FIABILITE, EXPLICATION_NOTE, maxEvalue, secteurLisible, tonNote, type Prospect } from "../lib/merx";
 import { COLONNE_KANBAN, TONES } from "../lib/ui-tokens";
 import BarreSelection from "../components/BarreSelection";
@@ -732,7 +733,7 @@ export default function Prospects() {
                   </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold text-avisdoc-ink">
                     {!p.opened_at && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nouveau</span>}
-                    {p.name}
+                    {p.name} <PastilleApprofondie le={p.enriched_at} />
                   </td>
                   <td className="px-4 py-2.5 text-[13px] text-muted-foreground">
                     {/* Assez large pour que « Travaux publics et BTP » ou « Services
