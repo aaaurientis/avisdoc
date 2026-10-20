@@ -159,7 +159,9 @@ export function personnesDuProspect(
     );
     const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
     if (!perso || perso === q.email?.toLowerCase()) continue;
-    if (!vue && attribuees.has(perso)) continue;
+    // Une adresse déduite qui irait aussi bien à un homonyme n'est donnée à personne.
+    if (!vue && (attribuees.has(perso) || [...formes.values()].filter((g) => g?.has(local(perso))).length > 1)) continue;
+    attribuees.add(perso);
     if (!q.email && vue) q.email = vue;
     else {
       q.emailPerso = perso;
