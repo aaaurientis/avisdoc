@@ -15,7 +15,7 @@ import BoutonMicro from "../BoutonMicro";
 import { confirmer } from "../Confirmation";
 import {
   ajouterEchange,
-  corrigerEchange,
+  ajouterPrecision,
   libelleGenre,
   marquerTraitee,
   modifierEchange,
@@ -147,14 +147,13 @@ export default function CompteRendu({
     existante ? (replanifie ? "programmer" : "revoir") : depuisPrevue ? "fait" : genre === "note" ? "note" : "programmer",
   );
   const quoi: GenreEchange = existante?.kind ?? depuisPrevue?.kind ?? genre;
-  // Une action déjà notée se corrige entièrement, résultat compris (Olivier, 19/10).
-  const resultats = mode === "fait" || (mode === "revoir" && quoi !== "note") ? (RESULTATS[quoi] ?? null) : null;
-  const [resultat, setResultat] = useState<string | null>(existante?.resultat ?? null);
-  const [contenu, setContenu] = useState(existante ? (existante.detail ?? "") : intitule ?? "");
+  const resultats = mode === "fait" ? (RESULTATS[quoi] ?? null) : null;
+  const [resultat, setResultat] = useState<string | null>(null);
+  const [contenu, setContenu] = useState(replanifie ? (existante?.detail ?? "") : intitule ?? "");
   const [avec, setAvec] = useState(existante ? (existante.avec ?? "") : (depuisPrevue?.avec ?? cible));
   const debut = existante ? new Date(existante.au) : new Date();
-  const [jour, setJour] = useState(existante ? jourISO(debut) : jourISO(new Date()));
-  const [heure, setHeure] = useState(existante ? heureISO(debut) : mode === "fait" ? heureISO(new Date()) : prochaineHeure());
+  const [jour, setJour] = useState(replanifie ? jourISO(debut) : mode === "fait" ? jourISO(new Date()) : jourISO(new Date()));
+  const [heure, setHeure] = useState(replanifie ? heureISO(debut) : mode === "fait" ? heureISO(new Date()) : prochaineHeure());
   const [rdvMode, setRdvMode] = useState<ModeRdv | null>(replanifie ? (existante?.rdv_mode ?? null) : null);
   const [rdvLien, setRdvLien] = useState(replanifie ? (existante?.rdv_lien ?? "") : "");
   const [suite, setSuite] = useState<GenreEchange | null>(null);
@@ -191,15 +190,13 @@ export default function CompteRendu({
   // Rendez-vous annulé : la fiche retournera dans sa colonne d'avant (s'il n'en reste pas d'autre).
   const retourSiAnnule =
     depuisPrevue?.kind === "rdv" && resultat === "Annulé" && suite !== "rdv" && estColonneRdv(etape?.actuelle) ? depuisPrevue.colonne_avant : null;
-  const avecQui = (mode === "programmer" || mode === "fait" || (mode === "revoir" && quoi !== "note")) && personnes.length > 0;
+  const avecQui = (mode === "programmer" || mode === "fait") && personnes.length > 0;
   const par = user?.email ?? "";
 
   const enregistrer = async () => {
     if (envoi) return;
     if (mode === "note" && !contenu.trim()) return setErreur("Écrivez la note.");
-    if (mode === "revoir" && quoi === "note" && !contenu.trim()) return setErreur("Écrivez la note.");
-    if (mode === "revoir" && !jour) return setErreur("Choisissez le jour.");
-    if (mode === "revoir" && quoi !== "note" && jour > aujourdhui) return setErreur("Une action faite ne peut pas être dans le futur : programmez-la plutôt.");
+    if (mode === "revoir" && !contenu.trim() && !suite) return setErreur("Ajoutez une précision ou programmez une action.");
     if ((mode === "programmer" || mode === "fait") && !jour) return setErreur("Choisissez le jour.");
     if (mode === "programmer" && !heure) return setErreur("Choisissez l’heure : le rappel par mail en dépend.");
     if (mode === "programmer" && !replanifie && jour < aujourdhui) return setErreur("Une action programmée est pour aujourd’hui ou plus tard.");
@@ -227,7 +224,8 @@ export default function CompteRendu({
           au: instant(suiteLe, suiteHeure),
           par,
           prevu: true,
-          avec: destinataire,
+          // Depuis une action rouverte, la suite se fait avec la même personne.
+          avec: destinataire ?? (mode === "revoir" ? (existante?.avec ?? null) : null),
           rdvMode: suite === "rdv" ? suiteMode : null,
           rdvLien: suite === "rdv" ? suiteLien : null,
           colonneAvant: suite === "rdv" ? colonneAvant : null,
@@ -244,12 +242,7 @@ export default function CompteRendu({
             ...(quoi === "rdv" ? { rdvMode, rdvLien } : {}),
           });
         } else {
-          await corrigerEchange(existante.id, {
-            detail: contenu,
-            au: instant(jour, heure || "12:00"),
-            avec: avecQui ? destinataire : (existante.avec ?? null),
-            resultat: resultats ? resultat : (existante.resultat ?? null),
-          });
+          if (contenu.trim()) await ajouterPrecision(existante, contenu, prenomDe(par) || par);
           await programmerSuite(cles);
           if (versRdv && avancer) await avancer(versRdv);
         }
@@ -356,23 +349,33 @@ export default function CompteRendu({
         </div>
       )}
 
-      {/* Une action notée, rouverte : tout se corrige — date, résultat, avec qui, texte (19/10). */}
+      {/* Une action notée, rouverte : ce qui a eu lieu, en lecture. */}
       {mode === "revoir" && existante && (
-        <>
-          {existante.par && <p className="mt-2 text-[12px] text-muted-foreground">Notée par {prenomDe(existante.par)}. Vos corrections remplacent ce qui était écrit.</p>}
-          <div className={sousTitre}>{existante.kind === "note" ? "Écrite le" : "Fait le"}</div>
-          <div className="flex flex-wrap gap-1.5">
-            <input
-              type="date"
-              value={jour}
-              max={existante.kind === "note" ? undefined : aujourdhui}
-              onChange={(e) => setJour(e.target.value)}
-              aria-label="Jour"
-              className={petitChamp}
-            />
-            <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} aria-label="Heure" className={petitChamp} />
+        <div className="mt-3 rounded-2xl bg-muted/60 px-4 py-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-avisdoc-ink">
+            <span>
+              <strong>{existante.kind === "note" ? "Écrite le" : existante.prevu ? "Prévu le" : "Fait le"}</strong> {quandCourt(existante.au)} · {heureISO(new Date(existante.au))}
+            </span>
+            {existante.resultat && (
+              <span>
+                <strong>Résultat</strong> {existante.resultat}
+              </span>
+            )}
+            {existante.avec && (
+              <span>
+                <strong>Avec</strong> {existante.avec}
+              </span>
+            )}
+            {existante.par && <span className="text-muted-foreground">par {prenomDe(existante.par)}</span>}
           </div>
-        </>
+          {existante.titre && existante.titre !== libelleGenre(existante.kind) && existante.titre !== "Note" && (
+            <p className="mt-2 text-[13.5px] font-semibold text-avisdoc-ink">{existante.titre}</p>
+          )}
+          <p className={cn("mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed", existante.detail ? "text-avisdoc-ink" : "text-muted-foreground")}>
+            {existante.detail || "Pas de compte rendu écrit."}
+          </p>
+          <p className="mt-2 text-[11.5px] text-muted-foreground">Enregistré : ce texte ne se modifie pas. Ajoutez une précision en dessous.</p>
+        </div>
       )}
 
       {(mode === "programmer" || mode === "fait") && (
@@ -458,9 +461,7 @@ export default function CompteRendu({
             : mode === "programmer"
               ? "À préparer, à dire (facultatif)"
               : mode === "revoir"
-                ? quoi === "note"
-                  ? "La note"
-                  : "Compte rendu — ce qui s’est dit"
+                ? "Ajouter une précision"
                 : "Compte rendu — ce qui s’est dit"}
         </span>
         <BoutonMicro onTexte={(t) => setContenu((c) => (c.trim() ? `${c.trim()} ${t}` : t))} />

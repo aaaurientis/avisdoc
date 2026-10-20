@@ -76,7 +76,7 @@ export const ECRANS: EcranAide[] = [
       "Actions : « Noter : + Appel · + Rendez-vous · + Présentation · + Mail · + Note », et « Autre… » (salon, SMS ou WhatsApp, LinkedIn, devis envoyé).",
       "Chaque action est « À programmer » ou « Déjà fait ». Un appel, un rendez-vous ou une présentation faits demandent « Ça a donné quoi ? ».",
       "« ✦ Où on en est » : Merx résume toutes les actions de la fiche.",
-      "« Modifier la fiche » corrige tout : l'entreprise, le dirigeant, les interlocuteurs, qui la suit. Une action, passée ou à venir, se corrige en l'ouvrant.",
+      "« Modifier la fiche » corrige tout : l'entreprise, le dirigeant, les interlocuteurs, qui la suit. Une action à venir se déplace en l'ouvrant ; une action faite ne se modifie plus : on y ajoute une précision.",
       "Dossier : « Approfondir la fiche » fait travailler Merx une bonne minute ; il prépare ce qu'il faut savoir avant d'appeler, les arguments, les objections, ce qu'on peut proposer.",
       "Devis (affaire et client) : la proposition (journées × tarif) et le devis Qonto se débloquent à l'étape « Proposition ».",
     ],
@@ -236,7 +236,7 @@ export const QUESTIONS: ThemeAide[] = [
       },
       {
         question: "Puis-je corriger une action déjà faite ?",
-        reponse: "Oui. Ouvrez-la dans l'historique de la fiche : la date, ce que ça a donné, avec qui et le compte rendu se corrigent, puis « Enregistrer ». Une action à venir se déplace ou s'annule de la même façon.",
+        reponse: "Non : c'est une décision de la direction, l'historique ne se modifie ni ne s'efface. Ouvrez l'action dans l'historique et ajoutez une précision : elle s'écrit à la suite, datée et signée. Une action à venir, elle, se déplace ou s'annule (elle reste alors dans l'historique, « Annulé »).",
       },
       {
         question: "Merx va-t-il modifier une fiche que j'ai saisie ?",

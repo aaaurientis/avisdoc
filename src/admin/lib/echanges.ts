@@ -220,30 +220,24 @@ export async function modifierEchange(
   if (error) throw new Error(error.message);
 }
 
-/**
- * Corriger une action déjà notée : date, texte, avec qui, résultat.
- *
- * Olivier, 19/10 : le commercial doit pouvoir corriger ce qui a été fait, même passé.
- * L'historique n'est plus figé ; une action programmée se déplace toujours par
- * `modifierEchange`, qui réarme son rappel.
- */
-export async function corrigerEchange(
-  id: string,
-  saisie: { detail: string; au: string; avec: string | null; resultat: string | null },
-): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("admin_echanges")
-    .update({ detail: saisie.detail.trim() || null, au: saisie.au, avec: saisie.avec?.trim() || null, resultat: saisie.resultat })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
-
 /** L'action programmée a eu lieu : son compte rendu est noté, elle quitte « À venir ». */
 export async function marquerTraitee(id: string): Promise<void> {
   const { error } = await supabaseAdmin.from("admin_echanges").update({ traite_le: new Date().toISOString() }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Ajouter une précision à ce qui a été noté. Le texte d'origine ne bouge pas :
+ * on écrit en dessous, daté et signé.
+ */
+export async function ajouterPrecision(e: Echange, ajout: string, qui: string): Promise<void> {
+  const jour = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" });
+  const suite = `— Ajout du ${jour} (${qui}) : ${ajout.trim()}`;
+  // Écrit en base à la suite du texte du moment (migration 0073) : le texte d'origine
+  // reste mot pour mot, et deux ajouts simultanés ne se gênent pas.
+  const { error } = await supabaseAdmin.rpc("admin_echanges_ajouter_precision", { p_id: e.id, p_ajout: suite });
+  if (error) throw new Error(error.message);
+}
 
 /** Les actions À VENIR d'une fiche : programmées, et pas encore faites. */
 export async function actionsAVenir(cles: ClesFiche): Promise<Echange[]> {
