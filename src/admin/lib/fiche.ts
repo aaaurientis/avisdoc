@@ -60,13 +60,16 @@ function formatMaison(adresses: string[], site: string | null | undefined): { do
     if (ADRESSE_GENERIQUE.test(a)) continue;
     const [local, domaine] = a.toLowerCase().split("@");
     if (!domaine || WEBMAIL.test(domaine) || MODELE_ADRESSE.test(local)) continue;
+    // Site connu : seules les adresses de son domaine disent le format de l'entreprise
+    // (pas celles de la mairie ou du syndicat cités dans le dossier).
+    if (hote && !(hote === domaine || hote.endsWith(`.${domaine}`) || domaine.endsWith(`.${hote}`))) continue;
     const forme = /^[a-z]\.[a-z-]{2,}$/.test(local) ? "i" : /^[a-z-]{2,}\.[a-z-]{2,}$/.test(local) ? "p" : null;
     if (forme) comptes.set(`${domaine}|${forme}`, (comptes.get(`${domaine}|${forme}`) ?? 0) + 1);
   }
   const [cle, n] = [...comptes].sort((a, b) => b[1] - a[1])[0] ?? [];
   if (!cle) return null;
   const [domaine, forme] = cle.split("|");
-  if (n! < 2 && !(hote && (hote === domaine || hote.endsWith(`.${domaine}`) || domaine.endsWith(`.${hote}`)))) return null;
+  if (!hote && n! < 2) return null;
   return { domaine, initiale: forme === "i" };
 }
 
@@ -134,7 +137,8 @@ export function personnesDuProspect(
       .filter((a): a is string => typeof a === "string" && a.includes("@"))
       .map((a) => a.trim().toLowerCase()),
   )];
-  const f = formatMaison([...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])], p.website);
+  // Sans site connu, les adresses du dossier (qui cite aussi des tiers) ne comptent pas.
+  const f = formatMaison(p.website ? [...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])] : relevees, p.website);
   const formesDe = (nom: string): Set<string> | null => {
     const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
     if (mots.length < 2) return null;
@@ -146,21 +150,24 @@ export function personnesDuProspect(
   };
   const local = (a: string) => sansAccent(a.split("@")[0]).replace(/-/g, "");
   const formes = new Map(sortie.map((q) => [q, formesDe(q.nom)]));
+  // Les contacts saisis (`deja`) comptent aussi : leurs adresses sont à eux, leurs noms
+  // rendent une adresse ambiguë.
+  const toutesFormes = [...formes.values(), ...deja.map((q) => formesDe(q.nom))];
   // Une adresse déjà attribuée à quelqu'un reste à lui ; une adresse qui irait à deux
   // personnes (Jean et Julie Martin, « j.martin@ ») n'est attribuée à aucune.
-  const attribuees = new Set(sortie.map((q) => q.email?.toLowerCase()).filter(Boolean));
+  const attribuees = new Set([...sortie, ...deja].map((q) => q.email?.toLowerCase()).filter(Boolean));
   for (const q of sortie) {
     const f2 = formes.get(q);
     if (!f2) continue;
     const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && f2.has(local(a));
     if (q.email && porteSonNom(q.email)) continue;
     const vue = relevees.find(
-      (a) => !attribuees.has(a) && porteSonNom(a) && [...formes.values()].filter((g) => g?.has(local(a))).length === 1,
+      (a) => !attribuees.has(a) && porteSonNom(a) && toutesFormes.filter((g) => g?.has(local(a))).length === 1,
     );
     const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
     if (!perso || perso === q.email?.toLowerCase()) continue;
     // Une adresse déduite qui irait aussi bien à un homonyme n'est donnée à personne.
-    if (!vue && (attribuees.has(perso) || [...formes.values()].filter((g) => g?.has(local(perso))).length > 1)) continue;
+    if (!vue && (attribuees.has(perso) || toutesFormes.filter((g) => g?.has(local(perso))).length > 1)) continue;
     attribuees.add(perso);
     if (!q.email && vue) q.email = vue;
     else {
