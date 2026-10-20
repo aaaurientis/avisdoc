@@ -4,7 +4,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Notation, TitreColonne } from "../FicheEntreprise";
-import { MODELE_ADRESSE as MODELE, personnesDuProspect, type NotesFiche } from "../../lib/fiche";
+import { MODELE_ADRESSE as MODELE, personnesDuProspect, type NotesFiche, type PersonneFiche } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { effectifLabel } from "../../lib/merx";
 import PastilleApprofondie from "../PastilleApprofondie";
@@ -111,13 +111,14 @@ export interface AutreContact {
  * (Pas de case à part dans la réponse de Merx : elle rendait son schéma trop gros pour
  * l'API, 20/10.)
  */
-export function autresContactsDe(p: Prospect | null): AutreContact[] {
+export function autresContactsDe(p: Prospect | null, affiches?: PersonneFiche[]): AutreContact[] {
   if (!p) return [];
   // Sans dossier, le site parle encore : ses contacts s'affichent quand même.
   const d = p.dossier ?? {};
   // Ce qui est déjà ailleurs dans la colonne (le standard de l'établissement, les
   // interlocuteurs) ne se répète pas ; tout le reste du site et du dossier s'affiche.
-  const pers = personnesDuProspect(p);
+  // `affiches` : les interlocuteurs tels que la fiche les montre (saisis + trouvés).
+  const pers = affiches ?? personnesDuProspect(p);
   const standard = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
   const melStandard = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
   const connus = new Set(

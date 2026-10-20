@@ -9,7 +9,7 @@
 // fournit que son contenu.
 
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { tonNote } from "../lib/merx";
 import { tonFiabilite, type NotesFiche } from "../lib/fiche";
 import { cn } from "@/lib/utils";
@@ -110,11 +110,12 @@ export default function FicheEntreprise({
               >
                 {o.label}
                 {o.etoile && (
+                  // La même pastille jaune que partout ailleurs (Olivier, 20/10).
                   <span
                     aria-label="Approfondi par Merx"
-                    className="absolute -right-2 -top-2 inline-flex size-[22px] items-center justify-center rounded-full bg-avisdoc-teal text-[13px] leading-none text-white ring-2 ring-card"
+                    className="absolute -right-2 -top-2 inline-flex size-[22px] items-center justify-center rounded-full bg-yellow-300 text-yellow-900 ring-2 ring-card"
                   >
-                    ✦
+                    <Sparkles className="size-3" />
                   </span>
                 )}
               </button>

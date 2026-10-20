@@ -135,19 +135,31 @@ export function personnesDuProspect(
       .map((a) => a.trim().toLowerCase()),
   )];
   const f = formatMaison([...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])], p.website);
-  for (const q of sortie) {
-    const mots = sansAccent(q.nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
-    if (mots.length < 2) continue;
-    const initiale = mots[0][0];
-    const famille = mots.slice(1).join("").replace(/[^a-z]/g, "");
+  const formesDe = (nom: string): Set<string> | null => {
+    const mots = sansAccent(nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
+    if (mots.length < 2) return null;
     const prenom = mots[0].replace(/[^a-z]/g, "");
+    const i = prenom[0];
+    const famille = mots.slice(1).join("").replace(/[^a-z]/g, "");
     // Correspondance exacte : « j.martinez@ » n'est pas Jean Martin (Codex, 20/10).
-    const formes = new Set([`${prenom}.${famille}`, `${initiale}.${famille}`, `${prenom}${famille}`, `${initiale}${famille}`, `${famille}.${prenom}`, `${famille}${prenom}`, `${prenom}_${famille}`]);
-    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && formes.has(sansAccent(a.split("@")[0]).replace(/-/g, ""));
+    return new Set([`${prenom}.${famille}`, `${i}.${famille}`, `${prenom}${famille}`, `${i}${famille}`, `${famille}.${prenom}`, `${famille}${prenom}`, `${prenom}_${famille}`]);
+  };
+  const local = (a: string) => sansAccent(a.split("@")[0]).replace(/-/g, "");
+  const formes = new Map(sortie.map((q) => [q, formesDe(q.nom)]));
+  // Une adresse déjà attribuée à quelqu'un reste à lui ; une adresse qui irait à deux
+  // personnes (Jean et Julie Martin, « j.martin@ ») n'est attribuée à aucune.
+  const attribuees = new Set(sortie.map((q) => q.email?.toLowerCase()).filter(Boolean));
+  for (const q of sortie) {
+    const f2 = formes.get(q);
+    if (!f2) continue;
+    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && f2.has(local(a));
     if (q.email && porteSonNom(q.email)) continue;
-    const vue = relevees.find(porteSonNom);
+    const vue = relevees.find(
+      (a) => !attribuees.has(a) && porteSonNom(a) && [...formes.values()].filter((g) => g?.has(local(a))).length === 1,
+    );
     const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
     if (!perso || perso === q.email?.toLowerCase()) continue;
+    if (!vue && attribuees.has(perso)) continue;
     if (!q.email && vue) q.email = vue;
     else {
       q.emailPerso = perso;
