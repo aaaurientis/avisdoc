@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     const LA = lundiDApres.toISOString();
     const COLONNES = "id, kind, au, created_at, prevu, traite_le, resultat, avec, par, detail, rdv_mode, deplace_de, prospect_id, client_id, account_id";
 
-    const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes] = await Promise.all([
+    const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine] = await Promise.all([
       // Ce qui était au planning cette semaine.
       admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").limit(2000),
       // Daté d'avant, mais noté ou annulé cette semaine : sinon il ne paraîtrait dans aucun récap.
@@ -196,8 +196,10 @@ Deno.serve(async (req) => {
       admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("created_at", L).limit(10000),
       admin.from("admin_fullenrich").select("credits").gte("created_at", L),
       admin.from("admin_accounts").select("name").gte("created_at", L),
+      // Les rendez-vous PRIS cette semaine, quelle que soit leur date.
+      admin.from("admin_echanges").select("id, resultat").eq("kind", "rdv").eq("prevu", true).gte("created_at", L),
     ]);
-    for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes]) if (r.error) throw new Error(r.error.message);
+    for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine]) if (r.error) throw new Error(r.error.message);
 
     // Une action programmée puis faite donne deux lignes : la programmée, close, et la
     // faite. On ne garde que la faite (sauf une annulation, qui est son propre état).
@@ -236,10 +238,7 @@ Deno.serve(async (req) => {
     // --- Les chiffres du haut ---
     const faites = dansLaSemaine.filter((e) => etat(e) === "Fait");
     const contactees = new Set(faites.map(societe).filter((s) => s !== "—")).size;
-    const rdvPris = ((semaine.data ?? []) as Echange[]).concat((prochaine.data ?? []) as Echange[], (retard.data ?? []) as Echange[]).filter(
-      (e) => e.kind === "rdv" && e.prevu && Date.parse(e.created_at) >= lundi.getTime() && e.resultat !== "Annulé",
-    );
-    const rdvUniques = new Set(rdvPris.map((e) => e.id)).size;
+    const rdvUniques = ((rdvDeLaSemaine.data ?? []) as { resultat: string | null }[]).filter((e) => e.resultat !== "Annulé").length;
     const nbApprofondis = (approfondis.data ?? []).length;
     const nbSignes = (signes.data ?? []).length;
 
