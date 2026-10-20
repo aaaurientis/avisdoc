@@ -36,6 +36,17 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
   // (« Appeler : 05 57 … ») : il doit se voir ici, pas seulement dans le Dossier (20/10).
   const duDossier = (p.dossier?.fiche_appel?.numero ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0] ?? null;
   const telephone = (p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone)) ?? duDossier;
+  // Un 06/07 est le portable de quelqu'un : on dit « Mobile » et à qui il est (Olivier,
+  // 20/10), d'après les interlocuteurs ou le contact de la fiche qui portent ce numéro.
+  const num = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33/, "0");
+  const estMobile = !!telephone && /^0[67]/.test(num(telephone));
+  const titulaire = (() => {
+    if (!telephone) return null;
+    const qui = (p.personnes ?? []).find((x) => num(x.telephone) === num(telephone) || num(x.mobile) === num(telephone));
+    if (qui) return [qui.nom, qui.fonction?.split(/[,(]/)[0].trim()].filter(Boolean).join(", ");
+    if (p.contact_name && num(p.contact_phone) === num(telephone)) return [p.contact_name, p.contact_role].filter(Boolean).join(", ");
+    return null;
+  })();
   const email = p.found_by ? (p.contact_email ?? p.site_contacts?.emails?.[0]) : (p.site_contacts?.emails?.[0] ?? p.contact_email);
   const chef = p.leaders?.[0];
   const candidates: { label: string; valeur: ReactNode | null | undefined }[] = [
@@ -46,7 +57,15 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
     { label: "Établissements", valeur: p.open_establishments ?? null },
     { label: typeof ca === "number" ? `Chiffre d’affaires ${annee}` : "Chiffre d’affaires", valeur: typeof ca === "number" ? euros(ca) : null },
     { label: "Site", valeur: p.website ? lien(p.website, p.website.replace(/^https?:\/\//, "").replace(/\/$/, "")) : null },
-    { label: "Téléphone", valeur: telephone ? <a href={`tel:${telephone.replace(/\s/g, "")}`} className="text-avisdoc-teal">{telephone}</a> : null },
+    {
+      label: estMobile ? "Mobile" : "Téléphone",
+      valeur: telephone ? (
+        <>
+          <a href={`tel:${telephone.replace(/\s/g, "")}`} className="text-avisdoc-teal">{telephone}</a>
+          {titulaire && <span className="text-muted-foreground"> — {titulaire}</span>}
+        </>
+      ) : null,
+    },
     { label: "E-mail", valeur: email ? <a href={`mailto:${email}`} className="break-all text-avisdoc-teal">{email}</a> : null },
   ];
   const vide = (v: ReactNode | null | undefined) => v === null || v === undefined || v === "";
