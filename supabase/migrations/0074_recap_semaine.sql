@@ -5,7 +5,8 @@
 -- associés d'AvisDoc » (destinataires dans la fonction recap-semaine).
 --
 -- 1. « Déplacé » : quand une action programmée change de date, on garde la date
---    d'origine (`deplace_de`), pour que le récap puisse dire « prévu d'abord le … ».
+--    qu'elle avait juste avant (`deplace_de`) : le récap de cette semaine-là la montre
+--    « Déplacé », même si elle est reportée plusieurs fois.
 -- 2. Le secret et la tâche planifiée, comme le récap du soir (0071) : la tâche passe
 --    le vendredi à 17 h et à 18 h UTC ; la fonction n'envoie qu'à 19 h à Paris, une
 --    fois par semaine.
@@ -22,7 +23,7 @@ as $$
 begin
   -- Seule une action programmée et pas encore faite se déplace (0073 fige le reste).
   if old.prevu and old.traite_le is null and new.au is distinct from old.au then
-    new.deplace_de := coalesce(old.deplace_de, old.au);
+    new.deplace_de := old.au;
   end if;
   return new;
 end;

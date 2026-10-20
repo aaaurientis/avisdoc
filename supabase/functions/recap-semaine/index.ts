@@ -199,18 +199,21 @@ Deno.serve(async (req) => {
 
     const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees] = await Promise.all([
       // Ce qui était au planning cette semaine.
-      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").limit(2000),
+      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").order("id").range(de, a)),
       // Daté hors de la semaine, mais noté (fait) ou clos cette semaine — un rendez-vous de
       // novembre annulé aujourd'hui compris : sinon il ne paraîtrait dans aucun récap.
-      admin
-        .from("admin_echanges")
-        .select(COLONNES)
-        .neq("kind", "note")
-        .or(`au.lt."${L}",au.gte."${LS}"`)
-        .or(`and(created_at.gte."${L}",prevu.eq.false),traite_le.gte."${L}"`)
-        .order("au")
-        .limit(2000),
-      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au"),
+      toutLire<Echange>((de, a) =>
+        admin
+          .from("admin_echanges")
+          .select(COLONNES)
+          .neq("kind", "note")
+          .or(`au.lt."${L}",au.gte."${LS}"`)
+          .or(`and(created_at.gte."${L}",prevu.eq.false),traite_le.gte."${L}"`)
+          .order("au")
+          .order("id")
+          .range(de, a),
+      ),
+      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au").order("id").range(de, a)),
       toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", L).is("deleted_at", null).order("id").range(de, a)),
       toutLire<{ name: string; city: string | null; sector: string | null; score_total: number | null; rationale: string | null }>((de, a) =>
         admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", L).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
@@ -220,9 +223,9 @@ Deno.serve(async (req) => {
       admin.from("admin_accounts").select("name").gte("created_at", L),
       // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
-      admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L),
+      toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", L).order("id").range(de, a)),
       // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
-      admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de"),
+      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("deplace_de", L).lt("deplace_de", LS).gte("au", LS).order("deplace_de").order("id").range(de, a)),
     ]);
     for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
@@ -263,7 +266,7 @@ Deno.serve(async (req) => {
     };
     const note = (e: Echange) => {
       const morceaux = [e.resultat && e.resultat !== "Annulé" ? `<strong>${echapper(e.resultat)}.</strong>` : "", e.detail?.trim() ? echapper(e.detail.trim()).replace(/\n/g, "<br>") : ""].filter(Boolean);
-      if (e.deplace_de) morceaux.push(`<span style="color:${C.doux}">Prévu d’abord le ${jourLong(e.deplace_de)}.</span>`);
+      if (e.deplace_de) morceaux.push(`<span style="color:${C.doux}">Déplacé du ${jourLong(e.deplace_de)}.</span>`);
       return morceaux.join(" ") || `<span style="color:${C.doux}">—</span>`;
     };
 
