@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.recap-du-soir]
 verify_jwt = false
 
+[functions.recap-semaine]
+verify_jwt = false
+
 # FullEnrich (cron chaque minute) : protégée par un secret en base (migration 0072).
 [functions.fullenrich]
 verify_jwt = false
