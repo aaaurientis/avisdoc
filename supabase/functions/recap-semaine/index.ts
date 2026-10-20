@@ -8,7 +8,7 @@
 // Protégée comme le récap du soir : un secret tiré au hasard dans la base (migration
 // 0074). La tâche passe le vendredi à 17 h et 18 h UTC ; seule celle qui tombe à 19 h à
 // Paris envoie, une seule fois par semaine (la semaine est réservée en base AVANT
-// l'envoi). `{ "essai": true }` envoie tout de suite, sans rien réserver, objet « [Essai] ».
+// l'envoi). `{ "essai": true }` envoie tout de suite à Olivier seul (olivier@audeger.fr), sans rien réserver, objet « [Essai] ».
 //
 // Ne dit que ce que la base contient : rien n'est estimé ni deviné. Les notes des
 // fiches sont reprises mot pour mot.
@@ -32,6 +32,9 @@ const DESTINATAIRES = [
   "arthur.aurientis@avisdoc.fr",
   "stephan.nacer@avisdoc.fr",
 ];
+
+/** Un essai ne va qu'à Olivier (20/10) : les associés ne reçoivent que le vrai récap du vendredi. */
+const ESSAI_A = ["olivier@audeger.fr"];
 
 /** Tarifs des modèles, en dollars par million de jetons : les mêmes que l'écran des coûts (src/admin/lib/couts.ts). */
 const TARIFS: Record<string, { entree: number; sortie: number }> = {
@@ -452,7 +455,7 @@ Deno.serve(async (req) => {
     const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#eef2f5">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f5"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:860px;background:#ffffff;border-radius:14px"><tr><td style="padding:28px 32px">
-${essai ? `<p style="${POLICE}font-size:13px;color:${C.corail};margin:0 0 12px"><strong>Essai :</strong> ce mail partira chaque vendredi à 19 h. Celui-ci couvre la semaine jusqu’à maintenant.</p>` : ""}
+${essai ? `<p style="${POLICE}font-size:13px;color:${C.corail};margin:0 0 12px"><strong>Essai, envoyé à vous seul :</strong> le vrai récap partira chaque vendredi à 19 h aux associés. Celui-ci couvre la semaine jusqu’à maintenant.</p>` : ""}
 <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;color:${C.encre};margin:0 0 16px;font-weight:600">La semaine d’AvisDoc</h2>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>${tuiles.join("")}</tr></table>
 ${sectionActions}
@@ -469,10 +472,10 @@ ${sectionDepenses}
     const envoi = await fetch("https://api.resend.com/emails/batch", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify(DESTINATAIRES.map((a) => ({ from: FROM, to: [a], subject: objet, html }))),
+      body: JSON.stringify((essai ? ESSAI_A : DESTINATAIRES).map((a) => ({ from: FROM, to: [a], subject: objet, html }))),
     });
     if (!envoi.ok) throw new Error(`Resend ${envoi.status} : ${await envoi.text()}`);
-    return json({ ok: true, essai, objet, envoyes: DESTINATAIRES.length, actions: actions.length, semaineSuivante: aVenir.length });
+    return json({ ok: true, essai, objet, envoyes: (essai ? ESSAI_A : DESTINATAIRES).length, actions: actions.length, semaineSuivante: aVenir.length });
   } catch (e) {
     await rendre();
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
