@@ -129,6 +129,17 @@ async function toutLire<T>(page: (de: number, a: number) => PromiseLike<{ data: 
   }
 }
 
+/** Par lots de 200 identifiants : une requête par lot, toutes les lignes gardées. */
+async function parLots(ids: string[], requete: (lot: string[]) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<{ data: unknown[] }> {
+  const tout: unknown[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await requete(ids.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    tout.push(...(data ?? []));
+  }
+  return { data: tout };
+}
+
 // --- Le gabarit du mail : tableaux, styles en ligne, polices système. ---
 const POLICE = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;";
 const C = { encre: "#12202f", doux: "#55657a", ligne: "#dde4ea", bleu: "#1f9fd6", bleuPale: "#e6f5fc", corail: "#e2703a", corailPale: "#fdf0e8", vert: "#1b8a5a", vertPale: "#e5f5ec", gris: "#eef2f5" };
@@ -251,9 +262,9 @@ Deno.serve(async (req) => {
     const toutes = [...dansLaSemaine, ...enRetard, ...aVenir, ...reporteesOuvertes];
     const ids = (k: "prospect_id" | "client_id" | "account_id") => [...new Set(toutes.map((e) => e[k]).filter((x): x is string => !!x))];
     const [ps, cs, as] = await Promise.all([
-      ids("prospect_id").length ? admin.from("admin_prospects").select("id, name, converted_client_id").in("id", ids("prospect_id")) : Promise.resolve({ data: [] }),
-      ids("client_id").length ? admin.from("admin_clients").select("id, company").in("id", ids("client_id")) : Promise.resolve({ data: [] }),
-      ids("account_id").length ? admin.from("admin_accounts").select("id, name, client_id").in("id", ids("account_id")) : Promise.resolve({ data: [] }),
+      parLots(ids("prospect_id"), (lot) => admin.from("admin_prospects").select("id, name, converted_client_id").in("id", lot)),
+      parLots(ids("client_id"), (lot) => admin.from("admin_clients").select("id, company").in("id", lot)),
+      parLots(ids("account_id"), (lot) => admin.from("admin_accounts").select("id, name, client_id").in("id", lot)),
     ]);
     // Une même société, qu'elle soit encore prospect, au Pipeline ou cliente : l'affaire la relie.
     const affaireDe = new Map<string, string>([
