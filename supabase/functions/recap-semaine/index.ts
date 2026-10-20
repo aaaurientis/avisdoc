@@ -246,7 +246,12 @@ Deno.serve(async (req) => {
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", D).lt("finished_at", M).order("finished_at").order("id").range(de, a)),
       toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", D).lt("traite_le", M).order("id").range(de, a)),
       // Signé dans la semaine, à la date de signature (du samedi au vendredi).
-      admin.from("admin_accounts").select("name").is("deleted_at", null).gt("signed_on", aParis(depuis).jour).lte("signed_on", vendrediJour),
+      // Plus celles datées du vendredi précédent mais saisies après son envoi de 19 h.
+      admin
+        .from("admin_accounts")
+        .select("name")
+        .is("deleted_at", null)
+        .or(`and(signed_on.gt.${aParis(depuis).jour},signed_on.lte.${vendrediJour}),and(signed_on.eq.${aParis(depuis).jour},created_at.gte."${D}",created_at.lt."${M}")`),
       // Les rendez-vous PRIS dans la semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", D).lt("created_at", M).order("id").range(de, a)),
@@ -307,8 +312,10 @@ Deno.serve(async (req) => {
     const etat = (e: Echange): string => {
       if (e.resultat === "Annulé") return "Annulé";
       if (!e.prevu || e.traite_le) return "Fait";
-      if (e.deplace_de) return "Déplacé";
-      return Date.parse(e.au) < maintenant.getTime() ? "Pas fait" : "Prévu";
+      // Une date passée sans compte rendu reste « Pas fait », même déplacée avant (le
+      // report se lit dans la note).
+      if (Date.parse(e.au) < maintenant.getTime()) return "Pas fait";
+      return e.deplace_de ? "Déplacé" : "Prévu";
     };
     const note = (e: Echange) => {
       const morceaux = [e.resultat && e.resultat !== "Annulé" && e.resultat !== "Fait" ? `<strong>${echapper(e.resultat)}.</strong>` : "", e.detail?.trim() ? echapper(e.detail.trim()).replace(/\n/g, "<br>") : ""].filter(Boolean);
