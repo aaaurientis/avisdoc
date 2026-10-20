@@ -61,6 +61,8 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
 
 const TEL = /(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g;
 const MEL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+/** Rien avant la coordonnée que de la ponctuation ou « e-mail » : elle suit la précédente. */
+const debutPhrase = (avant: string) => !/^[\s,;:–—-]*(?:et\s+)?(?:e-mail|mail|tél\.?|ou)?\s*:?\s*$/i.test(avant);
 const chiffres = (t: string) => t.replace(/\D/g, "").replace(/^33/, "0");
 
 export interface AutreContact {
@@ -73,23 +75,15 @@ export interface AutreContact {
 /**
  * Tous les contacts utiles que l'approfondissement a trouvés hors des interlocuteurs de
  * l'entreprise : voisins, mairie, syndicat… (Olivier, 20/10 : « toutes les informations
- * qui permettent de contacter… dans la colonne de gauche »). Les fiches approfondies
- * depuis le 20/10 les ont rangés à part ; pour les plus anciennes, on relève chaque
- * numéro et chaque adresse cités dans le texte du dossier, avec la phrase qui les cite.
+ * qui permettent de contacter… dans la colonne de gauche »). On relève chaque numéro et
+ * chaque adresse cités dans le texte du dossier — Merx les y écrit sous la forme
+ * « Contact utile : Nom (rôle / structure) au 05…, e-mail … » —, avec le nom qui les précède.
+ * (Pas de case à part dans la réponse de Merx : elle rendait son schéma trop gros pour
+ * l'API, 20/10.)
  */
 export function autresContactsDe(p: Prospect | null): AutreContact[] {
   const d = p?.dossier;
   if (!p || !d) return [];
-  if (Array.isArray(d.autres_contacts) && d.autres_contacts.length) {
-    return d.autres_contacts.filter((l): l is string => typeof l === "string" && !!l.trim()).map((ligne) => {
-      const [nom, role, structure, tel, mel] = ligne.split("|").map((x) => x.trim());
-      return {
-        qui: [nom, role, structure].filter(Boolean).join(" — ") || ligne,
-        telephones: tel ? (tel.match(TEL) ?? [tel]) : [],
-        emails: mel ? (mel.match(MEL) ?? []) : [],
-      };
-    });
-  }
   // Ce qui est déjà ailleurs dans la colonne ne se répète pas.
   const connus = new Set(
     [p.contact_phone, ...(p.site_contacts?.phones ?? []), p.dossier?.fiche_appel?.numero, ...(p.personnes ?? []).map((x) => x.telephone)]
@@ -109,7 +103,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
     ...(d.objections ?? []).map((o) => o.reponse),
     d.offre,
     ...(d.a_verifier ?? []),
-  ].filter((t): t is string => !!t);
+  ].filter((t): t is string => typeof t === "string" && !!t);
   // Un contact par numéro ou adresse : le nom est ce qui le précède dans la phrase
   // (« …, Robin Lafugie au 05 57 24 93 38 »), une précision entre parenthèses juste
   // après lui revient (« … au 05 47 84 06 76 (M. Gérard Canuel, maire…) »).
@@ -134,10 +128,17 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         if (estMel ? melsConnus.has(cle) : connus.has(cle)) continue;
         if (vus.has(cle)) continue;
         vus.add(cle);
-        const qui = (avant.split(/[:;,]\s|\s[–—-]\s(?=[a-zé])/).at(-1) ?? "")
-          .replace(/\s*\b(?:au|tél\.?|téléphone|joignable au|par mail|e-mail|mail)\s*:?\s*$/i, "")
-          .replace(/[\s(:–—-]+$/, "")
-          .trim();
+        // Le dernier morceau qui reste un nom une fois « au », « e-mail »… retirés :
+        // « Syndicat (président / ODG), e-mail x@y » garde « Syndicat (président / ODG) ».
+        const nettoyer = (t: string) =>
+          t.replace(/\s*\b(?:au|tél\.?|téléphone|joignable au|par mail|e-mail|mail)\s*:?\s*$/i, "").replace(/[\s(:–—-]+$/, "").trim();
+        const morceaux = avant.split(/[:;,]\s|\s[–—-]\s(?=[a-zé])/).map(nettoyer);
+        const qui = (!dernier || debutPhrase(avant) ? [...morceaux].reverse().find(Boolean) : morceaux.at(-1)) ?? "";
+        // « …au 05 47 84 06 76, e-mail x@y.fr » : l'e-mail revient au même contact.
+        if (!qui && dernier) {
+          (estMel ? dernier.emails : dernier.telephones).push(coord);
+          continue;
+        }
         const nom = qui || "Contact cité dans le dossier";
         const deja = out.find((c) => c.qui === nom);
         if (deja) {

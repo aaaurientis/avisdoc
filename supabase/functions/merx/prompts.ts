@@ -175,7 +175,7 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    d. la direction générale, seulement si l'entreprise est assez petite pour que le dirigeant décide lui-même.
    Un directeur QSE groupe n'est pas une mauvaise piste, mais il vient APRÈS le responsable de l'agence : le commercial veut parler à qui organisera la journée, pas à qui pilote une politique.
    OÙ CHERCHER : la page « équipe », « direction » ou « gouvernance » du site officiel, dont les passages te sont fournis dans « equipe » ; une recherche web sur le nom de l'entreprise avec « responsable QSE », « responsable HSE », « responsable sécurité », « chef d'agence » ET LE NOM DE LA VILLE de l'établissement ; les offres d'emploi, qui nomment souvent le responsable du service qui recrute ; les comptes rendus d'assemblées professionnelles et de remises de prix, qui citent les présents avec leur fonction ; les dirigeants du registre officiel, qui te sont fournis.
-   LES AUTRES CONTACTS UTILES vont dans « autres_contacts », pas dans « contacts » : toute personne ou organisation qui N'APPARTIENT PAS à l'entreprise mais peut aider le commercial — exploitations voisines pour une journée mutualisée, mairie, syndicat professionnel, coopérative, MSA, groupement d'employeurs. Une ligne par contact, au format exact « Nom | rôle | structure | téléphone | e-mail | page source », case vide si inconnue. RÈGLE : tout numéro de téléphone ou adresse électronique que tu cites où que ce soit dans le dossier figure aussi soit dans « contacts », soit dans « autres_contacts » — le commercial les cherche dans la colonne de la fiche, pas dans le texte.
+   LES AUTRES CONTACTS UTILES ne vont PAS dans « contacts » : toute personne ou organisation qui N'APPARTIENT PAS à l'entreprise mais peut aider le commercial — exploitations voisines pour une journée mutualisée, mairie, syndicat professionnel, coopérative, MSA, groupement d'employeurs. Mets-les dans « appel_a_retenir », une ligne par contact, au format exact « Contact utile : Nom (rôle / structure) au 05 00 00 00 00, e-mail nom@domaine.fr » — sans virgule ni deux-points avant le numéro, en omettant ce que tu n'as pas. La fiche relit ces lignes pour les montrer dans sa colonne.
    POUR CHACUN : nom, fonction, établissement de rattachement, e-mail, téléphone, et LA PAGE SOURCE. Marque « confiance » à « sure » quand la source est datée de moins de deux ans et nomme explicitement la personne à cette fonction ; « probable » sinon. Une piste probable se donne quand même — le commercial la confirmera en trois secondes au téléphone, alors qu'une case vide ne lui laisse rien.
    N'INVENTE AUCUN NOM. Pas de fonction supposée d'après un organigramme type, pas de personne déduite. Un nom faux coûte plus cher qu'une case vide.
    L'ADRESSE ÉLECTRONIQUE : tu ne fabriques jamais une adresse nominative que tu présenterais comme vérifiée. En revanche, si tu as relevé une seule adresse nominative publique de cette entreprise — sur son site, dans un communiqué, dans une offre d'emploi —, tu en DÉDUIS LE FORMAT MAISON et tu le donnes comme tel : « format observé : prenom.nom@domaine.fr, d'après untel@domaine.fr relevé sur telle page ». Le commercial obtient le nom au téléphone et compose l'adresse lui-même ; c'est précisément ce qui lui manque aujourd'hui. Le format n'est pas un contact : il va dans la fiche d'appel, pas dans « contacts ».
@@ -246,7 +246,7 @@ export const ENRICH_SCHEMA = {
   required: [
     "siren", "site_web", "contacts", "exposition_soleil", "affinite_prevention",
     "politique_sst", "actions_recentes", "instances", "contact_confirme",
-    "angle_approche", "dossier", "sources", "autres_contacts",
+    "angle_approche", "dossier", "sources",
   ],
   properties: {
     siren: { type: "string" },
@@ -323,10 +323,6 @@ export const ENRICH_SCHEMA = {
       },
     },
     sources: { type: "array", items: { type: "string" } },
-    // Les contacts utiles qui ne sont PAS l'entreprise (voisins, mairie, syndicat…),
-    // une ligne « Nom | rôle | structure | téléphone | e-mail | source » : à plat pour ne
-    // pas alourdir la grammaire du schéma (voir la note sur la fiche d'appel).
-    autres_contacts: { type: "array", items: { type: "string" } },
   },
 } as const;
 
@@ -348,7 +344,6 @@ export interface EnrichOut {
   instances: Preuve;
   contact_confirme: Preuve;
   angle_approche: string;
-  autres_contacts?: string[];
   dossier: {
     appel_numero: string;
     appel_qui_demander: string;
