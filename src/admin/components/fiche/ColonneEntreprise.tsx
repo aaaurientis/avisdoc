@@ -80,8 +80,8 @@ export interface AutreContact {
 export function autresContactsDe(p: Prospect | null): AutreContact[] {
   const d = p?.dossier;
   if (!p || !d) return [];
-  if (d.autres_contacts?.length) {
-    return d.autres_contacts.map((ligne) => {
+  if (Array.isArray(d.autres_contacts) && d.autres_contacts.length) {
+    return d.autres_contacts.filter((l): l is string => typeof l === "string" && !!l.trim()).map((ligne) => {
       const [nom, role, structure, tel, mel] = ligne.split("|").map((x) => x.trim());
       return {
         qui: [nom, role, structure].filter(Boolean).join(" — ") || ligne,
