@@ -1,4 +1,4 @@
-// Les filtres de la prospection : note, salariés, secteur, date d'arrivée, e-mail,
+// Les filtres de la prospection : approfondie ou non (Olivier, 20/10), note, salariés, secteur, date d'arrivée, e-mail,
 // ville, département. Ils se combinent, et « Tout » remet chacun à zéro.
 //
 // L'effectif n'est connu que des fiches approfondies : le palier « Non renseigné » sert à les retrouver.
@@ -6,6 +6,7 @@
 import { secteurLisible, type Prospect } from "../../lib/merx";
 
 export interface Filtres {
+  approfondie: string;
   noteMin: string;
   salaries: string;
   secteur: string;
@@ -16,6 +17,7 @@ export interface Filtres {
 }
 
 export const FILTRES_VIDES: Filtres = {
+  approfondie: "",
   noteMin: "",
   salaries: "",
   secteur: "",
@@ -53,6 +55,8 @@ const ARRIVEE: { valeur: string; label: string; jours: number; sens: "recent" | 
 
 /** Applique les filtres et la recherche à une fiche. */
 export function retenue(p: Prospect, f: Filtres, recherche: string): boolean {
+  if (f.approfondie === "oui" && !p.enriched_at) return false;
+  if (f.approfondie === "non" && p.enriched_at) return false;
   if (f.noteMin && (p.score_total ?? 0) < Number(f.noteMin)) return false;
 
   if (f.salaries) {
@@ -114,6 +118,12 @@ export default function FiltresProspects({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <select value={filtres.approfondie} onChange={set("approfondie")} className={selectCls} aria-label="Fiches approfondies">
+        <option value="">Approfondie</option>
+        <option value="oui">✨ Approfondies</option>
+        <option value="non">Pas encore approfondies</option>
+      </select>
+
       <select value={filtres.noteMin} onChange={set("noteMin")} className={selectCls} aria-label="Note minimale">
         <option value="">Note</option>
         <option value="70">70 et plus</option>
