@@ -175,17 +175,20 @@ Deno.serve(async (req) => {
   const maintenant = new Date();
   const { jour, heure: h } = aParis(maintenant);
   const jourSemaine = new Date(`${jour}T12:00:00Z`).getUTCDay(); // 0 dimanche … 5 vendredi
-  const lundiJour = plusJours(jour, -((jourSemaine + 6) % 7));
+  // La semaine va du samedi au vendredi 19 h (Olivier, 20/10). Son vendredi : aujourd'hui
+  // si l'on est vendredi avant 20 h, sinon le prochain (un essai en milieu de semaine).
+  const vendrediJour = plusJours(jour, jourSemaine === 5 && h < 20 ? 0 : (5 - jourSemaine + 7) % 7 || 7);
+  const dixNeufHeures = (j: string) => new Date(minuitParis(j).getTime() + 19 * 3_600_000);
 
-  // La réservation : la semaine (son lundi) d'un seul geste, comme le récap du soir.
+  // La réservation : la semaine (son vendredi) d'un seul geste, comme le récap du soir.
   let rendre: () => Promise<unknown> = async () => {};
   if (!essai && (jourSemaine !== 5 || h !== 19)) return json({ ok: true, ignore: `pas vendredi 19 h à Paris (${jour}, ${h} h)` });
   const { data: avant, error: lecture } = await admin.from("admin_secrets_internes").select("valeur").eq("cle", "recap_semaine_dernier").maybeSingle();
   if (lecture) return json({ error: lecture.message }, 500);
   const precedent = avant?.valeur ?? "";
   if (!essai) {
-    if (precedent.startsWith(`${lundiJour}|`)) return json({ ok: true, ignore: "déjà envoyé cette semaine" });
-    const reserve = `${lundiJour}|${maintenant.toISOString()}`;
+    if (precedent.startsWith(`${vendrediJour}|`)) return json({ ok: true, ignore: "déjà envoyé cette semaine" });
+    const reserve = `${vendrediJour}|${maintenant.toISOString()}`;
     const { data: pris, error: reservation } = await admin
       .from("admin_secrets_internes")
       .update({ valeur: reserve })
@@ -200,72 +203,56 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const lundi = minuitParis(lundiJour);
-    const lundiSuivant = minuitParis(plusJours(lundiJour, 7));
-    const lundiDApres = minuitParis(plusJours(lundiJour, 14));
-    const L = lundi.toISOString();
-    // Les compteurs (fiches, dossiers, dépenses, rendez-vous pris, actions notées en
-    // retard) partent de l'envoi précédent : ce qui se passe du vendredi 19 h au lundi
-    // n'échappe à aucun récap. À défaut d'envoi récent, du lundi.
+    // La période : de l'envoi précédent (le vendredi d'avant, 19 h) à maintenant. Chaque
+    // récap reprend exactement là où le précédent s'est arrêté : rien en double, rien perdu.
+    const finSemaine = dixNeufHeures(vendrediJour);
+    const vendrediPrecedent = dixNeufHeures(plusJours(vendrediJour, -7));
     const envoiPrecedent = precedent.includes("|") ? new Date(precedent.split("|")[1]) : null;
     const depuis =
-      envoiPrecedent && !isNaN(envoiPrecedent.getTime()) && envoiPrecedent < lundi && lundi.getTime() - envoiPrecedent.getTime() < 10 * 86_400_000 ? envoiPrecedent : lundi;
+      envoiPrecedent && !isNaN(envoiPrecedent.getTime()) && envoiPrecedent < maintenant && maintenant.getTime() - envoiPrecedent.getTime() < 10 * 86_400_000
+        ? envoiPrecedent
+        : vendrediPrecedent;
     const D = depuis.toISOString();
-    // … jusqu'à l'instant réservé (exclu) : deux récaps successifs ne se recouvrent pas.
     const M = maintenant.toISOString();
-    const LS = lundiSuivant.toISOString();
-    const LA = lundiDApres.toISOString();
+    // Le planning de la semaine court jusqu'au vendredi 19 h (un essai en milieu de
+    // semaine montre donc aussi ce qui reste prévu) ; la semaine suivante, sept jours de plus.
+    const F = (finSemaine > maintenant ? finSemaine : maintenant).toISOString();
+    const FS = new Date(Date.parse(F) + 7 * 86_400_000).toISOString();
     const COLONNES = "id, kind, titre, au, created_at, prevu, traite_le, resultat, avec, par, detail, rdv_mode, deplace_de, prospect_id, client_id, account_id";
 
     const [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees] = await Promise.all([
-      // Ce qui était au planning cette semaine.
-      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", L).lt("au", LS).order("au").order("id").range(de, a)),
-      // Daté hors de la semaine, mais noté (fait) ou clos cette semaine — un rendez-vous de
+      // Ce qui était au planning de la semaine.
+      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").gte("au", D).lt("au", F).order("au").order("id").range(de, a)),
+      // Daté hors de la semaine, mais noté (fait) ou clos pendant — un rendez-vous de
       // novembre annulé aujourd'hui compris : sinon il ne paraîtrait dans aucun récap.
       toutLire<Echange>((de, a) =>
         admin
           .from("admin_echanges")
           .select(COLONNES)
           .neq("kind", "note")
-          .or(`au.lt."${L}",au.gte."${LS}"`)
+          .or(`au.lt."${D}",au.gte."${F}"`)
           .or(`and(created_at.gte."${D}",created_at.lt."${M}",prevu.eq.false),and(traite_le.gte."${D}",traite_le.lt."${M}")`)
           .order("au")
           .order("id")
           .range(de, a),
       ),
-      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", LS).lt("au", LA).order("au").order("id").range(de, a)),
+      toutLire<Echange>((de, a) => admin.from("admin_echanges").select(COLONNES).neq("kind", "note").eq("prevu", true).is("traite_le", null).gte("au", F).lt("au", FS).order("au").order("id").range(de, a)),
       toutLire<{ sector: string | null }>((de, a) => admin.from("admin_prospects").select("sector").gte("created_at", D).lt("created_at", M).is("deleted_at", null).order("id").range(de, a)),
       toutLire<{ name: string; city: string | null; sector: string | null; score_total: number | null; rationale: string | null }>((de, a) =>
         admin.from("admin_prospects").select("name, city, sector, score_total, rationale").gte("enriched_at", D).lt("enriched_at", M).is("deleted_at", null).order("score_total", { ascending: false, nullsFirst: false }).order("id").range(de, a),
       ),
+      // Dépenses : à la date où le travail s'est TERMINÉ.
       toutLire((de, a) => admin.from("admin_merx_demandes").select("kind, model, usage, request, status, found_count, requested_by").gte("finished_at", D).lt("finished_at", M).order("finished_at").order("id").range(de, a)),
       toutLire<{ credits: number | string }>((de, a) => admin.from("admin_fullenrich").select("credits").gte("traite_le", D).lt("traite_le", M).order("id").range(de, a)),
-      // Signé cette semaine : la date de signature, pas celle de la saisie.
-      // Plus celles du week-end dernier, saisies après l'envoi précédent (jamais deux fois :
-      // une signature saisie avant cet envoi y a déjà été comptée).
-      admin
-        .from("admin_accounts")
-        .select("name")
-        .is("deleted_at", null)
-        .or(
-          `and(signed_on.gte.${lundiJour},signed_on.lt.${plusJours(lundiJour, 7)}),and(signed_on.gte.${aParis(depuis).jour},signed_on.lt.${lundiJour},created_at.gte."${D}",created_at.lt."${M}")`,
-        ),
-      // Les rendez-vous PRIS cette semaine, quelle que soit leur date et ce qu'ils sont
+      // Signé dans la semaine, à la date de signature (du samedi au vendredi).
+      admin.from("admin_accounts").select("name").is("deleted_at", null).gt("signed_on", aParis(depuis).jour).lte("signed_on", vendrediJour),
+      // Les rendez-vous PRIS dans la semaine, quelle que soit leur date et ce qu'ils sont
       // devenus : une annulation se lit dans le tableau des actions.
       toutLire<{ id: string }>((de, a) => admin.from("admin_echanges").select("id").eq("kind", "rdv").eq("prevu", true).gte("created_at", D).lt("created_at", M).order("id").range(de, a)),
-      // Prévues cette semaine à l'origine, reportées au-delà : elles restent visibles.
-      // (Dépenses et demandes Merx ci-dessus : à la date où le travail s'est TERMINÉ, pour
-      // qu'une demande lancée dimanche et finie lundi ne tombe pas entre deux récaps.)
-      // Les reports qui ont fait quitter la semaine (historique 0074), un par action.
-      toutLire<{ echange_id: string; de: string }>((de, a) => admin
-          .from("admin_echanges_reports")
-          .select("echange_id, de")
-          // Quitté cette semaine pour plus tard, ou — fait le week-end après l'envoi
-          // précédent — quitté le week-end dernier pour cette semaine ou plus tard.
-          .or(`and(de.gte."${L}",de.lt."${LS}",vers.gte."${LS}"),and(le.gte."${D}",le.lt."${M}",de.lt."${L}",vers.gte."${L}")`)
-          .order("de")
-          .order("id")
-          .range(de, a)),
+      // Les reports qui ont fait quitter la semaine (historique 0074).
+      toutLire<{ echange_id: string; de: string }>((de, a) =>
+        admin.from("admin_echanges_reports").select("echange_id, de").gte("de", D).lt("de", F).gte("vers", F).order("de").order("id").range(de, a),
+      ),
     ]);
     for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
@@ -280,7 +267,7 @@ Deno.serve(async (req) => {
     const quitte = new Map<string, string>();
     for (const r of (reportees.data ?? []) as { echange_id: string; de: string }[]) if (!quitte.has(r.echange_id)) quitte.set(r.echange_id, r.de);
     const { data: lesReportees, error: errReportees } = quitte.size
-      ? await admin.from("admin_echanges").select(COLONNES).in("id", [...quitte.keys()]).eq("prevu", true).is("traite_le", null).gte("au", LS)
+      ? await admin.from("admin_echanges").select(COLONNES).in("id", [...quitte.keys()]).eq("prevu", true).is("traite_le", null).gte("au", F)
       : { data: [], error: null };
     if (errReportees) throw new Error(errReportees.message);
     const reporteesOuvertes = ((lesReportees ?? []) as Echange[]).map((e) => ({ ...e, deplace_de: quitte.get(e.id) ?? e.deplace_de }));
@@ -323,7 +310,7 @@ Deno.serve(async (req) => {
       return Date.parse(e.au) < maintenant.getTime() ? "Pas fait" : "Prévu";
     };
     const note = (e: Echange) => {
-      const morceaux = [e.resultat && e.resultat !== "Annulé" ? `<strong>${echapper(e.resultat)}.</strong>` : "", e.detail?.trim() ? echapper(e.detail.trim()).replace(/\n/g, "<br>") : ""].filter(Boolean);
+      const morceaux = [e.resultat && e.resultat !== "Annulé" && e.resultat !== "Fait" ? `<strong>${echapper(e.resultat)}.</strong>` : "", e.detail?.trim() ? echapper(e.detail.trim()).replace(/\n/g, "<br>") : ""].filter(Boolean);
       if (e.deplace_de) morceaux.push(`<span style="color:${C.doux}">Déplacé du ${jourLong(e.deplace_de)}.</span>`);
       return morceaux.join(" ") || `<span style="color:${C.doux}">—</span>`;
     };
@@ -369,7 +356,7 @@ Deno.serve(async (req) => {
     const pourquoi = (e: Echange) =>
       Date.parse(e.created_at) >= depuis.getTime() ? `noté le ${jourCourt(e.created_at)}` : e.traite_le ? `${e.resultat === "Annulé" ? "annulé" : "clos"} le ${jourCourt(e.traite_le)}` : "";
     const ligneAction = (e: Echange, retardee = false) =>
-      `<tr>${td(`${jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
+      `<tr>${td(`${retardee ? jourLong(e.au) : jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
     const ligneReportee = (e: Echange) =>
       `<tr>${td(jourCourt(e.deplace_de!), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille("Déplacé"))}${td(`Reporté au ${jourLong(e.au)}.`, "min-width:240px;line-height:1.5")}</tr>`;
     const actions = [
@@ -384,7 +371,7 @@ Deno.serve(async (req) => {
       : titre("Les actions de la semaine") + `<p style="${POLICE}font-size:14px;color:${C.doux};margin:0">Aucune action au planning cette semaine.</p>`;
 
     const sectionSuivante = aVenir.length
-      ? titre(`La semaine prochaine, du ${dateTitre(plusJours(lundiJour, 7))} au ${dateTitre(plusJours(lundiJour, 11))}`, "Ce qui est déjà programmé.") +
+      ? titre(`La semaine prochaine, du samedi ${dateTitre(plusJours(vendrediJour, 1))} au vendredi ${dateTitre(plusJours(vendrediJour, 7))}`, "Ce qui est déjà programmé.") +
         tableau(
           `<tr>${th("Jour")}${th("Société")}${th("Qui")}${th("Quoi")}${th("Comment")}${th("Avec")}${th("État")}</tr>`,
           aVenir.map((e) => `<tr>${td(jourCourt(e.au), "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(quoi(e))}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}</tr>`),
@@ -449,10 +436,10 @@ Deno.serve(async (req) => {
         `<tr>${td("FullEnrich", "border-bottom:0")}${td("Interlocuteurs et e-mails", "color:" + C.doux + ";border-bottom:0")}${td(`${creditsFE.toLocaleString("fr-FR")} crédits`, "text-align:right;white-space:nowrap;border-bottom:0")}</tr>`,
       ]);
 
-    const vendrediJour = plusJours(lundiJour, 4);
+    const samediJour = plusJours(vendrediJour, -6);
     // « du 19 au 23 octobre », ou « du 28 septembre au 2 octobre » à cheval sur deux mois.
-    const memeMois = lundiJour.slice(0, 7) === vendrediJour.slice(0, 7);
-    const du = memeMois ? String(Number(lundiJour.slice(8))) : dateTitre(lundiJour);
+    const memeMois = samediJour.slice(0, 7) === vendrediJour.slice(0, 7);
+    const du = memeMois ? String(Number(samediJour.slice(8))) : dateTitre(samediJour);
     const objet = `${essai ? "[Essai] " : ""}AvisDoc, semaine du ${du} au ${dateTitre(vendrediJour)} : ${pluriel(contactees, "société contactée", "sociétés contactées")}, ${pluriel(nbApprofondis, "dossier approfondi", "dossiers approfondis")}`;
     const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#eef2f5">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f5"><tr><td align="center" style="padding:24px 12px">
@@ -465,7 +452,7 @@ ${sectionSuivante}
 ${sectionProspection}
 ${sectionDepenses}
 <p style="margin:28px 0 0"><a href="${ADMIN}" style="${POLICE}display:inline-block;background:${C.bleu};color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:999px;font-size:14px">Ouvrir l’admin AvisDoc</a></p>
-<p style="${POLICE}font-size:12px;color:${C.doux};margin:20px 0 0;border-top:1px solid ${C.ligne};padding-top:12px">Récap envoyé chaque vendredi à 19 h aux associés d’AvisDoc. Il couvre la semaine du lundi au dimanche : ce qui est prévu ce week-end y figure « Prévu ».</p>
+<p style="${POLICE}font-size:12px;color:${C.doux};margin:20px 0 0;border-top:1px solid ${C.ligne};padding-top:12px">Récap envoyé chaque vendredi à 19 h aux associés d’AvisDoc. Il couvre la semaine du samedi au vendredi 19 h, à la suite exacte du précédent.</p>
 </td></tr></table></td></tr></table></body></html>`;
 
     // Un mail par associé, chacun à son seul nom (Olivier, 20/10) : pas d'envoi groupé.
