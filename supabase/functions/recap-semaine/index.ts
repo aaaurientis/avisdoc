@@ -257,7 +257,15 @@ Deno.serve(async (req) => {
       // (Dépenses et demandes Merx ci-dessus : à la date où le travail s'est TERMINÉ, pour
       // qu'une demande lancée dimanche et finie lundi ne tombe pas entre deux récaps.)
       // Les reports qui ont fait quitter la semaine (historique 0074), un par action.
-      toutLire<{ echange_id: string; de: string }>((de, a) => admin.from("admin_echanges_reports").select("echange_id, de").gte("de", L).lt("de", LS).gte("vers", LS).order("de").order("id").range(de, a)),
+      toutLire<{ echange_id: string; de: string }>((de, a) => admin
+          .from("admin_echanges_reports")
+          .select("echange_id, de")
+          // Quitté cette semaine pour plus tard, ou — fait le week-end après l'envoi
+          // précédent — quitté le week-end dernier pour cette semaine ou plus tard.
+          .or(`and(de.gte."${L}",de.lt."${LS}",vers.gte."${LS}"),and(le.gte."${D}",le.lt."${M}",de.lt."${L}",vers.gte."${L}")`)
+          .order("de")
+          .order("id")
+          .range(de, a)),
     ]);
     for (const r of [semaine, retard, prochaine, prospects, approfondis, demandes, fe, signes, rdvDeLaSemaine, reportees]) if (r.error) throw new Error(r.error.message);
 
