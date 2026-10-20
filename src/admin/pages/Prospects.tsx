@@ -492,6 +492,7 @@ export default function Prospects() {
         message:
           `Merx va chercher pour chacune l’identité officielle, l’effectif, les dirigeants et le dossier commercial. ` +
           `Comptez ${minutes} minute${minutes > 1 ? "s" : ""}${cout ? `, ${cout}` : ""}. ` +
+          `FullEnrich ajoutera ensuite 2 interlocuteurs et leur e-mail : au plus ${Math.round(aFaire.length * 2.5)} crédits, rien quand rien n’est trouvé. ` +
           `Vous pouvez continuer à travailler pendant ce temps ; les fiches se mettent à jour au fur et à mesure.`,
         action: "Approfondir",
       }))

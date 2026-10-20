@@ -188,16 +188,16 @@ export default function Interlocuteurs({
         ))}
       </div>
 
-      {/* Une fiche saisie à la main n'a pas eu sa première recherche : elle se demande ici. */}
-      {fullenrich && (!premiere || (!enCoursFE(premiere) && !plus)) && (
+      {/* La première recherche se fait à l'approfondissement (20/10) ; ensuite, une fois, « 2 autres ». */}
+      {fullenrich && premiere && !enCoursFE(premiere) && !plus && (
         <button
           type="button"
-          onClick={() => void demander(premiere ? "contacts_plus" : "contacts")}
+          onClick={() => void demander("contacts_plus")}
           disabled={envoi !== null}
           className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-50"
         >
           {envoi === "contacts_plus" || envoi === "contacts" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}{" "}
-          {premiere ? "Chercher 2 autres contacts" : "Chercher 2 contacts"}
+          Chercher 2 autres contacts
         </button>
       )}
       {souci && <p className="mt-2 text-[12.5px] font-semibold text-rose-700">{souci}</p>}

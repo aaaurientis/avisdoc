@@ -291,17 +291,24 @@ export const nomReduit = (t: string) =>
     .trim();
 
 /**
- * Les fiches d'une recherche entrent dans la file FullEnrich : 2 interlocuteurs et leur
- * e-mail chacune (Olivier, 19/10). La fonction « fullenrich » les traite, dans le
- * plafond du mois. Si la table n'existe pas encore (migration 0072 pas collée), on
- * n'empêche pas la recherche d'aboutir : on le signale seulement.
+ * Une fiche approfondie entre dans la file FullEnrich : 2 interlocuteurs et leur e-mail
+ * (Olivier, 20/10 : FullEnrich à l'approfondissement seulement, jamais à la prospection).
+ * Une fiche déjà passée sans résultat (rien facturé) est relancée ; une fiche qui a déjà
+ * eu ses contacts ne l'est pas (« Chercher 2 autres contacts » est là pour ça). Si la
+ * table n'existe pas encore, l'approfondissement n'en souffre pas.
  */
-export async function demanderContacts(sb: SupabaseClient, demandeId: string, par: string): Promise<boolean> {
-  const { data } = await sb.from("admin_prospects").select("id").eq("found_by", demandeId);
-  const ids = (data ?? []).map((r: { id: string }) => r.id);
-  if (!ids.length) return true;
-  const { error } = await sb.from("admin_fullenrich").insert(ids.map((id: string) => ({ prospect_id: id, kind: "contacts", demande_par: par })));
-  return !error;
+export async function contactsALApprofondissement(sb: SupabaseClient, prospectId: string, par: string): Promise<void> {
+  const { data: deja } = await sb.from("admin_fullenrich").select("id, statut, credits").eq("prospect_id", prospectId).eq("kind", "contacts").maybeSingle();
+  if (!deja) {
+    await sb.from("admin_fullenrich").insert({ prospect_id: prospectId, kind: "contacts", demande_par: par });
+    return;
+  }
+  if (["termine", "echec", "bloque"].includes(deja.statut as string) && !Number(deja.credits)) {
+    await sb
+      .from("admin_fullenrich")
+      .update({ statut: "en_attente", message: null, traite_le: null, mois: null, reserve: 0, demande_par: par })
+      .eq("id", deja.id);
+  }
 }
 
 export async function listFoundNames(sb: SupabaseClient, demandeId: string, avecVille = false): Promise<string[]> {
