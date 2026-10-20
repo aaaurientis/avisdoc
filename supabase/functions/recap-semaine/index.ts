@@ -66,10 +66,13 @@ const SECTEURS: Record<string, string> = {
   autre: "Autre",
 };
 
-/** « stephan.nacer@avisdoc.fr » → « Stephan » : les associés se connaissent par leur prénom. */
+/** Les prénoms tels qu'on les écrit : l'adresse « stephan.nacer@ » est celle de Stéphane. */
+const PRENOMS: Record<string, string> = { stephan: "Stéphane", irene: "Irène", henry: "Henry", laurent: "Laurent", arthur: "Arthur", olivier: "Olivier" };
+
+/** « stephan.nacer@avisdoc.fr » → « Stéphane » : les associés se connaissent par leur prénom. */
 const prenom = (email: string | null | undefined) => {
-  const p = (email ?? "").split("@")[0].split(/[.\-_]/)[0] ?? "";
-  return p ? p[0].toUpperCase() + p.slice(1) : "—";
+  const p = ((email ?? "").split("@")[0].split(/[.\-_]/)[0] ?? "").toLowerCase();
+  return PRENOMS[p] ?? (p ? p[0].toUpperCase() + p.slice(1) : "—");
 };
 
 /** Le jour et l'heure à Paris, quel que soit le fuseau du serveur. */
@@ -267,8 +270,11 @@ Deno.serve(async (req) => {
       ...(nbSignes ? [tuile(String(nbSignes), nbSignes > 1 ? "clients signés" : "client signé", C.vertPale)] : []),
     ];
 
+    // Daté d'avant la semaine : on dit pourquoi il est là — noté, ou annulé, cette semaine.
+    const pourquoi = (e: Echange) =>
+      Date.parse(e.created_at) >= lundi.getTime() ? `noté le ${jourCourt(e.created_at)}` : e.traite_le ? `${e.resultat === "Annulé" ? "annulé" : "clos"} le ${jourCourt(e.traite_le)}` : "";
     const ligneAction = (e: Echange, retardee = false) =>
-      `<tr>${td(`${jourCourt(e.au)}${retardee ? sousTexte(`noté le ${jourCourt(e.created_at)}`) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(QUOI[e.kind] ?? e.kind)}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
+      `<tr>${td(`${jourCourt(e.au)}${retardee ? sousTexte(pourquoi(e)) : ""}`, "white-space:nowrap;color:" + C.doux)}${td(`<strong>${echapper(societe(e))}</strong>`)}${td(prenom(e.par))}${td(QUOI[e.kind] ?? e.kind)}${td(comment(e))}${td(echapper(e.avec ?? "—"))}${td(pastille(etat(e)))}${td(note(e), "min-width:240px;line-height:1.5")}</tr>`;
     const actions = [...dansLaSemaine.map((e) => ligneAction(e)), ...enRetard.map((e) => ligneAction(e, true))];
 
     const sectionActions = actions.length
@@ -329,7 +335,7 @@ Deno.serve(async (req) => {
             : "")
         : "";
 
-    const POSTES: Record<string, string> = { approfondissement: "Merx, approfondissements", recherche: "Merx, recherches de prospects", email: "Merx, e-mails rédigés", completion: "Merx, fiches complétées" };
+    const POSTES: Record<string, string> = { approfondissement: "Merx, approfondissements", recherche: "Merx, recherches et résumés « Où on en est »", email: "Merx, e-mails rédigés", completion: "Merx, fiches complétées" };
     const lignesDepenses = [...parPoste]
       .filter(([, p]) => p.cout > 0)
       .sort((a, b) => b[1].cout - a[1].cout)
@@ -343,7 +349,10 @@ Deno.serve(async (req) => {
       ]);
 
     const vendrediJour = plusJours(lundiJour, 4);
-    const objet = `${essai ? "[Essai] " : ""}AvisDoc, semaine du ${dateTitre(lundiJour)} au ${dateTitre(vendrediJour)} : ${pluriel(contactees, "société contactée", "sociétés contactées")}, ${pluriel(nbApprofondis, "dossier approfondi", "dossiers approfondis")}`;
+    // « du 19 au 23 octobre », ou « du 28 septembre au 2 octobre » à cheval sur deux mois.
+    const memeMois = lundiJour.slice(0, 7) === vendrediJour.slice(0, 7);
+    const du = memeMois ? String(Number(lundiJour.slice(8))) : dateTitre(lundiJour);
+    const objet = `${essai ? "[Essai] " : ""}AvisDoc, semaine du ${du} au ${dateTitre(vendrediJour)} : ${pluriel(contactees, "société contactée", "sociétés contactées")}, ${pluriel(nbApprofondis, "dossier approfondi", "dossiers approfondis")}`;
     const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#eef2f5">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f5"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:860px;background:#ffffff;border-radius:14px"><tr><td style="padding:28px 32px">
