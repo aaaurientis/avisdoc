@@ -135,13 +135,15 @@ export function personnesDuProspect(
       .map((a) => a.trim().toLowerCase()),
   )];
   const f = formatMaison([...relevees, ...(JSON.stringify(p.dossier ?? null).match(MAIL) ?? [])], p.website);
-  const lettres = (a: string) => sansAccent(a.split("@")[0]).replace(/[^a-z]/g, "");
   for (const q of sortie) {
     const mots = sansAccent(q.nom.replace(/\(.*?\)/g, " ")).replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
     if (mots.length < 2) continue;
     const initiale = mots[0][0];
     const famille = mots.slice(1).join("").replace(/[^a-z]/g, "");
-    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && lettres(a).includes(famille) && lettres(a)[0] === initiale;
+    const prenom = mots[0].replace(/[^a-z]/g, "");
+    // Correspondance exacte : « j.martinez@ » n'est pas Jean Martin (Codex, 20/10).
+    const formes = new Set([`${prenom}.${famille}`, `${initiale}.${famille}`, `${prenom}${famille}`, `${initiale}${famille}`, `${famille}.${prenom}`, `${famille}${prenom}`, `${prenom}_${famille}`]);
+    const porteSonNom = (a: string) => !ADRESSE_GENERIQUE.test(a) && formes.has(sansAccent(a.split("@")[0]).replace(/-/g, ""));
     if (q.email && porteSonNom(q.email)) continue;
     const vue = relevees.find(porteSonNom);
     const perso = vue ?? (f ? adresseComposee(q.nom, f) : null);
