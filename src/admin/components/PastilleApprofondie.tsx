@@ -11,7 +11,7 @@ export default function PastilleApprofondie({ le, className = "" }: { le: string
     <span
       title={texte}
       aria-label={texte}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-avisdoc-teal/10 p-1 align-middle text-avisdoc-teal ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-yellow-300 p-1 align-middle text-yellow-900 ${className}`}
     >
       <Sparkles className="size-3" />
     </span>

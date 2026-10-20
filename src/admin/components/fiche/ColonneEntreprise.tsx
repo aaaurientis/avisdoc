@@ -83,6 +83,14 @@ const TEL = /(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g;
 const MEL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Rien avant la coordonnée que de la ponctuation ou « e-mail » : elle suit la précédente. */
 const debutPhrase = (avant: string) => !/^[\s,;:–—-]*(?:et\s+)?(?:e-mail|mail|tél\.?|ou)?\s*:?\s*$/i.test(avant);
+/** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
+const MODELE = /^(?:prenom|nom|p|n|initiale|x+)(?:[._-](?:prenom|nom|p|n|initiale))*$/i;
+/** « ludovic.lamotte@… » → « Ludovic Lamotte » : le nom que porte une adresse nominative. */
+const nomDeLAdresse = (m: string): string | null => {
+  const local = m.split("@")[0];
+  if (!/^[a-zà-ÿ-]{2,}\.[a-zà-ÿ-]{2,}$/i.test(local)) return null;
+  return local.split(".").map((x) => x.replace(/(^|-)(\p{L})/gu, (_, s, c) => s + c.toUpperCase())).join(" ");
+};
 const chiffres = (t: string) => t.replace(/\D/g, "").replace(/^33/, "0");
 
 export interface AutreContact {
@@ -118,6 +126,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
     d.qui_aborder,
     d.accroche,
     d.fiche_appel?.qui_demander,
+    d.fiche_appel?.format_email,
     d.fiche_appel?.si_on_insiste,
     ...(d.arguments ?? []).flatMap((a) => [a.argument, a.parce_que]),
     ...(d.objections ?? []).map((o) => o.reponse),
@@ -145,6 +154,7 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
           if (dernier) dernier.qui = `${dernier.qui} ${paren[1]}`;
           avant = avant.slice(paren[0].length);
         }
+        if (estMel && MODELE.test(coord.split("@")[0])) continue;
         if (estMel ? melsConnus.has(cle) : connus.has(cle)) continue;
         if (vus.has(cle)) continue;
         vus.add(cle);
@@ -155,11 +165,16 @@ export function autresContactsDe(p: Prospect | null): AutreContact[] {
         const morceaux = avant.split(/[:;,]\s|\s[–—-]\s(?=[a-zé])/).map(nettoyer);
         const qui = (!dernier || debutPhrase(avant) ? [...morceaux].reverse().find(Boolean) : morceaux.at(-1)) ?? "";
         // « …au 05 47 84 06 76, e-mail x@y.fr » : l'e-mail revient au même contact.
-        if (!qui && dernier) {
+        if (!qui && dernier && !(estMel && nomDeLAdresse(coord))) {
           (estMel ? dernier.emails : dernier.telephones).push(coord);
           continue;
         }
-        const nom = qui || "Contact cité dans le dossier";
+        // Une adresse nominative dit au moins à qui elle est : « d'après x@… et
+        // ludovic.lamotte@… » ne donne pas de nom avant, l'adresse le donne (20/10).
+        const personne = estMel ? nomDeLAdresse(coord) : null;
+        const nom = personne && (!qui || /\b(?:d'après|et|relevée?s?|format)\b/i.test(qui))
+          ? `${personne} — fonction non précisée`
+          : qui ? qui.charAt(0).toUpperCase() + qui.slice(1) : "Contact cité dans le dossier";
         const deja = out.find((c) => c.qui === nom);
         if (deja) {
           (estMel ? deja.emails : deja.telephones).push(coord);
