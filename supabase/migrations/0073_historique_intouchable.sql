@@ -57,3 +57,17 @@ drop trigger if exists admin_echanges_intouchable on public.admin_echanges;
 create trigger admin_echanges_intouchable
   before update or delete on public.admin_echanges
   for each row execute function public.admin_echanges_intouchable();
+
+-- Ajouter une précision à la suite, sur le texte tel qu'il est en base À CET INSTANT :
+-- deux personnes peuvent compléter la même action sans se gêner.
+create or replace function public.admin_echanges_ajouter_precision(p_id uuid, p_ajout text)
+returns void
+language sql
+security invoker
+as $$
+  update public.admin_echanges
+     set detail = case when coalesce(detail, '') ~ '\S' then detail || E'\n\n' || p_ajout else coalesce(detail, '') || p_ajout end
+   where id = p_id;
+$$;
+
+grant execute on function public.admin_echanges_ajouter_precision(uuid, text) to authenticated;

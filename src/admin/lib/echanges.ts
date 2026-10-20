@@ -233,9 +233,9 @@ export async function marquerTraitee(id: string): Promise<void> {
 export async function ajouterPrecision(e: Echange, ajout: string, qui: string): Promise<void> {
   const jour = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" });
   const suite = `— Ajout du ${jour} (${qui}) : ${ajout.trim()}`;
-  // Le texte d'origine reste mot pour mot (espaces compris) : la base refuse tout le reste.
-  const detail = e.detail?.trim() ? `${e.detail}\n\n${suite}` : (e.detail ?? "") + suite;
-  const { error } = await supabaseAdmin.from("admin_echanges").update({ detail }).eq("id", e.id);
+  // Écrit en base à la suite du texte du moment (migration 0073) : le texte d'origine
+  // reste mot pour mot, et deux ajouts simultanés ne se gênent pas.
+  const { error } = await supabaseAdmin.rpc("admin_echanges_ajouter_precision", { p_id: e.id, p_ajout: suite });
   if (error) throw new Error(error.message);
 }
 
