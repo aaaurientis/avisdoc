@@ -39,6 +39,7 @@ interface Demande {
   kind: string;
   request: string;
   usage: Consommation | null;
+  model: string | null;
   prospect_id: string | null;
   objet: string | null;
   corps: string | null;
@@ -244,7 +245,7 @@ export default function Prospects() {
     // affichage ne faisait que ralentir l'écran.
     const { data: passees } = await supabaseAdmin
       .from("admin_merx_demandes")
-      .select("id, kind, request, usage, prospect_id, objet, corps, finished_at")
+      .select("id, kind, request, usage, model, prospect_id, objet, corps, finished_at")
       .eq("status", "terminee")
       .neq("kind", "completion");
     setDemandes((passees ?? []) as Demande[]);
