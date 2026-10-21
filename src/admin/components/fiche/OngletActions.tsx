@@ -313,6 +313,7 @@ export default function OngletActions({
           etape={etape}
           entrer={entrer}
           depuisPrevue={ouvert.quoi === "compte-rendu" ? ouvert.action : null}
+          intitule={ouvert.quoi === "nouvelle" ? ouvert.intitule : undefined}
           rediger={onEcrireAvecMerx}
           onFermer={() => setOuvert(null)}
           onEnregistre={() => void apres()}

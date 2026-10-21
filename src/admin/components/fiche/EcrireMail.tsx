@@ -53,6 +53,7 @@ export default function EcrireMail({
   etape,
   entrer,
   depuisPrevue,
+  intitule,
   rediger,
   onFermer,
   onEnregistre,
@@ -65,6 +66,8 @@ export default function EcrireMail({
   entrer?: (colonne: string) => Promise<ClesFiche>;
   /** Le mail programmé qu'on écrit maintenant : il se clôt à l'envoi. */
   depuisPrevue?: Echange | null;
+  /** Une proposition choisie sur la fiche (« Relancer pour la saison ») : ce qu'on veut dire. */
+  intitule?: string;
   /** Merx rédige ; reçoit ce qu'on veut dire et à qui. */
   rediger?: (intention: string, a: ContactMail | null) => Promise<BrouillonRendu>;
   onFermer: () => void;
@@ -76,9 +79,12 @@ export default function EcrireMail({
   const [nom, setNom] = useState(premier?.nom ?? "");
   const [adresse, setAdresse] = useState(premier?.email ?? "");
   const [facon, setFacon] = useState<"merx" | "moi">(rediger ? "merx" : "moi");
-  const [intention, setIntention] = useState(depuisPrevue?.detail ?? "");
-  const [objet, setObjet] = useState("");
-  const [corps, setCorps] = useState("");
+  // Un mail programmé rouvert : son brouillon revient (objet = intitulé, texte = détail) ;
+  // sans brouillon, son détail est ce qu'on voulait dire.
+  const brouillonPrevu = Boolean(depuisPrevue && !/^(e-mail prévu|relance prévue|e-mail)$/i.test(depuisPrevue.titre.trim()));
+  const [intention, setIntention] = useState(brouillonPrevu ? "" : (depuisPrevue?.detail ?? intitule ?? ""));
+  const [objet, setObjet] = useState(brouillonPrevu ? (depuisPrevue?.titre ?? "") : "");
+  const [corps, setCorps] = useState(brouillonPrevu ? (depuisPrevue?.detail ?? "") : "");
   const [messagerie, setMessagerie] = useState<Messagerie>(lirePreference);
   const [ouvert, setOuvert] = useState(false);
   const [relance, setRelance] = useState<number | null>(7);
@@ -207,8 +213,10 @@ export default function EcrireMail({
       const c = await clesDeLAction(false);
       await ajouterEchange(c, {
         kind: "email",
+        // Le brouillon se garde tel quel (objet en intitulé, texte en détail) pour revenir
+        // à l'identique ; sans brouillon, on garde ce qu'on voulait dire.
         titre: objet.trim() || "E-mail prévu",
-        detail: [intention.trim(), corps.trim()].filter(Boolean).join("\n\n"),
+        detail: corps.trim() || intention.trim(),
         au: instant(le, aHeure),
         par,
         prevu: true,

@@ -118,9 +118,16 @@ export default function ParlerAMerx({
           };
           if (i >= 0) personnes[i] = nouvelle;
           else personnes.push(nouvelle);
+          // Le contact principal de la fiche : sa fonction et son adresse suivent la correction
+          // (le téléphone principal reste le standard de l'entreprise).
+          const principal = Boolean(a.contact_name && cleNom(a.contact_name) === cleNom(nom));
           avant = ancienne ? [ancienne.nom, ancienne.fonction, ancienne.email, ancienne.telephone].filter(Boolean).join(", ") : "absent";
           apres = [nouvelle.nom, nouvelle.fonction, nouvelle.email, nouvelle.telephone].filter(Boolean).join(", ");
-          patch = { personnes };
+          patch = {
+            personnes,
+            ...(principal && c.fonction?.trim() ? { contact_role: c.fonction.trim() } : {}),
+            ...(principal && c.email?.trim() ? { contact_email: c.email.trim() } : {}),
+          };
         }
       }
       const { error } = await supabaseAdmin.from("admin_prospects").update(patch).eq("id", prospect.id);
