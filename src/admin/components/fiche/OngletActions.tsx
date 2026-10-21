@@ -133,6 +133,7 @@ export default function OngletActions({
   suggestions,
   onCompte,
   ouvrirGenre,
+  version,
 }: {
   cles: ClesFiche;
   /** Les noms des interlocuteurs, le principal d'abord. */
@@ -151,6 +152,8 @@ export default function OngletActions({
   onCompte?: (n: number) => void;
   /** Ouvrir directement une action de ce genre (le bouton « Écrire » de la colonne). */
   ouvrirGenre?: { genre: GenreEchange; n: number } | null;
+  /** Change quand l'historique a bougé ailleurs (une correction notée par Merx) : on le relit. */
+  version?: number;
 }) {
   const [actions, setActions] = useState<Echange[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -168,7 +171,7 @@ export default function OngletActions({
 
   useEffect(() => {
     void charger();
-  }, [charger]);
+  }, [charger, version]);
 
   useEffect(() => {
     if (ouvrirGenre) setOuvert({ quoi: "nouvelle", genre: ouvrirGenre.genre });

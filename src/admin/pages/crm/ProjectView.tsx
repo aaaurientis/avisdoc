@@ -151,6 +151,7 @@ export default function ProjectView({
   // Les onglets de la fiche « façon Onetip » : Actions, Dossier, et Devis (12/10).
   const [tab, setTab] = useState("actions");
   const [parler, setParler] = useState(false);
+  const [versionHisto, setVersionHisto] = useState(0);
 
   /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
   const chargerOrigine = useCallback(async () => {
@@ -473,7 +474,10 @@ export default function ProjectView({
               </button>
             )}
             {parler && origine && (
-              <ParlerAMerx prospect={origine} cles={clesHistorique} onModifiee={chargerOrigine} onFermer={() => setParler(false)} />
+              <ParlerAMerx prospect={origine} cles={clesHistorique} onModifiee={async () => {
+                  setVersionHisto((v) => v + 1);
+                  await chargerOrigine();
+                }} onFermer={() => setParler(false)} />
             )}
             <button type="button" onClick={startEdit} disabled={!origineLue} className={cn(btnOutline, "disabled:opacity-60")}>
               <Pencil className="size-3.5" /> Modifier la fiche
@@ -488,6 +492,7 @@ export default function ProjectView({
           {/* Toujours monté : le compte des actions à venir reste juste sur les autres onglets. */}
           <div className={tab === "actions" ? "" : "hidden"}>
             <OngletActions
+            version={versionHisto}
               cles={clesHistorique}
               personnes={interlocuteurs.map((q) => q.nom)}
               etape={{ actuelle: client.stage, colonnes: stages.map((s) => s.label) }}

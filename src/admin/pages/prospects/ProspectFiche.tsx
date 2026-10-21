@@ -78,6 +78,7 @@ export default function ProspectFiche({
   const [erreur, setErreur] = useState<string | null>(null);
   const [onglet, setOnglet] = useState("actions");
   const [parler, setParler] = useState(false);
+  const [versionHisto, setVersionHisto] = useState(0);
   const [nbAVenir, setNbAVenir] = useState(0);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
   /** L'affaire née de ce prospect — tout de suite après son entrée, avant que la liste ne soit relue. */
@@ -204,7 +205,10 @@ export default function ProspectFiche({
           <button type="button" onClick={() => setParler(true)} className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
             <MessagesSquare className="size-3.5" /> Parler à Merx
           </button>
-          {parler && <ParlerAMerx prospect={p} cles={cles} onModifiee={onActualiser} onFermer={() => setParler(false)} />}
+          {parler && <ParlerAMerx prospect={p} cles={cles} onModifiee={async () => {
+                setVersionHisto((v) => v + 1);
+                await onActualiser();
+              }} onFermer={() => setParler(false)} />}
           {onModifier && (
             <button type="button" onClick={() => onModifier(p)} className="h-[34px] rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
               Modifier la fiche
@@ -218,6 +222,7 @@ export default function ProspectFiche({
       {/* Toujours monté : le compte des actions à venir reste juste quand on est sur Dossier. */}
       <div className={onglet === "actions" ? "" : "hidden"}>
         <OngletActions
+            version={versionHisto}
           cles={cles}
           personnes={personnes.map((q) => q.nom)}
           etape={{ actuelle: idAffaire ? (affaire?.stage ?? null) : null, colonnes }}

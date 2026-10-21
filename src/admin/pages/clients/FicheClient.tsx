@@ -65,6 +65,7 @@ export default function FicheClient({
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("actions");
   const [parler, setParler] = useState(false);
+  const [versionHisto, setVersionHisto] = useState(0);
   const [origine, setOrigine] = useState<Prospect | null>(null);
   const [nbAVenir, setNbAVenir] = useState(0);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
@@ -355,6 +356,7 @@ export default function FicheClient({
                 prospect={origine}
                 cles={clesHistorique}
                 onModifiee={async () => {
+                  setVersionHisto((v) => v + 1);
                   const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("id", origine.id).maybeSingle();
                   if (data) setOrigine(data as Prospect);
                 }}
@@ -378,6 +380,7 @@ export default function FicheClient({
         {/* Toujours monté : le compte des actions à venir reste juste sur les autres onglets. */}
         <div className={onglet === "actions" ? "" : "hidden"}>
           <OngletActions
+            version={versionHisto}
             cles={clesHistorique}
             personnes={interlocuteurs.map((q) => q.nom)}
             etape={null}
