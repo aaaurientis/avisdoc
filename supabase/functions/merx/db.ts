@@ -641,19 +641,23 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; score: unknown; contact_source: string | null }
     | null;
   if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
-  // Un numéro que le commercial a corrigé lui-même (absent de tout ce que Merx avait
-  // relevé) reste : c'est lui qui a appelé. Aucune colonne ne dit qui a écrit le numéro ;
-  // Merx ne l'a jamais tiré que du site (site_contacts), du modèle (dossier) ou de la note
-  // (score) — Pappers et Google, refusés depuis le 24/09, n'en ont fourni aucun. Pas des
-  // personnes : la saisie du commercial y recopie le numéro qu'il corrige.
+  // Un numéro que le commercial a saisi ou corrigé lui-même reste : c'est lui qui a appelé.
+  // Merx ne remplace — ou n'efface — que les numéros qu'il a lui-même posés, reconnus à
+  // ce qu'ils figurent dans son dossier (fiche d'appel, standard) ou dans sa note, ou à
+  // leur source (annuaire, Pappers, Google). La fiche de saisie marque « saisi à la main »
+  // tout téléphone qu'elle change ; elle recopie aussi le numéro dans site_contacts et les
+  // personnes, qui ne prouvent donc rien.
   const neuf = (t: string) => t.replace(/\D/g, "").slice(-9);
   const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
-  const merxLAvait = [before?.dossier, ancienSite?.site_contacts, ancienSite?.score]
-    .map((v) => JSON.stringify(v ?? "").replace(/\D/g, ""))
-    .some((chiffres) => chiffres.includes(ancienTel)) ||
-    // Source posée par Merx lui-même (annuaire, Pappers, Google) : ce n'est pas une saisie.
-    /pappers\.fr|google\.[a-z.]+\/maps|annuaire-entreprises|pagesjaunes/i.test(ancienSite?.contact_source ?? "");
-  if (ancienTel.length === 9 && !merxLAvait) delete patch.contact_phone;
+  const saisiALaMain = /saisi à la main/i.test(ancienSite?.contact_source ?? "");
+  const merxLAvait =
+    !saisiALaMain &&
+    ([before?.dossier, ancienSite?.score].map((v) => JSON.stringify(v ?? "").replace(/\D/g, "")).some((chiffres) => chiffres.includes(ancienTel)) ||
+      /pappers\.fr|google\.[a-z.]+\/maps|annuaire-entreprises|pagesjaunes/i.test(ancienSite?.contact_source ?? ""));
+  if (ancienTel.length === 9 && !merxLAvait) {
+    delete patch.contact_phone;
+    delete patch.contact_source;
+  }
   for (const k of Object.keys(patch)) if ((patch[k] === null && !remplaces.has(k)) || patch[k] === undefined) delete patch[k];
   // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
   // rien trouvé n'en trouvera pas davantage la fois suivante, et c'est elle qui

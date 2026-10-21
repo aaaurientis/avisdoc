@@ -176,13 +176,18 @@ export function colonnesProspect(s: FicheSaisie, avant?: ProspectLu | null): Rec
     // Sans interlocuteur, le contact de la fiche est l'entreprise elle-même.
     contact_email: principal ? principal.email : n(s.email),
     contact_phone: principal ? principal.telephone : n(s.telephone),
-    contact_source: principal
-      ? avant?.contact_name === principal.nom
-        ? (avant?.contact_source ?? "saisi à la main")
-        : "saisi à la main"
-      : s.telephone.trim() || s.email.trim()
-        ? (avant?.contact_source ?? "saisi à la main")
-        : null,
+    // Un téléphone changé par le commercial porte « saisi à la main » : un approfondissement
+    // suivant ne le remplace plus (Merx ne remplace que les numéros qu'il a lui-même posés).
+    contact_source:
+      (principal ? principal.telephone : n(s.telephone)) && (principal ? principal.telephone : n(s.telephone)) !== (avant?.contact_phone ?? null)
+        ? "saisi à la main"
+        : principal
+          ? avant?.contact_name === principal.nom
+            ? (avant?.contact_source ?? "saisi à la main")
+            : "saisi à la main"
+          : s.telephone.trim() || s.email.trim()
+            ? (avant?.contact_source ?? "saisi à la main")
+            : null,
     personnes: personnes.length ? personnes : null,
     referent: n(s.referent),
     rationale: n(s.pourquoi),
