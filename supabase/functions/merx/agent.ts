@@ -941,7 +941,14 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     if (!standard.principal) {
       standard.principal = n;
       standard.pourquoi = null;
-    } else if (standard.autres.length < 3) standard.autres.push(n);
+    } else standard.autres.push(n);
+  }
+  // Un numéro vérifié passe toujours devant un numéro à vérifier, d'où qu'il vienne.
+  {
+    const tous = [standard.principal, ...standard.autres].filter((x): x is NonNullable<typeof x> => Boolean(x));
+    const ordre = [...tous.filter((x) => x.statut === "verifie"), ...tous.filter((x) => x.statut !== "verifie")];
+    standard.principal = ordre[0] ?? null;
+    standard.autres = ordre.slice(1, 4);
   }
   const phone = standard.principal?.numero ?? null;
 

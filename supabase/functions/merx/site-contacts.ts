@@ -84,7 +84,7 @@ const PAGES_RAPIDES = ["", "contact", "nous-contacter", "mentions-legales"];
 
 /** « 01.60.35.45.75 », « +33 1 60 35 45 75 » → « 01 60 35 45 75 ». */
 function numeroFrancais(brut: string): string | null {
-  const d = brut.replace(/\D/g, "").replace(/^0033/, "33").replace(/^33(?=[1-9]\d{8}$)/, "0");
+  const d = brut.replace(/\D/g, "").replace(/^0033/, "33").replace(/^330(?=[1-9]\d{8}$)/, "33").replace(/^33(?=[1-9]\d{8}$)/, "0");
   return /^0[1-9]\d{8}$/.test(d) ? d.replace(/(\d{2})(?=\d)/g, "$1 ") : null;
 }
 
