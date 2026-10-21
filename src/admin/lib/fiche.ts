@@ -209,3 +209,14 @@ export function personnesDuProspect(
   }
   return sortie;
 }
+
+/**
+ * Les interlocuteurs pour la fenêtre « Mail » : l'adresse de la personne relevée d'abord,
+ * puis celle trouvée, puis celle composée au format maison (à confirmer).
+ */
+export const contactsMail = (personnes: PersonneFiche[]) =>
+  personnes.map((q) => ({
+    nom: q.nom,
+    fonction: q.fonction,
+    email: (q.emailPerso && !q.persoDeduit ? q.emailPerso : null) ?? q.email ?? q.emailPerso ?? null,
+  }));

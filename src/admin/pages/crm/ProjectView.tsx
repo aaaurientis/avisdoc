@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Lock, Minus, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Loader2, Lock, MessagesSquare, Minus, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import ParlerAMerx from "../../components/fiche/ParlerAMerx";
 import type { Client, Stage } from "../../types";
 import { euro, splitAdresse, joinAdresse } from "../../lib/format";
 import { DOC_EXT, PROPO_STATUTS, TONES, colonnesDe, stageMeta, stageRank } from "../../lib/ui-tokens";
@@ -13,17 +14,16 @@ import QontoTag from "../../espace/QontoTag";
 import JournalCard from "../../espace/JournalCard";
 import { useAuth } from "../../auth/AuthContext";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
-import BrouillonEmail from "../prospects/BrouillonEmail";
 import type { Jalon } from "../../lib/echanges";
 import { SECTEURS } from "../../lib/merx";
 import type { Prospect } from "../../lib/merx";
-import { approfondirProspect, redigerEmailProspect, type BrouillonRendu } from "../../lib/merx-appels";
+import { approfondirProspect, redigerEmailProspect } from "../../lib/merx-appels";
 import FicheEntreprise from "../../components/FicheEntreprise";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
-import { notesDe, personnesDuProspect } from "../../lib/fiche";
+import { contactsMail, notesDe, personnesDuProspect } from "../../lib/fiche";
 import ColonneEntreprise, { autresContactsDe, etablissementDe } from "../../components/fiche/ColonneEntreprise";
 import PlacePipeline from "../../components/fiche/PlacePipeline";
 import OngletActions from "../../components/fiche/OngletActions";
@@ -143,14 +143,14 @@ export default function ProjectView({
   const [origineLue, setOrigineLue] = useState(false);
   const [nbAVenir, setNbAVenir] = useState(0);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
-  const [merxEnCours, setMerxEnCours] = useState<"approfondir" | "email" | null>(null);
+  const [merxEnCours, setMerxEnCours] = useState<"approfondir" | null>(null);
   const [merxErreur, setMerxErreur] = useState<string | null>(null);
-  const [brouillon, setBrouillon] = useState<BrouillonRendu | null>(null);
   /** Change de valeur après une action : l'historique se relit. */
   const [relire, setRelire] = useState(0);
 
   // Les onglets de la fiche « façon Onetip » : Actions, Dossier, et Devis (12/10).
   const [tab, setTab] = useState("actions");
+  const [parler, setParler] = useState(false);
 
   /** Le prospect d’où vient l’affaire : il porte la note et l’angle d’approche. */
   const chargerOrigine = useCallback(async () => {
@@ -257,17 +257,13 @@ export default function ProjectView({
     }
   };
 
-  const demanderAMerx = async (quoi: "approfondir" | "email") => {
+  const demanderAMerx = async (quoi: "approfondir") => {
     if (!origine || merxEnCours) return;
     setMerxEnCours(quoi);
     setMerxErreur(null);
     try {
-      if (quoi === "approfondir") {
-        await approfondirProspect(origine.id);
-        await chargerOrigine();
-      } else {
-        setBrouillon(await redigerEmailProspect(origine.id, user?.name ?? user?.email ?? ""));
-      }
+      await approfondirProspect(origine.id);
+      await chargerOrigine();
     } catch (e) {
       setMerxErreur(e instanceof Error ? e.message : "Merx n’a pas répondu.");
     } finally {
@@ -470,6 +466,15 @@ export default function ProjectView({
                 {merxEnCours === "approfondir" ? "Merx enrichit…" : "Enrichir par Merx"}
               </button>
             )}
+            {/* Une erreur, une fiche à améliorer : on en parle avec Merx (21/10). */}
+            {origine && (
+              <button type="button" onClick={() => setParler(true)} className={btnOutline}>
+                <MessagesSquare className="size-3.5" /> Parler à Merx
+              </button>
+            )}
+            {parler && origine && (
+              <ParlerAMerx prospect={origine} cles={clesHistorique} onModifiee={chargerOrigine} onFermer={() => setParler(false)} />
+            )}
             <button type="button" onClick={startEdit} disabled={!origineLue} className={cn(btnOutline, "disabled:opacity-60")}>
               <Pencil className="size-3.5" /> Modifier la fiche
             </button>
@@ -488,7 +493,8 @@ export default function ProjectView({
               etape={{ actuelle: client.stage, colonnes: stages.map((s) => s.label) }}
               jalons={jalons}
               avancer={async (s) => setClientStage(client.id, s)}
-              onEcrireAvecMerx={origine ? () => demanderAMerx("email") : undefined}
+              onEcrireAvecMerx={origine ? (intention, a) => redigerEmailProspect(origine.id, user?.name ?? user?.email ?? "", intention, a) : undefined}
+              contacts={contactsMail(interlocuteurs)}
               onCompte={compter}
             />
           </div>
@@ -638,15 +644,6 @@ export default function ProjectView({
         </Modal>
       )}
 
-      {brouillon && (
-        <BrouillonEmail
-          nom={client.company}
-          objet={brouillon.objet}
-          corps={brouillon.corps}
-          destinataire={brouillon.destinataire}
-          onClose={() => setBrouillon(null)}
-        />
-      )}
     </>
   );
 

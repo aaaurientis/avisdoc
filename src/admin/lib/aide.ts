@@ -248,7 +248,11 @@ export const QUESTIONS: ThemeAide[] = [
       },
       {
         question: "Comment faire écrire un e-mail par Merx ?",
-        reponse: "Sur la fiche, « + Mail », puis « Écrire un e-mail personnalisé avec Merx » (une trentaine de secondes). Rien n'est envoyé par le Hub : « Ouvrir dans ma messagerie » ou « Copier », et vous envoyez vous-même.",
+        reponse: "Sur la fiche, « + Mail ». Choisissez à qui, puis « Merx l'écrit pour moi » (dites-lui en une phrase ce que vous voulez dire) ou « J'écris moi-même » ; l'objet et le message se corrigent directement. « Ouvrir dans Gmail » ouvre votre boîte, mail déjà rempli (Outlook, autre messagerie ou Copier sinon) : vous envoyez vous-même. Puis « Mail envoyé » : il entre dans l'historique, texte compris, avec une relance si vous voulez. Un mail envoyé hors du Hub : « Déjà envoyé hors du Hub », collez-le. Pour plus tard : « Pas maintenant : me le rappeler le… ».",
+      },
+      {
+        question: "Une information de la fiche est fausse : que faire ?",
+        reponse: "En haut de la fiche, « Parler à Merx ». Dites-lui ce qui ne va pas (« le numéro est faux », « trouve le responsable QSE ») : il vérifie, sur le web si besoin, et vous propose chaque correction avec sa source. Rien ne change sans votre clic sur « Appliquer » ; chaque correction appliquée est notée dans l'historique.",
       },
       {
         question: "Comment savoir où on en est avec une entreprise ?",

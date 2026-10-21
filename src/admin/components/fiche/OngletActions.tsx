@@ -10,6 +10,8 @@ import { ChevronRight } from "lucide-react";
 import { LIEU_RDV, chargerEchanges, libelleGenre, type ClesFiche, type Echange, type GenreEchange, type Jalon } from "../../lib/echanges";
 import { AUTRES_ACTIONS, BOUTONS_ACTION, LIBELLE_BOUTON, heureISO, prenomDe, quandCourt, resultatNegatif } from "../../lib/actions-fiche";
 import CompteRendu, { type EtapeFiche } from "./CompteRendu";
+import EcrireMail, { type ContactMail } from "./EcrireMail";
+import type { BrouillonRendu } from "../../lib/merx-appels";
 import ResumeActivite from "./ResumeActivite";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +129,7 @@ export default function OngletActions({
   entrer,
   avancer,
   onEcrireAvecMerx,
+  contacts,
   suggestions,
   onCompte,
   ouvrirGenre,
@@ -138,7 +141,10 @@ export default function OngletActions({
   jalons: Jalon[];
   entrer?: (colonne: string) => Promise<ClesFiche>;
   avancer?: (colonne: string) => Promise<void>;
-  onEcrireAvecMerx?: (intention: string) => Promise<void> | void;
+  /** Merx rédige un mail ; reçoit ce qu'on veut dire et à qui, rend le brouillon. */
+  onEcrireAvecMerx?: (intention: string, a: ContactMail | null) => Promise<BrouillonRendu>;
+  /** Les interlocuteurs avec leur adresse, pour la fenêtre « Mail ». */
+  contacts?: ContactMail[];
   /** Ce qu'on propose couramment à un client : un clic ouvre l'action, l'intitulé écrit. */
   suggestions?: { titre: string; genre: GenreEchange }[];
   /** Le nombre d'actions à venir, pour l'onglet. */
@@ -298,7 +304,22 @@ export default function OngletActions({
         )}
       </section>
 
-      {ouvert && (
+      {/* Un mail à écrire (nouveau, ou programmé dont c'est le moment) : la fenêtre « Mail ». */}
+      {ouvert && ((ouvert.quoi === "nouvelle" && ouvert.genre === "email") || (ouvert.quoi === "compte-rendu" && ouvert.action.kind === "email")) && (
+        <EcrireMail
+          key={ouvert.quoi === "nouvelle" ? "mail-nouveau" : `mail-${ouvert.action.id}`}
+          cles={cles}
+          contacts={contacts ?? personnes.map((nom) => ({ nom, email: null }))}
+          etape={etape}
+          entrer={entrer}
+          depuisPrevue={ouvert.quoi === "compte-rendu" ? ouvert.action : null}
+          rediger={onEcrireAvecMerx}
+          onFermer={() => setOuvert(null)}
+          onEnregistre={() => void apres()}
+        />
+      )}
+
+      {ouvert && !((ouvert.quoi === "nouvelle" && ouvert.genre === "email") || (ouvert.quoi === "compte-rendu" && ouvert.action.kind === "email")) && (
         <CompteRendu
           key={ouvert.quoi === "nouvelle" ? `n-${ouvert.genre}-${ouvert.intitule ?? ""}` : `${ouvert.quoi}-${ouvert.action.id}`}
           genre={ouvert.quoi === "nouvelle" ? ouvert.genre : ouvert.action.kind}
@@ -311,7 +332,6 @@ export default function OngletActions({
           depuisPrevue={ouvert.quoi === "compte-rendu" ? ouvert.action : null}
           entrer={entrer}
           avancer={avancer}
-          onEcrireAvecMerx={onEcrireAvecMerx}
           onFermer={() => setOuvert(null)}
           onEnregistre={() => void apres()}
         />

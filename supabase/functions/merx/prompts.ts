@@ -727,6 +727,8 @@ export function emailPrompt(
     score?: Record<string, { points: number | null; justification: string }> | null;
   },
   commercial: string,
+  /** Ce que le commercial veut dire, et à qui (fenêtre « Mail », 21/10). */
+  demande?: { intention?: string; nom?: string; fonction?: string },
 ): string {
   const criteres = Object.entries(p.score ?? {})
     .filter(([, v]) => v?.justification)
@@ -734,7 +736,14 @@ export function emailPrompt(
     .join("\n");
   return [
     `Entreprise : ${p.legal_name || p.name}${p.city ? `, à ${p.city}` : ""}${p.activity ? ` (${p.activity})` : ""}.`,
-    p.contact_name ? `Destinataire : ${p.contact_name}${p.contact_role ? `, ${p.contact_role}` : ""}.` : "Destinataire : le responsable santé-sécurité ou QSE de l’établissement (nom inconnu).",
+    demande?.nom
+      ? `Destinataire : ${demande.nom}${demande.fonction ? `, ${demande.fonction}` : ""}.`
+      : p.contact_name
+        ? `Destinataire : ${p.contact_name}${p.contact_role ? `, ${p.contact_role}` : ""}.`
+        : "Destinataire : le responsable santé-sécurité ou QSE de l’établissement (nom inconnu).",
+    demande?.intention
+      ? `CE QUE LE COMMERCIAL VEUT DIRE (c'est le sujet de l'e-mail ; si c'est une suite — après une présentation, un appel —, ce n'est PAS un premier contact) : ${demande.intention}`
+      : "",
     p.headcount ? `Effectif : ${p.headcount}.` : "",
     p.open_establishments ? `Établissements ouverts : ${p.open_establishments}.` : "",
     p.rationale ? `Pourquoi c'est une cible : ${p.rationale}` : "",
@@ -1076,4 +1085,82 @@ export function enregistrerDossier(d: EnrichOut["dossier"] | null | undefined) {
     fiche_appel: { numero: appel_numero, qui_demander: appel_qui_demander, format_email: appel_format_email, si_on_insiste: appel_si_on_insiste },
     ...reste,
   };
+}
+
+// ── Parler à Merx d'une fiche (Olivier, 21/10) ───────────────────────────
+// Le commercial constate une erreur ou veut améliorer une fiche : il en discute avec Merx,
+// qui vérifie et PROPOSE des corrections. Rien ne change sans le clic du commercial.
+
+export const FICHE_SYSTEM = `${AVISDOC}
+
+Tu es Merx. Le commercial discute avec toi d'UNE fiche d'entreprise, dont les données te sont
+données. Il te signale une erreur, te demande de vérifier une information ou d'améliorer la fiche.
+
+Règles, sans exception :
+- Tu ne dis que ce que tu sais avec une source. Pour vérifier, fais une recherche web (le nom de
+  l'entreprise, la ville, « téléphone », « responsable QSE »…). Si tu ne trouves pas, dis-le
+  simplement : « je n'ai pas trouvé ». Ne réponds jamais pour répondre.
+- Un annuaire (Pages Jaunes, Societe.com, Manageo, Kompass, Infonet…) n'est jamais sûr à lui seul :
+  ses numéros datent souvent d'avant un déménagement. Préfère la fiche Google de l'établissement,
+  le site de l'entreprise, le registre officiel. Dis toujours d'où vient ce que tu avances.
+- Quand le commercial te donne lui-même une information (« le bon numéro est le … »), c'est une
+  source : tu peux la proposer telle quelle, source « donnée par le commercial ».
+- Pour changer la fiche, tu PROPOSES avec l'outil proposer_corrections : le commercial voit chaque
+  correction et décide. Tu ne prétends jamais avoir modifié la fiche toi-même.
+- Une personne : nom, fonction, et seulement l'adresse ou le numéro que tu as vus publiés pour elle.
+  Jamais d'adresse inventée.
+- Réponds court, en français, en vouvoyant le commercial.`;
+
+export const OUTIL_CORRECTIONS = {
+  name: "proposer_corrections",
+  description:
+    "Propose au commercial des corrections de la fiche, chacune avec sa source. Il les applique ou non. champ : telephone (le standard), email (l'adresse générale), site, interlocuteur (ajouter ou compléter une personne : nom obligatoire), retirer_interlocuteur (une personne fausse : nom obligatoire).",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["corrections"],
+    properties: {
+      corrections: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["champ", "source", "pourquoi"],
+          properties: {
+            champ: { type: "string", enum: ["telephone", "email", "site", "interlocuteur", "retirer_interlocuteur"] },
+            valeur: { type: "string", description: "La nouvelle valeur (téléphone, e-mail ou site)." },
+            nom: { type: "string", description: "Pour un interlocuteur : prénom et nom." },
+            fonction: { type: "string" },
+            email: { type: "string", description: "Pour un interlocuteur : son adresse, seulement si elle est publiée." },
+            telephone: { type: "string", description: "Pour un interlocuteur : son numéro, seulement s'il est publié." },
+            source: { type: "string", description: "La page consultée (adresse), ou « donnée par le commercial »." },
+            pourquoi: { type: "string", description: "Une phrase : ce qui était faux ou ce qui manquait." },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+export interface CorrectionFiche {
+  champ: "telephone" | "email" | "site" | "interlocuteur" | "retirer_interlocuteur";
+  valeur?: string;
+  nom?: string;
+  fonction?: string;
+  email?: string;
+  telephone?: string;
+  source: string;
+  pourquoi: string;
+}
+
+/** Ce que la fiche dit aujourd'hui, pour que Merx en parle juste. */
+export function fichePourDiscussion(p: Record<string, unknown>): string {
+  const garde = ["name", "legal_name", "siren", "city", "department", "activity", "website", "contact_name", "contact_role", "contact_phone", "contact_email", "head_office", "leaders", "personnes", "open_establishments"];
+  const fiche: Record<string, unknown> = {};
+  for (const k of garde) if (p[k] !== null && p[k] !== undefined) fiche[k] = p[k];
+  const site = p.site_contacts as { phones?: string[]; emails?: string[] } | null;
+  if (site) fiche.site = { telephones: site.phones ?? [], emails: site.emails ?? [] };
+  const dossier = p.dossier as { fiche_appel?: unknown } | null;
+  if (dossier?.fiche_appel) fiche.fiche_appel = dossier.fiche_appel;
+  return `LA FICHE, TELLE QU'ELLE EST AUJOURD'HUI :\n${JSON.stringify(fiche, null, 1)}`;
 }

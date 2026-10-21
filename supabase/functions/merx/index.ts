@@ -45,6 +45,10 @@ import {
   emailClientPrompt,
   emailPrompt,
   type EmailOut,
+  type CorrectionFiche,
+  FICHE_SYSTEM,
+  fichePourDiscussion,
+  OUTIL_CORRECTIONS,
 } from "./prompts.ts";
 
 /**
@@ -243,7 +247,11 @@ Deno.serve(async (req: Request) => {
       try {
         const signature = String(body.signature ?? "").trim() || email;
         const out = await complete<EmailOut>(
-          emailPrompt(p as never, signature),
+          emailPrompt(p as never, signature, {
+            intention: String(body.intention ?? "").trim().slice(0, 1000),
+            nom: String(body.destinataireNom ?? "").trim().slice(0, 120),
+            fonction: String(body.destinataireFonction ?? "").trim().slice(0, 200),
+          }),
           EMAIL_SCHEMA as unknown as Record<string, unknown>,
           { system: EMAIL_SYSTEM, usage: "email", timeoutMs: 40_000, onUsage: (u) => (usage = u) },
         );
@@ -586,6 +594,59 @@ Deno.serve(async (req: Request) => {
             .eq("id", demande.id);
         }
         return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+      }
+    }
+
+    // ── Parler à Merx d'une fiche ────────────────────────────────────────
+    // Olivier, 21/10 : « si la fiche n'est pas assez bonne ou si des erreurs sont
+    // constatées, on peut reprendre avec lui ». Merx vérifie et PROPOSE ; le commercial
+    // applique, depuis l'écran. Rien n'est écrit ici sur la fiche.
+    if (body.action === "fiche_discuter") {
+      if (!body.prospectId) return json({ error: "Fiche non précisée." }, 400);
+      const messages = (Array.isArray(body.messages) ? body.messages : [])
+        .filter((m: { role?: string; content?: unknown }) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+        .slice(-20)
+        .map((m: { role: "user" | "assistant"; content: string }) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+      if (!messages.length || messages[messages.length - 1].role !== "user") return json({ error: "Message vide." }, 400);
+      const { data: p } = await sb
+        .from("admin_prospects")
+        .select("id, name, legal_name, siren, city, department, activity, website, contact_name, contact_role, contact_phone, contact_email, head_office, leaders, personnes, open_establishments, site_contacts, dossier")
+        .eq("id", body.prospectId)
+        .maybeSingle();
+      if (!p) return json({ error: "Fiche introuvable." }, 404);
+
+      // Comptée avec les compléments de fiche, pour l'écran des coûts.
+      const { data: demande } = await sb
+        .from("admin_merx_demandes")
+        .insert({ kind: "completion", request: `Discussion — ${p.name}`, prospect_id: p.id, requested_by: email, status: "en_cours", started_at: new Date().toISOString() })
+        .select("id")
+        .single();
+      let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
+      const corrections: CorrectionFiche[] = [];
+      try {
+        const [premier, ...suite] = messages;
+        const reponse = await converse(
+          [{ role: "user", content: `${fichePourDiscussion(p)}\n\n${premier.content}` }, ...suite],
+          {
+            system: FICHE_SYSTEM,
+            model: model("chat"),
+            timeoutMs: 120_000,
+            webSearch: { maxUses: 5 },
+            onUsage: (u) => (usage = u),
+            tools: [OUTIL_CORRECTIONS as never],
+            runTool: async (_name, input) => {
+              const liste = ((input as { corrections?: CorrectionFiche[] })?.corrections ?? []).slice(0, 10);
+              corrections.push(...liste);
+              return "Corrections présentées au commercial : c'est lui qui les applique, ou non.";
+            },
+          },
+        );
+        if (demande) await sb.from("admin_merx_demandes").update({ status: "terminee", usage, model: model("chat"), finished_at: new Date().toISOString() }).eq("id", demande.id);
+        return json({ reponse, corrections });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (demande) await sb.from("admin_merx_demandes").update({ status: "echec", message, usage, model: model("chat"), finished_at: new Date().toISOString() }).eq("id", demande.id);
+        return json({ error: "Merx n'a pas pu répondre. Réessayez." }, 500);
       }
     }
 

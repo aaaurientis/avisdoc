@@ -56,11 +56,19 @@ export async function redigerEmailClient(accountId: string, intention: string, s
 }
 
 /** Demande un brouillon de premier contact. RIEN N'EST ENVOYÉ. */
-export async function redigerEmailProspect(prospectId: string, signature: string): Promise<BrouillonRendu> {
+export async function redigerEmailProspect(
+  prospectId: string,
+  signature: string,
+  intention?: string,
+  a?: { nom: string; fonction?: string | null } | null,
+): Promise<BrouillonRendu> {
   const r = await appeler<{ objet?: string; corps?: string; destinataire?: string | null }>({
     action: "email",
     prospectId,
     signature,
+    intention: intention ?? "",
+    destinataireNom: a?.nom ?? "",
+    destinataireFonction: a?.fonction ?? "",
   });
   return { objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null };
 }
@@ -91,4 +99,25 @@ export async function attendreDemande(demandeId: string, plafondMs = 180_000): P
   }
   // Le travail continue côté serveur : on cesse seulement de le regarder.
   return "trop_long";
+}
+
+/** Une correction que Merx propose pour une fiche ; le commercial l'applique ou non. */
+export interface CorrectionFiche {
+  champ: "telephone" | "email" | "site" | "interlocuteur" | "retirer_interlocuteur";
+  valeur?: string;
+  nom?: string;
+  fonction?: string;
+  email?: string;
+  telephone?: string;
+  source: string;
+  pourquoi: string;
+}
+
+/** Parler à Merx d'une fiche : il répond, et propose des corrections. RIEN N'EST MODIFIÉ. */
+export async function discuterFiche(
+  prospectId: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+): Promise<{ reponse: string; corrections: CorrectionFiche[] }> {
+  const r = await appeler<{ reponse?: string; corrections?: CorrectionFiche[] }>({ action: "fiche_discuter", prospectId, messages });
+  return { reponse: r.reponse ?? "", corrections: r.corrections ?? [] };
 }

@@ -8,7 +8,7 @@
 //    on ajoute une précision et on programme la suite.
 
 import { useState } from "react";
-import { Loader2, PenLine, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { Modal } from "../ui";
 import BoutonMicro from "../BoutonMicro";
@@ -115,7 +115,6 @@ export default function CompteRendu({
   depuisPrevue,
   entrer,
   avancer,
-  onEcrireAvecMerx,
   onFermer,
   onEnregistre,
 }: {
@@ -136,8 +135,6 @@ export default function CompteRendu({
   entrer?: (colonne: string) => Promise<ClesFiche>;
   /** Affaire : la passe à cette colonne. */
   avancer?: (colonne: string) => Promise<void>;
-  /** Merx rédige un e-mail ; reçoit ce qu'on veut dire. */
-  onEcrireAvecMerx?: (intention: string) => Promise<void> | void;
   onFermer: () => void;
   onEnregistre: () => void;
 }) {
@@ -163,7 +160,6 @@ export default function CompteRendu({
   const [suiteHeure, setSuiteHeure] = useState(prochaineHeure);
   const [etapeOk, setEtapeOk] = useState(false);
   const [envoi, setEnvoi] = useState(false);
-  const [ecriture, setEcriture] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const changerMode = (m: Mode) => {
@@ -397,27 +393,6 @@ export default function CompteRendu({
       )}
 
       {mode === "programmer" && quoi === "rdv" && <ChoixRdv mode={rdvMode} setMode={setRdvMode} lien={rdvLien} setLien={setRdvLien} />}
-
-      {/* Un mail pas encore écrit : Merx le rédige, on l'envoie, puis on note l'envoi. */}
-      {quoi === "email" && !existante && onEcrireAvecMerx && (
-        <button
-          type="button"
-          disabled={ecriture}
-          onClick={async () => {
-            if (ecriture) return;
-            setEcriture(true);
-            try {
-              await onEcrireAvecMerx(contenu.trim());
-            } finally {
-              setEcriture(false);
-            }
-          }}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:cursor-wait disabled:opacity-60"
-        >
-          {ecriture ? <Loader2 className="size-3.5 animate-spin" /> : <PenLine className="size-3.5" />}
-          {ecriture ? "Merx écrit… une trentaine de secondes" : "Écrire un e-mail personnalisé avec Merx"}
-        </button>
-      )}
 
       {avecQui && (
         <>

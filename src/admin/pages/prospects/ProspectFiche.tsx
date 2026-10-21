@@ -5,7 +5,8 @@
 // avec ce que Merx a trouvé, et la fiche reste ouverte.
 
 import { useCallback, useMemo, useState } from "react";
-import { Loader2, PenLine, Search, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, MessagesSquare, PenLine, Search, Sparkles, Trash2 } from "lucide-react";
+import ParlerAMerx from "../../components/fiche/ParlerAMerx";
 import BarreProgression, { ETAPES_APPROFONDIR } from "../../components/BarreProgression";
 import { useAdminData } from "../../data/AdminDataContext";
 import { useAuth } from "../../auth/AuthContext";
@@ -24,7 +25,8 @@ import CeQuOnSait from "../../components/fiche/CeQuOnSait";
 import Interlocuteurs from "../../components/fiche/Interlocuteurs";
 import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
-import { notesDe, personnesDuProspect } from "../../lib/fiche";
+import { contactsMail, notesDe, personnesDuProspect } from "../../lib/fiche";
+import type { BrouillonRendu } from "../../lib/merx-appels";
 import type { ClesFiche, Jalon } from "../../lib/echanges";
 import { quandCourt } from "../../lib/actions-fiche";
 
@@ -57,8 +59,8 @@ export default function ProspectFiche({
   onEcarter: (p: Prospect) => Promise<void>;
   /** Relit la liste sans fermer la fiche : après son entrée au Pipeline, par exemple. */
   onActualiser: () => Promise<void>;
-  /** Demande à Merx un brouillon de premier contact. */
-  onRedigerEmail: (p: Prospect) => Promise<void>;
+  /** Demande à Merx un brouillon : ce qu'on veut dire, à qui ; rend le brouillon. */
+  onRedigerEmail: (p: Prospect, intention: string, a: { nom: string; fonction?: string | null } | null) => Promise<BrouillonRendu>;
   /** Ce que coûte chaque bouton, mesuré ou estimé tant qu'aucune demande n'a eu lieu. */
   couts: { approfondissement: { montant: number; mesure: boolean }; email: { montant: number; mesure: boolean } };
   /** La recherche qui a fait apparaître cette fiche. */
@@ -75,6 +77,7 @@ export default function ProspectFiche({
   const [enCours, setEnCours] = useState<"approfondir" | "ecarter" | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [onglet, setOnglet] = useState("actions");
+  const [parler, setParler] = useState(false);
   const [nbAVenir, setNbAVenir] = useState(0);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
   /** L'affaire née de ce prospect — tout de suite après son entrée, avant que la liste ne soit relue. */
@@ -197,6 +200,11 @@ export default function ProspectFiche({
               {enCours === "approfondir" ? "Merx enrichit…" : "Enrichir par Merx"}
             </button>
           )}
+          {/* Une erreur, une fiche à améliorer : on en parle avec Merx (21/10). */}
+          <button type="button" onClick={() => setParler(true)} className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
+            <MessagesSquare className="size-3.5" /> Parler à Merx
+          </button>
+          {parler && <ParlerAMerx prospect={p} cles={cles} onModifiee={onActualiser} onFermer={() => setParler(false)} />}
           {onModifier && (
             <button type="button" onClick={() => onModifier(p)} className="h-[34px] rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
               Modifier la fiche
@@ -218,7 +226,8 @@ export default function ProspectFiche({
           avancer={async (c) => {
             if (idAffaire) setClientStage(idAffaire, c);
           }}
-          onEcrireAvecMerx={() => onRedigerEmail(p)}
+          onEcrireAvecMerx={(intention, a) => onRedigerEmail(p, intention, a)}
+          contacts={contactsMail(personnes)}
           onCompte={compter}
         />
       </div>

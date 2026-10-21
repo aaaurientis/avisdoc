@@ -19,6 +19,7 @@ import CaseFiche, { CaseColonne } from "../components/CaseFiche";
 import { cn } from "@/lib/utils";
 import ProspectFiche from "./prospects/ProspectFiche";
 import BrouillonEmail from "./prospects/BrouillonEmail";
+import { redigerEmailProspect } from "../lib/merx-appels";
 import NouveauProspect from "./prospects/NouveauProspect";
 import ImportProspection from "./prospects/ImportProspection";
 import { COLONNES_MODELE } from "../lib/import-prospection";
@@ -436,15 +437,11 @@ export default function Prospects() {
   );
 
   const redigerEmail = useCallback(
-    async (p: Prospect) => {
-      const { data, error } = await supabaseAdmin.functions.invoke("merx", {
-        body: { action: "email", prospectId: p.id, signature: nomDuCommercial },
-      });
-      if (error) throw new Error(error.message);
-      const r = data as { objet?: string; corps?: string; destinataire?: string | null; error?: string };
-      if (r.error) throw new Error(r.error);
-      setBrouillon({ prospect: p, objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null });
-      await charger();
+    async (p: Prospect, intention: string, a: { nom: string; fonction?: string | null } | null) => {
+      // Le brouillon revient dans la fenêtre « Mail » de la fiche, où on le corrige.
+      const r = await redigerEmailProspect(p.id, nomDuCommercial, intention, a);
+      void charger();
+      return r;
     },
     [charger, nomDuCommercial],
   );
