@@ -380,7 +380,7 @@ export default function Couts() {
                     {/* En-tête : chaque colonne se trie, un second clic inverse le sens. */}
                     <div className="flex items-center gap-3 border-b border-border bg-muted/50 px-4 py-2">
                       <span className="size-4 shrink-0" />
-                      <EnTete colonne="date" libelle="Recherche du" tri={tri} onTrier={trierPar} className="w-24" />
+                      <EnTete colonne="date" libelle="Recherche du" tri={tri} onTrier={trierPar} className="hidden w-24 sm:flex" />
                       <EnTete colonne="nom" libelle="Entreprise" tri={tri} onTrier={trierPar} className="min-w-0 flex-1" />
                       <EnTete colonne="depenses" libelle="Dépenses" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
                       <EnTete colonne="cout" libelle="Coût" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
@@ -404,7 +404,7 @@ export default function Couts() {
                           <ChevronRight
                             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouverte && "rotate-90")}
                           />
-                          <span className="w-24 shrink-0 text-[12.5px] text-muted-foreground">{jourCourt(dateDeRecherche(a))}</span>
+                          <span className="hidden w-24 shrink-0 text-[12.5px] text-muted-foreground sm:block">{jourCourt(dateDeRecherche(a))}</span>
                           <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-avisdoc-ink">
                             {a.nom}
                           </span>
