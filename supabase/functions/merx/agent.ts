@@ -863,7 +863,10 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // entreprise, et son vrai site (recreaction.fr, standard 01 60 35 45 75) était ignoré.
   // Ordre : le site de la fiche Google vérifiée à l'adresse du siège, puis celui que les
   // recherches du modèle ont réellement visité, puis celui de la fiche.
-  const siteGoogle = standard.principal?.statut === "verifie" ? officialSite(standard.site ?? "") : null;
+  // Vérifiée PAR L'ADRESSE seulement : une fiche Google « vérifiée » parce que le site de la
+  // fiche publie le même numéro ne prouve rien sur ce site.
+  const auSiege = standard.principal?.libelle.includes("à l'adresse du registre officiel") ?? false;
+  const siteGoogle = standard.principal?.statut === "verifie" && auSiege ? officialSite(standard.site ?? "") : null;
   const siteVisite = proposed && seenHosts.has(host(proposed)) ? proposed : null;
   const website = siteGoogle ?? siteVisite ?? p.website ?? officialSite(lieu?.site ?? "");
   const ownHost = website ? host(website) : null;
