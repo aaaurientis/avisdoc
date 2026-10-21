@@ -136,6 +136,8 @@ export default function ParlerAMerx({
             personnes,
             ...(principal && c.fonction?.trim() ? { contact_role: c.fonction.trim() } : {}),
             ...(principal && c.email?.trim() ? { contact_email: c.email.trim() } : {}),
+            // Le numéro du contact principal se lit dans contact_phone : il suit aussi.
+            ...(principal && c.telephone?.trim() ? { contact_phone: c.telephone.trim() } : {}),
           };
         }
       }
