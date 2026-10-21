@@ -82,11 +82,17 @@ export const ESTIMATIONS: Record<string, number> = {
 
 /** Moyenne observée pour une sorte de demande ; à défaut, l'ordre de grandeur ci-dessus. */
 export function coutMoyen(
-  demandes: { kind: string; usage: Consommation | null }[],
+  demandes: { kind: string; usage: Consommation | null; model?: string | null; finished_at?: string | null }[],
   kind: string,
 ): { montant: number; mesure: boolean } {
-  const siennes = demandes.filter((d) => d.kind === kind);
+  // Au tarif du modèle qui a vraiment travaillé (Opus pour approfondir, cinq fois plus cher
+  // que le modèle par défaut : la fiche affichait 0,16 $ pour 0,85 $ réels, 21/10), et sur
+  // les vingt dernières demandes, pour donner le prix d'aujourd'hui.
+  const siennes = demandes
+    .filter((d) => d.kind === kind && d.model)
+    .sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""))
+    .slice(0, 20);
   if (!siennes.length) return { montant: ESTIMATIONS[kind] ?? 0, mesure: false };
-  const total = siennes.reduce((s, d) => s + coutDe(d.usage).total, 0);
+  const total = siennes.reduce((s, d) => s + coutDe(d.usage, d.model ?? undefined).total, 0);
   return { montant: total / siennes.length, mesure: true };
 }
