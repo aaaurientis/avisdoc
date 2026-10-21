@@ -19,6 +19,10 @@
 
 const URL_RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 const TIMEOUT_MS = 6_000;
+// La clé du projet est restreinte aux appels venant du Hub (référent HTTP) : sans ce
+// référent, Google refusait tout appel du serveur et aucun standard n'était jamais
+// trouvé (Récré'Action, 21/10 : 01 60 35 45 75 sur Google Maps, rien chez Merx).
+export const REFERENT_HUB = "https://admin.avisdoc.fr/";
 
 export type StatutStandard = "verifie" | "a_verifier";
 
@@ -85,11 +89,12 @@ async function chercher(requete: string, cle: string): Promise<any[]> {
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": cle,
+      Referer: REFERENT_HUB,
       "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.businessStatus,places.websiteUri",
     },
     body: JSON.stringify({ textQuery: requete, languageCode: "fr", regionCode: "FR", maxResultCount: 3 }),
   });
-  if (!res.ok) throw new Error(`Google Places a répondu ${res.status}`);
+  if (!res.ok) throw new Error(`Google Maps a répondu ${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`);
   return ((await res.json())?.places ?? []) as any[];
 }
 
@@ -125,7 +130,12 @@ export async function trouverStandard(e: {
 
   // Une recherche par nom (enseigne et sigle d'abord : c'est sous eux que Google les connaît).
   const requetes = e.noms.slice(0, 3).map((n) => [n, e.ville].filter(Boolean).join(" "));
-  const resultats = await Promise.all(requetes.map((q) => chercher(q, cle).catch(() => [] as any[])));
+  // Un refus de Google se dit : jamais « aucun numéro publié » quand on n'a pas pu demander.
+  let echec: string | null = null;
+  const resultats = await Promise.all(requetes.map((q) => chercher(q, cle).catch((err) => {
+    echec = String((err as Error)?.message ?? err);
+    return [] as any[];
+  })));
   const lieux = new Map<string, any>();
   for (const liste of resultats) for (const p of liste) if (p?.id && !lieux.has(p.id)) lieux.set(p.id, p);
 
@@ -187,7 +197,11 @@ export async function trouverStandard(e: {
     site: tries[0]?.site ?? null,
     principal: liste[0] ?? null,
     autres: liste.slice(1, 4),
-    pourquoi: liste.length ? null : "aucune fiche Google ni page officielle ne publie de numéro pour cette entreprise à cette adresse",
+    pourquoi: liste.length
+      ? null
+      : lieux.size === 0 && echec
+        ? `Google Maps n'a pas pu être interrogé (${echec}) : le standard n'a pas été cherché`
+        : "aucune fiche Google ni page officielle ne publie de numéro pour cette entreprise à cette adresse",
     releve_le,
   };
 }

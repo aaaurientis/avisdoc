@@ -12,6 +12,8 @@
 // Tout échec est silencieux : une clé absente, un quota atteint ou un établissement
 // introuvable ne doivent jamais faire échouer un approfondissement.
 
+import { REFERENT_HUB } from "./standard.ts";
+
 const URL_RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 
 /** La dernière raison pour laquelle Places n'a rien rendu, pour pouvoir la dire. */
@@ -53,6 +55,7 @@ export async function chercherLieu(nom: string, ville: string | null): Promise<L
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": cle,
+        Referer: REFERENT_HUB,
         "X-Goog-FieldMask":
           "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri",
       },
