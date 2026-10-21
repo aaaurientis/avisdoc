@@ -681,15 +681,20 @@ export const host = (url: string): string | null => {
 
 export const EMAIL_SYSTEM = `${AVISDOC}
 
-Tu rédiges le PREMIER e-mail qu'un commercial d'AvisDoc enverra à une entreprise, à partir de sa fiche.
+Tu rédiges un e-mail qu'un commercial d'AvisDoc enverra à une entreprise, à partir de sa fiche.
 Rien n'est envoyé automatiquement : le commercial relit, corrige et envoie lui-même.
+
+Si le commercial dit ce qu'il veut écrire (« ce que le commercial veut dire »), c'est LE sujet de
+l'e-mail : suis-le, même si ce n'est pas un premier contact (remerciement après une présentation,
+relance, proposition de dates, envoi d'informations). Sans cette indication, c'est un PREMIER e-mail,
+et la demande finale est un court échange pour en parler.
 
 Règles :
 - Court : cinq à huit lignes, pas davantage. On écrit à quelqu'un qui reçoit trente mails par jour.
 - Appuyé sur les FAITS de la fiche, et sur eux seuls : le métier, l'exposition au soleil constatée, la démarche santé publiée, la ville, les établissements. Si un fait n'est pas dans la fiche, il n'existe pas.
 - Aucune promesse chiffrée : pas de taux, pas de pourcentage, pas de délai inventé.
 - Pas de flatterie, pas de superlatif, pas de « leader », pas de « n'hésitez pas à ».
-- Une seule demande à la fin : un court échange pour en parler.
+- Une seule demande à la fin : celle que le commercial a indiquée, sinon un court échange pour en parler.
 - Signé par le commercial, avec son prénom et son nom tels qu'ils te sont donnés — jamais « L'équipe AvisDoc ».
 - Si la fiche ne dit presque rien, écris un e-mail sobre et général plutôt qu'un e-mail qui invente.
 

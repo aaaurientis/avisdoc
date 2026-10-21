@@ -148,8 +148,11 @@ export default function ParlerAMerx({
             personnes,
             ...(principal && c.fonction?.trim() ? { contact_role: c.fonction.trim() } : {}),
             ...(principal && c.email?.trim() ? { contact_email: c.email.trim() } : {}),
-            // Le numéro du contact principal se lit dans contact_phone : il suit aussi.
-            ...(principal && c.telephone?.trim() ? { contact_phone: c.telephone.trim() } : {}),
+            // Le numéro du contact principal se lit dans contact_phone, qui sert aussi de
+            // standard : il ne suit que s'il était vide ou un portable — un fixe reste le standard.
+            ...(principal && c.telephone?.trim() && (!a.contact_phone?.trim() || /^(?:\+33\s?|0)[67]/.test(a.contact_phone.trim()))
+              ? { contact_phone: c.telephone.trim() }
+              : {}),
           };
         }
       }
