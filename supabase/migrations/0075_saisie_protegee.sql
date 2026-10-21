@@ -27,6 +27,17 @@ as $$
       or (jsonb_typeof(v) = 'string' and btrim(v #>> '{}') = '');
 $$;
 
+-- Les seules cases remplies d'un objet : ce qui a été écrit, sans les vides.
+create or replace function public.admin_jsonb_pleins(o jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  select coalesce(jsonb_object_agg(k, v), '{}'::jsonb)
+    from jsonb_each(case when jsonb_typeof(o) = 'object' then o else '{}'::jsonb end) e(k, v)
+   where not public.admin_jsonb_vide(v);
+$$;
+
 create or replace function public.admin_prospects_saisie_protegee()
 returns trigger
 language plpgsql
@@ -71,8 +82,15 @@ begin
         -- L'adresse : ce qui a été saisi reste, les cases restées vides peuvent se remplir.
         apres := jsonb_set(apres, array[c], (apres->c) || jsonb_strip_nulls(avant->c));
       elsif c = 'personnes' and jsonb_typeof(avant->c) = 'array' then
-        -- Les personnes saisies restent toutes, telles quelles ; Merx n'ajoute que des nouvelles.
-        apres := jsonb_set(apres, array[c], (avant->c) || coalesce((
+        -- Les personnes saisies restent toutes : ce qui y est écrit ne bouge pas, leurs cases
+        -- vides peuvent se remplir (e-mail trouvé par FullEnrich…), et Merx ajoute les nouvelles.
+        apres := jsonb_set(apres, array[c], coalesce((
+          select jsonb_agg(coalesce((
+            select q from jsonb_array_elements(case when jsonb_typeof(apres->c) = 'array' then apres->c else '[]'::jsonb end) q
+            where lower(btrim(q->>'nom')) = lower(btrim(o->>'nom')) limit 1
+          ), '{}'::jsonb) || public.admin_jsonb_pleins(o) order by ord)
+          from jsonb_array_elements(avant->c) with ordinality t(o, ord)
+        ), '[]'::jsonb) || coalesce((
           select jsonb_agg(q) from jsonb_array_elements(case when jsonb_typeof(apres->c) = 'array' then apres->c else '[]'::jsonb end) q
           where not exists (
             select 1 from jsonb_array_elements(avant->c) o
