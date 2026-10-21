@@ -150,20 +150,21 @@ export async function readSiteContacts(site: string | null, rapide = false, sire
 
   // L'accueil d'abord : c'est lui qui dit où sont vraiment le contact et les mentions
   // légales (« /nous-contacter/ », « /contact-2 », « /fr/mentions »…).
+  // Accueil en panne : on lit quand même les pages habituelles.
   const accueil = await lire(base);
-  if (!accueil) return null;
-  const origine = new URL(accueil.url);
-  const chemins = new Set<string>(liensUtiles(accueil.html, origine));
+  const origine = accueil ? new URL(accueil.url) : base;
+  const chemins = new Set<string>(accueil ? liensUtiles(accueil.html, origine) : []);
   for (const page of rapide ? PAGES_RAPIDES : PAGES) if (page) chemins.add(new URL(page, origine).href);
-  const pages = [{ ...accueil, chemin: "" }, ...(await Promise.all([...chemins].map(async (c) => {
+  const pages = [...(accueil ? [{ ...accueil, chemin: "" }] : []), ...(await Promise.all([...chemins].map(async (c) => {
     const lu = await lire(c);
     return lu ? { ...lu, chemin: c } : null;
   }))).filter((x): x is { html: string; url: string; chemin: string } => x !== null)];
+  if (!pages.length) return null;
 
   const emails = new Set<string>();
   const equipe = new Set<string>();
   // Le standard est sur la page de contact, puis dans les mentions légales, puis sur l'accueil.
-  const rang = (url: string) => (/contact/i.test(url) ? 0 : /mentions|l[ée]gal/i.test(url) ? 1 : url === accueil.url ? 2 : 3);
+  const rang = (url: string) => (/contact/i.test(url) ? 0 : /mentions|l[ée]gal/i.test(url) ? 1 : url === accueil?.url ? 2 : 3);
   const numeros: { n: string; rang: number }[] = [];
   let preuve: string | null = null;
   for (const { html, url } of pages) {
@@ -185,7 +186,7 @@ export async function readSiteContacts(site: string | null, rapide = false, sire
     for (const n of numerosDuTexte(texte)) numeros.push({ n, rang: r + 0.5 });
     if (siren && !preuve && porteLeSiren(texte, siren)) preuve = url;
     // Les pages d'équipe : on remonte qui y est nommé, et à quel titre.
-    if (url !== accueil.url && r !== 1) {
+    if (url !== accueil?.url && r !== 1) {
       for (const extrait of passagesNommes(texte)) equipe.add(extrait);
     }
   }

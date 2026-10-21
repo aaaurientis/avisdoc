@@ -637,8 +637,8 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   // Récré'Action, 21/10). La saisie du commercial reste protégée par garderLaSaisie.
   const remplaces = new Set(["website", "contact_phone", "site_contacts", "reliability", "reliability_detail"]);
   // L'e-mail aussi, quand l'ancien venait du site qu'on abandonne.
-  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, site_contacts, personnes, score").eq("id", id).maybeSingle()).data as
-    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; personnes: unknown; score: unknown }
+  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, contact_source, site_contacts, personnes, score").eq("id", id).maybeSingle()).data as
+    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; personnes: unknown; score: unknown; contact_source: string | null }
     | null;
   if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
   // Un numéro que le commercial a corrigé lui-même (absent de tout ce que Merx avait
@@ -649,7 +649,9 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
   const merxLAvait = [before?.dossier, ancienSite?.site_contacts, ancienSite?.personnes, ancienSite?.score]
     .map((v) => JSON.stringify(v ?? "").replace(/\D/g, ""))
-    .some((chiffres) => chiffres.includes(ancienTel));
+    .some((chiffres) => chiffres.includes(ancienTel)) ||
+    // Source posée par Merx lui-même (annuaire, Pappers, Google) : ce n'est pas une saisie.
+    /pappers\.fr|google\.[a-z.]+\/maps|annuaire-entreprises|pagesjaunes/i.test(ancienSite?.contact_source ?? "");
   if (ancienTel.length === 9 && !merxLAvait) delete patch.contact_phone;
   for (const k of Object.keys(patch)) if ((patch[k] === null && !remplaces.has(k)) || patch[k] === undefined) delete patch[k];
   // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
