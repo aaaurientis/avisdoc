@@ -14,6 +14,17 @@
 alter table public.admin_prospects
   add column if not exists champs_saisis text[] not null default '{}';
 
+-- Une case vide (rien, « », [], {}) n'est pas une saisie : le formulaire en envoie pour les
+-- cases qu'on n'a pas remplies, et Merx doit pouvoir les remplir ensuite.
+create or replace function public.admin_jsonb_vide(v jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select v is null or v = 'null'::jsonb or v = '[]'::jsonb or v = '{}'::jsonb
+      or (jsonb_typeof(v) = 'string' and btrim(v #>> '{}') = '');
+$$;
+
 create or replace function public.admin_prospects_saisie_protegee()
 returns trigger
 language plpgsql
@@ -33,7 +44,7 @@ begin
   if tg_op = 'INSERT' then
     if role_appel = 'authenticated' then
       foreach c in array suivis loop
-        if (apres->c) is not null and (apres->c) <> 'null'::jsonb and not (c = any(new.champs_saisis)) then
+        if not public.admin_jsonb_vide(apres->c) and not (c = any(new.champs_saisis)) then
           new.champs_saisis := array_append(new.champs_saisis, c);
         end if;
       end loop;
@@ -43,7 +54,7 @@ begin
   avant := to_jsonb(old);
   if role_appel = 'authenticated' then
     foreach c in array suivis loop
-      if (apres->c) is distinct from (avant->c) and not (c = any(new.champs_saisis)) then
+      if (apres->c) is distinct from (avant->c) and not public.admin_jsonb_vide(apres->c) and not (c = any(new.champs_saisis)) then
         new.champs_saisis := array_append(new.champs_saisis, c);
       end if;
     end loop;

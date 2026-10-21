@@ -487,7 +487,7 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
 
   // Les interlocuteurs : ceux du commercial d'abord — Merx ne fait que remplir leurs
   // cases vides —, puis ceux que Merx a trouvés en plus.
-  if (Array.isArray(patch.personnes) && Array.isArray(a.personnes) && a.personnes.length) {
+  if ((!a.found_by || saisis.has("personnes")) && Array.isArray(patch.personnes) && Array.isArray(a.personnes) && a.personnes.length) {
     type P = Record<string, unknown> & { nom: string };
     const trouves = new Map((patch.personnes as P[]).map((q) => [q.nom.trim().toLowerCase(), q]));
     const connus = (a.personnes as P[]).map((q) => {
@@ -505,7 +505,7 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
   const hote = (v: unknown) => String((v as { readOn?: string } | null)?.readOn ?? "").replace(/^https?:\/\/(www\.)?/, "");
   // Des coordonnées saisies à la main restent, quel que soit le site retenu ensuite.
   if (saisis.has("site_contacts") && patch.site_contacts === null) delete patch.site_contacts;
-  if (patch.site_contacts && a.site_contacts && (saisis.has("site_contacts") || hote(patch.site_contacts) === hote(a.site_contacts))) {
+  if (patch.site_contacts && a.site_contacts && (saisis.has("site_contacts") || (!a.found_by && hote(patch.site_contacts) === hote(a.site_contacts)))) {
     const av = a.site_contacts as { emails?: string[]; phones?: string[]; equipe?: string[]; readOn?: string };
     const nv = patch.site_contacts as typeof av;
     const unir = (x?: string[], y?: string[]) => [...new Set([...(x ?? []), ...(y ?? [])])];
