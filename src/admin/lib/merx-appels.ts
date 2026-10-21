@@ -91,7 +91,8 @@ export async function redigerEmailProspect(
  * On suit donc l'avancement dans la table plutôt que dans la connexion. Fermer l'onglet
  * n'interrompt plus rien : on retrouve la fiche complétée en revenant.
  */
-export async function attendreDemande(demandeId: string, plafondMs = 180_000): Promise<"terminee" | "echec" | "trop_long"> {
+// Cinq minutes : l'approfondissement peut durer jusqu'à quatre minutes (21/10).
+export async function attendreDemande(demandeId: string, plafondMs = 300_000): Promise<"terminee" | "echec" | "trop_long"> {
   const debut = Date.now();
   while (Date.now() - debut < plafondMs) {
     await new Promise((r) => setTimeout(r, 2_500));

@@ -250,7 +250,7 @@ export default function ProspectFiche({
               </span>
             </div>
             {enCours === "approfondir" && (
-              <BarreProgression className="mt-3 max-w-[520px]" dureeEstimeeS={80} etapes={ETAPES_APPROFONDIR} />
+              <BarreProgression className="mt-3 max-w-[520px]" dureeEstimeeS={120} etapes={ETAPES_APPROFONDIR} />
             )}
             <p className="mt-1.5 text-[12px] text-muted-foreground">
               {couts.approfondissement.mesure ? "Coût mesuré" : "Coût estimé"} — approfondir : {euroDollar(couts.approfondissement.montant)} · écrire un

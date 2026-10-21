@@ -522,7 +522,7 @@ export default function ProjectView({
                 </span>
               </div>
               {merxEnCours === "approfondir" && (
-                <BarreProgression className="max-w-[520px]" dureeEstimeeS={80} etapes={ETAPES_APPROFONDIR} />
+                <BarreProgression className="max-w-[520px]" dureeEstimeeS={120} etapes={ETAPES_APPROFONDIR} />
               )}
               <ApprocheEntreprise origine={origine} />
               <CeQuOnSait prospect={origine} enPlus={ceQueSaitLAffaire} />
