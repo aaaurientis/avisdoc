@@ -43,6 +43,10 @@ export interface FichePappers {
 let dernierEchec: string | null = null;
 /** La dernière raison pour laquelle Pappers n'a rien rendu, pour pouvoir la dire. */
 export const echecPappers = () => dernierEchec;
+/** Chaque demande repart à zéro : un refus d'une demande précédente ne lui est pas imputé. */
+export const oublierEchecPappers = () => {
+  dernierEchec = null;
+};
 
 /** Les champs que la formule souscrite a réellement renvoyés, au premier appel réussi. */
 let champsVus: string[] = [];

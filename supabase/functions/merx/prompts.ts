@@ -217,8 +217,8 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    • a_retenir : TROIS faits CONCRETS au plus sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
    • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
    • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
-   • arguments : deux ou trois arguments de vente, chacun avec le fait qui le fonde. Un argument sans fait n'a aucune valeur : écris ce que tu as lu.
-   • objections : deux objections que CETTE entreprise-là opposera, et ce qu'on répond. Pense à sa taille, à son secteur, à ce que tu as appris.
+   • arguments : DEUX arguments de vente au plus, chacun en UNE phrase courte, avec le fait qui le fonde en une phrase courte aussi. Un argument sans fait n'a aucune valeur : écris ce que tu as lu. Moins mais juste (Olivier, 21/10 : « trop d'informations »).
+   • objections : DEUX objections au plus que CETTE entreprise-là opposera, chacune en une phrase, et la réponse en une phrase. Pense à sa taille, à son secteur, à ce que tu as appris.
    • offre : ce qui lui conviendrait — une journée d'essai, plusieurs journées, un rendez-vous régulier — au vu de son effectif et de ses implantations. Dis le raisonnement, jamais un prix.
    • a_verifier : ce que tu n'as PAS pu établir et qu'il faudra demander. C'est une qualité, pas un aveu.
 

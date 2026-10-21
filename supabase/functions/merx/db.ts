@@ -401,6 +401,8 @@ export interface Enrichment {
   sources: string[];
   score: Score;
   scoreTotal: number;
+  /** La fiabilité recalculée sur ce que l'approfondissement a établi. */
+  fiabilite?: { note: number; details: unknown } | null;
 }
 
 /** Un approfondissement n'efface jamais une donnée déjà là : chaque champ vide laisse l'ancien en place. */
@@ -491,7 +493,9 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
     patch.personnes = [...connus, ...(patch.personnes as P[]).filter((q) => !noms.has(q.nom.trim().toLowerCase()))];
   }
   // Les numéros et adresses : ceux du commercial d'abord (le standard est le premier).
-  if (patch.site_contacts && a.site_contacts) {
+  // Seulement s'il s'agit du même site : les coordonnées d'un site abandonné ne reviennent pas.
+  const hote = (v: unknown) => String((v as { readOn?: string } | null)?.readOn ?? "").replace(/^https?:\/\/(www\.)?/, "");
+  if (patch.site_contacts && a.site_contacts && hote(patch.site_contacts) === hote(a.site_contacts)) {
     const av = a.site_contacts as { emails?: string[]; phones?: string[]; equipe?: string[]; readOn?: string };
     const nv = patch.site_contacts as typeof av;
     const unir = (x?: string[], y?: string[]) => [...new Set([...(x ?? []), ...(y ?? [])])];
@@ -570,7 +574,19 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     const liste = (v: unknown) => Array.isArray(v) && v.length > 0;
     return texte(o.accroche) || texte(o.qui_aborder) || texte(o.offre) || liste(o.a_retenir) || liste(o.arguments) || liste(o.objections);
   };
-  const dossier = dossierUtile(e.dossier) ? e.dossier : dossierUtile(before?.dossier) ? (before?.dossier as unknown) : null;
+  // L'ancien dossier repris garde ses textes, mais JAMAIS son ancien standard : le standard
+  // et le numéro de la fiche d'appel sont toujours ceux qu'on vient d'établir (21/10).
+  const nouveau = (e.dossier ?? {}) as { standard?: unknown };
+  const ancien = before?.dossier as Record<string, unknown> | null;
+  const dossier = dossierUtile(e.dossier)
+    ? e.dossier
+    : dossierUtile(ancien)
+      ? {
+          ...ancien,
+          standard: nouveau.standard ?? null,
+          fiche_appel: { ...((ancien?.fiche_appel as object) ?? {}), numero: (nouveau.standard as { principal?: { numero?: string } } | null)?.principal?.numero ?? "" },
+        }
+      : (e.dossier ?? null);
 
   // La note se fusionne critère par critère : un critère qu'on n'a pas su juger
   // cette fois garde son jugement d'avant, et le total suit.
@@ -611,15 +627,27 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     score_total: totalFusionne,
     enriched_at: new Date().toISOString(),
   };
-  // Le numéro que Merx met dans la fiche d'appel (« Appeler : 05 57 … ») va aussi dans la
-  // case téléphone quand elle est vide : il doit se voir dans la colonne de la fiche, pas
-  // seulement dans le Dossier (Olivier, 20/10). garderLaSaisie protège ce qui est saisi.
-  if (!patch.contact_phone && dossier && typeof dossier === "object") {
-    const numero = String((dossier as { fiche_appel?: { numero?: string } }).fiche_appel?.numero ?? "");
-    const tel = numero.match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
-    if (tel) patch.contact_phone = tel;
+  if (e.fiabilite !== undefined) {
+    patch.reliability = e.fiabilite?.note ?? null;
+    patch.reliability_detail = e.fiabilite?.details ?? null;
   }
-  for (const k of Object.keys(patch)) if (patch[k] === null || patch[k] === undefined) delete patch[k];
+  // Ce que l'approfondissement établit sur le site et le standard REMPLACE l'ancien, même
+  // quand il n'a rien trouvé : un ancien numéro faux ou le site d'une autre entreprise ne
+  // doivent pas survivre parce que la nouvelle recherche est vide (Barde Sud-Ouest,
+  // Récré'Action, 21/10). La saisie du commercial reste protégée par garderLaSaisie.
+  const remplaces = new Set(["website", "contact_phone", "site_contacts", "reliability", "reliability_detail"]);
+  // L'e-mail aussi, quand l'ancien venait du site qu'on abandonne.
+  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, site_contacts").eq("id", id).maybeSingle()).data as
+    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null }
+    | null;
+  if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
+  // Un numéro que le commercial a corrigé lui-même (absent de tout ce que Merx avait
+  // relevé) reste : c'est lui qui a appelé.
+  const neuf = (t: string) => t.replace(/\D/g, "").slice(-9);
+  const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
+  const merxLAvait = (JSON.stringify(before?.dossier ?? "") + JSON.stringify(ancienSite?.site_contacts ?? "")).replace(/\D/g, "").includes(ancienTel);
+  if (ancienTel.length === 9 && !merxLAvait) delete patch.contact_phone;
+  for (const k of Object.keys(patch)) if ((patch[k] === null && !remplaces.has(k)) || patch[k] === undefined) delete patch[k];
   // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
   // rien trouvé n'en trouvera pas davantage la fois suivante, et c'est elle qui
   // repartait indéfiniment — 4 662 appels pour 255 fiches le 30 septembre

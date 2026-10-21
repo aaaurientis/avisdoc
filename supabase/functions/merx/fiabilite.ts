@@ -8,6 +8,10 @@
 // sur dix parce que son code d'activité était confirmé — et personne ne lit cela
 // autrement que « cette fiche est parfaite ».
 //
+// 21/10 : « recoupé » ne se dit plus sur la seule PRÉSENCE de deux sources — deux
+// téléphones différents passaient pour « deux sources donnent le même numéro ». On
+// compare les valeurs, et un site ou un numéro ne compte que s'il est prouvé.
+//
 // Le barème n'a donc de sens que depuis que la recherche remplit vraiment la fiche :
 // le registre pour l'identité et les dirigeants, Pappers pour le site et le téléphone,
 // Google pour le standard. Huit informations, notées présentes OU ABSENTES :
@@ -52,12 +56,14 @@ export function deLaRecherche(f: {
   effectifDuSite: boolean;
   effectif: string | null;
   site: string | null;
-  siteRecoupe: boolean;
+  /** Ce qui prouve que le site est le sien (« son SIREN est écrit sur le site »). */
+  sitePreuve: string | null;
   dirigeant: string | null;
   dirigeantRecoupe: boolean;
   email: string | null;
   telephone: string | null;
-  telephoneRecoupe: boolean;
+  /** Le statut du numéro et sa source, tels que le standard les a établis. */
+  telephonePreuve: { verifie: boolean; dit: string } | null;
 }): Ligne[] {
   const manque = "non trouvé — l’approfondissement ira le chercher";
   return [
@@ -75,8 +81,8 @@ export function deLaRecherche(f: {
       : f.effectif
         ? { quoi: "Effectif", sur: 1, dit: "effectif de l’entreprise entière — celui du site n’est pas publié" }
         : { quoi: "Effectif", sur: 0, dit: "effectif non publié" },
-    f.site
-      ? { quoi: "Site web", sur: f.siteRecoupe ? 2 : 1, dit: f.siteRecoupe ? "deux sources concordent" : "une seule source" }
+    f.site && f.sitePreuve
+      ? { quoi: "Site web", sur: 2, dit: f.sitePreuve }
       : { quoi: "Site web", sur: 0, dit: manque },
     f.dirigeant
       ? {
@@ -90,12 +96,8 @@ export function deLaRecherche(f: {
     f.email
       ? { quoi: "E-mail", sur: 1, dit: "adresse publiée, non recoupée" }
       : { quoi: "E-mail", sur: 0, dit: manque },
-    f.telephone
-      ? {
-          quoi: "Téléphone",
-          sur: f.telephoneRecoupe ? 2 : 1,
-          dit: f.telephoneRecoupe ? "deux sources donnent le même numéro" : "une seule source",
-        }
+    f.telephone && f.telephonePreuve
+      ? { quoi: "Téléphone", sur: f.telephonePreuve.verifie ? 2 : 1, dit: f.telephonePreuve.verifie ? f.telephonePreuve.dit : `à vérifier — ${f.telephonePreuve.dit}` }
       : { quoi: "Téléphone", sur: 0, dit: manque },
   ];
 }

@@ -28,10 +28,19 @@ const JUNK = /(sentry|wixpress|squarespace|example\.(com|org)|@2x|\.(png|jpe?g|g
 
 export interface SiteContacts {
   emails: string[];
+  /** Le standard d'abord : pages de contact, puis mentions légales, puis accueil. */
   phones: string[];
   /** Extraits des pages d'équipe où une personne est nommée avec sa fonction. */
   equipe: string[];
   readOn: string;
+  /**
+   * Le SIREN de l'entreprise est écrit sur ce site (mentions légales, pied de page) :
+   * c'est bien SON site. Sans cette preuve, un site trouvé n'est qu'un candidat —
+   * « recre-action.fr » n'était pas le site de Récré'Action (21/10).
+   */
+  prouve: boolean;
+  /** La page où le SIREN a été lu. */
+  preuve: string | null;
 }
 
 /** Le texte d'une page, débarrassé du balisage et des scripts. */
@@ -73,7 +82,52 @@ function passagesNommes(texte: string): string[] {
  */
 const PAGES_RAPIDES = ["", "contact", "nous-contacter", "mentions-legales"];
 
-export async function readSiteContacts(site: string | null, rapide = false): Promise<SiteContacts | null> {
+/** « 01.60.35.45.75 », « +33 1 60 35 45 75 » → « 01 60 35 45 75 ». */
+function numeroFrancais(brut: string): string | null {
+  const d = brut.replace(/\D/g, "").replace(/^0033/, "33").replace(/^33(?=[1-9]\d{8}$)/, "0");
+  return /^0[1-9]\d{8}$/.test(d) ? d.replace(/(\d{2})(?=\d)/g, "$1 ") : null;
+}
+
+/**
+ * Les numéros écrits dans le texte, pas seulement les liens « tel: » : la plupart des
+ * sites écrivent « Tél. 01 60 35 45 75 » sans lien (recreaction.fr, 21/10). Un numéro
+ * précédé de « fax » ou « télécopie » n'est pas un standard.
+ */
+function numerosDuTexte(texte: string): string[] {
+  const trouves: string[] = [];
+  for (const m of texte.matchAll(/(?<![\d+])(?:\+33\s?(?:\(0\)\s?)?|0)[1-9](?:[\s.\-]?\d{2}){4}(?!\d)/g)) {
+    const avant = texte.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0);
+    if (/fax|t[ée]l[ée]copie/i.test(avant)) continue;
+    const n = numeroFrancais(m[0]);
+    if (n) trouves.push(n);
+  }
+  return trouves;
+}
+
+/** Le SIREN (ou le SIRET, ou la TVA intracommunautaire qui le contient) est-il écrit ici ? */
+function porteLeSiren(texte: string, siren: string): boolean {
+  const colle = texte.replace(/(\d)[\s.\u00a0]+(?=\d)/g, "$1");
+  return new RegExp(`(?<!\\d)${siren}(?:\\d{5})?(?!\\d)|FR\\s?\\d{2}${siren}(?!\\d)`).test(colle);
+}
+
+/** Les liens de la page d'accueil vers le contact et les mentions légales, quel que soit leur chemin. */
+function liensUtiles(html: string, base: URL): string[] {
+  const liens = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi)) {
+    const cible = `${m[1]} ${m[2].replace(/<[^>]+>/g, " ")}`;
+    if (!/contact|mentions|l[ée]gal|imprint/i.test(cible)) continue;
+    try {
+      const u = new URL(m[1], base);
+      if (u.host.replace(/^www\./, "") === base.host.replace(/^www\./, "")) liens.add(u.href);
+    } catch {
+      // lien mal formé : on passe
+    }
+    if (liens.size >= 4) break;
+  }
+  return [...liens];
+}
+
+export async function readSiteContacts(site: string | null, rapide = false, siren: string | null = null): Promise<SiteContacts | null> {
   if (!site) return null;
   let base: URL;
   try {
@@ -81,38 +135,64 @@ export async function readSiteContacts(site: string | null, rapide = false): Pro
   } catch {
     return null;
   }
+  const lire = async (url: URL | string): Promise<{ html: string; url: string } | null> => {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+        headers: { "user-agent": "Mozilla/5.0 (compatible; AvisDocHub/1.0)" },
+      });
+      if (!res.ok) return null;
+      return { html: (await res.text()).slice(0, MAX_HTML), url: res.url || String(url) };
+    } catch {
+      return null; // page absente, site injoignable ou trop lent
+    }
+  };
+
+  // L'accueil d'abord : c'est lui qui dit où sont vraiment le contact et les mentions
+  // légales (« /nous-contacter/ », « /contact-2 », « /fr/mentions »…).
+  const accueil = await lire(base);
+  if (!accueil) return null;
+  const origine = new URL(accueil.url);
+  const chemins = new Set<string>(liensUtiles(accueil.html, origine));
+  for (const page of rapide ? PAGES_RAPIDES : PAGES) if (page) chemins.add(new URL(page, origine).href);
+  const pages = [{ ...accueil, chemin: "" }, ...(await Promise.all([...chemins].map(async (c) => {
+    const lu = await lire(c);
+    return lu ? { ...lu, chemin: c } : null;
+  }))).filter((x): x is { html: string; url: string; chemin: string } => x !== null)];
+
   const emails = new Set<string>();
-  const phones = new Set<string>();
   const equipe = new Set<string>();
-  await Promise.all(
-    (rapide ? PAGES_RAPIDES : PAGES).map(async (page) => {
-      try {
-        const res = await fetch(new URL(page, base), {
-          signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
-          headers: { "user-agent": "Mozilla/5.0 (compatible; AvisDocHub/1.0)" },
-        });
-        if (!res.ok) return;
-        const html = (await res.text()).slice(0, MAX_HTML);
-        for (const m of html.matchAll(/mailto:([^"'?\s>&]+@[^"'?\s>&]+)/gi)) {
-          const email = decodeURIComponent(m[1]).toLowerCase().replace(/[.,;]$/, "");
-          if (!JUNK.test(email) && email.length < 90) emails.add(email);
-        }
-        for (const m of html.matchAll(/tel:(\+?[\d\s().-]{8,20})/gi)) phones.add(m[1].replace(/\s+/g, " ").trim());
-        // Les pages d'équipe : on remonte qui y est nommé, et à quel titre.
-        if (page !== "" && page !== "mentions-legales") {
-          for (const extrait of passagesNommes(texteDe(html))) equipe.add(extrait);
-        }
-      } catch {
-        // page absente, site injoignable ou trop lent : on passe
-      }
-    }),
-  );
-  if (!emails.size && !phones.size && !equipe.size) return null;
+  // Le standard est sur la page de contact, puis dans les mentions légales, puis sur l'accueil.
+  const rang = (url: string) => (/contact/i.test(url) ? 0 : /mentions|l[ée]gal/i.test(url) ? 1 : url === accueil.url ? 2 : 3);
+  const numeros: { n: string; rang: number }[] = [];
+  let preuve: string | null = null;
+  for (const { html, url } of pages) {
+    for (const m of html.matchAll(/mailto:([^"'?\s>&]+@[^"'?\s>&]+)/gi)) {
+      const email = decodeURIComponent(m[1]).toLowerCase().replace(/[.,;]$/, "");
+      if (!JUNK.test(email) && email.length < 90) emails.add(email);
+    }
+    const texte = texteDe(html);
+    const r = rang(url);
+    for (const m of html.matchAll(/tel:(\+?[\d\s().-]{8,20})/gi)) {
+      const n = numeroFrancais(m[1]);
+      if (n) numeros.push({ n, rang: r });
+    }
+    for (const n of numerosDuTexte(texte)) numeros.push({ n, rang: r + 0.5 });
+    if (siren && !preuve && porteLeSiren(texte, siren)) preuve = url;
+    // Les pages d'équipe : on remonte qui y est nommé, et à quel titre.
+    if (url !== accueil.url && r !== 1) {
+      for (const extrait of passagesNommes(texte)) equipe.add(extrait);
+    }
+  }
+  const phones = [...new Set(numeros.sort((a, b) => a.rang - b.rang).map((x) => x.n))];
+  if (!emails.size && !phones.length && !equipe.size && !preuve) return null;
   return {
     emails: [...emails].slice(0, 5),
-    phones: [...phones].slice(0, 3),
+    phones: phones.slice(0, 3),
     equipe: [...equipe].slice(0, 10),
-    readOn: base.origin,
+    readOn: origine.origin,
+    prouve: preuve !== null,
+    preuve,
   };
 }
 
@@ -165,7 +245,7 @@ export async function devinerSite(nom: string): Promise<string | null> {
         if (!res.ok) continue;
         const html = (await res.text()).slice(0, 200_000);
         // Une page de parking ou de vente de domaine ne compte pas.
-        if (/domain (is )?for sale|acheter ce domaine|parking|sedoparking|afternic/i.test(html)) continue;
+        if (/domain (is )?for sale|acheter ce domaine|parking|parked domain|sedoparking|afternic|hostinger dns|domaine (est )?(à vendre|réservé)/i.test(html)) continue;
         return url;
       } catch {
         // domaine inexistant ou injoignable : on essaie le suivant
