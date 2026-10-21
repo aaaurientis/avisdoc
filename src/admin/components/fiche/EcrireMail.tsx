@@ -15,7 +15,7 @@ import { Check, ClipboardPaste, Clock, Copy, Loader2, Mail, PenLine, Sparkles, X
 import { useAuth } from "../../auth/AuthContext";
 import { Modal } from "../ui";
 import { ajouterEchange, marquerTraitee, type ClesFiche, type Echange } from "../../lib/echanges";
-import { colonneDEntree, etapeProposee, instant, jourISO } from "../../lib/actions-fiche";
+import { colonneDEntree, etapeProposee, heureISO, instant, jourISO } from "../../lib/actions-fiche";
 import type { EtapeFiche } from "./CompteRendu";
 import type { BrouillonRendu } from "../../lib/merx-appels";
 import { cn } from "@/lib/utils";
@@ -86,7 +86,8 @@ export default function EcrireMail({
   const reste = garde ? (garde[2] ?? "") : (depuisPrevue?.detail ?? "");
   const brouillon = /^Objet : (.*?)(?:\n\n([\s\S]*))?$/.exec(reste);
   const premier = contacts.find((c) => c.nom === depuisPrevue?.avec) ?? contacts.find((c) => c.email) ?? contacts[0] ?? null;
-  const [nom, setNom] = useState(premier?.nom ?? "");
+  // Le destinataire d'un mail programmé reste le sien, même s'il n'est plus dans la liste.
+  const [nom, setNom] = useState(depuisPrevue?.avec ?? premier?.nom ?? "");
   const [adresse, setAdresse] = useState(garde?.[1] ?? premier?.email ?? "");
   const [facon, setFacon] = useState<"merx" | "moi">(rediger ? "merx" : "moi");
   const [intention, setIntention] = useState(brouillon ? "" : depuisPrevue ? reste : (intitule ?? ""));
@@ -96,8 +97,10 @@ export default function EcrireMail({
   const [ouvert, setOuvert] = useState(false);
   const [relance, setRelance] = useState<number | null>(7);
   const [plusTard, setPlusTard] = useState(false);
-  const [le, setLe] = useState(dansJours(1));
-  const [aHeure, setAHeure] = useState("10:00");
+  // Un mail programmé rouvert garde sa date et son heure si on le reprogramme.
+  const auPrevu = depuisPrevue && Date.parse(depuisPrevue.au) > Date.now() ? new Date(depuisPrevue.au) : null;
+  const [le, setLe] = useState(auPrevu ? jourISO(auPrevu) : dansJours(1));
+  const [aHeure, setAHeure] = useState(auPrevu ? heureISO(auPrevu) : "10:00");
   const [horsHub, setHorsHub] = useState(false);
   const [colle, setColle] = useState("");
   const [envoyeLe, setEnvoyeLe] = useState(jourISO(new Date()));
