@@ -100,6 +100,7 @@ export default function EcrireMail({
   const [aHeure, setAHeure] = useState("10:00");
   const [horsHub, setHorsHub] = useState(false);
   const [colle, setColle] = useState("");
+  const [envoyeLe, setEnvoyeLe] = useState(jourISO(new Date()));
   const [ecriture, setEcriture] = useState(false);
   const [envoi, setEnvoi] = useState<null | "envoye" | "programme">(null);
   const [copie, setCopie] = useState(false);
@@ -182,6 +183,7 @@ export default function EcrireMail({
     if (envoi) return;
     const texte = horsHub ? colle.trim() : [objet.trim() && `Objet : ${objet.trim()}`, corps.trim()].filter(Boolean).join("\n\n");
     if (!texte) return setErreur(horsHub ? "Collez le mail que vous avez envoyé." : "Le mail est vide.");
+    if (horsHub && (!envoyeLe || envoyeLe > jourISO(new Date()))) return setErreur("Choisissez le jour où le mail est parti (aujourd’hui ou avant).");
     setEnvoi("envoye");
     setErreur(null);
     try {
@@ -190,7 +192,8 @@ export default function EcrireMail({
         kind: "email",
         titre: (!horsHub && objet.trim()) || "E-mail envoyé",
         detail: texte,
-        au: new Date().toISOString(),
+        // Hors du Hub, le mail est daté du jour où il est vraiment parti.
+        au: horsHub && envoyeLe !== jourISO(new Date()) ? instant(envoyeLe, "12:00") : new Date().toISOString(),
         par,
         prevu: false,
         avec: nom || null,
@@ -361,6 +364,18 @@ export default function EcrireMail({
         </>
       )}
 
+      {horsHub && (
+        <label className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-avisdoc-ink">
+          Envoyé le
+          <input
+            type="date"
+            value={envoyeLe}
+            max={jourISO(new Date())}
+            onChange={(e) => setEnvoyeLe(e.target.value)}
+            className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]"
+          />
+        </label>
+      )}
       {horsHub && (
         <textarea
           value={colle}
