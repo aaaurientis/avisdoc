@@ -42,7 +42,7 @@ export interface PersonneFiche {
 export const ADRESSE_GENERIQUE = /^(?:webmaster|contact|contacts|info|infos|accueil|dpo|rgpd|noreply|no-reply|admin|hello|bonjour|support|secretariat|standard)@/i;
 const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Adresses d'un service (drh@, prevention@, dgs@…) : la personne a sûrement aussi la sienne. */
-const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
+export const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
 /** Messageries grand public : « vignobles.levrier@gmail.com » ne dit rien d'un format maison. */
 const WEBMAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|msn|free|orange|wanadoo|sfr|neuf|laposte|icloud|me|aol|gmx|proton|protonmail|bbox|numericable)\./i;
 /** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */
@@ -135,6 +135,13 @@ export function personnesDuProspect(
     if (!cle || vus.has(cle)) return;
     const deja2 = sortie.find((x) => cleDe(x.nom) === cle);
     if (deja2) {
+      // Une personne vérifiée (corrigée avec Merx, ou sûre) passe devant le contact principal,
+      // dont le numéro sert souvent de standard ; sinon on ne fait que compléter le vide.
+      if (q.aConfirmer === false) {
+        deja2.fonction = q.fonction || deja2.fonction;
+        deja2.email = q.email || deja2.email;
+        deja2.telephone = q.telephone || deja2.telephone;
+      }
       deja2.fonction ||= q.fonction;
       deja2.email ||= q.email;
       deja2.telephone ||= q.telephone;
@@ -209,3 +216,14 @@ export function personnesDuProspect(
   }
   return sortie;
 }
+
+/**
+ * Les interlocuteurs pour la fenêtre « Mail » : l'adresse de la personne relevée d'abord,
+ * puis celle trouvée, puis celle composée au format maison (à confirmer).
+ */
+export const contactsMail = (personnes: PersonneFiche[]) =>
+  personnes.map((q) => {
+    const email = (q.emailPerso && !q.persoDeduit ? q.emailPerso : null) ?? q.email ?? q.emailPerso ?? null;
+    // L'adresse composée au format maison reste signalée « déduite » jusque dans la fenêtre Mail.
+    return { nom: q.nom, fonction: q.fonction, email, deduite: Boolean(email && q.persoDeduit && email === q.emailPerso) };
+  });

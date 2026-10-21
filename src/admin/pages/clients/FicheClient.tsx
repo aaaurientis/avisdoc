@@ -3,7 +3,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, Search, Trash2, Undo2, X } from "lucide-react";
+import { Loader2, MessagesSquare, Pencil, Search, Trash2, Undo2, X } from "lucide-react";
+import ParlerAMerx from "../../components/fiche/ParlerAMerx";
 import type { Account, AccountField } from "../../types";
 import { colonnesDe } from "../../lib/ui-tokens";
 import { useAdminData } from "../../data/AdminDataContext";
@@ -11,7 +12,7 @@ import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { Modal } from "../../components/ui";
 import ChoixReferent from "../../components/ChoixReferent";
 import FicheEntreprise from "../../components/FicheEntreprise";
-import { notesDe, personnesDuProspect } from "../../lib/fiche";
+import { contactsMail, notesDe, personnesDuProspect } from "../../lib/fiche";
 import ColonneEntreprise, { autresContactsDe, etablissementDe } from "../../components/fiche/ColonneEntreprise";
 import OngletActions from "../../components/fiche/OngletActions";
 import DevisQonto from "../../espace/DevisQonto";
@@ -22,7 +23,6 @@ import ApprocheEntreprise from "../../components/fiche/ApprocheEntreprise";
 import LigneIdentite from "../../components/fiche/LigneIdentite";
 import EspaceClientCard from "../../espace/EspaceClientCard";
 import RendezVousCard from "../../espace/RendezVousCard";
-import BrouillonEmail from "../prospects/BrouillonEmail";
 import { approfondirProspect, redigerEmailClient } from "../../lib/merx-appels";
 import { confirmer } from "../../components/Confirmation";
 import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
@@ -64,9 +64,10 @@ export default function FicheClient({
   const { accountFields, addAccount, saveAccount, getClient, setClientStage, updateClientFields, stages, addProjectContact, removeProjectContact, rafraichir } = useAdminData();
   const [mode, setMode] = useState<"lecture" | "edition">(fiche ? modeInitial : "edition");
   const [onglet, setOnglet] = useState("actions");
+  const [parler, setParler] = useState(false);
+  const [versionHisto, setVersionHisto] = useState(0);
   const [origine, setOrigine] = useState<Prospect | null>(null);
   const [nbAVenir, setNbAVenir] = useState(0);
-  const [brouillon, setBrouillon] = useState<{ objet: string; corps: string; destinataire: string | null } | null>(null);
   const compter = useCallback((n: number) => setNbAVenir(n), []);
   const { user } = useAuth();
   const [enCours, setEnCours] = useState<"approfondir" | "pipeline" | null>(null);
@@ -147,17 +148,11 @@ export default function FicheClient({
    * Merx écrit à un client qu'on connaît : il relit ce qui s'est passé avec eux et
    * part de l'intention dite dans l'intitulé. Sans intitulé, il n'a pas de sujet.
    */
-  const ecrireAvecMerx = async (intention: string) => {
-    if (!fiche) return;
-    if (!intention) {
-      toast.error("Écrivez d’abord ce que vous voulez leur dire, ou choisissez une proposition.");
-      return;
-    }
-    try {
-      setBrouillon(await redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? ""));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Merx n’a pas pu écrire ce message.");
-    }
+  // Le brouillon revient dans la fenêtre « Mail » de la fiche, où on le corrige.
+  const ecrireAvecMerx = async (intention: string, a: { nom: string; fonction?: string | null } | null) => {
+    if (!fiche) throw new Error("Fiche introuvable.");
+    if (!intention) throw new Error("Écrivez d’abord ce que vous voulez leur dire.");
+    return redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? "", a);
   };
 
   /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
@@ -349,13 +344,33 @@ export default function FicheClient({
         actif={onglet}
         onOnglet={setOnglet}
         enHaut={
-          <button
-            type="button"
-            onClick={() => setMode("edition")}
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
-          >
-            <Pencil className="size-3.5" /> Modifier la fiche
-          </button>
+          <>
+            {/* Une erreur, une fiche à améliorer : on en parle avec Merx (21/10). */}
+            {origine && (
+              <button type="button" onClick={() => setParler(true)} className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink hover:border-avisdoc-teal">
+                <MessagesSquare className="size-3.5" /> Parler à Merx
+              </button>
+            )}
+            {parler && origine && (
+              <ParlerAMerx
+                prospect={origine}
+                cles={clesHistorique}
+                onModifiee={async () => {
+                  setVersionHisto((v) => v + 1);
+                  const { data } = await supabaseAdmin.from("admin_prospects").select("*").eq("id", origine.id).maybeSingle();
+                  if (data) setOrigine(data as Prospect);
+                }}
+                onFermer={() => setParler(false)}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => setMode("edition")}
+              className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-border px-3.5 text-[13px] font-semibold text-avisdoc-ink transition-colors hover:border-avisdoc-teal"
+            >
+              <Pencil className="size-3.5" /> Modifier la fiche
+            </button>
+          </>
         }
         message={
           souci ? <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">{souci}</p> : undefined
@@ -365,12 +380,14 @@ export default function FicheClient({
         {/* Toujours monté : le compte des actions à venir reste juste sur les autres onglets. */}
         <div className={onglet === "actions" ? "" : "hidden"}>
           <OngletActions
+            version={versionHisto}
             cles={clesHistorique}
             personnes={interlocuteurs.map((q) => q.nom)}
             etape={null}
             jalons={jalons}
             suggestions={SUGGESTIONS}
             onEcrireAvecMerx={ecrireAvecMerx}
+            contacts={contactsMail(interlocuteurs)}
             onCompte={compter}
           />
         </div>
@@ -420,15 +437,6 @@ export default function FicheClient({
           </div>
         )}
       </FicheEntreprise>
-      {brouillon && (
-        <BrouillonEmail
-          nom={fiche.name}
-          objet={brouillon.objet}
-          corps={brouillon.corps}
-          destinataire={brouillon.destinataire}
-          onClose={() => setBrouillon(null)}
-        />
-      )}
       </>
     );
   }
@@ -504,16 +512,6 @@ export default function FicheClient({
         )}
       </div>
     </Modal>
-    {/* Après la fiche dans la page : à niveau égal, c'est le dernier rendu qui passe devant. */}
-    {brouillon && fiche && (
-      <BrouillonEmail
-        nom={fiche.name}
-        objet={brouillon.objet}
-        corps={brouillon.corps}
-        destinataire={brouillon.destinataire}
-        onClose={() => setBrouillon(null)}
-      />
-    )}
     </>
   );
 }

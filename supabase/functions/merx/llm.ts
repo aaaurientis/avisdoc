@@ -133,7 +133,9 @@ export async function converse(
   messages: ChatMessage[],
   options: LlmOptions & { tools: ChatTool[]; runTool: (name: string, input: unknown) => Promise<string> },
 ): Promise<string> {
-  const tools = options.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  const tools: any[] = options.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  // La recherche web, quand on la permet : elle s'exécute chez Anthropic, dans la même réponse.
+  if (options.webSearch) tools.push(webSearchTool(options.webSearch.maxUses));
   const history: any[] = messages.map((m) => ({ role: m.role, content: m.content }));
   const usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   try {
@@ -149,6 +151,13 @@ export async function converse(
       const u = usageOf(response);
       usage.inputTokens += u.inputTokens;
       usage.outputTokens += u.outputTokens;
+      usage.webSearches += u.webSearches;
+      options.onSources?.(sourcesOf(response));
+      // Une recherche web longue met la réponse en pause : on la laisse reprendre.
+      if (response.stop_reason === "pause_turn" && round < MAX_TOOL_ROUNDS) {
+        history.push({ role: "assistant", content: response.content });
+        continue;
+      }
       const calls = response.content.filter((b: any) => b.type === "tool_use");
       if (response.stop_reason !== "tool_use" || !calls.length || round >= MAX_TOOL_ROUNDS) return textOf(response).join("").trim();
       const results = [];
