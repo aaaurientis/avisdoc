@@ -123,6 +123,11 @@ begin
         apres := jsonb_set(apres, array[c], coalesce(avant->c, 'null'::jsonb));
       end if;
     end loop;
+    -- Un contact saisi garde aussi sa source : sinon un numéro tapé à la main se verrait
+    -- attribuer la page lue par Merx.
+    if old.champs_saisis && array['contact_name', 'contact_email', 'contact_phone', 'contact_role'] then
+      apres := jsonb_set(apres, array['contact_source'], coalesce(avant->'contact_source', 'null'::jsonb));
+    end if;
     new := jsonb_populate_record(new, apres);
     new.champs_saisis := old.champs_saisis;
   end if;
