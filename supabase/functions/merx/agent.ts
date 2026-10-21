@@ -920,8 +920,20 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // fiche restait sans numéro et le conseil « appelez le standard » était vide.
   // Le téléphone de la fiche, c'est LE STANDARD vérifié par le code. Un site officiel
   // découvert en route qui publie le même numéro le fait passer « vérifié ».
-  if (standard.principal?.statut === "a_verifier" && site?.phones.some((t) => t.replace(/\D/g, "").endsWith(standard.principal!.numero.replace(/\D/g, "").slice(-9)))) {
+  // Seule une fiche GOOGLE confirmée par le site devient « vérifiée » (deux sources) — un
+  // numéro du site ne se confirme pas lui-même.
+  const memeNumero = (a: string, b: string) => a.replace(/\D/g, "").slice(-9) === b.replace(/\D/g, "").slice(-9);
+  if (standard.principal?.statut === "a_verifier" && standard.principal.source && site?.phones.some((t) => memeNumero(t, standard.principal!.numero))) {
     standard.principal = { ...standard.principal, statut: "verifie", libelle: `${standard.principal.libelle} — même numéro sur le site officiel` };
+  }
+  // Un site officiel découvert en route : ses numéros s'ajoutent, à vérifier.
+  for (const t of site?.phones ?? []) {
+    if ([standard.principal, ...standard.autres].some((n) => n && memeNumero(n.numero, t))) continue;
+    const n = { numero: t, statut: "a_verifier" as const, libelle: "Site officiel de l'entreprise (une seule source)", source: site?.readOn ?? null };
+    if (!standard.principal) {
+      standard.principal = n;
+      standard.pourquoi = null;
+    } else if (standard.autres.length < 3) standard.autres.push(n);
   }
   const phone = standard.principal?.numero ?? null;
 

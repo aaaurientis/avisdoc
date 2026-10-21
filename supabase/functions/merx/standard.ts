@@ -49,6 +49,8 @@ export interface Standard {
 const sansAccent = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const national = (t: string) => t.replace(/\D/g, "").replace(/^33(?=\d{9}$)/, "0");
 const MOTS_VIDES = new Set(["entreprise", "societe", "ste", "sas", "sa", "sarl", "eurl", "snc", "groupe", "france", "et", "de", "des", "du", "la", "le", "les", "l", "d"]);
+/** Les mots de type de voie : ils ne distinguent pas une rue d'une autre. */
+const VOIES = new Set(["rue", "avenue", "boulevard", "chemin", "route", "allee", "impasse", "place", "quai", "cours", "zone", "zac", "parc", "lieu", "dit", "bis", "ter", "general", "saint", "sainte", "grand", "grande", "petit", "petite", "cedex", "france"]);
 const motsUtiles = (t: string) => sansAccent(t).split(/[^a-z0-9]+/).filter((m) => m.length >= 3 && !MOTS_VIDES.has(m));
 
 /** « ENTREPRISE BARDE SUD-OUEST (CITEOS) (BSO) » → « ENTREPRISE BARDE SUD-OUEST », « CITEOS », « BSO ». */
@@ -96,13 +98,20 @@ export async function trouverStandard(e: {
   const cle = Deno.env.get("GOOGLE_MAPS_KEY");
   const duSite = (e.telephonesDuSite ?? []).map(national).filter((t) => t.length === 10);
   const cpSiege = (e.siege ?? "").match(/\b\d{5}\b/)?.[0] ?? null;
-  // La rue du siège : ses mots significatifs (« joseph », « cugnot »), numéro compris.
-  const rueSiege = motsUtiles((e.siege ?? "").replace(/\b\d{5}\b.*$/, ""));
+  // La rue du siège : ses mots DISTINCTIFS (« joseph », « cugnot »), sans « rue » ni « général ».
+  const rueSiege = motsUtiles((e.siege ?? "").replace(/\b\d{5}\b.*$/, "")).filter((m) => !VOIES.has(m));
   const numeroSiege = (e.siege ?? "").match(/\b(\d{1,4})\s+(?:bis\s+|ter\s+)?(?:rue|avenue|av|bd|boulevard|chemin|route|allee|allée|impasse|place|quai|cours|zi|za|zac)\b/i)?.[1] ?? null;
   const motsDuNom = new Set(e.noms.flatMap(motsUtiles));
 
+  // Sans Google : le site officiel seul, à vérifier — mieux qu'aucun numéro.
   if (!cle || !e.noms.length) {
-    return { principal: null, autres: [], pourquoi: cle ? "aucun nom à chercher" : "recherche Google Maps indisponible (clé absente)", releve_le };
+    const site = (e.telephonesDuSite ?? []).map((t) => ({ numero: t, statut: "a_verifier" as StatutStandard, libelle: "Site officiel de l'entreprise (une seule source)", source: null }));
+    return {
+      principal: site[0] ?? null,
+      autres: site.slice(1, 4),
+      pourquoi: site.length ? null : cle ? "aucun nom à chercher" : "recherche Google Maps indisponible (clé absente)",
+      releve_le,
+    };
   }
 
   // Une recherche par nom (enseigne et sigle d'abord : c'est sous eux que Google les connaît).
@@ -127,10 +136,14 @@ export async function trouverStandard(e: {
     // Un nom d'un seul mot (« BSO ») ne suffit pas hors de la ville : trop d'homonymes.
     const nomFort = variantes.some((m) => m.length >= 2 && m.every((x) => motsGoogle.has(x)));
     const cp = adresse.match(/\b\d{5}\b/)?.[0] ?? null;
-    const motsAdresse = new Set(motsUtiles(adresse));
+    // La seule partie rue de l'adresse Google (avant le code postal) : « Paris » dans
+    // « 7 Rue de Lyon, 75001 Paris » n'est pas un mot de la rue.
+    const motsAdresse = new Set(motsUtiles(adresse.replace(/\b\d{5}\b[\s\S]*$/, "")).filter((m) => !VOIES.has(m)));
     const rueCommune = rueSiege.filter((m) => motsAdresse.has(m)).length;
     const memeNumero = numeroSiege ? new RegExp(`\\b${numeroSiege}\\b`).test(adresse) : false;
-    const auSiege = Boolean(cpSiege && cp === cpSiege && rueCommune >= 1 && (memeNumero || rueCommune >= 2));
+    // Au siège : même code postal, même nom de rue (mots distinctifs), et même numéro
+    // quand le registre en donne un.
+    const auSiege = Boolean(cpSiege && cp === cpSiege && rueCommune >= Math.min(2, rueSiege.length) && rueCommune >= 1 && (numeroSiege ? memeNumero : true));
     const memeVille = Boolean(e.ville && sansAccent(adresse).includes(sansAccent(e.ville)));
     // Ailleurs qu'au siège et dans une autre ville : un autre établissement, retenu
     // seulement sous un nom de plusieurs mots.
