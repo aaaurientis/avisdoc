@@ -469,11 +469,11 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
   const { data: marques } = await sb.from("admin_prospects").select("champs_saisis").eq("id", id).maybeSingle();
   const saisis = new Set<string>(((marques as { champs_saisis?: string[] } | null)?.champs_saisis) ?? []);
   if (a.found_by) {
-    for (const k of Object.keys(patch)) if (saisis.has(k) && k !== "personnes" && k !== "site_contacts") delete patch[k];
-    if (!saisis.has("personnes") && !saisis.has("site_contacts")) return;
+    for (const k of Object.keys(patch)) if (saisis.has(k) && !["personnes", "site_contacts", "head_office"].includes(k)) delete patch[k];
+    if (!saisis.has("personnes") && !saisis.has("site_contacts") && !saisis.has("head_office")) return;
   }
   // Le siège : on complète ses cases vides (une ville seule n'empêche pas d'ajouter l'adresse).
-  if (!a.found_by && patch.head_office && a.head_office && typeof a.head_office === "object") {
+  if ((!a.found_by || saisis.has("head_office")) && patch.head_office && a.head_office && typeof a.head_office === "object") {
     const av = a.head_office as Record<string, unknown>;
     const nv = patch.head_office as Record<string, unknown>;
     const fusion: Record<string, unknown> = { ...nv };
