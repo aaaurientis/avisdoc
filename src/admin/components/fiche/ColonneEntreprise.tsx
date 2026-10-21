@@ -103,7 +103,8 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
   return {
     lignes: candidates.filter((c) => !vide(c.valeur)).map((c) => ({ label: c.label, valeur: c.valeur })),
     manquants: [
-      ...candidates.filter((c) => vide(c.valeur)).map((c) => c.label),
+      // Le téléphone affiché dans le bloc « Standard » ne manque pas.
+      ...candidates.filter((c) => vide(c.valeur) && !((c.label === "Téléphone" || c.label === "Mobile") && standardDe(p)?.principal)).map((c) => c.label),
       ...(p.contact_name || p.personnes?.length ? [] : ["Interlocuteur"]),
       ...(p.siren ? [] : ["SIREN"]),
     ],

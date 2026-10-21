@@ -826,11 +826,17 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // LE STANDARD, trouvé et vérifié par le code — jamais par le modèle (Olivier, 21/10 :
   // « d'abord le standard, en gros, ultra vérifié »). Google Maps sous tous les noms de
   // l'entreprise (enseigne, sigle, nom légal), rapproché de l'adresse de la fiche.
-  const cible = candidates.find((c) => c.siren === p.siren) ?? candidates[0] ?? null;
+  // Le registre ne sert ici que si c'est SÛREMENT la même entreprise (même SIREN) ; sinon
+  // on cherche avec ce que la fiche dit d'elle-même. La ville et l'adresse sont celles de
+  // la fiche (une agence n'est pas son siège) ; celles du registre seulement à défaut, et
+  // seulement dans la même ville.
+  const cible = p.siren ? (candidates.find((c) => c.siren === p.siren) ?? null) : null;
+  const ville = p.headOffice?.city ?? p.city ?? cible?.headOffice.city ?? null;
+  const memeVille = (v: string | null | undefined) => Boolean(v && ville && v.trim().toLowerCase() === ville.trim().toLowerCase());
   const standard = await trouverStandard({
     noms: nomsDeLEntreprise(p.name, cible?.autresNoms ?? []),
-    ville: p.headOffice?.city ?? cible?.headOffice.city ?? p.city,
-    siege: p.headOffice?.address ?? cible?.headOffice.address ?? null,
+    ville,
+    siege: p.headOffice?.address ?? (cible && memeVille(cible.headOffice.city) ? cible.headOffice.address : null),
     telephonesDuSite: siteAtStart?.phones ?? [],
   });
   const lieu = standard.principal
