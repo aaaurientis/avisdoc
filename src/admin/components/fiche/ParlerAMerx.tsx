@@ -184,8 +184,8 @@ export default function ParlerAMerx({
             mobile: c.telephone?.trim()
               ? /^(?:\+33\s?|0)[67]/.test(c.telephone.trim())
                 ? c.telephone.trim()
-                : ancienne?.telephone
-                  ? (ancienne.mobile ?? null)
+                : ancienne?.telephone && ancienne.mobile && telNational(ancienne.mobile) !== telNational(ancienne.telephone)
+                  ? ancienne.mobile
                   : null
               : (ancienne?.mobile ?? null),
             source: c.source || ancienne?.source || null,

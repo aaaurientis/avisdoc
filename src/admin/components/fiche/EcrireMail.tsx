@@ -185,7 +185,7 @@ export default function EcrireMail({
 
   /** « Mail envoyé » : il entre dans l'historique, texte compris ; la relance se programme. */
   const noterEnvoye = async () => {
-    if (envoi) return;
+    if (envoi || ecriture) return;
     // L'historique garde à quelle adresse le mail est vraiment parti.
     const texte = horsHub ? colle.trim() : [objet.trim() && `Objet : ${objet.trim()}`, corps.trim()].filter(Boolean).join("\n\n");
     const avecAdresse = texte && adresse.trim() ? `À : ${adresse.trim()}\n${texte}` : texte;
@@ -228,7 +228,7 @@ export default function EcrireMail({
 
   /** « Pas maintenant » : le mail est programmé, brouillon compris, avec son rappel. */
   const programmer = async () => {
-    if (envoi) return;
+    if (envoi || ecriture) return;
     if (!le || !aHeure) return setErreur("Choisissez le jour et l’heure.");
     if (le < jourISO(new Date())) return setErreur("Choisissez aujourd’hui ou plus tard.");
     setEnvoi("programme");
@@ -405,7 +405,7 @@ export default function EcrireMail({
             <button
               type="button"
               onClick={() => void noterEnvoye()}
-              disabled={Boolean(envoi)}
+              disabled={Boolean(envoi) || ecriture}
               className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
             >
               {envoi === "envoye" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Mail envoyé
@@ -445,7 +445,7 @@ export default function EcrireMail({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <input type="date" value={le} min={jourISO(new Date())} onChange={(e) => setLe(e.target.value)} className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Jour" />
             <input type="time" value={aHeure} onChange={(e) => setAHeure(e.target.value)} className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Heure" />
-            <button type="button" onClick={() => void programmer()} disabled={Boolean(envoi)} className={bouton}>
+            <button type="button" onClick={() => void programmer()} disabled={Boolean(envoi) || ecriture} className={bouton}>
               {envoi === "programme" ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />} Programmer
             </button>
           </div>
