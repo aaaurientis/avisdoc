@@ -115,7 +115,9 @@ export default function EcrireMail({
       const r = await rediger(intention.trim(), contact);
       setObjet(r.objet);
       setCorps(r.corps);
-      if (!adresse && r.destinataire) setAdresse(r.destinataire);
+      // L'adresse rendue par Merx est celle du contact principal : on ne la prend que si
+      // personne n'a été choisi, jamais à la place de la personne choisie.
+      if (!adresse && !nom && r.destinataire) setAdresse(r.destinataire);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Merx n’a pas pu écrire le mail. Réessayez.");
     } finally {

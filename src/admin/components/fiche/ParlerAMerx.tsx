@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Check, Loader2, Send, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
+import { useAdminData } from "../../data/AdminDataContext";
 import { Modal } from "../ui";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { ajouterEchange, type ClesFiche } from "../../lib/echanges";
@@ -45,6 +46,7 @@ export default function ParlerAMerx({
   onFermer: () => void;
 }) {
   const { user } = useAuth();
+  const { rafraichir } = useAdminData();
   const par = user?.email ?? "";
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; corrections?: CorrectionFiche[] }[]>([]);
   const [saisie, setSaisie] = useState("");
@@ -141,8 +143,35 @@ export default function ParlerAMerx({
           };
         }
       }
+      // Sur une affaire du Pipeline, les contacts saisis sur l'affaire passent devant ceux de
+      // la fiche : la correction d'une personne les suit. Un contact saisi ne se retire pas
+      // d'ici (il se retire avec « Modifier la fiche »).
+      let contactSaisi: { id: string; name: string } | null = null;
+      if (cles.clientId && (c.champ === "interlocuteur" || c.champ === "retirer_interlocuteur")) {
+        const { data: lignes, error: lectureContacts } = await supabaseAdmin.from("admin_client_contacts").select("id, name, prenom, nom").eq("client_id", cles.clientId);
+        if (lectureContacts) throw new Error(lectureContacts.message);
+        const cible = cleNom(c.nom ?? "");
+        contactSaisi =
+          ((lignes ?? []) as { id: string; name: string | null; prenom: string | null; nom: string | null }[])
+            .map((l) => ({ id: l.id, name: l.name || [l.prenom, l.nom].filter(Boolean).join(" ") }))
+            .find((l) => cleNom(l.name) === cible) ?? null;
+        if (contactSaisi && c.champ === "retirer_interlocuteur")
+          throw new Error(`${contactSaisi.name} a été saisi sur l’affaire : retirez-le avec « Modifier la fiche ».`);
+      }
       const { error } = await supabaseAdmin.from("admin_prospects").update(patch).eq("id", prospect.id);
       if (error) throw new Error(error.message);
+      if (contactSaisi && c.champ === "interlocuteur") {
+        const maj = {
+          ...(c.fonction?.trim() ? { role: c.fonction.trim() } : {}),
+          ...(c.email?.trim() ? { email: c.email.trim() } : {}),
+          ...(c.telephone?.trim() ? { tel: c.telephone.trim() } : {}),
+        };
+        if (Object.keys(maj).length) {
+          const { error: errContact } = await supabaseAdmin.from("admin_client_contacts").update(maj).eq("id", contactSaisi.id);
+          if (errContact) throw new Error(errContact.message);
+          await rafraichir();
+        }
+      }
       await ajouterEchange(cles, {
         kind: "note",
         titre: "Note",
