@@ -49,7 +49,11 @@ const duree = (d: Demande) => {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
 };
 
-type Colonne = "nom" | "depenses" | "cout";
+type Colonne = "date" | "nom" | "depenses" | "cout";
+
+/** La date de la recherche qui a fait apparaître la fiche : sa première dépense. */
+const dateDeRecherche = (a: { lignes: { quand: string }[] }) => a.lignes[0]?.quand ?? "";
+const jourCourt = (iso: string) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit" }) : "—");
 
 /** Un en-tête qui trie. La flèche dit la colonne active et son sens. */
 function EnTete({
@@ -145,7 +149,7 @@ export default function Couts() {
   const [depliees, setDepliees] = useState<Set<string>>(new Set());
   const [recherche, setRecherche] = useState("");
   /** Le tri courant. Par défaut le plus cher en tête : c'est ce qu'on vient voir. */
-  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "cout", sens: "desc" });
+  const [tri, setTri] = useState<{ colonne: Colonne; sens: "asc" | "desc" }>({ colonne: "date", sens: "desc" });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -233,6 +237,8 @@ export default function Couts() {
     const filtrees = q ? cap.acquisitions.filter((a) => nu(a.nom).includes(q)) : cap.acquisitions;
     const sens = tri.sens === "asc" ? 1 : -1;
     return [...filtrees].sort((a, b) => {
+      // Par date de recherche (Olivier, 21/10), la plus récente d'abord par défaut.
+      if (tri.colonne === "date") return sens * dateDeRecherche(a).localeCompare(dateDeRecherche(b));
       if (tri.colonne === "nom") return sens * a.nom.localeCompare(b.nom, "fr");
       if (tri.colonne === "depenses") return sens * (a.lignes.length - b.lignes.length);
       return sens * (a.total - b.total);
@@ -374,6 +380,7 @@ export default function Couts() {
                     {/* En-tête : chaque colonne se trie, un second clic inverse le sens. */}
                     <div className="flex items-center gap-3 border-b border-border bg-muted/50 px-4 py-2">
                       <span className="size-4 shrink-0" />
+                      <EnTete colonne="date" libelle="Recherche du" tri={tri} onTrier={trierPar} className="hidden w-24 sm:flex" />
                       <EnTete colonne="nom" libelle="Entreprise" tri={tri} onTrier={trierPar} className="min-w-0 flex-1" />
                       <EnTete colonne="depenses" libelle="Dépenses" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
                       <EnTete colonne="cout" libelle="Coût" tri={tri} onTrier={trierPar} className="w-24 justify-end text-right" />
@@ -397,6 +404,7 @@ export default function Couts() {
                           <ChevronRight
                             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouverte && "rotate-90")}
                           />
+                          <span className="hidden w-24 shrink-0 text-[12.5px] text-muted-foreground sm:block">{jourCourt(dateDeRecherche(a))}</span>
                           <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-avisdoc-ink">
                             {a.nom}
                           </span>
