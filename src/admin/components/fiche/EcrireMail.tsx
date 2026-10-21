@@ -79,12 +79,12 @@ export default function EcrireMail({
   const [nom, setNom] = useState(premier?.nom ?? "");
   const [adresse, setAdresse] = useState(premier?.email ?? "");
   const [facon, setFacon] = useState<"merx" | "moi">(rediger ? "merx" : "moi");
-  // Un mail programmé rouvert : son brouillon revient (objet = intitulé, texte = détail) ;
-  // sans brouillon, son détail est ce qu'on voulait dire.
-  const brouillonPrevu = Boolean(depuisPrevue && !/^(e-mail prévu|relance prévue|e-mail)$/i.test(depuisPrevue.titre.trim()));
-  const [intention, setIntention] = useState(brouillonPrevu ? "" : (depuisPrevue?.detail ?? intitule ?? ""));
-  const [objet, setObjet] = useState(brouillonPrevu ? (depuisPrevue?.titre ?? "") : "");
-  const [corps, setCorps] = useState(brouillonPrevu ? (depuisPrevue?.detail ?? "") : "");
+  // Un mail programmé rouvert : un brouillon gardé (« Objet : … » puis le texte, comme un
+  // mail envoyé) revient tel quel ; sinon, son détail est ce qu'on voulait dire.
+  const brouillon = /^Objet : (.*)\n\n([\s\S]*)$/.exec(depuisPrevue?.detail ?? "");
+  const [intention, setIntention] = useState(brouillon ? "" : (depuisPrevue?.detail ?? intitule ?? ""));
+  const [objet, setObjet] = useState(brouillon?.[1] ?? "");
+  const [corps, setCorps] = useState(brouillon?.[2] ?? "");
   const [messagerie, setMessagerie] = useState<Messagerie>(lirePreference);
   const [ouvert, setOuvert] = useState(false);
   const [relance, setRelance] = useState<number | null>(7);
@@ -213,10 +213,10 @@ export default function EcrireMail({
       const c = await clesDeLAction(false);
       await ajouterEchange(c, {
         kind: "email",
-        // Le brouillon se garde tel quel (objet en intitulé, texte en détail) pour revenir
-        // à l'identique ; sans brouillon, on garde ce qu'on voulait dire.
+        // Le brouillon se garde sous la forme « Objet : … » puis le texte, pour revenir à
+        // l'identique ; sans brouillon, on garde ce qu'on voulait dire.
         titre: objet.trim() || "E-mail prévu",
-        detail: corps.trim() || intention.trim(),
+        detail: corps.trim() ? `Objet : ${objet.trim()}\n\n${corps.trim()}` : intention.trim(),
         au: instant(le, aHeure),
         par,
         prevu: true,

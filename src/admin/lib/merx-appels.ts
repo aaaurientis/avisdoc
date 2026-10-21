@@ -45,12 +45,19 @@ export async function approfondirProspect(prospectId: string): Promise<void> {
  * Demande un brouillon pour quelqu'un qui est DÉJÀ client : Merx s'appuie sur la campagne
  * menée et sur tout ce qui a été noté avec eux. RIEN N'EST ENVOYÉ.
  */
-export async function redigerEmailClient(accountId: string, intention: string, signature: string): Promise<BrouillonRendu> {
+export async function redigerEmailClient(
+  accountId: string,
+  intention: string,
+  signature: string,
+  a?: { nom: string; fonction?: string | null } | null,
+): Promise<BrouillonRendu> {
   const r = await appeler<{ objet?: string; corps?: string; destinataire?: string | null }>({
     action: "email_client",
     accountId,
     intention,
     signature,
+    destinataireNom: a?.nom ?? "",
+    destinataireFonction: a?.fonction ?? "",
   });
   return { objet: r.objet ?? "", corps: r.corps ?? "", destinataire: r.destinataire ?? null };
 }

@@ -346,7 +346,12 @@ Deno.serve(async (req: Request) => {
               depistes: affaire?.depistes ?? null,
               orientes: affaire?.orientes ?? null,
               ville: affaire?.ville ?? null,
-              contact: contact ? { nom: [contact.prenom, contact.nom].filter(Boolean).join(" "), role: contact.role ?? null } : null,
+              // La personne choisie dans la fenêtre « Mail », sinon le premier contact de l'affaire.
+              contact: String(body.destinataireNom ?? "").trim()
+                ? { nom: String(body.destinataireNom).trim().slice(0, 120), role: String(body.destinataireFonction ?? "").trim().slice(0, 200) || null }
+                : contact
+                  ? { nom: [contact.prenom, contact.nom].filter(Boolean).join(" "), role: contact.role ?? null }
+                  : null,
             },
             intention,
             (fil ?? []).map((e) => ({

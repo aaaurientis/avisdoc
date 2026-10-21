@@ -148,10 +148,10 @@ export default function FicheClient({
    * part de l'intention dite dans l'intitulé. Sans intitulé, il n'a pas de sujet.
    */
   // Le brouillon revient dans la fenêtre « Mail » de la fiche, où on le corrige.
-  const ecrireAvecMerx = async (intention: string) => {
+  const ecrireAvecMerx = async (intention: string, a: { nom: string; fonction?: string | null } | null) => {
     if (!fiche) throw new Error("Fiche introuvable.");
     if (!intention) throw new Error("Écrivez d’abord ce que vous voulez leur dire.");
-    return redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? "");
+    return redigerEmailClient(fiche.id, intention, user?.name ?? user?.email ?? "", a);
   };
 
   /** L'affaire du Pipeline dont vient cette fiche : c'est elle qui porte l'identité complète. */
