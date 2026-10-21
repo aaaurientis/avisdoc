@@ -135,6 +135,13 @@ export function personnesDuProspect(
     if (!cle || vus.has(cle)) return;
     const deja2 = sortie.find((x) => cleDe(x.nom) === cle);
     if (deja2) {
+      // Une personne vérifiée (corrigée avec Merx, ou sûre) passe devant le contact principal,
+      // dont le numéro sert souvent de standard ; sinon on ne fait que compléter le vide.
+      if (q.aConfirmer === false) {
+        deja2.fonction = q.fonction || deja2.fonction;
+        deja2.email = q.email || deja2.email;
+        deja2.telephone = q.telephone || deja2.telephone;
+      }
       deja2.fonction ||= q.fonction;
       deja2.email ||= q.email;
       deja2.telephone ||= q.telephone;
