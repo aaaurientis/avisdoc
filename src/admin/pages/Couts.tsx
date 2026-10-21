@@ -127,6 +127,17 @@ const USAGES: { cle: string; titre: string; modele: string; pourquoi: string }[]
   },
 ];
 
+/** Toutes les lignes d'une table, page par page : un total ne se calcule pas sur un extrait. */
+async function toutLire<T>(page: (de: number, a: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const tout: T[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await page(de, de + 999);
+    if (error) throw new Error(error.message);
+    tout.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) return tout;
+  }
+}
+
 export default function Couts() {
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [fiches, setFiches] = useState<FicheBrute[]>([]);
@@ -140,18 +151,27 @@ export default function Couts() {
 
   const charger = useCallback(async () => {
     setErreur(null);
-    const [{ data, error }, { data: lesFiches }] = await Promise.all([
-      supabaseAdmin
-        .from("admin_merx_demandes")
-        .select("id, kind, request, requested_by, status, found_count, usage, model, prospect_id, account_id, created_at, finished_at")
-        .order("created_at", { ascending: false })
-        .limit(400),
-      // Les fiches supprimées comptent aussi : ce qu'on a dépensé pour elles a bien été dépensé.
-      supabaseAdmin.from("admin_prospects").select("id, name, found_by").limit(1000),
-    ]);
-    if (error) setErreur(messageErreur(error.message));
-    else setDemandes((data ?? []) as Demande[]);
-    setFiches((lesFiches ?? []) as FicheBrute[]);
+    // TOUT est lu, page par page (Olivier, 21/10 : « pas admissible ») : le serveur ne rend
+    // que 1 000 lignes à la fois, et l'écran ne lisait que les 400 dernières demandes et
+    // les 1 000 premières fiches — des totaux faux et des noms manquants (« Fiche supprimée »).
+    try {
+      const [lesDemandes, lesFiches] = await Promise.all([
+        toutLire<Demande>((de, a) =>
+          supabaseAdmin
+            .from("admin_merx_demandes")
+            .select("id, kind, request, requested_by, status, found_count, usage, model, prospect_id, account_id, created_at, finished_at")
+            .order("created_at", { ascending: false })
+            .order("id")
+            .range(de, a),
+        ),
+        // Les fiches à la corbeille comptent aussi : ce qu'on a dépensé pour elles a bien été dépensé.
+        toutLire<FicheBrute>((de, a) => supabaseAdmin.from("admin_prospects").select("id, name, found_by, deleted_at").order("id").range(de, a)),
+      ]);
+      setDemandes(lesDemandes);
+      setFiches(lesFiches);
+    } catch (e) {
+      setErreur(messageErreur(e instanceof Error ? e.message : String(e)));
+    }
     setChargement(false);
   }, []);
 

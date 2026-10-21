@@ -12,7 +12,7 @@ import { coutDe, type Consommation } from "./couts";
 
 export interface DemandeBrute {
   id: string;
-  kind: "recherche" | "approfondissement" | "email";
+  kind: "recherche" | "approfondissement" | "email" | "completion";
   request: string;
   status: string;
   requested_by: string;
@@ -30,6 +30,8 @@ export interface FicheBrute {
   name: string;
   /** La recherche qui a fait apparaître cette fiche. */
   found_by: string | null;
+  /** Mise à la corbeille : ses dépenses restent comptées, sous son vrai nom. */
+  deleted_at?: string | null;
 }
 
 /** Une dépense, telle qu'elle apparaît sous la ligne d'une entreprise. */
@@ -66,7 +68,15 @@ export interface Cap {
 }
 
 const libelle = (d: DemandeBrute): string =>
-  d.kind === "recherche" ? `Recherche — ${d.request}` : d.kind === "approfondissement" ? "Approfondissement" : "Rédaction d’un e-mail";
+  d.kind === "recherche"
+    ? `Recherche — ${d.request}`
+    : d.kind === "approfondissement"
+      ? "Approfondissement"
+      : d.kind === "completion"
+        ? d.request?.startsWith("Discussion —")
+          ? "Discussion avec Merx"
+          : "Fiche complétée"
+        : "Rédaction d’un e-mail";
 
 /**
  * Répartit toutes les dépenses sur les fiches.
@@ -76,7 +86,9 @@ const libelle = (d: DemandeBrute): string =>
  * et c'est une information en soi.
  */
 export function calculerCap(demandes: DemandeBrute[], fiches: FicheBrute[]): Cap {
-  const nomDe = new Map(fiches.map((f) => [f.id, f.name]));
+  // Le vrai nom, toujours ; « à la corbeille » quand elle y est. « Fiche introuvable » ne
+  // reste que pour une fiche réellement effacée de la base.
+  const nomDe = new Map(fiches.map((f) => [f.id, f.deleted_at ? `${f.name} (à la corbeille)` : f.name]));
 
   // Quelles fiches chaque recherche a-t-elle réellement produites ?
   const parRecherche = new Map<string, string[]>();
@@ -91,7 +103,7 @@ export function calculerCap(demandes: DemandeBrute[], fiches: FicheBrute[]): Cap
   const pour = (prospectId: string): Acquisition => {
     const deja = acquisitions.get(prospectId);
     if (deja) return deja;
-    const neuve: Acquisition = { prospectId, nom: nomDe.get(prospectId) ?? "Fiche supprimée", total: 0, lignes: [] };
+    const neuve: Acquisition = { prospectId, nom: nomDe.get(prospectId) ?? "Fiche introuvable", total: 0, lignes: [] };
     acquisitions.set(prospectId, neuve);
     return neuve;
   };
