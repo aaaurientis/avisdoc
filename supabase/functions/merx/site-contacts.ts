@@ -168,7 +168,12 @@ export async function readSiteContacts(site: string | null, rapide = false, sire
   let preuve: string | null = null;
   for (const { html, url } of pages) {
     for (const m of html.matchAll(/mailto:([^"'?\s>&]+@[^"'?\s>&]+)/gi)) {
-      const email = decodeURIComponent(m[1]).toLowerCase().replace(/[.,;]$/, "");
+      let email: string;
+      try {
+        email = decodeURIComponent(m[1]).toLowerCase().replace(/[.,;]$/, "");
+      } catch {
+        continue; // lien mal formé : il ne doit pas faire échouer toute la lecture
+      }
       if (!JUNK.test(email) && email.length < 90) emails.add(email);
     }
     const texte = texteDe(html);

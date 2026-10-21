@@ -637,15 +637,19 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   // Récré'Action, 21/10). La saisie du commercial reste protégée par garderLaSaisie.
   const remplaces = new Set(["website", "contact_phone", "site_contacts", "reliability", "reliability_detail"]);
   // L'e-mail aussi, quand l'ancien venait du site qu'on abandonne.
-  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, site_contacts").eq("id", id).maybeSingle()).data as
-    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null }
+  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, site_contacts, personnes, score").eq("id", id).maybeSingle()).data as
+    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; personnes: unknown; score: unknown }
     | null;
   if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
   // Un numéro que le commercial a corrigé lui-même (absent de tout ce que Merx avait
-  // relevé) reste : c'est lui qui a appelé.
+  // relevé) reste : c'est lui qui a appelé. Aucune colonne ne dit qui a écrit le numéro ;
+  // Merx ne l'a jamais tiré que du site (site_contacts), du modèle (dossier, personnes) ou
+  // de la note (score) — Pappers et Google, refusés depuis le 24/09, n'en ont fourni aucun.
   const neuf = (t: string) => t.replace(/\D/g, "").slice(-9);
   const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
-  const merxLAvait = (JSON.stringify(before?.dossier ?? "") + JSON.stringify(ancienSite?.site_contacts ?? "")).replace(/\D/g, "").includes(ancienTel);
+  const merxLAvait = [before?.dossier, ancienSite?.site_contacts, ancienSite?.personnes, ancienSite?.score]
+    .map((v) => JSON.stringify(v ?? "").replace(/\D/g, ""))
+    .some((chiffres) => chiffres.includes(ancienTel));
   if (ancienTel.length === 9 && !merxLAvait) delete patch.contact_phone;
   for (const k of Object.keys(patch)) if ((patch[k] === null && !remplaces.has(k)) || patch[k] === undefined) delete patch[k];
   // Posé APRÈS le nettoyage des champs vides, et toujours : une complétion qui n'a
