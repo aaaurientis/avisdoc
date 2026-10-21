@@ -79,7 +79,7 @@ export default function EcrireMail({
   const par = user?.email ?? "";
   // Un mail programmé rouvert : un brouillon gardé (« À : … », « Objet : … » puis le texte)
   // revient tel quel, adresse comprise ; sinon, son détail est ce qu'on voulait dire.
-  const brouillon = /^(?:À : (.*)\n)?Objet : (.*)\n\n([\s\S]*)$/.exec(depuisPrevue?.detail ?? "");
+  const brouillon = /^(?:À : (.*)\n)?Objet : (.*?)(?:\n\n([\s\S]*))?$/.exec(depuisPrevue?.detail ?? "");
   const premier = contacts.find((c) => c.nom === depuisPrevue?.avec) ?? contacts.find((c) => c.email) ?? contacts[0] ?? null;
   const [nom, setNom] = useState(premier?.nom ?? "");
   const [adresse, setAdresse] = useState(brouillon?.[1] ?? premier?.email ?? "");
@@ -220,7 +220,10 @@ export default function EcrireMail({
         // Le brouillon se garde sous la forme « Objet : … » puis le texte, pour revenir à
         // l'identique ; sans brouillon, on garde ce qu'on voulait dire.
         titre: objet.trim() || "E-mail prévu",
-        detail: corps.trim() ? `${adresse.trim() ? `À : ${adresse.trim()}\n` : ""}Objet : ${objet.trim()}\n\n${corps.trim()}` : intention.trim(),
+        detail:
+          corps.trim() || objet.trim()
+            ? `${adresse.trim() ? `À : ${adresse.trim()}\n` : ""}Objet : ${objet.trim()}\n\n${corps.trim()}`
+            : intention.trim(),
         au: instant(le, aHeure),
         par,
         prevu: true,

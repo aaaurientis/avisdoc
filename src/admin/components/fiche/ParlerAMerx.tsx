@@ -11,6 +11,7 @@ import { Modal } from "../ui";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { ajouterEchange, type ClesFiche } from "../../lib/echanges";
 import { discuterFiche, type CorrectionFiche } from "../../lib/merx-appels";
+import { ADRESSE_GENERIQUE } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
@@ -115,7 +116,16 @@ export default function ParlerAMerx({
           if (i >= 0) personnes.splice(i, 1);
           avant = nom;
           apres = "retiré";
-          patch = { personnes, ...(a.contact_name && cleNom(a.contact_name) === cleNom(nom) ? { contact_name: null, contact_role: null } : {}) };
+          // Le contact principal retiré emporte ses coordonnées personnelles (adresse
+          // nominative, portable) ; le standard et une adresse générale restent ceux de l'entreprise.
+          const principal = Boolean(a.contact_name && cleNom(a.contact_name) === cleNom(nom));
+          const portable = /^(?:\+33\s?|0)[67]/.test((a.contact_phone ?? "").trim());
+          patch = {
+            personnes,
+            ...(principal ? { contact_name: null, contact_role: null } : {}),
+            ...(principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) ? { contact_email: null } : {}),
+            ...(principal && portable ? { contact_phone: null } : {}),
+          };
         } else {
           const ancienne = i >= 0 ? personnes[i] : null;
           const nouvelle: Personne = {
