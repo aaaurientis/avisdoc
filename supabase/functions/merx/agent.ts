@@ -928,9 +928,14 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // Seule une fiche GOOGLE confirmée par le site devient « vérifiée » (deux sources) — un
   // numéro du site ne se confirme pas lui-même.
   const memeNumero = (a: string, b: string) => a.replace(/\D/g, "").slice(-9) === b.replace(/\D/g, "").slice(-9);
-  if (site?.prouve && standard.principal?.statut === "a_verifier" && standard.principal.source && site.phones.some((t) => memeNumero(t, standard.principal!.numero))) {
-    standard.principal = { ...standard.principal, statut: "verifie", libelle: `${standard.principal.libelle} — même numéro sur le site officiel` };
-  }
+  // Une fiche Google « à vérifier » dont le site prouvé publie le même numéro devient
+  // vérifiée — la principale comme les autres.
+  const confirme = <T extends { numero: string; statut: string; libelle: string; source: string | null }>(n: T): T =>
+    site?.prouve && n.statut === "a_verifier" && n.source && site.phones.some((t) => memeNumero(t, n.numero))
+      ? { ...n, statut: "verifie", libelle: `${n.libelle} — même numéro sur le site officiel` }
+      : n;
+  if (standard.principal) standard.principal = confirme(standard.principal);
+  standard.autres = standard.autres.map(confirme);
   // Le site officiel trouvé en route : ses numéros s'ajoutent — vérifiés s'il porte le
   // SIREN, à vérifier s'il n'est connu que par la fiche Google.
   for (const t of site?.phones ?? []) {
