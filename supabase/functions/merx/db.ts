@@ -463,9 +463,17 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
     if (patch.registre && typeof patch.registre === "object") patch.registre = { ...(patch.registre as object), siret: registre.siret, agence: true };
     return;
   }
-  if (a.found_by) return;
+  // Les cases remplies ou corrigées à la main (migration 0075) : Merx n'y touche pas, même
+  // sur une fiche qu'il a trouvée. La base le garantit aussi ; on ne l'envoie même pas.
+  // Lu à part : avant la migration, la colonne n'existe pas et rien ne doit échouer.
+  const { data: marques } = await sb.from("admin_prospects").select("champs_saisis").eq("id", id).maybeSingle();
+  const saisis = new Set<string>(((marques as { champs_saisis?: string[] } | null)?.champs_saisis) ?? []);
+  if (a.found_by) {
+    for (const k of Object.keys(patch)) if (saisis.has(k) && !["personnes", "site_contacts", "head_office"].includes(k)) delete patch[k];
+    if (!saisis.has("personnes") && !saisis.has("site_contacts") && !saisis.has("head_office")) return;
+  }
   // Le siège : on complète ses cases vides (une ville seule n'empêche pas d'ajouter l'adresse).
-  if (patch.head_office && a.head_office && typeof a.head_office === "object") {
+  if ((!a.found_by || saisis.has("head_office")) && patch.head_office && a.head_office && typeof a.head_office === "object") {
     const av = a.head_office as Record<string, unknown>;
     const nv = patch.head_office as Record<string, unknown>;
     const fusion: Record<string, unknown> = { ...nv };
@@ -473,13 +481,13 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
     patch.head_office = fusion;
     a.head_office = null; // traité ici : ne pas le retirer plus bas
   }
-  for (const k of SAISIS) if (k in patch && rempliTot(a[k])) delete patch[k];
+  if (!a.found_by) for (const k of SAISIS) if (k in patch && rempliTot(a[k])) delete patch[k];
   // Le contact saisi garde sa source : on ne la remplace que si on a posé le contact.
   if (!("contact_name" in patch) && !("contact_email" in patch) && !("contact_phone" in patch)) delete patch.contact_source;
 
   // Les interlocuteurs : ceux du commercial d'abord — Merx ne fait que remplir leurs
   // cases vides —, puis ceux que Merx a trouvés en plus.
-  if (Array.isArray(patch.personnes) && Array.isArray(a.personnes) && a.personnes.length) {
+  if ((!a.found_by || saisis.has("personnes")) && Array.isArray(patch.personnes) && Array.isArray(a.personnes) && a.personnes.length) {
     type P = Record<string, unknown> & { nom: string };
     const trouves = new Map((patch.personnes as P[]).map((q) => [q.nom.trim().toLowerCase(), q]));
     const connus = (a.personnes as P[]).map((q) => {
@@ -495,7 +503,9 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
   // Les numéros et adresses : ceux du commercial d'abord (le standard est le premier).
   // Seulement s'il s'agit du même site : les coordonnées d'un site abandonné ne reviennent pas.
   const hote = (v: unknown) => String((v as { readOn?: string } | null)?.readOn ?? "").replace(/^https?:\/\/(www\.)?/, "");
-  if (patch.site_contacts && a.site_contacts && hote(patch.site_contacts) === hote(a.site_contacts)) {
+  // Des coordonnées saisies à la main restent, quel que soit le site retenu ensuite.
+  if (saisis.has("site_contacts") && patch.site_contacts === null) delete patch.site_contacts;
+  if (patch.site_contacts && a.site_contacts && (saisis.has("site_contacts") || (!a.found_by && hote(patch.site_contacts) === hote(a.site_contacts)))) {
     const av = a.site_contacts as { emails?: string[]; phones?: string[]; equipe?: string[]; readOn?: string };
     const nv = patch.site_contacts as typeof av;
     const unir = (x?: string[], y?: string[]) => [...new Set([...(x ?? []), ...(y ?? [])])];
