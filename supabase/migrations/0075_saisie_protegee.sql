@@ -3,7 +3,7 @@
 --
 -- La base retient elle-même QUELLES cases ont été remplies ou corrigées à la main : toute
 -- modification faite depuis l'écran (rôle « authenticated ») ajoute la colonne changée à
--- champs_saisis. Une modification faite par Merx ou FullEnrich (rôle « service_role ») ne
+-- champs_saisis (à la création ou à l'import : toutes les cases remplies). Une modification faite par Merx ou FullEnrich (rôle « service_role ») ne
 -- peut plus changer ces colonnes : la base remet l'ancienne valeur. Les personnes et les
 -- coordonnées du site sont fusionnées par le code (on y ajoute, on n'enlève rien).
 --
@@ -26,9 +26,21 @@ declare
     'personnes', 'site_contacts', 'rationale', 'referent'
   ];
   c text;
-  avant jsonb := to_jsonb(old);
+  avant jsonb;
   apres jsonb := to_jsonb(new);
 begin
+  -- Une fiche créée ou importée depuis l'écran : tout ce qu'elle porte a été saisi.
+  if tg_op = 'INSERT' then
+    if role_appel = 'authenticated' then
+      foreach c in array suivis loop
+        if (apres->c) is not null and (apres->c) <> 'null'::jsonb and not (c = any(new.champs_saisis)) then
+          new.champs_saisis := array_append(new.champs_saisis, c);
+        end if;
+      end loop;
+    end if;
+    return new;
+  end if;
+  avant := to_jsonb(old);
   if role_appel = 'authenticated' then
     foreach c in array suivis loop
       if (apres->c) is distinct from (avant->c) and not (c = any(new.champs_saisis)) then
@@ -50,7 +62,7 @@ $$;
 
 drop trigger if exists admin_prospects_saisie_protegee on public.admin_prospects;
 create trigger admin_prospects_saisie_protegee
-  before update on public.admin_prospects
+  before insert or update on public.admin_prospects
   for each row execute function public.admin_prospects_saisie_protegee();
 
 notify pgrst, 'reload schema';
