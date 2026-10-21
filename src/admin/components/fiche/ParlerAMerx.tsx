@@ -105,9 +105,13 @@ export default function ParlerAMerx({
           const ancien = String(a[col]);
           const meme = (x: string | null) =>
             c.champ === "telephone" ? (x ?? "").replace(/\D/g, "") === ancien.replace(/\D/g, "") && Boolean(x) : (x ?? "").toLowerCase() === ancien.toLowerCase();
-          if (personnes.some((q) => meme(c.champ === "telephone" ? q.telephone : q.email))) {
+          if (personnes.some((q) => (c.champ === "telephone" ? meme(q.telephone) || meme(q.mobile) : meme(q.email)))) {
             patch.personnes = personnes.map((q) =>
-              c.champ === "telephone" ? (meme(q.telephone) ? { ...q, telephone: valeur } : q) : meme(q.email) ? { ...q, email: valeur } : q,
+              c.champ === "telephone"
+                ? { ...q, ...(meme(q.telephone) ? { telephone: valeur } : {}), ...(meme(q.mobile) ? { mobile: valeur } : {}) }
+                : meme(q.email)
+                  ? { ...q, email: valeur }
+                  : q,
             );
           }
         }
@@ -125,6 +129,7 @@ export default function ParlerAMerx({
         if (!nom) throw new Error("La correction ne nomme personne.");
         const i = personnes.findIndex((q) => cleNom(q.nom) === cleNom(nom));
         if (c.champ === "retirer_interlocuteur") {
+          const retiree = i >= 0 ? personnes[i] : null;
           if (i >= 0) personnes.splice(i, 1);
           avant = nom;
           apres = "retiré";
@@ -135,16 +140,19 @@ export default function ParlerAMerx({
           // Son portable disparaît aussi des autres endroits où la fiche le range (numéros du
           // site, fiche d'appel du dossier), sans quoi il resterait affiché comme numéro.
           const chiffres = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33/, "0");
-          const sonPortable = principal && portable ? chiffres(a.contact_phone) : "";
-          const sonAdresse =
-            principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) && !ADRESSE_SERVICE.test(a.contact_email) ? a.contact_email.toLowerCase() : "";
+          // Ses coordonnées personnelles : celles du contact principal, sinon celles de sa
+          // ligne d'interlocuteur (portable, adresse nominative).
+          const personnelle = (m: string | null | undefined) => Boolean(m && !ADRESSE_GENERIQUE.test(m) && !ADRESSE_SERVICE.test(m));
+          const mobileDe = (t: string | null | undefined) => (/^(?:\+33\s?|0)[67]/.test((t ?? "").trim()) ? chiffres(t) : "");
+          const sonPortable = principal && portable ? chiffres(a.contact_phone) : mobileDe(retiree?.mobile) || mobileDe(retiree?.telephone);
+          const sonAdresse = principal && personnelle(a.contact_email) ? a.contact_email!.toLowerCase() : personnelle(retiree?.email) ? retiree!.email!.toLowerCase() : "";
           const site = a.site_contacts;
           const fa = a.dossier?.fiche_appel;
           patch = {
             personnes,
             ...(principal ? { contact_name: null, contact_role: null } : {}),
-            ...(sonAdresse ? { contact_email: null } : {}),
-            ...(sonPortable ? { contact_phone: null } : {}),
+            ...(sonAdresse && (a.contact_email ?? "").toLowerCase() === sonAdresse ? { contact_email: null } : {}),
+            ...(sonPortable && chiffres(a.contact_phone) === sonPortable ? { contact_phone: null } : {}),
             ...((sonPortable && site?.phones?.some((x) => chiffres(x) === sonPortable)) ||
             (sonAdresse && site?.emails?.some((x) => x.toLowerCase() === sonAdresse))
               ? {
