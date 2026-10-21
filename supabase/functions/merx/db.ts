@@ -637,17 +637,18 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
   // Récré'Action, 21/10). La saisie du commercial reste protégée par garderLaSaisie.
   const remplaces = new Set(["website", "contact_phone", "site_contacts", "reliability", "reliability_detail"]);
   // L'e-mail aussi, quand l'ancien venait du site qu'on abandonne.
-  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, contact_source, site_contacts, personnes, score").eq("id", id).maybeSingle()).data as
-    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; personnes: unknown; score: unknown; contact_source: string | null }
+  const ancienSite = (await sb.from("admin_prospects").select("contact_email, contact_phone, contact_source, site_contacts, score").eq("id", id).maybeSingle()).data as
+    | { contact_email: string | null; contact_phone: string | null; site_contacts: { emails?: string[]; phones?: string[] } | null; score: unknown; contact_source: string | null }
     | null;
   if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
   // Un numéro que le commercial a corrigé lui-même (absent de tout ce que Merx avait
   // relevé) reste : c'est lui qui a appelé. Aucune colonne ne dit qui a écrit le numéro ;
-  // Merx ne l'a jamais tiré que du site (site_contacts), du modèle (dossier, personnes) ou
-  // de la note (score) — Pappers et Google, refusés depuis le 24/09, n'en ont fourni aucun.
+  // Merx ne l'a jamais tiré que du site (site_contacts), du modèle (dossier) ou de la note
+  // (score) — Pappers et Google, refusés depuis le 24/09, n'en ont fourni aucun. Pas des
+  // personnes : la saisie du commercial y recopie le numéro qu'il corrige.
   const neuf = (t: string) => t.replace(/\D/g, "").slice(-9);
   const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
-  const merxLAvait = [before?.dossier, ancienSite?.site_contacts, ancienSite?.personnes, ancienSite?.score]
+  const merxLAvait = [before?.dossier, ancienSite?.site_contacts, ancienSite?.score]
     .map((v) => JSON.stringify(v ?? "").replace(/\D/g, ""))
     .some((chiffres) => chiffres.includes(ancienTel)) ||
     // Source posée par Merx lui-même (annuaire, Pappers, Google) : ce n'est pas une saisie.
