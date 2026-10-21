@@ -25,6 +25,8 @@ export interface ContactMail {
   nom: string;
   fonction?: string | null;
   email: string | null;
+  /** Adresse composée au format maison, jamais vue publiée : à confirmer. */
+  deduite?: boolean;
 }
 
 type Messagerie = "gmail" | "outlook" | "autre";
@@ -269,11 +271,15 @@ export default function EcrireMail({
             >
               {c.nom}
               {!c.email && <span className="ml-1 font-normal text-muted-foreground">(sans adresse)</span>}
+              {c.email && c.deduite && <span className="ml-1 font-normal text-amber-700">(adresse déduite)</span>}
             </button>
           ))}
         </div>
       )}
       <input value={adresse} onChange={(e) => setAdresse(e.target.value)} placeholder="adresse@entreprise.fr" className={champ} aria-label="Adresse du destinataire" />
+      {contacts.some((c) => c.deduite && c.email === adresse) && (
+        <p className="mt-1 text-[12px] text-amber-700">Adresse déduite du format maison de l’entreprise, jamais vue publiée : à confirmer avant d’envoyer.</p>
+      )}
 
       {/* 1. Écrire */}
       <div className={etapeCls}>1 · Écrire</div>

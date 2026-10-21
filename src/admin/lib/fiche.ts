@@ -215,8 +215,8 @@ export function personnesDuProspect(
  * puis celle trouvée, puis celle composée au format maison (à confirmer).
  */
 export const contactsMail = (personnes: PersonneFiche[]) =>
-  personnes.map((q) => ({
-    nom: q.nom,
-    fonction: q.fonction,
-    email: (q.emailPerso && !q.persoDeduit ? q.emailPerso : null) ?? q.email ?? q.emailPerso ?? null,
-  }));
+  personnes.map((q) => {
+    const email = (q.emailPerso && !q.persoDeduit ? q.emailPerso : null) ?? q.email ?? q.emailPerso ?? null;
+    // L'adresse composée au format maison reste signalée « déduite » jusque dans la fenêtre Mail.
+    return { nom: q.nom, fonction: q.fonction, email, deduite: Boolean(email && q.persoDeduit && email === q.emailPerso) };
+  });

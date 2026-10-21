@@ -80,11 +80,11 @@ export default function ParlerAMerx({
     try {
       const { data: actuelle, error: lecture } = await supabaseAdmin
         .from("admin_prospects")
-        .select("contact_phone, contact_email, website, contact_name, personnes")
+        .select("contact_phone, contact_email, website, contact_name, personnes, site_contacts")
         .eq("id", prospect.id)
         .single();
       if (lecture) throw new Error(lecture.message);
-      const a = actuelle as Pick<Prospect, "contact_phone" | "contact_email" | "website" | "contact_name" | "personnes">;
+      const a = actuelle as Pick<Prospect, "contact_phone" | "contact_email" | "website" | "contact_name" | "personnes" | "site_contacts">;
       const personnes = [...((a.personnes ?? []) as Personne[])];
       let patch: Record<string, unknown> = {};
       let avant = "";
@@ -96,6 +96,15 @@ export default function ParlerAMerx({
         avant = String(a[col] ?? "vide");
         apres = valeur;
         patch = { [col]: valeur };
+        // Les coordonnées du site passent avant sur une fiche saisie : la correction s'y met en tête.
+        const site = a.site_contacts;
+        if (site && (c.champ === "telephone" || c.champ === "email")) {
+          const liste = c.champ === "telephone" ? site.phones : site.emails;
+          const ancienne = liste?.[0];
+          const suite = (liste ?? []).filter((x) => x !== valeur && x !== ancienne);
+          patch.site_contacts = { ...site, [c.champ === "telephone" ? "phones" : "emails"]: [valeur, ...suite] };
+          if (ancienne) avant = ancienne;
+        }
       } else {
         const nom = (c.nom ?? "").trim();
         if (!nom) throw new Error("La correction ne nomme personne.");
