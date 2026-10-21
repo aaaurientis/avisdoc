@@ -124,15 +124,24 @@ export default function ParlerAMerx({
           // site, fiche d'appel du dossier), sans quoi il resterait affiché comme numéro.
           const chiffres = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33/, "0");
           const sonPortable = principal && portable ? chiffres(a.contact_phone) : "";
+          const sonAdresse =
+            principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) && !ADRESSE_SERVICE.test(a.contact_email) ? a.contact_email.toLowerCase() : "";
           const site = a.site_contacts;
           const fa = a.dossier?.fiche_appel;
           patch = {
             personnes,
             ...(principal ? { contact_name: null, contact_role: null } : {}),
-            ...(principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) && !ADRESSE_SERVICE.test(a.contact_email) ? { contact_email: null } : {}),
+            ...(sonAdresse ? { contact_email: null } : {}),
             ...(sonPortable ? { contact_phone: null } : {}),
-            ...(sonPortable && site?.phones?.some((x) => chiffres(x) === sonPortable)
-              ? { site_contacts: { ...site, phones: site.phones.filter((x) => chiffres(x) !== sonPortable) } }
+            ...((sonPortable && site?.phones?.some((x) => chiffres(x) === sonPortable)) ||
+            (sonAdresse && site?.emails?.some((x) => x.toLowerCase() === sonAdresse))
+              ? {
+                  site_contacts: {
+                    ...site!,
+                    phones: (site?.phones ?? []).filter((x) => !sonPortable || chiffres(x) !== sonPortable),
+                    emails: (site?.emails ?? []).filter((x) => !sonAdresse || x.toLowerCase() !== sonAdresse),
+                  },
+                }
               : {}),
             ...(sonPortable && fa?.numero && chiffres(fa.numero).includes(sonPortable)
               ? { dossier: { ...a.dossier, fiche_appel: { ...fa, numero: "" } } }
