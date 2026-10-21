@@ -11,9 +11,10 @@
 //  2. Chaque fiche Google est rapprochée du registre officiel : même code postal ET même
 //     rue que le siège → « vérifié ». Même ville et même nom, autre adresse → l'accueil
 //     d'un autre établissement, « à vérifier ».
-//  3. Un numéro que le site officiel de l'entreprise publie aussi est « vérifié » (deux
-//     sources indépendantes).
-//  4. Rien de sûr : on le dit, en gros. Jamais un numéro d'annuaire présenté comme sûr.
+//  3. Le site officiel PROUVÉ (son SIREN écrit sur ses pages) : ses numéros sont « vérifiés »
+//     — c'est l'entreprise qui les publie elle-même (Olivier, 21/10 : mentions légales avec
+//     le SIREN, oui). Un site non prouvé ne fournit aucun numéro.
+//  4. Rien de sûr : on le dit. Jamais un numéro d'annuaire, sous aucun statut (21/10).
 //
 // Coût : une recherche Google Maps par nom (trois au plus), environ 0,035 $ chacune.
 
@@ -25,6 +26,7 @@ const TIMEOUT_MS = 6_000;
 export const REFERENT_HUB = "https://admin.avisdoc.fr/";
 
 export type StatutStandard = "verifie" | "a_verifier";
+export const SUR_LE_SITE = "Site officiel de l'entreprise (son SIREN y est écrit)";
 
 export interface NumeroTrouve {
   numero: string;
@@ -102,7 +104,8 @@ async function chercher(requete: string, cle: string): Promise<any[]> {
  * Le standard, vérifié autant que possible.
  *
  * `siege` : l'adresse du registre (« ZI LE GRAND JOFFRERY 7 RUE JOSEPH CUGNOT 31600 MURET »).
- * `telephonesDuSite` : ceux que le site officiel publie (deuxième source indépendante).
+ * `telephonesDuSite` : ceux que publie le site officiel PROUVÉ par son SIREN — jamais ceux
+ * d'un site seulement deviné.
  */
 export async function trouverStandard(e: {
   noms: string[];
@@ -117,9 +120,9 @@ export async function trouverStandard(e: {
   const numeroSiege = (e.siege ?? "").match(/\b(\d{1,4})\s+(?:bis\s+|ter\s+)?(?:rue|avenue|av|bd|boulevard|chemin|route|allee|allée|impasse|place|quai|cours|zi|za|zac)\b/i)?.[1] ?? null;
   const motsDuNom = new Set(e.noms.flatMap(motsUtiles));
 
-  // Sans Google : le site officiel seul, à vérifier — mieux qu'aucun numéro.
+  // Sans Google : le site officiel prouvé seul.
   if (!cle || !e.noms.length) {
-    const site = (e.telephonesDuSite ?? []).map((t) => ({ numero: t, statut: "a_verifier" as StatutStandard, libelle: "Site officiel de l'entreprise (une seule source)", source: null }));
+    const site = (e.telephonesDuSite ?? []).map((t) => ({ numero: t, statut: "verifie" as StatutStandard, libelle: SUR_LE_SITE, source: null }));
     return {
       principal: site[0] ?? null,
       autres: site.slice(1, 4),
@@ -182,10 +185,11 @@ export async function trouverStandard(e: {
     });
   }
 
-  // Le site officiel seul : une source, pas deux.
+  // Le site officiel prouvé : c'est l'entreprise qui publie ce numéro. Après la fiche
+  // Google à l'adresse du siège, avant celle d'un autre établissement.
   for (const t of e.telephonesDuSite ?? []) {
     if (trouves.some((x) => national(x.numero) === national(t))) continue;
-    trouves.push({ numero: t, statut: "a_verifier", libelle: "Site officiel de l'entreprise (une seule source)", source: null, rang: 3, site: null });
+    trouves.push({ numero: t, statut: "verifie", libelle: SUR_LE_SITE, source: null, rang: 1.5, site: null });
   }
 
   // Un numéro, une ligne : la plus sûre.

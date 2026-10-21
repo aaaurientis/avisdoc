@@ -44,9 +44,8 @@ import {
 import { devinerSite, readSiteContacts, type SiteContacts } from "./site-contacts.ts";
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
-import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
-import { nomsDeLEntreprise, trouverStandard } from "./standard.ts";
-import { champsPappers, chercherPappers, chercherPappersEnLot, echecPappers } from "./pappers.ts";
+import { nomsDeLEntreprise, SUR_LE_SITE, trouverStandard } from "./standard.ts";
+import { champsPappers, chercherPappers, chercherPappersEnLot, echecPappers, oublierEchecPappers } from "./pappers.ts";
 import { deLaRecherche, fiabilite } from "./fiabilite.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
 
@@ -187,39 +186,6 @@ function populationDuSite(local: Establishment, c: Found, parAgence = false) {
     : populationScore(c.headcountBand, false, c.headcountYear, local.employeur);
 }
 
-/** Mots d'une adresse qui ne la distinguent pas d'une autre. */
-const MOTS_VIDES = new Set(["rue", "avenue", "av", "boulevard", "bd", "chemin", "route", "place", "allee", "impasse", "quai", "cours", "zone", "za", "zi", "zac", "parc", "rond", "point", "lieu", "dit", "france", "cedex", "bis", "ter"]);
-const motsAdresse = (t: string) =>
-  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-
-/**
- * L'adresse que Google rend est-elle celle de l'établissement au registre ? Même code
- * postal, même numéro dans la voie s'il y en a un, et au moins un mot du nom de la voie.
- */
-function memeAdresse(local: Establishment, google: string | null): boolean {
-  if (!google || !local.address) return false;
-  const g = motsAdresse(google);
-  const r = motsAdresse(local.address);
-  const cp = local.postalCode ?? r.find((m) => /^\d{5}$/.test(m)) ?? null;
-  if (!cp || !g.includes(cp)) return false;
-  const numero = r.find((m) => /^\d{1,4}$/.test(m));
-  if (numero && !g.includes(numero)) return false;
-  const ville = new Set(motsAdresse(local.city ?? ""));
-  const voie = r.filter((m) => m.length >= 4 && !/^\d+$/.test(m) && !MOTS_VIDES.has(m) && !ville.has(m));
-  return voie.length === 0 || voie.some((m) => g.includes(m));
-}
-
-/** Le nom que Google donne porte-t-il un mot distinctif du nom de la société ? */
-function memeNom(societe: string, google: string | null): boolean {
-  if (!google) return false;
-  const formes = new Set(["sa", "sas", "sasu", "sarl", "eurl", "snc", "sci", "groupe", "group", "france", "societe", "ste", "et", "de", "des", "du", "la", "le", "les"]);
-  const g = new Set(motsAdresse(google));
-  return motsAdresse(societe).filter((m) => m.length >= 3 && !formes.has(m)).some((m) => g.has(m));
-}
-
-/** La clé d'un lieu Google : l'établissement visé, sinon l'entreprise. */
-const cleLieu = (c: Found) => c.localSites[0]?.siret ?? c.siren;
-
 /**
  * `parAgence` : chaque entrée est UNE AGENCE d'une société (« les agences Bouygues
  * Immobilier »). Sa fiche ne porte alors que ce qui la concerne, elle : l'adresse de
@@ -227,6 +193,35 @@ const cleLieu = (c: Found) => c.localSites[0]?.siret ?? c.siren;
  * siège, ni le dirigeant du groupe, ni les numéros lus sur le site national — Olivier,
  * 19/10 : « s'il n'y a pas, tu mets rien ». Le site internet, lui, est celui de la société.
  */
+/**
+ * Le premier site candidat dont les pages portent le SIREN de l'entreprise ; aucun sinon.
+ * Un site deviné d'après le nom, proposé par un annuaire ou cité par une recherche n'est
+ * qu'un candidat tant que l'entreprise n'y écrit pas son propre SIREN.
+ */
+async function premierSiteProuve(candidats: (string | null | undefined)[], siren: string | null | undefined, rapide = false): Promise<SiteContacts | null> {
+  if (!siren) return null;
+  const vus = new Set<string>();
+  for (const c of candidats) {
+    const h = c ? host(c) : null;
+    if (!c || !h || vus.has(h)) continue;
+    vus.add(h);
+    const lu = await readSiteContacts(c, rapide, siren);
+    if (lu?.prouve) return lu;
+  }
+  return null;
+}
+
+/** Le dirigeant du registre est-il aussi celui que Pappers nomme ? On compare les noms. */
+function memeDirigeant(nom: string | null | undefined, autres: { nom: string }[] | null | undefined): boolean {
+  const mots = (t: string) => new Set(t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z]+/).filter((m) => m.length > 1));
+  if (!nom || !autres?.length) return false;
+  const a = mots(nom);
+  return autres.some((o) => {
+    const b = mots(o.nom);
+    return b.size > 0 && [...b].every((m) => a.has(m));
+  });
+}
+
 async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence = false): Promise<LightProspect[]> {
   // Le standard, l'adresse exacte et le site officiel de toutes les entreprises d'un
   // coup. Sans cela la recherche rendait des fiches sans un numéro à composer — moins
@@ -235,18 +230,13 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
   // le standard et l'adresse exacte ; Pappers donne le site officiel, le téléphone et
   // parfois l'adresse électronique. Aucune ne suffit seule, et l'une comme l'autre peut
   // échouer sans conséquence — ce qui manque sera dit, plus jamais tu.
-  const [lieux, pappers] = await Promise.all([
-    // Une clé par établissement : les agences d'une même société ont chacune leur standard.
-    // Une agence : on donne à Google son adresse exacte au registre, pas seulement la ville.
-    chercherLieux(
-      trouvees.map((c) => ({
-        cle: cleLieu(c),
-        nom: c.name,
-        ville: parAgence ? (c.localSites[0]?.address ?? c.localSites[0]?.city ?? null) : (c.localSites[0] ?? c.headOffice).city,
-      })),
-    ),
-    chercherPappersEnLot([...new Set(trouvees.map((c) => c.siren).filter(Boolean))]),
-  ]);
+  //
+  // 21/10 : plus de Google Maps à la recherche. Il prenait le premier résultat sans
+  // vérifier que c'était la bonne entreprise, et aurait coûté jusqu'à cent appels par
+  // recherche. Le standard vérifié par Google se cherche à l'approfondissement et à la
+  // complétion, fiche par fiche (standard.ts). Pappers ne fournit plus qu'un site
+  // CANDIDAT, qui n'est retenu que s'il porte le SIREN de l'entreprise.
+  const pappers = await chercherPappersEnLot([...new Set(trouvees.map((c) => c.siren).filter(Boolean))]);
 
   // Les sites officiels : devinés, puis lus. C'est là que sont les adresses
   // électroniques et les standards, et personne d'autre ne les donne — le registre
@@ -277,11 +267,13 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
     const vague = parPotentiel.slice(i, i + DE_FRONT).filter((c) => !tentees.has(c.siren) && tentees.add(c.siren));
     await Promise.all(
       vague.map(async (c) => {
-        const connu = pappers.get(c.siren)?.site ?? lieux.get(cleLieu(c))?.site ?? (await devinerSite(c.name));
-        if (!connu) return;
         // Lecture rapide : la page d'accueil, le contact et les mentions légales.
         // Dix-neuf pages pour cent entreprises dépasseraient le budget de la fonction.
-        const lu = await readSiteContacts(connu, true);
+        // Un site n'est retenu que s'il porte le SIREN : un domaine deviné d'après le nom
+        // peut être celui d'une autre entreprise (recre-action.fr, 21/10).
+        const lu =
+          (await premierSiteProuve([pappers.get(c.siren)?.site], c.siren, true)) ??
+          (await premierSiteProuve([await devinerSite(c.name)], c.siren, true));
         if (lu) sites.set(c.siren, lu);
       }),
     );
@@ -310,21 +302,17 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
     // est la seule que le registre suffise à établir. Maturité prévention et
     // accessibilité commerciale se lisent sur le site de l'entreprise : elles restent
     // non évaluées tant que la fiche n'est pas approfondie, et la note le montre.
-    // Une agence ne garde la fiche Google que si c'est bien SON adresse : sinon c'est le
-    // standard du siège ou d'une autre agence, et l'on préfère ne rien mettre (19/10).
-    const trouveParGoogle = lieux.get(cleLieu(c)) ?? null;
-    const lieu = parAgence && trouveParGoogle && !(memeAdresse(local, trouveParGoogle.adresse) && memeNom(c.name, trouveParGoogle.nom)) ? null : trouveParGoogle;
     const pap = pappers.get(c.siren) ?? null;
     const lu = sites.get(c.siren) ?? null;
     // Le dirigeant du registre : sur cent entreprises de travaux publics, quatre-vingt-
     // une en publient un, et nous ne l'affichions pas. Pappers complète quand il a mieux.
     const dirigeant = parAgence ? null : (c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null));
-    // Ce que l'entreprise publie elle-même passe devant. Une agence : son seul standard.
-    const telephone = parAgence ? (lieu?.telephone ?? null) : (lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null);
-    const courriel = parAgence ? null : (lu?.emails[0] ?? pap?.email ?? null);
-    // Une agence : seul le site que Pappers rattache à SON SIREN — un domaine deviné
-    // pourrait être celui d'une autre société (audit du 19/10).
-    const site = parAgence ? (pap?.site ?? null) : (lu?.readOn ?? pap?.site ?? lieu?.site ?? null);
+    // Seulement ce que l'entreprise publie elle-même sur son site prouvé : jamais un numéro
+    // d'annuaire (Pappers compris) — Olivier, 21/10 : « des infos justes ». Une agence
+    // n'a pas le standard du siège : le sien se cherche à l'approfondissement.
+    const telephone = parAgence ? null : (lu?.phones[0] ?? null);
+    const courriel = parAgence ? null : (lu?.emails[0] ?? null);
+    const site = lu?.readOn ?? null;
 
     const score: Score = {
       // Étape 2 — la pertinence, que le registre suffit à établir.
@@ -340,9 +328,8 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
       coordonnees: telephone || courriel
         ? {
             points: courriel && telephone ? 4 : 2,
-            justification: [telephone, courriel].filter(Boolean).join(" · ") +
-              ` — ${lu ? "site officiel de l’entreprise" : pap?.telephone ? "fiche Pappers" : "fiche d’établissement Google"}.`,
-            source: lu?.readOn ?? pap?.source ?? lieu?.source ?? null,
+            justification: [telephone, courriel].filter(Boolean).join(" · ") + " — site officiel de l’entreprise (son SIREN y est écrit).",
+            source: lu?.preuve ?? lu?.readOn ?? null,
           }
         : { points: null, justification: "Aucun numéro trouvé : l’approfondissement ira le chercher.", source: null },
     };
@@ -370,11 +357,11 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
       contactPhone: telephone,
       contactEmail: courriel,
       siteContacts: parAgence ? null : lu,
-      contactSource: parAgence ? (lieu?.telephone ? lieu.source : null) : (pap?.source ?? lieu?.source ?? null),
+      contactSource: telephone || courriel ? (lu?.readOn ?? null) : null,
       // Une agence : SON adresse au registre (jamais celle du siège).
       headOffice: parAgence
         ? { address: local.address, city: local.city, department: local.department }
-        : { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
+        : { address: c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
       leaders: parAgence ? null : c.leaders,
       // Ce que l'État publie et qu'on ne sait pas encore afficher : on le garde.
       // Une agence garde son SIRET d'établissement et la marque « agence » : un
@@ -389,7 +376,7 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
       headcountYear: parAgence ? (local.headcountBand && local.headcountBand !== "NN" ? local.headcountYear : null) : (local.headcountYear ?? c.headcountYear),
       openEstablishments: parAgence ? null : c.openEstablishments,
       rationale: `${metier.pourquoi}${autresSites}`.trim() || null,
-      sources: [source, lieu?.source, pap?.source].filter(Boolean) as string[],
+      sources: [source, lu?.preuve, pap?.source].filter(Boolean) as string[],
       // La note de fiabilité n'a de sens que depuis que la fiche est remplie : le
       // registre, Pappers et Google se recoupent, et c'est ce recoupement qu'elle
       // mesure. Une fiche sans rien d'établi n'obtient pas une mauvaise note : aucune.
@@ -401,12 +388,12 @@ async function versFiches(trouvees: Found[], budgetSitesMs = 90_000, parAgence =
           effectifDuSite: Boolean(local.headcountBand && local.headcountBand !== "NN"),
           effectif: local.headcountBand ?? c.headcountBand,
           site,
-          siteRecoupe: Boolean(lu && (pap?.site || lieu?.site)),
+          sitePreuve: lu ? "son SIREN est écrit sur le site" : null,
           dirigeant: dirigeant?.name ?? null,
-          dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
+          dirigeantRecoupe: memeDirigeant(c.leaders[0]?.name, pap?.dirigeants),
           email: courriel,
           telephone,
-          telephoneRecoupe: parAgence ? false : [lu?.phones[0], pap?.telephone, lieu?.telephone].filter(Boolean).length >= 2,
+          telephonePreuve: telephone ? { verifie: true, dit: "publié sur le site officiel de l’entreprise" } : null,
         }),
       ),
       score,
@@ -479,24 +466,24 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
   const c = candidats[0] ?? null;
   if (!c) return { found: 0, message: "Aucune entreprise du registre officiel ne correspond : identité non confirmée." };
 
-  const [pap, lieu] = await Promise.all([
-    chercherPappers(c.siren),
-    chercherLieu(c.name, c.headOffice.city),
-  ]);
+  const pap = await chercherPappers(c.siren);
 
-  // Le site officiel : celui qu'on connaît, celui que Pappers ou Google donnent, ou
-  // celui qu'on devine. Une fois trouvé, on le LIT — c'est là que sont l'adresse
-  // électronique et le standard. Château Cheval Blanc publie « 05 57 55 55 55 » et
-  // « contact@chateau-chevalblanc.com » sur sa page contact : deux secondes, gratuit.
-  const siteConnu = p.website ?? pap?.site ?? lieu?.site ?? (await devinerSite(c.name));
-  const lu = siteConnu ? await readSiteContacts(siteConnu) : null;
+  // Le site officiel PROUVÉ : celui de la fiche, celui que Pappers donne, ou celui qu'on
+  // devine — retenu seulement s'il porte le SIREN (21/10). C'est là que sont l'adresse
+  // électronique et le standard publiés par l'entreprise elle-même.
+  // La complétion se lance seule sur les nouvelles fiches : elle n'interroge donc PAS
+  // Google Maps, payant à l'appel (cent fiches = trois cents appels). Le standard vérifié
+  // par Google se cherche à l'approfondissement. Ici : le site prouvé, rien d'autre —
+  // jamais le numéro d'un annuaire, Pappers compris.
+  const lu =
+    (await premierSiteProuve([p.website, pap?.site], c.siren)) ??
+    (await premierSiteProuve([await devinerSite(c.name)], c.siren));
+  const sitePreuve = lu ? "son SIREN est écrit sur le site" : null;
 
   const dirigeant = c.leaders[0] ?? (pap?.dirigeants[0] ? { name: pap.dirigeants[0].nom, role: pap.dirigeants[0].role } : null);
-  // Le site officiel passe devant : un numéro publié par l'entreprise elle-même vaut
-  // mieux qu'un standard trouvé ailleurs.
-  const telephone = lu?.phones[0] ?? pap?.telephone ?? lieu?.telephone ?? null;
-  const email = lu?.emails[0] ?? pap?.email ?? null;
-  const site = siteConnu;
+  const telephone = lu?.phones[0] ?? null;
+  const email = lu?.emails[0] ?? null;
+  const site = lu?.readOn ?? null;
 
   const note = fiabilite(
     deLaRecherche({
@@ -505,13 +492,13 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
       activite: c.activityCode,
       effectifDuSite: false,
       effectif: c.headcountBand,
-      site: site ?? p.website,
-      siteRecoupe: Boolean(pap?.site && lieu?.site),
+      site,
+      sitePreuve,
       dirigeant: dirigeant?.name ?? p.contactName ?? null,
-      dirigeantRecoupe: Boolean(c.leaders[0] && pap?.dirigeants.length),
+      dirigeantRecoupe: memeDirigeant(c.leaders[0]?.name, pap?.dirigeants),
       email: email ?? p.contactEmail ?? null,
-      telephone: telephone ?? p.contactPhone,
-      telephoneRecoupe: Boolean(pap?.telephone && lieu?.telephone),
+      telephone,
+      telephonePreuve: telephone ? { verifie: true, dit: "publié sur le site officiel de l’entreprise" } : null,
     }),
   );
 
@@ -521,7 +508,7 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
     headcountBand: c.headcountBand,
     headcountYear: c.headcountYear,
     openEstablishments: c.openEstablishments,
-    headOffice: { address: lieu?.adresse ?? c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
+    headOffice: { address: c.headOffice.address, city: c.headOffice.city, department: c.headOffice.department },
     leaders: c.leaders,
     registre: c.registre,
     website: site,
@@ -529,7 +516,7 @@ async function runCompletion(sb: SupabaseClient, req: Demande) {
     contactRole: dirigeant?.role ?? null,
     contactPhone: telephone,
     contactEmail: email,
-    contactSource: lu?.readOn ?? pap?.source ?? lieu?.source ?? null,
+    contactSource: telephone || email ? (lu?.preuve ?? lu?.readOn ?? null) : null,
     siteContacts: lu,
     reliability: note?.note ?? null,
     reliabilityDetail: note?.details ?? null,
@@ -737,7 +724,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
       // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.
       // Le bilan dans la langue du commercial (Olivier, 19/10) : ce qui est ajouté, ce
       // qu'il avait déjà, s'il en reste. Les pannes techniques ne le regardent pas : elles
-      // restent dans la trace de la demande (echecPlaces, echecPappers) pour nous.
+      // restent dans la demande (usage.pannes, runAgentTick) pour nous.
       const total = Math.max(totalZone, totalQualifiees);
       const compte = [
         `${inserted} entreprise${inserted > 1 ? "s" : ""} ajoutée${inserted > 1 ? "s" : ""} en Prospection`,
@@ -822,7 +809,10 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     return withCity.length ? withCity : await lookup(p.name).catch(() => []);
   };
   // Le registre pour le légal, le site pour les coordonnées publiées.
-  const [candidates, siteAtStart] = await Promise.all([searchRegistry(), readSiteContacts(p.website)]);
+  // Le site de la fiche ne compte que s'il porte le SIREN : sinon c'est peut-être celui
+  // d'une autre entreprise, et ni ses numéros ni ses adresses ne doivent entrer (21/10).
+  const [candidates, siteLuAuDebut] = await Promise.all([searchRegistry(), readSiteContacts(p.website, false, p.siren)]);
+  const siteAtStart = siteLuAuDebut?.prouve ? siteLuAuDebut : null;
   // LE STANDARD, trouvé et vérifié par le code — jamais par le modèle (Olivier, 21/10 :
   // « d'abord le standard, en gros, ultra vérifié »). Google Maps sous tous les noms de
   // l'entreprise (enseigne, sigle, nom légal), rapproché de l'adresse de la fiche.
@@ -858,31 +848,19 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const company = candidates.find((c) => c.siren === out.siren.trim()) ?? null;
   const seenHosts = new Set(urls.map(host).filter(Boolean));
   const proposed = officialSite(out.site_web);
-  // Le site officiel CONFIRMÉ passe devant celui de la fiche, qui a pu être deviné d'après
-  // le nom : Récré'Action (21/10) portait « recre-action.fr », le site d'une autre
-  // entreprise, et son vrai site (recreaction.fr, standard 01 60 35 45 75) était ignoré.
-  // Ordre : le site de la fiche Google vérifiée à l'adresse du siège, puis celui que les
-  // recherches du modèle ont réellement visité, puis celui de la fiche.
-  // Vérifiée PAR L'ADRESSE seulement : une fiche Google « vérifiée » parce que le site de la
-  // fiche publie le même numéro ne prouve rien sur ce site.
+  // Le site officiel : seulement un site PROUVÉ — son SIREN écrit sur ses pages —, ou celui
+  // que cite la fiche Google vérifiée à l'adresse du siège. Récré'Action (21/10) portait
+  // « recre-action.fr », le site d'une autre entreprise ; son vrai site (recreaction.fr,
+  // standard 01 60 35 45 75) porte son SIREN dans ses mentions légales.
+  const sirenSur = company?.siren ?? p.siren ?? null;
   const auSiege = standard.principal?.libelle.includes("à l'adresse du registre officiel") ?? false;
   const siteGoogle = standard.principal?.statut === "verifie" && auSiege ? officialSite(standard.site ?? "") : null;
   const siteVisite = proposed && seenHosts.has(host(proposed)) ? proposed : null;
-  const website = siteGoogle ?? siteVisite ?? p.website ?? officialSite(lieu?.site ?? "");
+  if (!site) site = await premierSiteProuve([siteGoogle, siteVisite, p.website], sirenSur);
+  if (!site && siteGoogle) site = await readSiteContacts(siteGoogle, false, sirenSur);
+  const website = site?.readOn ?? null;
+  const sitePreuve = site?.prouve ? "son SIREN est écrit sur le site" : site ? "cité par la fiche Google à l'adresse du siège" : null;
   const ownHost = website ? host(website) : null;
-  // Un autre site que celui de la fiche : on y lit à notre tour e-mail et téléphone, et ce
-  // qu'on avait lu sur l'ancien ne compte plus.
-  if (website && (!p.website || host(website) !== host(p.website))) {
-    site = await readSiteContacts(website);
-    // Les numéros venus de l'ancien site sortent du standard ; un numéro Google « vérifié »
-    // seulement parce que l'ancien site le publiait redevient « à vérifier ».
-    const garde = [standard.principal, ...standard.autres]
-      .filter((n): n is NonNullable<typeof n> => Boolean(n && n.source))
-      .map((n) => (n.statut === "verifie" && n.libelle.includes("même numéro sur le site officiel") ? { ...n, statut: "a_verifier" as const } : n));
-    standard.principal = garde[0] ?? null;
-    standard.autres = garde.slice(1);
-    if (!standard.principal) standard.pourquoi = standard.pourquoi ?? "aucun numéro sûr";
-  }
   const seen = new Set(urls);
   const allowed = (source: string) => seen.has(source) || (ownHost !== null && host(source) === ownHost);
 
@@ -950,17 +928,32 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // Seule une fiche GOOGLE confirmée par le site devient « vérifiée » (deux sources) — un
   // numéro du site ne se confirme pas lui-même.
   const memeNumero = (a: string, b: string) => a.replace(/\D/g, "").slice(-9) === b.replace(/\D/g, "").slice(-9);
-  if (standard.principal?.statut === "a_verifier" && standard.principal.source && site?.phones.some((t) => memeNumero(t, standard.principal!.numero))) {
-    standard.principal = { ...standard.principal, statut: "verifie", libelle: `${standard.principal.libelle} — même numéro sur le site officiel` };
-  }
-  // Un site officiel découvert en route : ses numéros s'ajoutent, à vérifier.
+  // Une fiche Google « à vérifier » dont le site prouvé publie le même numéro devient
+  // vérifiée — la principale comme les autres.
+  const confirme = <T extends { numero: string; statut: string; libelle: string; source: string | null }>(n: T): T =>
+    site?.prouve && n.statut === "a_verifier" && n.source && site.phones.some((t) => memeNumero(t, n.numero))
+      ? { ...n, statut: "verifie", libelle: `${n.libelle} — même numéro sur le site officiel` }
+      : n;
+  if (standard.principal) standard.principal = confirme(standard.principal);
+  standard.autres = standard.autres.map(confirme);
+  // Le site officiel trouvé en route : ses numéros s'ajoutent — vérifiés s'il porte le
+  // SIREN, à vérifier s'il n'est connu que par la fiche Google.
   for (const t of site?.phones ?? []) {
     if ([standard.principal, ...standard.autres].some((n) => n && memeNumero(n.numero, t))) continue;
-    const n = { numero: t, statut: "a_verifier" as const, libelle: "Site officiel de l'entreprise (une seule source)", source: site?.readOn ?? null };
+    const n = site?.prouve
+      ? { numero: t, statut: "verifie" as const, libelle: SUR_LE_SITE, source: site.preuve ?? site.readOn }
+      : { numero: t, statut: "a_verifier" as const, libelle: "Site cité par la fiche Google (son SIREN n'y est pas écrit)", source: site?.readOn ?? null };
     if (!standard.principal) {
       standard.principal = n;
       standard.pourquoi = null;
-    } else if (standard.autres.length < 3) standard.autres.push(n);
+    } else standard.autres.push(n);
+  }
+  // Un numéro vérifié passe toujours devant un numéro à vérifier, d'où qu'il vienne.
+  {
+    const tous = [standard.principal, ...standard.autres].filter((x): x is NonNullable<typeof x> => Boolean(x));
+    const ordre = [...tous.filter((x) => x.statut === "verifie"), ...tous.filter((x) => x.statut !== "verifie")];
+    standard.principal = ordre[0] ?? null;
+    standard.autres = ordre.slice(1, 4);
   }
   const phone = standard.principal?.numero ?? null;
 
@@ -995,10 +988,13 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const coordonneesScore = (): CriterionScore => {
     const nominatif = Boolean(email && named && c.email.trim() === email);
     const surSite = Boolean(email && site?.emails.includes(email));
-    if (nominatif && phone) return { points: 5, justification: "E-mail nominatif et téléphone, relevés sur une page vérifiée.", source: named?.source ?? null };
-    if ((nominatif || surSite) && phone) return { points: 4, justification: "E-mail publié par l'entreprise et téléphone.", source: site?.readOn ?? null };
-    if (email && phone) return { points: 3, justification: "E-mail et téléphone relevés, sans certitude sur le destinataire.", source: site?.readOn ?? null };
-    if (email || phone) return { points: 2, justification: email ? "E-mail seul." : "Standard seul — il faudra demander le service.", source: site?.readOn ?? null };
+    // Un standard « à vérifier » ne compte pas comme un téléphone sûr.
+    const tel = standard.principal?.statut === "verifie" ? phone : null;
+    if (nominatif && tel) return { points: 5, justification: "E-mail nominatif et standard vérifié.", source: named?.source ?? null };
+    if ((nominatif || surSite) && tel) return { points: 4, justification: "E-mail publié par l'entreprise et standard vérifié.", source: site?.readOn ?? null };
+    if (email && tel) return { points: 3, justification: "E-mail et standard vérifié, sans certitude sur le destinataire de l'e-mail.", source: site?.readOn ?? null };
+    if (email || tel) return { points: 2, justification: email ? (phone ? "E-mail ; standard à vérifier." : "E-mail seul.") : "Standard vérifié seul — il faudra demander le service.", source: site?.readOn ?? null };
+    if (phone) return { points: 1, justification: "Standard à vérifier seulement.", source: standard.principal?.source ?? null };
     return { points: 0, justification: "Aucune coordonnée trouvée.", source: null };
   };
 
@@ -1051,6 +1047,23 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     sources: out.sources.filter(allowed),
     score,
     scoreTotal: total(score),
+    // La fiabilité se recalcule ici : elle disait encore ce que la recherche avait cru.
+    fiabilite: fiabilite(
+      deLaRecherche({
+        siren: company?.siren ?? null,
+        villeConfirmee: Boolean(company && memeVille(company.headOffice.city)),
+        activite: company?.activityCode ?? null,
+        effectifDuSite: false,
+        effectif: company?.headcountBand ?? null,
+        site: website,
+        sitePreuve,
+        dirigeant: contact?.name ?? null,
+        dirigeantRecoupe: Boolean(named && company?.leaders.some((l) => memeDirigeant(l.name, [{ nom: named.name }]))),
+        email,
+        telephone: phone,
+        telephonePreuve: standard.principal ? { verifie: standard.principal.statut === "verifie", dit: standard.principal.libelle } : null,
+      }),
+    ),
   });
   return { found: company ? 1 : 0, message: company ? null : "Aucune entreprise de l'annuaire officiel ne correspond : identité non confirmée." };
 }
@@ -1061,12 +1074,16 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
   if (!req) return { processed: null };
   let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   const onUsage = (u: LlmUsage) => (usage = u);
+  oublierEchecPappers();
+  // Les pannes des sources restent dans la demande, pour nous : 5 395 refus de Pappers
+  // (24/09 – 14/10) puis plus aucune trace, faute d'endroit où les écrire (audit du 21/10).
+  const avecPannes = () => (echecPappers() ? { ...usage, pannes: { pappers: echecPappers() } } : usage);
   try {
     const result =
       req.kind === "recherche" ? await runSearch(sb, req, onUsage)
       : req.kind === "completion" ? await runCompletion(sb, req)
       : await runEnrichment(sb, req, onUsage);
-    await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage, model: model(modeleDe(req.kind)) });
+    await finishRequest(sb, req.id, { foundCount: result.found, message: result.message, usage: avecPannes(), model: model(modeleDe(req.kind)) });
     // FullEnrich n'agit qu'à l'APPROFONDISSEMENT, jamais à la prospection (Olivier, 20/10) :
     // une fois que Merx a approfondi la fiche, il y ajoute ses 2 interlocuteurs et leur e-mail.
     if (req.kind === "approfondissement" && req.prospectId) await contactsALApprofondissement(sb, req.prospectId, req.requestedBy);
@@ -1079,7 +1096,7 @@ export async function runAgentTick(sb: SupabaseClient, requestId?: string): Prom
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await failRequest(sb, req.id, message, usage, model(modeleDe(req.kind)));
+    await failRequest(sb, req.id, message, avecPannes(), model(modeleDe(req.kind)));
     if (req.kind === "recherche" && req.conversationId) {
       await appendConversationMessage(sb, req.conversationId, {
         role: "assistant",
