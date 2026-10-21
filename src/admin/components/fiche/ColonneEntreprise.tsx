@@ -43,7 +43,10 @@ export function standardDe(p: Prospect | null): StandardAffiche | null {
     }
     return { principal: s.principal, autres: s.autres ?? [], pourquoi: s.pourquoi, releve_le: s.releve_le };
   }
-  const numero = (p.contact_phone ?? p.site_contacts?.phones?.[0] ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
+  // Même ordre que l'établissement : trouvée par Merx, le contact de la fiche ; saisie à la
+  // main, le numéro du site (contact_phone peut y être le direct d'une personne).
+  const brut = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
+  const numero = (brut ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
   if (!numero) return { principal: null, autres: [], pourquoi: "aucun numéro sur la fiche", releve_le: null };
   return {
     principal: { numero, statut: "a_verifier", libelle: "Numéro relevé avant la vérification du 21/10 : source inconnue (parfois un annuaire)", source: null },

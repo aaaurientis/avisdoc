@@ -49,9 +49,20 @@ export interface Standard {
 const sansAccent = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const national = (t: string) => t.replace(/\D/g, "").replace(/^33(?=\d{9}$)/, "0");
 const MOTS_VIDES = new Set(["entreprise", "societe", "ste", "sas", "sa", "sarl", "eurl", "snc", "groupe", "france", "et", "de", "des", "du", "la", "le", "les", "l", "d"]);
-/** Les mots de type de voie : ils ne distinguent pas une rue d'une autre. */
-const VOIES = new Set(["rue", "avenue", "boulevard", "chemin", "route", "allee", "impasse", "place", "quai", "cours", "zone", "zac", "parc", "lieu", "dit", "bis", "ter", "general", "saint", "sainte", "grand", "grande", "petit", "petite", "cedex", "france"]);
 const motsUtiles = (t: string) => sansAccent(t).split(/[^a-z0-9]+/).filter((m) => m.length >= 3 && !MOTS_VIDES.has(m));
+
+/**
+ * Le nom de la rue, complet : « ZI LE GRAND JOFFRERY 7 RUE JOSEPH CUGNOT 31600 MURET » →
+ * « joseph cugnot » ; « 7 Rue Joseph Cugnot, 31600 Muret » → « joseph cugnot ». Sans type
+ * de voie reconnaissable : null (on ne vérifie pas sur un à-peu-près).
+ */
+export function nomDeRue(adresse: string): string | null {
+  const avantCp = adresse.replace(/\b\d{5}\b[\s\S]*$/, "").split(",")[0];
+  const m = sansAccent(avantCp).match(/\b(?:rue|avenue|av|boulevard|bd|chemin|route|allee|impasse|place|quai|cours|chaussee|square|voie|passage|rond-point)\b\.?\s+(.+)$/);
+  if (!m) return null;
+  const mots = m[1].split(/[^a-z0-9]+/).filter((x) => x && !["de", "du", "des", "la", "le", "les", "l", "d"].includes(x));
+  return mots.length ? mots.join(" ") : null;
+}
 
 /** « ENTREPRISE BARDE SUD-OUEST (CITEOS) (BSO) » → « ENTREPRISE BARDE SUD-OUEST », « CITEOS », « BSO ». */
 export function nomsDeLEntreprise(nom: string, autres: (string | null | undefined)[] = []): string[] {
@@ -98,8 +109,6 @@ export async function trouverStandard(e: {
   const cle = Deno.env.get("GOOGLE_MAPS_KEY");
   const duSite = (e.telephonesDuSite ?? []).map(national).filter((t) => t.length === 10);
   const cpSiege = (e.siege ?? "").match(/\b\d{5}\b/)?.[0] ?? null;
-  // La rue du siège : ses mots DISTINCTIFS (« joseph », « cugnot »), sans « rue » ni « général ».
-  const rueSiege = motsUtiles((e.siege ?? "").replace(/\b\d{5}\b.*$/, "")).filter((m) => !VOIES.has(m) && !/^\d+$/.test(m));
   const numeroSiege = (e.siege ?? "").match(/\b(\d{1,4})\s+(?:bis\s+|ter\s+)?(?:rue|avenue|av|bd|boulevard|chemin|route|allee|allée|impasse|place|quai|cours|zi|za|zac)\b/i)?.[1] ?? null;
   const motsDuNom = new Set(e.noms.flatMap(motsUtiles));
 
@@ -136,14 +145,12 @@ export async function trouverStandard(e: {
     // Un nom d'un seul mot (« BSO ») ne suffit pas hors de la ville : trop d'homonymes.
     const nomFort = variantes.some((m) => m.length >= 2 && m.every((x) => motsGoogle.has(x)));
     const cp = adresse.match(/\b\d{5}\b/)?.[0] ?? null;
-    // La seule partie rue de l'adresse Google (avant le code postal) : « Paris » dans
-    // « 7 Rue de Lyon, 75001 Paris » n'est pas un mot de la rue.
-    const motsAdresse = new Set(motsUtiles(adresse.replace(/\b\d{5}\b[\s\S]*$/, "")).filter((m) => !VOIES.has(m) && !/^\d+$/.test(m)));
-    const rueCommune = rueSiege.filter((m) => motsAdresse.has(m)).length;
     const memeNumero = numeroSiege ? new RegExp(`\\b${numeroSiege}\\b`).test(adresse) : false;
-    // Au siège : même code postal, même nom de rue (mots distinctifs), et même numéro
-    // quand le registre en donne un.
-    const auSiege = Boolean(cpSiege && cp === cpSiege && rueCommune >= Math.min(2, rueSiege.length) && rueCommune >= 1 && (numeroSiege ? memeNumero : true));
+    // Au siège : même code postal, MÊME NOM DE RUE COMPLET, et même numéro quand le
+    // registre en donne un. « Jean Baptiste Clément » n'est pas « Jean Baptiste Say ».
+    const rueA = e.siege ? nomDeRue(e.siege) : null;
+    const rueB = nomDeRue(adresse);
+    const auSiege = Boolean(cpSiege && cp === cpSiege && rueA && rueB && rueA === rueB && (numeroSiege ? memeNumero : true));
     const memeVille = Boolean(e.ville && sansAccent(adresse).includes(sansAccent(e.ville)));
     // Ailleurs qu'au siège et dans une autre ville : un autre établissement, retenu
     // seulement sous un nom de plusieurs mots.
