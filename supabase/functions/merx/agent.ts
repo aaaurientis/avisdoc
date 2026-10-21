@@ -858,11 +858,31 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const company = candidates.find((c) => c.siren === out.siren.trim()) ?? null;
   const seenHosts = new Set(urls.map(host).filter(Boolean));
   const proposed = officialSite(out.site_web);
-  // Un site proposé par le modèle n'est retenu que si ses recherches y sont réellement passées.
-  const website = p.website ?? (proposed && seenHosts.has(host(proposed)) ? proposed : null) ?? officialSite(lieu?.site ?? "");
+  // Le site officiel CONFIRMÉ passe devant celui de la fiche, qui a pu être deviné d'après
+  // le nom : Récré'Action (21/10) portait « recre-action.fr », le site d'une autre
+  // entreprise, et son vrai site (recreaction.fr, standard 01 60 35 45 75) était ignoré.
+  // Ordre : le site de la fiche Google vérifiée à l'adresse du siège, puis celui que les
+  // recherches du modèle ont réellement visité, puis celui de la fiche.
+  // Vérifiée PAR L'ADRESSE seulement : une fiche Google « vérifiée » parce que le site de la
+  // fiche publie le même numéro ne prouve rien sur ce site.
+  const auSiege = standard.principal?.libelle.includes("à l'adresse du registre officiel") ?? false;
+  const siteGoogle = standard.principal?.statut === "verifie" && auSiege ? officialSite(standard.site ?? "") : null;
+  const siteVisite = proposed && seenHosts.has(host(proposed)) ? proposed : null;
+  const website = siteGoogle ?? siteVisite ?? p.website ?? officialSite(lieu?.site ?? "");
   const ownHost = website ? host(website) : null;
-  // Site officiel découvert pendant l'approfondissement : on y lit à notre tour e-mail et téléphone.
-  if (!site && website && website !== p.website) site = await readSiteContacts(website);
+  // Un autre site que celui de la fiche : on y lit à notre tour e-mail et téléphone, et ce
+  // qu'on avait lu sur l'ancien ne compte plus.
+  if (website && (!p.website || host(website) !== host(p.website))) {
+    site = await readSiteContacts(website);
+    // Les numéros venus de l'ancien site sortent du standard ; un numéro Google « vérifié »
+    // seulement parce que l'ancien site le publiait redevient « à vérifier ».
+    const garde = [standard.principal, ...standard.autres]
+      .filter((n): n is NonNullable<typeof n> => Boolean(n && n.source))
+      .map((n) => (n.statut === "verifie" && n.libelle.includes("même numéro sur le site officiel") ? { ...n, statut: "a_verifier" as const } : n));
+    standard.principal = garde[0] ?? null;
+    standard.autres = garde.slice(1);
+    if (!standard.principal) standard.pourquoi = standard.pourquoi ?? "aucun numéro sûr";
+  }
   const seen = new Set(urls);
   const allowed = (source: string) => seen.has(source) || (ownHost !== null && host(source) === ownHost);
 
