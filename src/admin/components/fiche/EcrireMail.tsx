@@ -88,7 +88,10 @@ export default function EcrireMail({
   const premier = contacts.find((c) => c.nom === depuisPrevue?.avec) ?? contacts.find((c) => c.email) ?? contacts[0] ?? null;
   // Le destinataire d'un mail programmé reste le sien, même s'il n'est plus dans la liste.
   const [nom, setNom] = useState(depuisPrevue?.avec ?? premier?.nom ?? "");
-  const [adresse, setAdresse] = useState(garde?.[1] ?? premier?.email ?? "");
+  // Jamais l'adresse d'un autre : celle gardée, sinon celle de la personne prévue, sinon vide.
+  const [adresse, setAdresse] = useState(
+    garde?.[1] ?? (depuisPrevue?.avec ? (contacts.find((c) => c.nom === depuisPrevue.avec)?.email ?? "") : (premier?.email ?? "")),
+  );
   const [facon, setFacon] = useState<"merx" | "moi">(rediger ? "merx" : "moi");
   const [intention, setIntention] = useState(brouillon ? "" : depuisPrevue ? reste : (intitule ?? ""));
   const [objet, setObjet] = useState(brouillon?.[1] ?? "");
