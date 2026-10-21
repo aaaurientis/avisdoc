@@ -499,7 +499,7 @@ async function garderLaSaisie(sb: SupabaseClient, id: string, patch: Record<stri
     const av = a.site_contacts as { emails?: string[]; phones?: string[]; equipe?: string[]; readOn?: string };
     const nv = patch.site_contacts as typeof av;
     const unir = (x?: string[], y?: string[]) => [...new Set([...(x ?? []), ...(y ?? [])])];
-    patch.site_contacts = { emails: unir(av.emails, nv.emails), phones: unir(av.phones, nv.phones), equipe: unir(av.equipe, nv.equipe), readOn: av.readOn ?? nv.readOn };
+    patch.site_contacts = { ...nv, emails: unir(av.emails, nv.emails), phones: unir(av.phones, nv.phones), equipe: unir(av.equipe, nv.equipe), readOn: av.readOn ?? nv.readOn };
   }
 }
 
