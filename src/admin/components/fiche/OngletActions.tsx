@@ -312,6 +312,7 @@ export default function OngletActions({
           contacts={contacts ?? personnes.map((nom) => ({ nom, email: null }))}
           etape={etape}
           entrer={entrer}
+          avancer={avancer}
           depuisPrevue={ouvert.quoi === "compte-rendu" ? ouvert.action : null}
           intitule={ouvert.quoi === "nouvelle" ? ouvert.intitule : undefined}
           rediger={onEcrireAvecMerx}

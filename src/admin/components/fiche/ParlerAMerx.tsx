@@ -99,6 +99,18 @@ export default function ParlerAMerx({
         avant = String(a[col] ?? "vide");
         apres = valeur;
         patch = { [col]: valeur };
+        // La personne qui portait l'ancien standard ou l'ancienne adresse les perd au profit
+        // de la correction : sinon son ancienne valeur, vérifiée, repasserait devant.
+        if (c.champ !== "site" && a[col]) {
+          const ancien = String(a[col]);
+          const meme = (x: string | null) =>
+            c.champ === "telephone" ? (x ?? "").replace(/\D/g, "") === ancien.replace(/\D/g, "") && Boolean(x) : (x ?? "").toLowerCase() === ancien.toLowerCase();
+          if (personnes.some((q) => meme(c.champ === "telephone" ? q.telephone : q.email))) {
+            patch.personnes = personnes.map((q) =>
+              c.champ === "telephone" ? (meme(q.telephone) ? { ...q, telephone: valeur } : q) : meme(q.email) ? { ...q, email: valeur } : q,
+            );
+          }
+        }
         // Les coordonnées du site passent avant sur une fiche saisie : la correction s'y met en tête.
         const site = a.site_contacts;
         if (site && (c.champ === "telephone" || c.champ === "email")) {

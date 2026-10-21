@@ -15,7 +15,7 @@ import { Check, ClipboardPaste, Clock, Copy, Loader2, Mail, PenLine, Sparkles, X
 import { useAuth } from "../../auth/AuthContext";
 import { Modal } from "../ui";
 import { ajouterEchange, marquerTraitee, type ClesFiche, type Echange } from "../../lib/echanges";
-import { colonneDEntree, instant, jourISO } from "../../lib/actions-fiche";
+import { colonneDEntree, etapeProposee, instant, jourISO } from "../../lib/actions-fiche";
 import type { EtapeFiche } from "./CompteRendu";
 import type { BrouillonRendu } from "../../lib/merx-appels";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,7 @@ export default function EcrireMail({
   contacts,
   etape,
   entrer,
+  avancer,
   depuisPrevue,
   intitule,
   rediger,
@@ -66,6 +67,8 @@ export default function EcrireMail({
   etape: EtapeFiche | null;
   /** Prospect hors Pipeline : le mail envoyé l'y fait entrer (comme toute action). */
   entrer?: (colonne: string) => Promise<ClesFiche>;
+  /** Affaire déjà au Pipeline : la passe à cette colonne (« Contacté » après un mail). */
+  avancer?: (colonne: string) => Promise<void>;
   /** Le mail programmé qu'on écrit maintenant : il se clôt à l'envoi. */
   depuisPrevue?: Echange | null;
   /** Une proposition choisie sur la fiche (« Relancer pour la saison ») : ce qu'on veut dire. */
@@ -101,6 +104,9 @@ export default function EcrireMail({
   const [envoi, setEnvoi] = useState<null | "envoye" | "programme">(null);
   const [copie, setCopie] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Affaire au Pipeline : un mail envoyé propose de la passer en « Contacté », comme avant.
+  const aProposer = etape?.actuelle ? etapeProposee("email", null, null, etape.actuelle, etape.colonnes) : null;
+  const [etapeOk, setEtapeOk] = useState(true);
 
   const choisir = (c: ContactMail) => {
     setNom(c.nom);
@@ -190,11 +196,13 @@ export default function EcrireMail({
         avec: nom || null,
       });
       if (depuisPrevue) await marquerTraitee(depuisPrevue.id);
+      if (!entree && aProposer && etapeOk && avancer) await avancer(aProposer);
       if (relance) {
         await ajouterEchange(c, {
           kind: "email",
           titre: "Relance prévue",
-          detail: objet.trim() ? `Relance de « ${objet.trim()} »` : "",
+          // L'adresse choisie suit la relance (« À : … », comme un mail programmé).
+          detail: `${adresse.trim() ? `À : ${adresse.trim()}\n` : ""}${objet.trim() ? `Relance de « ${objet.trim()} »` : ""}`,
           au: instant(dansJours(relance), "10:00"),
           par,
           prevu: true,
@@ -398,6 +406,12 @@ export default function EcrireMail({
               non
             </button>
           </div>
+          {aProposer && avancer && (
+            <label className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-emerald-800">
+              <input type="checkbox" checked={etapeOk} onChange={(e) => setEtapeOk(e.target.checked)} className="size-4 accent-emerald-600" />
+              Passer l’affaire en « {aProposer} »
+            </label>
+          )}
           <p className="mt-2 text-[11.5px] text-emerald-800/80">Le mail entre dans l’historique de la fiche, texte compris.</p>
         </div>
       )}
