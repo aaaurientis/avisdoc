@@ -317,17 +317,17 @@ function BlocStandard({ s }: { s: StandardAffiche }) {
   const sur = p?.statut === "verifie";
   const jour = s.releve_le ? new Date(`${s.releve_le}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : null;
   return (
-    <div className={`mt-4 rounded-2xl border-2 p-3.5 ${!p ? "border-rose-300 bg-rose-50" : sur ? "border-emerald-300 bg-emerald-50" : "border-amber-400 bg-amber-50"}`}>
+    <div className={`mt-3 rounded-xl border p-3 ${!p ? "border-rose-300 bg-rose-50" : sur ? "border-emerald-300 bg-emerald-50" : "border-amber-400 bg-amber-50"}`}>
       <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted-foreground">Standard</div>
       {p ? (
         <>
-          <a href={`tel:${p.numero.replace(/[\s.-]/g, "")}`} className="mt-0.5 block font-display text-[28px] font-bold leading-tight text-avisdoc-ink">
+          <a href={`tel:${p.numero.replace(/[\s.-]/g, "")}`} className="mt-0.5 inline-block text-[18px] font-bold leading-tight text-avisdoc-ink">
             {p.numero}
           </a>
-          <div className={`mt-1 inline-block rounded-full px-3 py-1 text-[13px] font-extrabold uppercase tracking-wide text-white ${sur ? "bg-emerald-600" : "bg-amber-500"}`}>
+          <span className={`ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-[11.5px] font-bold text-white ${sur ? "bg-emerald-600" : "bg-amber-500"}`}>
             {sur ? "✓ Vérifié" : "⚠ À vérifier"}
-          </div>
-          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+          </span>
+          <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
             {p.libelle}
             {jour ? ` · relevé le ${jour}` : ""}
             {p.source && (
@@ -342,7 +342,7 @@ function BlocStandard({ s }: { s: StandardAffiche }) {
         </>
       ) : (
         <>
-          <div className="mt-0.5 font-display text-[22px] font-bold leading-tight text-rose-700">Aucun standard sûr</div>
+          <div className="mt-0.5 text-[15px] font-bold leading-tight text-rose-700">Aucun standard sûr</div>
           <p className="mt-1 text-[12px] text-rose-800">
             {s.pourquoi ? `${s.pourquoi.charAt(0).toUpperCase()}${s.pourquoi.slice(1)}. ` : ""}« Parler à Merx » pour le chercher, ou réapprofondir la fiche.
           </p>
