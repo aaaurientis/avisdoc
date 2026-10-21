@@ -118,11 +118,15 @@ export default function ParlerAMerx({
         // Les coordonnées du site passent avant sur une fiche saisie : la correction s'y met en tête.
         const site = a.site_contacts;
         if (site && (c.champ === "telephone" || c.champ === "email")) {
-          const liste = c.champ === "telephone" ? site.phones : site.emails;
-          const ancienne = liste?.[0];
-          const suite = (liste ?? []).filter((x) => x !== valeur && x !== ancienne);
-          patch.site_contacts = { ...site, [c.champ === "telephone" ? "phones" : "emails"]: [valeur, ...suite] };
-          if (ancienne) avant = ancienne;
+          const liste = (c.champ === "telephone" ? site.phones : site.emails) ?? [];
+          const norme = (x: string | null | undefined) => (c.champ === "telephone" ? (x ?? "").replace(/\D/g, "") : (x ?? "").toLowerCase().trim());
+          // La valeur affichée et remplacée : le premier numéro du site sur une fiche saisie,
+          // le contact de la fiche sinon. Seule elle s'en va ; les autres numéros restent.
+          const remplacee = prospect.found_by ? a[col] : (liste[0] ?? a[col]);
+          const reste = liste.filter((x) => norme(x) !== norme(valeur) && norme(x) !== norme(remplacee));
+          const nouvelle = prospect.found_by && !liste.some((x) => norme(x) === norme(remplacee)) ? liste.filter((x) => norme(x) !== norme(valeur)) : [valeur, ...reste];
+          patch.site_contacts = { ...site, [c.champ === "telephone" ? "phones" : "emails"]: nouvelle };
+          if (!prospect.found_by && liste[0]) avant = liste[0];
         }
       } else {
         const nom = (c.nom ?? "").trim();
