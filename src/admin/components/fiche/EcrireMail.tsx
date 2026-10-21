@@ -110,6 +110,8 @@ export default function EcrireMail({
   const [etapeOk, setEtapeOk] = useState(true);
 
   const choisir = (c: ContactMail) => {
+    // Pendant que Merx écrit pour une personne, on ne change pas de destinataire.
+    if (ecriture) return;
     setNom(c.nom);
     setAdresse(c.email ?? "");
   };
@@ -280,6 +282,7 @@ export default function EcrireMail({
               key={c.nom}
               type="button"
               onClick={() => choisir(c)}
+              disabled={ecriture}
               className={cn(
                 "rounded-full border px-3 py-1 text-[12.5px] font-semibold transition-colors",
                 c.nom === nom ? "border-avisdoc-teal bg-avisdoc-teal/10 text-avisdoc-teal" : "border-border text-avisdoc-ink hover:border-avisdoc-teal",
@@ -292,7 +295,7 @@ export default function EcrireMail({
           ))}
         </div>
       )}
-      <input value={adresse} onChange={(e) => setAdresse(e.target.value)} placeholder="adresse@entreprise.fr" className={champ} aria-label="Adresse du destinataire" />
+      <input value={adresse} onChange={(e) => setAdresse(e.target.value)} disabled={ecriture} placeholder="adresse@entreprise.fr" className={champ} aria-label="Adresse du destinataire" />
       {contacts.some((c) => c.deduite && c.email === adresse) && (
         <p className="mt-1 text-[12px] text-amber-700">Adresse déduite du format maison de l’entreprise, jamais vue publiée : à confirmer avant d’envoyer.</p>
       )}
