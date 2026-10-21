@@ -42,7 +42,7 @@ export interface PersonneFiche {
 export const ADRESSE_GENERIQUE = /^(?:webmaster|contact|contacts|info|infos|accueil|dpo|rgpd|noreply|no-reply|admin|hello|bonjour|support|secretariat|standard)@/i;
 const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 /** Adresses d'un service (drh@, prevention@, dgs@…) : la personne a sûrement aussi la sienne. */
-const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
+export const ADRESSE_SERVICE = /^(?:d?rh|drh-?\w*|dgs?|dga|daf|prevention|qhse|qse|hse|sst|securite|direction\w*|compta\w*|commercial\w*|recrutement|emploi|technique\w*|exploitation|environnement|decheteries?|services?[\w.-]*|secretariat\w*|administration|juridique|achats?|paie|formation)@/i;
 /** Messageries grand public : « vignobles.levrier@gmail.com » ne dit rien d'un format maison. */
 const WEBMAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|msn|free|orange|wanadoo|sfr|neuf|laposte|icloud|me|aol|gmx|proton|protonmail|bbox|numericable)\./i;
 /** « prenom.nom@… », « p.nom@… » : un modèle d'adresse, pas l'adresse de quelqu'un. */

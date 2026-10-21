@@ -11,7 +11,7 @@ import { Modal } from "../ui";
 import { supabaseAdmin } from "../../data/supabaseAdmin";
 import { ajouterEchange, type ClesFiche } from "../../lib/echanges";
 import { discuterFiche, type CorrectionFiche } from "../../lib/merx-appels";
-import { ADRESSE_GENERIQUE } from "../../lib/fiche";
+import { ADRESSE_GENERIQUE, ADRESSE_SERVICE } from "../../lib/fiche";
 import type { Prospect } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
@@ -129,7 +129,7 @@ export default function ParlerAMerx({
           patch = {
             personnes,
             ...(principal ? { contact_name: null, contact_role: null } : {}),
-            ...(principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) ? { contact_email: null } : {}),
+            ...(principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) && !ADRESSE_SERVICE.test(a.contact_email) ? { contact_email: null } : {}),
             ...(sonPortable ? { contact_phone: null } : {}),
             ...(sonPortable && site?.phones?.some((x) => chiffres(x) === sonPortable)
               ? { site_contacts: { ...site, phones: site.phones.filter((x) => chiffres(x) !== sonPortable) } }
