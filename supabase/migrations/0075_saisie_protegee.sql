@@ -80,7 +80,7 @@ begin
     foreach c in array old.champs_saisis loop
       if c = 'head_office' and jsonb_typeof(avant->c) = 'object' and jsonb_typeof(apres->c) = 'object' then
         -- L'adresse : ce qui a été saisi reste, les cases restées vides peuvent se remplir.
-        apres := jsonb_set(apres, array[c], (apres->c) || jsonb_strip_nulls(avant->c));
+        apres := jsonb_set(apres, array[c], (apres->c) || public.admin_jsonb_pleins(avant->c));
       elsif c = 'personnes' and jsonb_typeof(avant->c) = 'array' then
         -- Les personnes saisies restent toutes : ce qui y est écrit ne bouge pas, leurs cases
         -- vides peuvent se remplir (e-mail trouvé par FullEnrich…), et Merx ajoute les nouvelles.
