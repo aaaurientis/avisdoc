@@ -149,7 +149,17 @@ export interface NoteCritere {
 }
 
 /** Le dossier commercial monté par Merx : de quoi décrocher son téléphone. */
+/** Un numéro trouvé par le code, avec sa preuve (merx/standard.ts). */
+export interface NumeroVerifie {
+  numero: string;
+  statut: "verifie" | "a_verifier";
+  libelle: string;
+  source: string | null;
+}
+
 export interface Dossier {
+  /** Le standard, trouvé et vérifié par le code à l'approfondissement (21/10). */
+  standard?: { principal: NumeroVerifie | null; autres: NumeroVerifie[]; pourquoi: string | null; releve_le: string };
   /** Les quatre lignes qui suffisent à passer l'appel : elles passent avant tout. */
   fiche_appel?: { numero?: string; qui_demander?: string; format_email?: string; si_on_insiste?: string };
   a_retenir?: string[];

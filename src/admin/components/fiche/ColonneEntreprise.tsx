@@ -5,9 +5,56 @@
 import { useState, type ReactNode } from "react";
 import { Notation, TitreColonne } from "../FicheEntreprise";
 import { MODELE_ADRESSE as MODELE, personnesDuProspect, type NotesFiche, type PersonneFiche } from "../../lib/fiche";
-import type { Prospect } from "../../lib/merx";
+import type { NumeroVerifie, Prospect } from "../../lib/merx";
 import { effectifLabel } from "../../lib/merx";
 import PastilleApprofondie from "../PastilleApprofondie";
+
+/** Ce que le grand bloc « Standard » affiche. */
+export interface StandardAffiche {
+  principal: NumeroVerifie | null;
+  autres: NumeroVerifie[];
+  pourquoi: string | null;
+  releve_le: string | null;
+}
+
+const national = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33(?=\d{9}$)/, "0");
+
+/**
+ * Le standard de la fiche (Olivier, 21/10 : « d'abord le standard, en gros, ultra vérifié,
+ * et si pas sûr, le mettre en gros »). Approfondie depuis le 21/10 : celui que le code a
+ * trouvé et vérifié. Avant : le numéro de la fiche, dont on ignore la source — donc
+ * « à vérifier », jamais présenté comme sûr.
+ */
+export function standardDe(p: Prospect | null): StandardAffiche | null {
+  if (!p) return null;
+  const s = p.dossier?.standard;
+  if (s) {
+    // Un numéro corrigé depuis (« Modifier la fiche », « Parler à Merx ») passe devant : le
+    // standard relevé reste visible parmi les autres numéros.
+    const corrige = (p.contact_phone ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
+    if (corrige && national(corrige) !== national(s.principal?.numero)) {
+      const deja = (s.autres ?? []).find((n) => national(n.numero) === national(corrige));
+      return {
+        principal: deja ?? { numero: corrige, statut: "a_verifier", libelle: "Numéro corrigé sur la fiche après le relevé", source: null },
+        autres: [...(s.principal ? [s.principal] : []), ...(s.autres ?? []).filter((n) => national(n.numero) !== national(corrige))],
+        pourquoi: null,
+        releve_le: s.releve_le,
+      };
+    }
+    return { principal: s.principal, autres: s.autres ?? [], pourquoi: s.pourquoi, releve_le: s.releve_le };
+  }
+  // Même ordre que l'établissement : trouvée par Merx, le contact de la fiche ; saisie à la
+  // main, le numéro du site (contact_phone peut y être le direct d'une personne).
+  const brut = p.found_by ? (p.contact_phone ?? p.site_contacts?.phones?.[0]) : (p.site_contacts?.phones?.[0] ?? p.contact_phone);
+  const numero = (brut ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
+  if (!numero) return { principal: null, autres: [], pourquoi: "aucun numéro sur la fiche", releve_le: null };
+  return {
+    principal: { numero, statut: "a_verifier", libelle: "Numéro relevé avant la vérification du 21/10 : source inconnue (parfois un annuaire)", source: null },
+    autres: [],
+    pourquoi: null,
+    releve_le: null,
+  };
+}
 
 export interface LigneEtablissement {
   label: string;
@@ -59,7 +106,8 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
     { label: "Site", valeur: p.website ? lien(p.website, p.website.replace(/^https?:\/\//, "").replace(/\/$/, "")) : null },
     {
       label: estMobile ? "Mobile" : "Téléphone",
-      valeur: telephone ? (
+      // Le standard a son grand bloc en haut : il ne se répète pas ici (un portable, si).
+      valeur: telephone && (estMobile || national(telephone) !== national(standardDe(p)?.principal?.numero)) ? (
         <>
           <a href={`tel:${telephone.replace(/\s/g, "")}`} className="text-avisdoc-teal">{telephone}</a>
           {titulaire && <span className="text-muted-foreground"> — {titulaire}</span>}
@@ -72,7 +120,8 @@ export function etablissementDe(p: Prospect | null): { lignes: LigneEtablissemen
   return {
     lignes: candidates.filter((c) => !vide(c.valeur)).map((c) => ({ label: c.label, valeur: c.valeur })),
     manquants: [
-      ...candidates.filter((c) => vide(c.valeur)).map((c) => c.label),
+      // Le téléphone affiché dans le bloc « Standard » ne manque pas.
+      ...candidates.filter((c) => vide(c.valeur) && !((c.label === "Téléphone" || c.label === "Mobile") && standardDe(p)?.principal)).map((c) => c.label),
       ...(p.contact_name || p.personnes?.length ? [] : ["Interlocuteur"]),
       ...(p.siren ? [] : ["SIREN"]),
     ],
@@ -261,6 +310,65 @@ export function autresContactsDe(p: Prospect | null, affiches?: PersonneFiche[])
   return out;
 }
 
+/** Le standard, en gros, avec son statut tout aussi gros : vérifié, ou à vérifier. */
+function BlocStandard({ s }: { s: StandardAffiche }) {
+  const [voirAutres, setVoirAutres] = useState(false);
+  const p = s.principal;
+  const sur = p?.statut === "verifie";
+  const jour = s.releve_le ? new Date(`${s.releve_le}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : null;
+  return (
+    <div className={`mt-4 rounded-2xl border-2 p-3.5 ${!p ? "border-rose-300 bg-rose-50" : sur ? "border-emerald-300 bg-emerald-50" : "border-amber-400 bg-amber-50"}`}>
+      <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted-foreground">Standard</div>
+      {p ? (
+        <>
+          <a href={`tel:${p.numero.replace(/[\s.-]/g, "")}`} className="mt-0.5 block font-display text-[28px] font-bold leading-tight text-avisdoc-ink">
+            {p.numero}
+          </a>
+          <div className={`mt-1 inline-block rounded-full px-3 py-1 text-[13px] font-extrabold uppercase tracking-wide text-white ${sur ? "bg-emerald-600" : "bg-amber-500"}`}>
+            {sur ? "✓ Vérifié" : "⚠ À vérifier"}
+          </div>
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            {p.libelle}
+            {jour ? ` · relevé le ${jour}` : ""}
+            {p.source && (
+              <>
+                {" · "}
+                <a href={p.source} target="_blank" rel="noreferrer" className="text-avisdoc-teal underline-offset-2 hover:underline">
+                  voir la fiche Google
+                </a>
+              </>
+            )}
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="mt-0.5 font-display text-[22px] font-bold leading-tight text-rose-700">Aucun standard sûr</div>
+          <p className="mt-1 text-[12px] text-rose-800">
+            {s.pourquoi ? `${s.pourquoi.charAt(0).toUpperCase()}${s.pourquoi.slice(1)}. ` : ""}« Parler à Merx » pour le chercher, ou réapprofondir la fiche.
+          </p>
+        </>
+      )}
+      {s.autres.length > 0 && (
+        <div className="mt-2 text-[12.5px]">
+          <button type="button" onClick={() => setVoirAutres(!voirAutres)} className="font-semibold text-muted-foreground underline underline-offset-2">
+            {s.autres.length} autre{s.autres.length > 1 ? "s" : ""} numéro{s.autres.length > 1 ? "s" : ""} {voirAutres ? "▴" : "▾"}
+          </button>
+          {voirAutres &&
+            s.autres.map((n) => (
+              <div key={n.numero} className="mt-1.5">
+                <a href={`tel:${n.numero.replace(/[\s.-]/g, "")}`} className="font-semibold text-avisdoc-teal">
+                  {n.numero}
+                </a>{" "}
+                <span className={n.statut === "verifie" ? "font-bold text-emerald-700" : "font-bold text-amber-700"}>{n.statut === "verifie" ? "vérifié" : "à vérifier"}</span>
+                <span className="text-muted-foreground"> · {n.libelle}</span>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ColonneEntreprise({
   titre,
   sousTitre,
@@ -271,6 +379,7 @@ export default function ColonneEntreprise({
   inscrite,
   interlocuteurs,
   autresContacts = [],
+  standard,
   etablissement,
   manquants = [],
   onCompleter,
@@ -288,6 +397,8 @@ export default function ColonneEntreprise({
   interlocuteurs: ReactNode;
   /** Les contacts utiles hors de l'entreprise : voir autresContactsDe. */
   autresContacts?: AutreContact[];
+  /** Le standard, en gros, en tête : voir standardDe. */
+  standard?: StandardAffiche | null;
   etablissement: LigneEtablissement[];
   manquants?: string[];
   onCompleter?: () => void;
@@ -300,6 +411,8 @@ export default function ColonneEntreprise({
       </h2>
       {sousTitre && <div className="mt-1 text-[13px] text-muted-foreground">{sousTitre}</div>}
       {identite && <div className="mt-1.5">{identite}</div>}
+
+      {standard && <BlocStandard s={standard} />}
 
       <TitreColonne className="mt-4">Notation</TitreColonne>
       <Notation notes={notes} />

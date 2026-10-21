@@ -45,6 +45,7 @@ import { devinerSite, readSiteContacts, type SiteContacts } from "./site-contact
 import { metierDe, secteurDe } from "./metiers.ts";
 import { libelleNaf } from "./naf.ts";
 import { chercherLieu, chercherLieux, echecPlaces } from "./places.ts";
+import { nomsDeLEntreprise, trouverStandard } from "./standard.ts";
 import { champsPappers, chercherPappers, chercherPappersEnLot, echecPappers } from "./pappers.ts";
 import { deLaRecherche, fiabilite } from "./fiabilite.ts";
 import { deploiementScore, dirigeantScore, expositionScore, indexEgalite, isSector, notable, peauScore, populationScore, signauxOfficiels, surPreuve, total, type CriterionScore, type Score } from "./scoring.ts";
@@ -92,7 +93,8 @@ const RETRY_BEFORE_MS = 60_000; // seconde tentative seulement s'il reste le tem
 // Quatre recherches, plus six. La recherche remet désormais au modèle l'identité,
 // l'effectif, les dirigeants et l'adresse : il dépensait ses appels à retrouver ce
 // qu'on venait de lui donner, et l'approfondissement durait près de deux minutes.
-const ENRICH_WEB_SEARCHES = 5;
+// Trois depuis le 21/10 : « moins d'info, plus vite ». Le standard ne dépend plus d'elles.
+const ENRICH_WEB_SEARCHES = 3;
 // Au-delà, le commercial ne traite plus — et chaque page du registre est un appel.
 const REGISTRE_MAX = 100;
 
@@ -819,13 +821,28 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     const withCity = p.city ? await lookup(`${p.name} ${p.city}`).catch(() => []) : [];
     return withCity.length ? withCity : await lookup(p.name).catch(() => []);
   };
-  // Trois sources en parallèle : le registre pour le légal, le site pour les
-  // coordonnées publiées, Google pour le téléphone du standard — celui qu'on compose.
-  const [candidates, siteAtStart, lieu] = await Promise.all([
-    searchRegistry(),
-    readSiteContacts(p.website),
-    chercherLieu(p.name, p.city),
-  ]);
+  // Le registre pour le légal, le site pour les coordonnées publiées.
+  const [candidates, siteAtStart] = await Promise.all([searchRegistry(), readSiteContacts(p.website)]);
+  // LE STANDARD, trouvé et vérifié par le code — jamais par le modèle (Olivier, 21/10 :
+  // « d'abord le standard, en gros, ultra vérifié »). Google Maps sous tous les noms de
+  // l'entreprise (enseigne, sigle, nom légal), rapproché de l'adresse de la fiche.
+  // Le registre ne sert ici que si c'est SÛREMENT la même entreprise (même SIREN) ; sinon
+  // on cherche avec ce que la fiche dit d'elle-même. La ville et l'adresse sont celles de
+  // la fiche (une agence n'est pas son siège) ; celles du registre seulement à défaut, et
+  // seulement dans la même ville.
+  const cible = p.siren ? (candidates.find((c) => c.siren === p.siren) ?? null) : null;
+  // La ville de la fiche d'abord : une agence approfondie garde parfois le siège en adresse.
+  const ville = p.city ?? p.headOffice?.city ?? cible?.headOffice.city ?? null;
+  const memeVille = (v: string | null | undefined) => Boolean(v && ville && v.trim().toLowerCase() === ville.trim().toLowerCase());
+  const standard = await trouverStandard({
+    noms: nomsDeLEntreprise(p.name, cible?.autresNoms ?? []),
+    ville,
+    siege: memeVille(p.headOffice?.city) ? (p.headOffice?.address ?? null) : cible && memeVille(cible.headOffice.city) ? cible.headOffice.address : null,
+    telephonesDuSite: siteAtStart?.phones ?? [],
+  });
+  const lieu = standard.principal
+    ? { adresse: null, telephone: standard.principal.numero, site: standard.site ?? null, source: standard.principal.source, verifie: standard.principal.statut === "verifie" }
+    : null;
   let site: SiteContacts | null = siteAtStart;
   let urls: string[] = [];
 
@@ -908,7 +925,24 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // Le téléphone : celui d'une personne nommée d'abord, puis celui publié sur le
   // site, puis le standard trouvé par Google. Avant, faute des deux premiers, la
   // fiche restait sans numéro et le conseil « appelez le standard » était vide.
-  const phone = (named && c.telephone.trim()) || site?.phones[0] || lieu?.telephone || null;
+  // Le téléphone de la fiche, c'est LE STANDARD vérifié par le code. Un site officiel
+  // découvert en route qui publie le même numéro le fait passer « vérifié ».
+  // Seule une fiche GOOGLE confirmée par le site devient « vérifiée » (deux sources) — un
+  // numéro du site ne se confirme pas lui-même.
+  const memeNumero = (a: string, b: string) => a.replace(/\D/g, "").slice(-9) === b.replace(/\D/g, "").slice(-9);
+  if (standard.principal?.statut === "a_verifier" && standard.principal.source && site?.phones.some((t) => memeNumero(t, standard.principal!.numero))) {
+    standard.principal = { ...standard.principal, statut: "verifie", libelle: `${standard.principal.libelle} — même numéro sur le site officiel` };
+  }
+  // Un site officiel découvert en route : ses numéros s'ajoutent, à vérifier.
+  for (const t of site?.phones ?? []) {
+    if ([standard.principal, ...standard.autres].some((n) => n && memeNumero(n.numero, t))) continue;
+    const n = { numero: t, statut: "a_verifier" as const, libelle: "Site officiel de l'entreprise (une seule source)", source: site?.readOn ?? null };
+    if (!standard.principal) {
+      standard.principal = n;
+      standard.pourquoi = null;
+    } else if (standard.autres.length < 3) standard.autres.push(n);
+  }
+  const phone = standard.principal?.numero ?? null;
 
   const previous = (p.score ?? {}) as Score;
   const sun = out.exposition_soleil;
@@ -989,7 +1023,11 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     personnes: personnes.length ? personnes : null,
     siteContacts: site,
     approach: out.angle_approche.trim() || null,
-    dossier: enregistrerDossier(out.dossier),
+    // La fiche d'appel compose le standard vérifié, pas un numéro choisi par le modèle.
+    dossier: (() => {
+      const d = enregistrerDossier(out.dossier);
+      return d ? { ...d, fiche_appel: { ...d.fiche_appel, numero: standard.principal?.numero ?? "" }, standard } : { standard };
+    })(),
     sources: out.sources.filter(allowed),
     score,
     scoreTotal: total(score),

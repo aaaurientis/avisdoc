@@ -18,7 +18,7 @@ import { clientDepuisProspect, contactDepuisProspect, dejaAuPipeline } from "../
 import { euroDollar } from "../../lib/couts";
 import { colonnesDe } from "../../lib/ui-tokens";
 import FicheEntreprise from "../../components/FicheEntreprise";
-import ColonneEntreprise, { autresContactsDe, etablissementDe } from "../../components/fiche/ColonneEntreprise";
+import ColonneEntreprise, { autresContactsDe, etablissementDe, standardDe } from "../../components/fiche/ColonneEntreprise";
 import PlacePipeline, { pipelineParDefaut } from "../../components/fiche/PlacePipeline";
 import OngletActions from "../../components/fiche/OngletActions";
 import CeQuOnSait from "../../components/fiche/CeQuOnSait";
@@ -169,6 +169,7 @@ export default function ProspectFiche({
           referent={<ChoixReferent quoi="prospect" id={p.id} />}
           inscrite={p.found_by ? `Trouvée le ${quandCourt(p.created_at)} par Merx` : `Créée à la main le ${quandCourt(p.created_at)}`}
             autresContacts={autresContactsDe(p, personnes)}
+            standard={standardDe(p)}
             interlocuteurs={
             // En Prospection, pas de mobile : il est réservé aux vrais clients (19/10).
             <Interlocuteurs personnes={personnes} fullenrich={{ prospectId: p.id, mobile: false, onResultat: () => void onActualiser() }} />
