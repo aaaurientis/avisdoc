@@ -178,7 +178,14 @@ export default function ParlerAMerx({
             fonction: c.fonction?.trim() || ancienne?.fonction || null,
             email: c.email?.trim() || ancienne?.email || null,
             telephone: c.telephone?.trim() || ancienne?.telephone || null,
-            mobile: ancienne?.mobile ?? null,
+            // Un numéro corrigé remplace aussi l'ancien portable quand c'était lui qu'on affichait.
+            mobile: c.telephone?.trim()
+              ? /^(?:\+33\s?|0)[67]/.test(c.telephone.trim())
+                ? c.telephone.trim()
+                : ancienne?.telephone
+                  ? (ancienne.mobile ?? null)
+                  : null
+              : (ancienne?.mobile ?? null),
             source: c.source || ancienne?.source || null,
             sur: true,
           };

@@ -183,7 +183,9 @@ export default function EcrireMail({
   /** « Mail envoyé » : il entre dans l'historique, texte compris ; la relance se programme. */
   const noterEnvoye = async () => {
     if (envoi) return;
+    // L'historique garde à quelle adresse le mail est vraiment parti.
     const texte = horsHub ? colle.trim() : [objet.trim() && `Objet : ${objet.trim()}`, corps.trim()].filter(Boolean).join("\n\n");
+    const avecAdresse = texte && adresse.trim() ? `À : ${adresse.trim()}\n${texte}` : texte;
     if (!texte) return setErreur(horsHub ? "Collez le mail que vous avez envoyé." : "Le mail est vide.");
     if (horsHub && (!envoyeLe || envoyeLe > jourISO(new Date()))) return setErreur("Choisissez le jour où le mail est parti (aujourd’hui ou avant).");
     setEnvoi("envoye");
@@ -193,7 +195,7 @@ export default function EcrireMail({
       await ajouterEchange(c, {
         kind: "email",
         titre: (!horsHub && objet.trim()) || "E-mail envoyé",
-        detail: texte,
+        detail: avecAdresse,
         // Hors du Hub, le mail est daté du jour où il est vraiment parti.
         au: horsHub && envoyeLe !== jourISO(new Date()) ? instant(envoyeLe, "12:00") : new Date().toISOString(),
         par,
