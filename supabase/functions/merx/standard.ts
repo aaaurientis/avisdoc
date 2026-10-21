@@ -99,7 +99,7 @@ export async function trouverStandard(e: {
   const duSite = (e.telephonesDuSite ?? []).map(national).filter((t) => t.length === 10);
   const cpSiege = (e.siege ?? "").match(/\b\d{5}\b/)?.[0] ?? null;
   // La rue du siège : ses mots DISTINCTIFS (« joseph », « cugnot »), sans « rue » ni « général ».
-  const rueSiege = motsUtiles((e.siege ?? "").replace(/\b\d{5}\b.*$/, "")).filter((m) => !VOIES.has(m));
+  const rueSiege = motsUtiles((e.siege ?? "").replace(/\b\d{5}\b.*$/, "")).filter((m) => !VOIES.has(m) && !/^\d+$/.test(m));
   const numeroSiege = (e.siege ?? "").match(/\b(\d{1,4})\s+(?:bis\s+|ter\s+)?(?:rue|avenue|av|bd|boulevard|chemin|route|allee|allée|impasse|place|quai|cours|zi|za|zac)\b/i)?.[1] ?? null;
   const motsDuNom = new Set(e.noms.flatMap(motsUtiles));
 
@@ -138,7 +138,7 @@ export async function trouverStandard(e: {
     const cp = adresse.match(/\b\d{5}\b/)?.[0] ?? null;
     // La seule partie rue de l'adresse Google (avant le code postal) : « Paris » dans
     // « 7 Rue de Lyon, 75001 Paris » n'est pas un mot de la rue.
-    const motsAdresse = new Set(motsUtiles(adresse.replace(/\b\d{5}\b[\s\S]*$/, "")).filter((m) => !VOIES.has(m)));
+    const motsAdresse = new Set(motsUtiles(adresse.replace(/\b\d{5}\b[\s\S]*$/, "")).filter((m) => !VOIES.has(m) && !/^\d+$/.test(m)));
     const rueCommune = rueSiege.filter((m) => motsAdresse.has(m)).length;
     const memeNumero = numeroSiege ? new RegExp(`\\b${numeroSiege}\\b`).test(adresse) : false;
     // Au siège : même code postal, même nom de rue (mots distinctifs), et même numéro

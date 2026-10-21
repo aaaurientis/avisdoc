@@ -28,7 +28,21 @@ const national = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").
 export function standardDe(p: Prospect | null): StandardAffiche | null {
   if (!p) return null;
   const s = p.dossier?.standard;
-  if (s) return { principal: s.principal, autres: s.autres ?? [], pourquoi: s.pourquoi, releve_le: s.releve_le };
+  if (s) {
+    // Un numéro corrigé depuis (« Modifier la fiche », « Parler à Merx ») passe devant : le
+    // standard relevé reste visible parmi les autres numéros.
+    const corrige = (p.contact_phone ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
+    if (corrige && national(corrige) !== national(s.principal?.numero)) {
+      const deja = (s.autres ?? []).find((n) => national(n.numero) === national(corrige));
+      return {
+        principal: deja ?? { numero: corrige, statut: "a_verifier", libelle: "Numéro corrigé sur la fiche après le relevé", source: null },
+        autres: [...(s.principal ? [s.principal] : []), ...(s.autres ?? []).filter((n) => national(n.numero) !== national(corrige))],
+        pourquoi: null,
+        releve_le: s.releve_le,
+      };
+    }
+    return { principal: s.principal, autres: s.autres ?? [], pourquoi: s.pourquoi, releve_le: s.releve_le };
+  }
   const numero = (p.contact_phone ?? p.site_contacts?.phones?.[0] ?? "").match(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/)?.[0];
   if (!numero) return { principal: null, autres: [], pourquoi: "aucun numéro sur la fiche", releve_le: null };
   return {
