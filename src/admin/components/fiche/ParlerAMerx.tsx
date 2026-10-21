@@ -83,11 +83,11 @@ export default function ParlerAMerx({
     try {
       const { data: actuelle, error: lecture } = await supabaseAdmin
         .from("admin_prospects")
-        .select("contact_phone, contact_email, website, contact_name, personnes, site_contacts")
+        .select("contact_phone, contact_email, website, contact_name, personnes, site_contacts, dossier")
         .eq("id", prospect.id)
         .single();
       if (lecture) throw new Error(lecture.message);
-      const a = actuelle as Pick<Prospect, "contact_phone" | "contact_email" | "website" | "contact_name" | "personnes" | "site_contacts">;
+      const a = actuelle as Pick<Prospect, "contact_phone" | "contact_email" | "website" | "contact_name" | "personnes" | "site_contacts" | "dossier">;
       const personnes = [...((a.personnes ?? []) as Personne[])];
       let patch: Record<string, unknown> = {};
       let avant = "";
@@ -120,11 +120,23 @@ export default function ParlerAMerx({
           // nominative, portable) ; le standard et une adresse générale restent ceux de l'entreprise.
           const principal = Boolean(a.contact_name && cleNom(a.contact_name) === cleNom(nom));
           const portable = /^(?:\+33\s?|0)[67]/.test((a.contact_phone ?? "").trim());
+          // Son portable disparaît aussi des autres endroits où la fiche le range (numéros du
+          // site, fiche d'appel du dossier), sans quoi il resterait affiché comme numéro.
+          const chiffres = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33/, "0");
+          const sonPortable = principal && portable ? chiffres(a.contact_phone) : "";
+          const site = a.site_contacts;
+          const fa = a.dossier?.fiche_appel;
           patch = {
             personnes,
             ...(principal ? { contact_name: null, contact_role: null } : {}),
             ...(principal && a.contact_email && !ADRESSE_GENERIQUE.test(a.contact_email) ? { contact_email: null } : {}),
-            ...(principal && portable ? { contact_phone: null } : {}),
+            ...(sonPortable ? { contact_phone: null } : {}),
+            ...(sonPortable && site?.phones?.some((x) => chiffres(x) === sonPortable)
+              ? { site_contacts: { ...site, phones: site.phones.filter((x) => chiffres(x) !== sonPortable) } }
+              : {}),
+            ...(sonPortable && fa?.numero && chiffres(fa.numero).includes(sonPortable)
+              ? { dossier: { ...a.dossier, fiche_appel: { ...fa, numero: "" } } }
+              : {}),
           };
         } else {
           const ancienne = i >= 0 ? personnes[i] : null;
