@@ -322,6 +322,8 @@ export interface ProspectToEnrich {
   contactName?: string | null;
   contactRole?: string | null;
   contactPhone?: string | null;
+  /** L'adresse de la fiche (celle d'une agence pour une fiche d'agence). */
+  headOffice?: { address?: string | null; city?: string | null } | null;
   id: string;
   name: string;
   city: string | null;
@@ -336,7 +338,7 @@ export async function getProspectForEnrichment(sb: SupabaseClient, id: string): 
   // ses recherches web à retrouver un SIREN et un dirigeant qu'on vient de lui donner.
   const { data, error } = await sb
     .from("admin_prospects")
-    .select("id, name, city, activity, website, department, score, siren, headcount_band, contact_name, contact_role, contact_phone")
+    .select("id, name, city, activity, website, department, score, siren, headcount_band, contact_name, contact_role, contact_phone, head_office")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -348,6 +350,7 @@ export async function getProspectForEnrichment(sb: SupabaseClient, id: string): 
     contactName: (r.contact_name as string) ?? null,
     contactRole: (r.contact_role as string) ?? null,
     contactPhone: (r.contact_phone as string) ?? null,
+    headOffice: (r.head_office as ProspectToEnrich["headOffice"]) ?? null,
   } as ProspectToEnrich;
 }
 

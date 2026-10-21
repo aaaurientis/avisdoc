@@ -65,6 +65,8 @@ export interface Establishment {
 export interface Company {
   siren: string;
   name: string;
+  /** Enseignes, nom commercial, sigle : c'est souvent sous eux que Google connaît l'entreprise. */
+  autresNoms: string[];
   activityCode: string | null; // code NAF ; l'annuaire ne renvoie pas son libellé
   headcountBand: string | null; // effectif de l'entreprise entière
   headcountYear: number | null; // année de la donnée (valeur au 31/12 de N-2)
@@ -150,6 +152,7 @@ export function toCompany(r: any): Company {
   return {
     siren: r.siren,
     name: r.nom_complet,
+    autresNoms: [...(r.siege?.liste_enseignes ?? []), r.siege?.nom_commercial, r.sigle].filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 1),
     activityCode: r.activite_principale ?? null,
     headcountBand: r.tranche_effectif_salarie ?? null,
     headcountYear: year(r.annee_tranche_effectif_salarie),

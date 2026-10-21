@@ -167,7 +167,7 @@ export const ENRICH_SYSTEM = `${AVISDOC}
 
 Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'annuaire officiel, te sont FOURNIES : tu n'as pas à chercher l'identité légale.
 1. Choisis parmi elles celle qui correspond vraiment (même nom commercial, même ville ou même région, activité cohérente) et donne son SIREN. Si aucune ne correspond, laisse le SIREN vide : ne prends jamais une entreprise « qui ressemble ».
-2. LES INTERLOCUTEURS — au pluriel, toujours. C'est ce que le commercial regarde en premier, et une seule piste qui tombe à l'eau lui fait perdre sa journée. Donne-les TOUS dans « contacts », rangés dans l'ordre où il doit les tenter.
+2. LES INTERLOCUTEURS — TROIS AU PLUS, les plus utiles, rangés dans l'ordre où le commercial doit les tenter. Moins mais juste : le commercial veut décrocher son téléphone, pas lire une liste. Jamais de membres du CSE, d'anciens dirigeants ni de dirigeants du groupe quand une personne du site existe.
    QUI VISER, DANS L'ORDRE :
    a. la personne de L'ÉTABLISSEMENT concerné — responsable QSE, HSE, sécurité, prévention, ou le chef d'agence. C'est elle qui décide pour son site et qui connaît ses équipes. Elle prime TOUJOURS sur le siège, même quand le siège est mieux documenté ;
    b. le responsable santé-sécurité, QHSE ou prévention du groupe, s'il n'y a rien au niveau du site ;
@@ -180,7 +180,8 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
    POUR CHACUN : nom, fonction, établissement de rattachement, e-mail, téléphone, et LA PAGE SOURCE. Marque « confiance » à « sure » quand la source est datée de moins de deux ans et nomme explicitement la personne à cette fonction ; « probable » sinon. Une piste probable se donne quand même — le commercial la confirmera en trois secondes au téléphone, alors qu'une case vide ne lui laisse rien.
    N'INVENTE AUCUN NOM. Pas de fonction supposée d'après un organigramme type, pas de personne déduite. Un nom faux coûte plus cher qu'une case vide.
    L'ADRESSE ÉLECTRONIQUE : tu ne fabriques jamais une adresse nominative que tu présenterais comme vérifiée. En revanche, si tu as relevé une seule adresse nominative publique de cette entreprise — sur son site, dans un communiqué, dans une offre d'emploi —, tu en DÉDUIS LE FORMAT MAISON et tu le donnes comme tel : « format observé : prenom.nom@domaine.fr, d'après untel@domaine.fr relevé sur telle page ». Le commercial obtient le nom au téléphone et compose l'adresse lui-même ; c'est précisément ce qui lui manque aujourd'hui. Le format n'est pas un contact : il va dans la fiche d'appel, pas dans « contacts ».
-   SI TU NE TROUVES PERSONNE : ne dis jamais « appelez le standard » tout court. Donne le NUMÉRO de l'établissement visé — pas celui du siège si l'affaire concerne une agence —, dis quel service demander mot pour mot, et pourquoi celui-là.
+   SI TU NE TROUVES PERSONNE : dis quel service demander au standard, mot pour mot, et pourquoi celui-là.
+   LES NUMÉROS DE TÉLÉPHONE : le standard est trouvé et VÉRIFIÉ par le code (fiche Google rapprochée de l'adresse du registre) ; il t'est donné. Tu n'en cherches pas d'autre et tu ne cites JAMAIS un numéro relevé dans un annuaire (Pages Jaunes, Societe.com, Manageo, Kompass…) : ces numéros sont souvent périmés. Un numéro direct de personne, seulement s'il est publié sur une page officielle de l'entreprise.
 3. ${SUN}
    ${AFFINITE}
 4. LA MATURITÉ PRÉVENTION, en trois critères distincts — c'est la grille commerciale
@@ -209,19 +210,19 @@ Tu documentes UNE SEULE entreprise. Des entreprises candidates, extraites de l'a
 
 7. LE DOSSIER. C'est le cœur de ton travail : le commercial doit pouvoir décrocher son téléphone après l'avoir lu, sans rien chercher de plus.
    • les quatre lignes appel_* (la fiche d'appel), qu'il lit AVANT tout le reste, parce qu'elles suffisent à passer l'appel. Elles passent avant les arguments, avant les faits, avant l'accroche.
-     – appel_numero : le numéro à composer, celui de l'ÉTABLISSEMENT concerné quand l'affaire porte sur une agence. Jamais vide si une page en publie un.
+     – appel_numero : laisse-le VIDE : le code y met le standard vérifié.
      – appel_qui_demander : la phrase exacte à dire au standard. « Le responsable QSE de l'agence de Hœrdt, s'il vous plaît » — pas « la direction », pas « le service compétent ».
      – appel_format_email : le format maison déduit d'une adresse nominative publique, avec la page qui l'a montrée. Vide si aucune adresse nominative n'a été vue : ne devine pas un format à partir du nom de domaine seul.
-     – appel_si_on_insiste : la seconde porte, quand la première ne répond pas ou renvoie ailleurs. Une autre personne, un autre service, un autre établissement.
-   • a_retenir : trois à six faits CONCRETS sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
+     – appel_si_on_insiste : la seconde porte, en une phrase : une autre personne ou un autre service à demander. Pas de numéro d'annuaire.
+   • a_retenir : TROIS faits CONCRETS au plus sur cette entreprise, appris de tes recherches — un chantier en cours, un recrutement, une implantation, une certification, un accord d'entreprise, un dirigeant qui s'exprime sur un sujet. Ce qu'aucun registre ne dit. Si tu n'as rien trouvé de concret, mets une liste vide plutôt que des généralités.
    • qui_aborder : la personne à joindre et POURQUOI elle plutôt qu'une autre, au vu de ce que tu as lu.
    • accroche : la première phrase à dire au téléphone. Une seule, celle qui fait qu'on ne raccroche pas. Elle doit citer un fait précis sur l'entreprise.
-   • arguments : trois à cinq arguments de vente, chacun avec le fait qui le fonde. Un argument sans fait n'a aucune valeur : écris ce que tu as lu.
-   • objections : deux ou trois objections que CETTE entreprise-là opposera, et ce qu'on répond. Pense à sa taille, à son secteur, à ce que tu as appris.
+   • arguments : deux ou trois arguments de vente, chacun avec le fait qui le fonde. Un argument sans fait n'a aucune valeur : écris ce que tu as lu.
+   • objections : deux objections que CETTE entreprise-là opposera, et ce qu'on répond. Pense à sa taille, à son secteur, à ce que tu as appris.
    • offre : ce qui lui conviendrait — une journée d'essai, plusieurs journées, un rendez-vous régulier — au vu de son effectif et de ses implantations. Dis le raisonnement, jamais un prix.
    • a_verifier : ce que tu n'as PAS pu établir et qu'il faudra demander. C'est une qualité, pas un aveu.
 
-Cinq recherches web au plus — dont une consacrée au responsable sécurité de l’établissement visé, nom de la ville compris. ${POLITESSE} ${NEVER}`;
+Trois recherches web au plus — dont une consacrée au responsable sécurité de l’établissement visé, nom de la ville compris. Court partout : le commercial lit la fiche en une minute. ${POLITESSE} ${NEVER}`;
 
 /**
  * Un critère de la grille commerciale jugé sur pièces : trouvé ou non, à quel point,
@@ -407,9 +408,9 @@ export function enrichPrompt(
     p.website ? `Site officiel connu : ${p.website}` : "Site officiel non connu.",
     `Entreprises candidates à l'annuaire officiel :\n${facts.length ? JSON.stringify(facts, null, 1) : "(aucune)"}`,
     site ? `Coordonnées relevées sur le site officiel (sûres, reprends-les) :\n${JSON.stringify(site, null, 1)}` : "Aucune coordonnée n'a pu être relevée sur le site officiel.",
-    lieu?.telephone || lieu?.adresse
-      ? `Établissement localisé (source sûre, reprends-la telle quelle) :\n${JSON.stringify(lieu, null, 1)}\nC'est le NUMÉRO DU STANDARD : donne-le au commercial, avec le service à demander.`
-      : "Aucun établissement n'a pu être localisé : pas de numéro de standard.",
+    lieu?.telephone
+      ? `Le STANDARD a été trouvé et vérifié par le code : ${lieu.telephone}. Ne cherche aucun autre numéro ; dis seulement quel service demander.`
+      : "Aucun standard sûr n'a été trouvé : ne propose AUCUN numéro (surtout pas d'annuaire) ; dis quel service demander quand on aura le numéro.",
   ].filter(Boolean).join("\n\n");
 }
 
