@@ -642,18 +642,17 @@ export async function saveEnrichment(sb: SupabaseClient, id: string, e: Enrichme
     | null;
   if (ancienSite?.contact_email && ancienSite.site_contacts?.emails?.includes(ancienSite.contact_email)) remplaces.add("contact_email");
   // Un numéro que le commercial a saisi ou corrigé lui-même reste : c'est lui qui a appelé.
-  // Merx ne remplace — ou n'efface — que les numéros qu'il a lui-même posés, reconnus à
-  // ce qu'ils figurent dans son dossier (fiche d'appel, standard) ou dans sa note, ou à
-  // leur source (annuaire, Pappers, Google). La fiche de saisie marque « saisi à la main »
-  // tout téléphone qu'elle change ; elle recopie aussi le numéro dans site_contacts et les
-  // personnes, qui ne prouvent donc rien.
+  // Merx ne remplace — ou n'efface — que les numéros qu'il a lui-même posés : ceux de son
+  // dossier (fiche d'appel, standard) ou de sa note, et ceux dont la source est une adresse
+  // web (Merx pose toujours la page où il a lu le numéro). La fiche de saisie marque
+  // « saisi à la main » tout téléphone qu'elle change.
   const neuf = (t: string) => t.replace(/\D/g, "").slice(-9);
   const ancienTel = ancienSite?.contact_phone ? neuf(ancienSite.contact_phone) : "";
   const saisiALaMain = /saisi à la main/i.test(ancienSite?.contact_source ?? "");
   const merxLAvait =
     !saisiALaMain &&
     ([before?.dossier, ancienSite?.score].map((v) => JSON.stringify(v ?? "").replace(/\D/g, "")).some((chiffres) => chiffres.includes(ancienTel)) ||
-      /pappers\.fr|google\.[a-z.]+\/maps|annuaire-entreprises|pagesjaunes/i.test(ancienSite?.contact_source ?? ""));
+      /^https?:\/\//i.test(ancienSite?.contact_source ?? ""));
   if (ancienTel.length === 9 && !merxLAvait) {
     delete patch.contact_phone;
     delete patch.contact_source;

@@ -96,7 +96,8 @@ function numeroFrancais(brut: string): string | null {
 function numerosDuTexte(texte: string): string[] {
   const trouves: string[] = [];
   for (const m of texte.matchAll(/(?<![\d+])(?:\+33\s?(?:\(0\)\s?)?|0)[1-9](?:[\s.\-]?\d{2}){4}(?!\d)/g)) {
-    const avant = texte.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0);
+    // Le libellé juste devant CE numéro : ce qui suit le chiffre précédent (« Fax : 01 … Tél : 01 … »).
+    const avant = texte.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0).replace(/^[\s\S]*\d/, "");
     if (/fax|t[ée]l[ée]copie/i.test(avant)) continue;
     const n = numeroFrancais(m[0]);
     if (n) trouves.push(n);
