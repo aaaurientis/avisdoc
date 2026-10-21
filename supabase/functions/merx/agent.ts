@@ -831,16 +831,17 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   // la fiche (une agence n'est pas son siège) ; celles du registre seulement à défaut, et
   // seulement dans la même ville.
   const cible = p.siren ? (candidates.find((c) => c.siren === p.siren) ?? null) : null;
-  const ville = p.headOffice?.city ?? p.city ?? cible?.headOffice.city ?? null;
+  // La ville de la fiche d'abord : une agence approfondie garde parfois le siège en adresse.
+  const ville = p.city ?? p.headOffice?.city ?? cible?.headOffice.city ?? null;
   const memeVille = (v: string | null | undefined) => Boolean(v && ville && v.trim().toLowerCase() === ville.trim().toLowerCase());
   const standard = await trouverStandard({
     noms: nomsDeLEntreprise(p.name, cible?.autresNoms ?? []),
     ville,
-    siege: p.headOffice?.address ?? (cible && memeVille(cible.headOffice.city) ? cible.headOffice.address : null),
+    siege: memeVille(p.headOffice?.city) ? (p.headOffice?.address ?? null) : cible && memeVille(cible.headOffice.city) ? cible.headOffice.address : null,
     telephonesDuSite: siteAtStart?.phones ?? [],
   });
   const lieu = standard.principal
-    ? { adresse: null, telephone: standard.principal.numero, site: standard.site ?? null, source: standard.principal.source }
+    ? { adresse: null, telephone: standard.principal.numero, site: standard.site ?? null, source: standard.principal.source, verifie: standard.principal.statut === "verifie" }
     : null;
   let site: SiteContacts | null = siteAtStart;
   let urls: string[] = [];

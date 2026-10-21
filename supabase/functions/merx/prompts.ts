@@ -389,7 +389,7 @@ export function enrichPrompt(
   p: { name: string; city: string | null; activity: string | null; website: string | null; siren?: string | null; headcountBand?: string | null; contactName?: string | null; contactRole?: string | null; contactPhone?: string | null },
   candidates: Company[],
   site: SiteContacts | null,
-  lieu?: { adresse: string | null; telephone: string | null; site: string | null; source: string | null } | null,
+  lieu?: { adresse: string | null; telephone: string | null; site: string | null; source: string | null; verifie?: boolean } | null,
 ): string {
   const facts = candidates.map((c) => ({
     siren: c.siren,
@@ -409,7 +409,7 @@ export function enrichPrompt(
     `Entreprises candidates à l'annuaire officiel :\n${facts.length ? JSON.stringify(facts, null, 1) : "(aucune)"}`,
     site ? `Coordonnées relevées sur le site officiel (sûres, reprends-les) :\n${JSON.stringify(site, null, 1)}` : "Aucune coordonnée n'a pu être relevée sur le site officiel.",
     lieu?.telephone
-      ? `Le STANDARD a été trouvé et vérifié par le code : ${lieu.telephone}. Ne cherche aucun autre numéro ; dis seulement quel service demander.`
+      ? `Le STANDARD a été trouvé par le code : ${lieu.telephone} (${lieu.verifie ? "vérifié : fiche Google à l'adresse du registre" : "À VÉRIFIER : fiche Google d'un autre établissement ou une seule source"}). Ne cherche aucun autre numéro ; dis seulement quel service demander${lieu.verifie ? "" : ", et signale dans a_verifier qu'il faut confirmer ce numéro"}.`
       : "Aucun standard sûr n'a été trouvé : ne propose AUCUN numéro (surtout pas d'annuaire) ; dis quel service demander quand on aura le numéro.",
   ].filter(Boolean).join("\n\n");
 }
