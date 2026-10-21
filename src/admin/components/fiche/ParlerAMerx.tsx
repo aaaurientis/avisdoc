@@ -31,6 +31,8 @@ const LIBELLES: Record<CorrectionFiche["champ"], string> = {
   retirer_interlocuteur: "Retirer l’interlocuteur",
 };
 
+/** « +33 6 12… », « 06.12… » → « 0612… » : un même numéro, quel que soit son format. */
+const telNational = (t: string | null | undefined) => (t ?? "").replace(/\D/g, "").replace(/^33(?=\d{9}$)/, "0");
 const cleNom = (n: string) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export default function ParlerAMerx({
@@ -104,7 +106,7 @@ export default function ParlerAMerx({
         if (c.champ !== "site" && a[col]) {
           const ancien = String(a[col]);
           const meme = (x: string | null) =>
-            c.champ === "telephone" ? (x ?? "").replace(/\D/g, "") === ancien.replace(/\D/g, "") && Boolean(x) : (x ?? "").toLowerCase() === ancien.toLowerCase();
+            c.champ === "telephone" ? telNational(x) === telNational(ancien) && Boolean(x) : (x ?? "").toLowerCase() === ancien.toLowerCase();
           if (personnes.some((q) => (c.champ === "telephone" ? meme(q.telephone) || meme(q.mobile) : meme(q.email)))) {
             patch.personnes = personnes.map((q) =>
               c.champ === "telephone"
@@ -119,7 +121,7 @@ export default function ParlerAMerx({
         const site = a.site_contacts;
         if (site && (c.champ === "telephone" || c.champ === "email")) {
           const liste = (c.champ === "telephone" ? site.phones : site.emails) ?? [];
-          const norme = (x: string | null | undefined) => (c.champ === "telephone" ? (x ?? "").replace(/\D/g, "") : (x ?? "").toLowerCase().trim());
+          const norme = (x: string | null | undefined) => (c.champ === "telephone" ? telNational(x) : (x ?? "").toLowerCase().trim());
           // La valeur affichée et remplacée : le premier numéro du site sur une fiche saisie,
           // le contact de la fiche sinon. Seule elle s'en va ; les autres numéros restent.
           const remplacee = prospect.found_by ? a[col] : (liste[0] ?? a[col]);
