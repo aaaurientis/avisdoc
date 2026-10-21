@@ -69,6 +69,11 @@ function enClair(message: string): string {
 // L'hébergeur coupe à 150 s. On s'arrête à 140 pour garder de quoi écrire le résultat :
 // à 120, une recherche large partait à la poubelle après deux minutes de travail.
 const BUDGET_MS = 140_000;
+// L'approfondissement travaille en arrière-plan (l'écran n'attend pas la réponse) : la
+// limite de l'hébergeur y est de 400 s sur l'offre Pro, pas 150. À 140 s, les grosses
+// entreprises (Campenon Bernard, Würth, 21/10) échouaient faute de temps ; on lui laisse
+// 240 s, en dessous d'une coupure signalée vers 200-400 s par d'autres utilisateurs.
+const BUDGET_APPROFONDIR_MS = 240_000;
 
 /** Quel modèle sert à quelle sorte de demande : sert à enregistrer le bon tarif. */
 const modeleDe = (kind: string): Usage => (kind === "approfondissement" ? "approfondissement" : "recherche");
@@ -830,7 +835,7 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
     webSearch: { maxUses: ENRICH_WEB_SEARCHES },
     onSources: (u) => (urls = u),
     onUsage,
-    timeoutMs: Math.max(5_000, BUDGET_MS - (Date.now() - started)),
+    timeoutMs: Math.max(5_000, BUDGET_APPROFONDIR_MS - (Date.now() - started)),
   });
 
   const company = candidates.find((c) => c.siren === out.siren.trim()) ?? null;
