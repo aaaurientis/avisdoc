@@ -869,7 +869,17 @@ async function runEnrichment(sb: SupabaseClient, req: Demande, onUsage: (u: LlmU
   const ownHost = website ? host(website) : null;
   // Un autre site que celui de la fiche : on y lit à notre tour e-mail et téléphone, et ce
   // qu'on avait lu sur l'ancien ne compte plus.
-  if (website && (!p.website || host(website) !== host(p.website))) site = await readSiteContacts(website);
+  if (website && (!p.website || host(website) !== host(p.website))) {
+    site = await readSiteContacts(website);
+    // Les numéros venus de l'ancien site sortent du standard ; un numéro Google « vérifié »
+    // seulement parce que l'ancien site le publiait redevient « à vérifier ».
+    const garde = [standard.principal, ...standard.autres]
+      .filter((n): n is NonNullable<typeof n> => Boolean(n && n.source))
+      .map((n) => (n.statut === "verifie" && n.libelle.includes("même numéro sur le site officiel") ? { ...n, statut: "a_verifier" as const } : n));
+    standard.principal = garde[0] ?? null;
+    standard.autres = garde.slice(1);
+    if (!standard.principal) standard.pourquoi = standard.pourquoi ?? "aucun numéro sûr";
+  }
   const seen = new Set(urls);
   const allowed = (source: string) => seen.has(source) || (ownHost !== null && host(source) === ownHost);
 
