@@ -61,7 +61,7 @@ function fmtDateTime(iso: string): string {
 }
 
 export default function Audit() {
-  const { isSuperAdmin } = useAuth();
+  const { peut } = useAuth();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [cat, setCat] = useState<"Tous" | AuditCategory>("Tous");
@@ -83,8 +83,8 @@ export default function Audit() {
   );
 
   useEffect(() => {
-    if (isSuperAdmin) void load();
-  }, [isSuperAdmin, load]);
+    if (peut("admin")) void load();
+  }, [peut, load]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -101,15 +101,15 @@ export default function Audit() {
   }, [entries, cat, q]);
 
   // Garde d'accès (la RLS reste la garde ultime côté base).
-  if (!isSuperAdmin) {
+  if (!peut("admin")) {
     return (
       <div>
         <PageHeader title="Auditabilité" />
         <Card className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <ShieldAlert className="size-8 text-avisdoc-coral" />
           <p className="max-w-md text-sm text-muted-foreground">
-            Cet espace est réservé aux profils super-administrateur. Votre compte
-            n'y a pas accès.
+            Cet espace est réservé aux comptes disposant du module Admin. Votre
+            compte n'y a pas accès.
           </p>
         </Card>
       </div>

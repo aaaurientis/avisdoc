@@ -91,8 +91,8 @@ const MENU: Entree[] = [
   { module: "documents", label: "Documents", icon: FileText, to: "/documents" },
   { module: "admin", label: "Admin", icon: Settings, enfants: [
     { to: "/settings", label: "Réglages", icon: SlidersHorizontal },
-    { to: "/droits", label: "Droits d'accès", icon: KeyRound, superadmin: true },
-    { to: "/audit", label: "Auditabilité", icon: ScrollText, superadmin: true },
+    { to: "/droits", label: "Droits d'accès", icon: KeyRound },
+    { to: "/audit", label: "Auditabilité", icon: ScrollText },
   ] },
 ];
 
