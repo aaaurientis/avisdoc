@@ -1,4 +1,4 @@
-// Droits d'accès par module (réservé aux super-admins).
+// Droits d'accès par module (réservé aux comptes ayant le module Admin).
 // Chaque utilisateur @avisdoc.fr non listé a les modules par défaut (tout sauf
 // Admin) ; une ligne ici remplace ces défauts. Les super-admins (table
 // admin_superadmins, gérée au SQL Editor) ont toujours tous les modules.
@@ -16,7 +16,7 @@ interface Ligne {
 }
 
 export default function Droits() {
-  const { isSuperAdmin, user } = useAuth();
+  const { peut, user } = useAuth();
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [nouvelEmail, setNouvelEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ export default function Droits() {
     setErr(null);
     setLignes((data as Ligne[]) ?? []);
   }
-  useEffect(() => { if (isSuperAdmin) charger(); }, [isSuperAdmin]);
+  useEffect(() => { if (peut("admin")) charger(); }, [peut]);
 
   async function agir(fn: () => Promise<unknown>) {
     setBusy(true); setErr(null);
@@ -67,12 +67,12 @@ export default function Droits() {
       if (error) throw new Error(error.message);
     });
 
-  if (!isSuperAdmin) {
+  if (!peut("admin")) {
     return (
       <div>
-        <PageHeader title="Droits d'accès" subtitle="Réservé aux super-admins" />
+        <PageHeader title="Droits d'accès" subtitle="Réservé au module Admin" />
         <Card className="p-6 text-sm text-muted-foreground">
-          Cette page est réservée aux super-admins du Hub.
+          Cette page est réservée aux comptes disposant du module Admin.
         </Card>
       </div>
     );
