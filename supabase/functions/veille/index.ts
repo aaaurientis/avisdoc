@@ -680,8 +680,8 @@ async function alerter(db: Db, maintenant: Date) {
 }
 
 /**
- * Le budget du mois (Veille › CPR) : un mail à 80 % puis à 100 %, une fois chacun par mois, à l'administrateur qui l'a
- * réglé (sinon aux destinataires du rapport). Rien n'est coupé (décision d'Olivier, 30/10). Un budget à 0 $ : pas de suivi.
+ * Le budget du mois (Veille › CPR) : un mail à 80 % puis à 100 %, une fois chacun par mois, aux adresses de « prevenir »
+ * (l'administrateur qui l'a réglé, ou la liste posée à la mise en route), sinon aux destinataires du rapport. Rien n'est coupé (décision d'Olivier, 30/10). Un budget à 0 $ : pas de suivi.
  */
 async function surveillerBudget(db: Db, maintenant: Date) {
   const b = await verifie(db.from("admin_veille_budget").select("montant_usd, alerte80_mois, alerte100_mois, prevenir").maybeSingle()) as any;
@@ -699,7 +699,9 @@ async function surveillerBudget(db: Db, maintenant: Date) {
   if (!pris.length) return;
   const { sujet, html } = composerBudget(depense, budget, seuil);
   try {
-    if (b.prevenir) await envoyerA([adresseReelle(b.prevenir)], sujet, html, `veille-budget-${mois}-${seuil}-${budget}`);
+    // « prevenir » : une adresse, ou plusieurs séparées par des virgules.
+    const pour = [...new Set(String(b.prevenir ?? "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => x.endsWith("@avisdoc.fr")).map(adresseReelle))];
+    if (pour.length) await envoyerA(pour, sujet, html, `veille-budget-${mois}-${seuil}-${budget}`);
     else await envoyer(sujet, html, `veille-budget-${mois}-${seuil}-${budget}`);
   } catch (err) {
     await db.from("admin_veille_budget").update({ [colonne]: b[colonne] ?? null }).eq("id", true);
