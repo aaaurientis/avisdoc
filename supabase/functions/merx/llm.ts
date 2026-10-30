@@ -15,10 +15,15 @@ export interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
   webSearches: number;
+  /** Jetons écrits en cache et relus du cache (seulement avec `systemEnCache`), facturés à part. */
+  cacheWriteTokens?: number;
+  cacheReadTokens?: number;
 }
 
 export interface LlmOptions {
   system?: string;
+  /** Les consignes `system` sont les mêmes d'un appel à l'autre : on les met en cache 5 minutes (Vigile, tri par lots). `complete()` seulement. */
+  systemEnCache?: boolean;
   model?: string;
   /** À défaut de modèle explicite, celui de cet usage. */
   usage?: Usage;
@@ -83,7 +88,11 @@ const timeoutMessage = (e: unknown, options?: LlmOptions) =>
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 function usageOf(r: any): LlmUsage {
-  return { inputTokens: r.usage.input_tokens, outputTokens: r.usage.output_tokens, webSearches: r.usage.server_tool_use?.web_search_requests ?? 0 };
+  return {
+    inputTokens: r.usage.input_tokens, outputTokens: r.usage.output_tokens, webSearches: r.usage.server_tool_use?.web_search_requests ?? 0,
+    ...(r.usage.cache_creation_input_tokens && { cacheWriteTokens: r.usage.cache_creation_input_tokens }),
+    ...(r.usage.cache_read_input_tokens && { cacheReadTokens: r.usage.cache_read_input_tokens }),
+  };
 }
 
 function sourcesOf(r: any): string[] {
@@ -105,7 +114,9 @@ export async function complete<T>(prompt: string, schema: Record<string, unknown
       {
         model: options?.model ?? model(options?.usage),
         max_tokens: 16000,
-        ...(options?.system && { system: options.system }),
+        ...(options?.system && {
+          system: options.systemEnCache ? [{ type: "text", text: options.system, cache_control: { type: "ephemeral" } }] : options.system,
+        }),
         messages: [{ role: "user", content: prompt }],
         ...(options?.webSearch && { tools: [webSearchTool(options.webSearch.maxUses)] }),
         output_config: { format: { type: "json_schema" as const, schema } },

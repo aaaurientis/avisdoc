@@ -31,6 +31,13 @@ import {
   type LucideIcon,
   Users,
   Wallet,
+  Radar,
+  Eye,
+  MessageCircle,
+  Activity,
+  Newspaper,
+  Archive,
+  Calculator,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -40,6 +47,7 @@ import { initials } from "../lib/format";
 import { ecrireArrivee, lireArrivee, type Arrivee } from "../lib/arrivee";
 import type { Module } from "../lib/modules";
 import { appliquerTheme, themeCourant, type Theme } from "../lib/theme";
+import { nouveautesCommercial } from "../lib/veille";
 import { Avatar } from "./ui";
 
 interface Enfant {
@@ -53,6 +61,8 @@ interface Enfant {
   module?: Module;
   /** Correspondance exacte du lien actif (sinon un préfixe suffit). */
   end?: boolean;
+  /** Une pastille rouge : le nombre de nouveautés arrivées depuis la dernière ouverture. */
+  pastille?: "commercial-veille";
 }
 interface Entree {
   /** Module de droits ; null = visible par tous (tableau de bord). */
@@ -72,6 +82,7 @@ const MENU: Entree[] = [
   { module: "crm", label: "Commercial", icon: Building2, enfants: [
     { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
     { to: "/planning", label: "Planning", icon: CalendarDays, module: "merx" },
+    { to: "/commercial-veille", label: "Veille", icon: Newspaper, module: "veille", pastille: "commercial-veille" },
     { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
     { to: "/crm", label: "Pipeline", icon: LayoutGrid },
     { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
@@ -79,6 +90,14 @@ const MENU: Entree[] = [
     { to: "/couts", label: "CAP", icon: Coins, module: "merx" },
     { to: "/aide", label: "Aide", icon: LifeBuoy },
     { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
+  ] },
+  { module: "veille", label: "Veille", icon: Radar, enfants: [
+    { to: "/veille/vigile", label: "Vigile", icon: MessageCircle },
+    { to: "/veille/surveiller", label: "Réglages", icon: Eye },
+    { to: "/veille/direct", label: "En direct", icon: Activity },
+    { to: "/veille", label: "Rapports", icon: Radar, end: true },
+    { to: "/veille/archives", label: "Archivés", icon: Archive },
+    { to: "/veille/cpr", label: "CPR", icon: Calculator },
   ] },
   { module: null, label: "Contacts Médicaux", icon: Users, enfants: [
     { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, module: "contacts", end: true },
@@ -104,12 +123,33 @@ const lienCls = (actif: boolean) =>
     actif ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
   );
 
+/** Les entreprises arrivées dans Commercial › Veille depuis votre dernière visite : relu à chaque changement d'écran. */
+function useNouveautesCommercial(actif: boolean) {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!actif || !user?.email) return;
+    if (pathname.startsWith("/commercial-veille")) return setN(0);
+    let vivant = true;
+    nouveautesCommercial(user.email).then((x) => vivant && setN(x), () => {});
+    return () => {
+      vivant = false;
+    };
+  }, [actif, user?.email, pathname]);
+  return n;
+}
+
+const Pastille = ({ n }: { n: number }) =>
+  n > 0 ? <span className="ml-auto min-w-[18px] shrink-0 rounded-full bg-red-600 px-1.5 text-center text-[10px] font-bold leading-[18px] text-white">{n}</span> : null;
+
 function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: boolean; peut: (m: Module) => boolean }) {
   const { pathname } = useLocation();
   const enfants = (entree.enfants ?? []).filter((e) => (!e.superadmin || isSuperAdmin) && (!e.module || peut(e.module)));
   const enfantActif = enfants.some((e) => pathname.startsWith(e.to));
   const [ouvert, setOuvert] = useState(enfantActif);
   const Icon = entree.icon;
+  const nouveautes = useNouveautesCommercial(enfants.some((e) => e.pastille === "commercial-veille"));
 
   // Le groupe suit la navigation : il s'ouvre sur ses écrans, se referme dès qu'on le
   // quitte. Sans cela, « enfantActif » forçait l'ouverture et le chevron ne servait à rien.
@@ -129,6 +169,7 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
       >
         <Icon className="size-[18px]" strokeWidth={2.2} />
         <span className="min-w-0 flex-1 truncate text-left">{entree.label}</span>
+        {!ouvert && <Pastille n={nouveautes} />}
         <ChevronDown className={cn("size-4 shrink-0 transition-transform", ouvert && "rotate-180")} />
       </button>
       {ouvert && (
@@ -151,6 +192,7 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
               >
                 <IconeEnfant className="size-[15px] shrink-0" strokeWidth={1.9} />
                 <span className="min-w-0 truncate">{e.label}</span>
+                {e.pastille === "commercial-veille" && <Pastille n={nouveautes} />}
               </NavLink>
             );
           })}

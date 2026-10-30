@@ -129,13 +129,15 @@ export default function ProspectFiche({
   const jalons = useMemo<Jalon[]>(
     () =>
       ([
-        p.found_by
-          ? { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at }
-          : { libelle: "Fiche créée à la main", au: p.created_at },
+        p.origine === "vigile"
+          ? { libelle: "Repérée par Vigile", au: p.created_at }
+          : p.found_by
+            ? { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at }
+            : { libelle: "Fiche créée à la main", au: p.created_at },
         p.enriched_at ? { libelle: "Fiche approfondie", au: p.enriched_at } : null,
         p.converted_at ? { libelle: "Passée au Pipeline", au: p.converted_at } : null,
       ] as (Jalon | null)[]).filter((j): j is Jalon => j !== null),
-    [demandeOrigine, p.found_by, p.created_at, p.enriched_at, p.converted_at],
+    [demandeOrigine, p.origine, p.found_by, p.created_at, p.enriched_at, p.converted_at],
   );
 
   const personnes = personnesDuProspect(p);

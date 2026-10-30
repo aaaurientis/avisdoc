@@ -2,11 +2,12 @@
 // Le tableau de bord n'est pas un module : accessible à tous, ses widgets
 // sont filtrés selon les modules autorisés.
 
-export type Module = "crm" | "merx" | "contacts" | "marketing" | "finance" | "documents" | "infirmieres" | "admin";
+export type Module = "crm" | "merx" | "veille" | "contacts" | "marketing" | "finance" | "documents" | "infirmieres" | "admin";
 
 export const MODULES: { key: Module; label: string }[] = [
   { key: "crm", label: "Commercial" },
   { key: "merx", label: "Merx (prospection)" },
+  { key: "veille", label: "Veille" },
   { key: "contacts", label: "Contacts Médicaux" },
   { key: "marketing", label: "Marketing" },
   { key: "finance", label: "Finance" },

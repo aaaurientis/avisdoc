@@ -25,6 +25,13 @@ import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
 import Droits from "./pages/Droits";
+import Veille from "./pages/Veille";
+import VeilleSurveiller from "./pages/VeilleSurveiller";
+import Vigile from "./pages/Vigile";
+import CommercialVeille from "./pages/CommercialVeille";
+import VeilleArchives from "./pages/VeilleArchives";
+import VeilleCpr from "./pages/VeilleCpr";
+import VeilleDirect from "./pages/VeilleDirect";
 import type { Module } from "./lib/modules";
 import { lireArrivee } from "./lib/arrivee";
 
@@ -89,6 +96,14 @@ function Gate() {
           <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
           <Route path="/aide" element={<Garde module="crm"><Aide /></Garde>} />
           <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
+          <Route path="/commercial-veille" element={<Garde module="veille"><CommercialVeille /></Garde>} />
+          <Route path="/veille" element={<Garde module="veille"><Veille /></Garde>} />
+          <Route path="/veille/direct" element={<Garde module="veille"><VeilleDirect /></Garde>} />
+          <Route path="/veille/vigile" element={<Garde module="veille"><Vigile /></Garde>} />
+          <Route path="/veille/surveiller" element={<Garde module="veille"><VeilleSurveiller /></Garde>} />
+          <Route path="/veille/archives" element={<Garde module="veille"><VeilleArchives /></Garde>} />
+          <Route path="/veille/cpr" element={<Garde module="veille"><VeilleCpr /></Garde>} />
+          <Route path="/veille/:rapportId" element={<Garde module="veille"><Veille /></Garde>} />
           <Route path="/contacts" element={<Garde module="contacts"><ContactsDashboard /></Garde>} />
           <Route path="/contacts/requis" element={<Garde module="contacts"><Contacts fixedType="Requis" /></Garde>} />
           <Route path="/contacts/reseau" element={<Garde module="contacts"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
