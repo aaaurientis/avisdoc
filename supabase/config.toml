@@ -115,3 +115,7 @@ verify_jwt = false
 # Échéances des attestations (cron quotidien) — protégée par un secret partagé.
 [functions.req-echeances]
 verify_jwt = false
+
+# Veille (cron) — protégée par un secret partagé (x-secret), comme rappels-actions.
+[functions.veille]
+verify_jwt = false

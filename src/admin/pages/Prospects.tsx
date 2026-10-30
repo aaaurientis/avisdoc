@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { ArrowUpDown, Check, Download, Loader2, Mail, Pencil, Phone, Plus, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, PageHeader, SectionLabel } from "../components/ui";
@@ -422,6 +423,15 @@ export default function Prospects() {
     },
     [charger],
   );
+  // Arrivée depuis un lien (le rapport de Vigile : « Voir sa fiche prospect ») : la fiche demandée s'ouvre, une fois.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get("fiche");
+    const p = id ? prospects.find((x) => x.id === id) : undefined;
+    if (!p) return;
+    ouvrir(p);
+    setParams({}, { replace: true });
+  }, [params, prospects, ouvrir, setParams]);
   /** Parties au Pipeline : on dit où elles sont allées plutôt que de les laisser disparaître sans un mot. */
   const auPipeline = useMemo(
     () => prospects.filter((p) => p.converted_client_id).length,

@@ -173,6 +173,8 @@ export interface Dossier {
 
 export interface Prospect {
   id: string;
+  /** « vigile » : créée depuis un rapport de veille (26/10). */
+  origine?: string | null;
   owner_email: string;
   name: string;
   city: string | null;
