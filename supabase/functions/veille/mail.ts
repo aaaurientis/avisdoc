@@ -180,6 +180,28 @@ export function composerBudget(depense: number, budget: number, seuil: 80 | 100)
   return { sujet, html };
 }
 
+export interface Panne { nature: string; fin: Date; statut: string; bloquee: boolean; erreur: string | null; pannes: string[] }
+
+/** Le mail technique d'une tournée en panne : ce qui s'est passé, ce que ça change, ce qu'il faut faire. */
+export function composerPanne(liste: Panne[]) {
+  const nom = (p: Panne) => `${p.nature === "quotidienne" ? "la tournée complète" : "la tournée légère"} de ${momentEnClair(p.fin)}`;
+  const sujet = liste.length > 1 ? `Vigile · ${liste.length} tournées ont eu un problème` : `Vigile · Problème sur ${nom(liste[0])}`;
+  const blocs = liste.map((p) => {
+    const quoi = p.bloquee ? `Elle n'est pas terminée et n'avance plus (étape : ${p.statut}).` : p.statut === "echec" ? "Elle a échoué." : "Elle est terminée, mais il manque ce qui suit.";
+    const lignes = [p.erreur, ...p.pannes.slice(0, 10), ...(p.pannes.length > 10 ? [`… et ${p.pannes.length - 10} autres`] : [])].filter(Boolean) as string[];
+    return `<p style="font-size:14px;font-weight:bold;margin:0 0 4px;">${echapper(nom(p))}</p>
+    <p style="font-size:14px;margin:0 0 4px;">${quoi}</p>
+    ${lignes.length ? `<p style="font-size:13px;margin:0 0 12px;white-space:pre-wrap;color:${GRIS};">${echapper(lignes.join("\n"))}</p>` : ""}`;
+  }).join("");
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${ENCRE};max-width:520px;">
+    <p style="font-size:16px;font-weight:bold;margin:0 0 8px;">${echapper(sujet)}</p>
+    ${blocs}
+    <p style="font-size:14px;margin:0 0 8px;"><b>Ce que ça change :</b> les publications de ces recherches peuvent manquer. Le reste de la veille continue, et la tournée suivante repart normalement.</p>
+    <p style="font-size:14px;margin:0 0 12px;"><b>Que faire :</b> si le message parle de clé, de quota, de 401, 402, 403 ou 429, vérifiez le compte du service concerné. Sinon, regardez si la tournée suivante passe avant d'intervenir. Vous ne recevrez pas d'autre mail avant 6 heures.</p>
+    <p style="margin:0;"><a href="${hub()}/veille/cpr" style="color:${BLEU};">Voir les tournées dans CPR</a></p></div>`;
+  return { sujet, html };
+}
+
 export function composerAlerte(fin: Date, statut: string, detail: string) {
   const sujet = `Vigile · Veille AvisDoc : le rapport de ${momentEnClair(fin)} n'est pas parti`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${ENCRE};max-width:520px;">

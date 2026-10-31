@@ -291,6 +291,24 @@ export async function changerAlerte(email: string, active: boolean) {
 export async function retirerArticle(id: string, retirer: boolean) {
   await lire(supabaseAdmin.rpc("veille_retirer", { p_id: id, p_retirer: retirer }));
 }
+/** La fin de la dernière tournée terminée, pour la ligne discrète d'En direct. */
+export async function derniereTournee() {
+  const r = await lire<{ periode_fin: string } | null>(supabaseAdmin.from("admin_veille_rapports").select("periode_fin").in("nature", ["quotidienne", "legere"]).eq("statut", "termine").order("periode_fin", { ascending: false }).limit(1).maybeSingle());
+  return r?.periode_fin ?? null;
+}
+
+/** « Dernier passage aujourd'hui à 12 h · prochain à 15 h », à l'heure de Paris : une tournée toutes les 3 heures, plus celle de 7 h. */
+export function lignePassages(fin: string, maintenant = new Date()) {
+  const jour = (d: Date) => d.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  const heure = (d: Date) => Number(d.toLocaleString("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }));
+  const d = new Date(fin);
+  const hier = new Date(maintenant.getTime() - 86_400_000);
+  const quand = jour(d) === jour(maintenant) ? "aujourd'hui" : jour(d) === jour(hier) ? "hier" : `le ${jour(d).slice(0, 5)}`;
+  const h = heure(maintenant);
+  const prochain = h === 6 ? 7 : ((Math.floor(h / 3) + 1) * 3) % 24; // 7 h : la tournée quotidienne
+  return `Dernier passage ${quand} à ${heure(d)} h · prochain à ${prochain} h`;
+}
+
 /** CPR, le coût de la veille : par jour et par poste, par tournée ou rapport, et les recherches Linkup du mois. */
 export interface Cpr {
   jours: { jour: string; tri: number; rapport: number; perplexity: number; questions: number }[];

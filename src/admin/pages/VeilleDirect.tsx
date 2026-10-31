@@ -12,7 +12,7 @@ import { Card, PageHeader } from "../components/ui";
 import Onglets from "../components/Onglets";
 import CarteArticle from "./veille/CarteArticle";
 import {
-  A_DEMARCHER, alerteActive, AXES, changerAlerte, confiee, estReseau, listerDirect, listerExpressions,
+  A_DEMARCHER, alerteActive, AXES, changerAlerte, confiee, derniereTournee, estReseau, lignePassages, listerDirect, listerExpressions,
   listerRubriques, noterOngletVu, ongletsVus, sourcesNommees, statutsEntreprises, VU_PAR_DEFAUT,
   type Article, type Axe, type Expression, type StatutEntreprise,
 } from "../lib/veille";
@@ -44,6 +44,7 @@ export default function VeilleDirect() {
   const [chargeLe, setChargeLe] = useState("");
   const [alerte, setAlerte] = useState<boolean | null>(null);
   const [bascule, setBascule] = useState(false);
+  const [dernierPassage, setDernierPassage] = useState<string | null>(null);
   const demande = params.get("onglet");
   const onglet: Onglet = estOnglet(demande) ? demande : "urgent";
 
@@ -61,6 +62,7 @@ export default function VeilleDirect() {
         setChargeLe(avant);
         // Case illisible : on la masque plutôt que de la montrer décochée à tort.
         alerteActive(user.email).then(setAlerte, () => setAlerte(null));
+        derniereTournee().then(setDernierPassage, () => setDernierPassage(null));
         setStatuts(await statutsEntreprises(a.map((x) => x.entreprise ?? "")));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Le direct n'a pas pu être lu.");
@@ -148,6 +150,7 @@ export default function VeilleDirect() {
         />
         <div className="border-b border-border bg-muted/40 px-5 py-2.5 text-[12px] text-muted-foreground">
           <p>{courant.sousTitre}</p>
+          {dernierPassage && <p className="mt-0.5">{lignePassages(dernierPassage)}</p>}
           {!["urgent", "reseaux", "nous"].includes(onglet) && rubriquesDe(onglet).length > 0 && <p className="mt-0.5"><span className="font-bold text-avisdoc-ink">Rubriques :</span> {rubriquesDe(onglet).join(" · ")}</p>}
         </div>
         {onglet === "nous" && <NomsSurveilles />}
