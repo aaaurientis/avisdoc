@@ -20,7 +20,9 @@ import type { Article, Periode } from "./sources.ts";
 import * as pplx from "./perplexity.ts";
 import { aVerifier, type Verification, verifier } from "./verifier.ts";
 import { modeleSynthese, modeleTri, pointsCles, PROMPT_VERSION, trier } from "./agent.ts";
-import { type ArticleMail, composer, composerAlerte, composerBudget, composerRecap, composerUrgent, envoyer, envoyerA, type Suite } from "./mail.ts";
+import { type ArticleMail, composer, composerAlerte, composerBudget, composerPanne, composerRecap, composerUrgent, envoyer, envoyerA, type Suite } from "./mail.ts";
+import { partDuJour, reduire } from "./linkup.ts";
+import { tourneesEnPanne } from "./pannes.ts";
 import { Erreur, repondre } from "./vigile.ts";
 import { confier } from "./confier.ts";
 
@@ -45,11 +47,13 @@ const SUPPORTS: Record<string, string[]> = {
   linkedin: ["linkedin.com"], facebook: ["facebook.com"], instagram: ["instagram.com"], x: ["x.com", "twitter.com"], youtube: ["youtube.com"],
 };
 const ABANDON_APRES_H = 24;
-/** Le plafond mensuel des recherches Linkup (gratuit jusqu'à environ 4 000) : au-delà, la tournée quotidienne s'en passe. */
+/** Le plafond mensuel des recherches Linkup (gratuit jusqu'à environ 4 000) : chaque tournée quotidienne n'en prend que sa part. */
 const LINKUP_PAR_MOIS = Number(Deno.env.get("VEILLE_LINKUP_PAR_MOIS") ?? "3500");
 /** Les sources gratuites et sans limite : les seules de la tournée légère, toutes les 3 heures. */
 const GENRES_LEGERS = new Set(["pubmed", "europepmc", "medrxiv", "clinicaltrials", "boamp", "rss"]);
 const ALERTE_APRES_MIN = 15;
+/** Au plus un mail de panne toutes les 6 heures : une source en panne ne prévient pas à chaque tournée légère. */
+const PAUSE_PANNES_H = 6;
 /**
  * Qui suit quelle case (30/10) : les entreprises à démarcher vont à Stéphane, les collectivités à Laurent.
  * Chacun reçoit tout de suite les « À ne pas rater » de sa case, et un récapitulatif du reste à la fin de chaque tournée.
@@ -223,11 +227,11 @@ async function creerEtapesDeCollecte(db: Db, id: string, nature: Nature) {
     : etapes.filter((e) => e.genre === "collecte");
   if (nature === "quotidienne") {
     const parLinkup = (e: any) => e.params?.source === "linkup" || e.params?.source === "web" || sourcesParCle.get(e.params?.source) === "site";
-    const linkup = gardees.filter(parLinkup).length;
-    if ((await linkupCeMois(db)) + linkup > LINKUP_PAR_MOIS) {
-      gardees = gardees.filter((e) => !parLinkup(e));
-      await db.from("admin_veille_rapports").update({ sources_en_panne: [`Linkup : plafond mensuel de ${LINKUP_PAR_MOIS} recherches atteint`] }).eq("id", id);
-    }
+    const p = paris(new Date());
+    const joursRestants = new Date(Date.UTC(p.annee, p.mois, 0)).getUTCDate() - p.jour + 1;
+    const { gardees: reduites, enlevees } = reduire(gardees, parLinkup, partDuJour(await linkupCeMois(db), LINKUP_PAR_MOIS, joursRestants));
+    gardees = reduites;
+    if (enlevees) await db.from("admin_veille_rapports").update({ sources_en_panne: [`Linkup : plafond mensuel de ${LINKUP_PAR_MOIS} recherches, ${enlevees} laissées de côté aujourd'hui`] }).eq("id", id);
   }
   await creerEtapes(db, gardees);
 }
@@ -680,6 +684,32 @@ async function alerter(db: Db, maintenant: Date) {
 }
 
 /**
+ * Une tournée qui a échoué, qui est bloquée, ou dont une source n'a pas répondu : un mail technique, avec le détail,
+ * aux adresses de VEILLE_ALERTES_TECHNIQUES (décision d'Olivier, 31/10). Rien n'est envoyé quand tout va bien.
+ */
+async function surveillerTournees(db: Db, maintenant: Date) {
+  const pour = [...new Set((Deno.env.get("VEILLE_ALERTES_TECHNIQUES") ?? "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => x.includes("@")))];
+  if (!pour.length) return;
+  const derniere = await verifie(db.from("admin_veille_rapports").select("alerte_le").neq("nature", "rapport").not("alerte_le", "is", null).order("alerte_le", { ascending: false }).limit(1).maybeSingle()) as any;
+  if (derniere && maintenant.getTime() - new Date(derniere.alerte_le).getTime() < PAUSE_PANNES_H * 3_600_000) return;
+  const recentes = await verifie(db.from("admin_veille_rapports").select("id, nature, periode_fin, statut, erreur").neq("nature", "rapport").is("alerte_le", null)
+    .gte("periode_fin", new Date(maintenant.getTime() - 48 * 3_600_000).toISOString()).lte("periode_fin", maintenant.toISOString())) as any[];
+  if (!recentes.length) return;
+  const abandons = await verifie(db.from("admin_veille_etapes").select("rapport_id, genre, cle, params, erreur").eq("statut", "abandon").in("rapport_id", recentes.map((r) => r.id))) as any[];
+  const enPanne = tourneesEnPanne(recentes, abandons, maintenant);
+  if (!enPanne.length) return;
+  const { sujet, html } = composerPanne(enPanne.map((r) => ({
+    nature: r.nature, fin: new Date(r.periode_fin), statut: r.statut, bloquee: r.bloquee, erreur: r.erreur,
+    pannes: [...new Set(r.etapes.map((e: any) => `${e.params?.source ?? e.genre} : ${e.erreur ?? "pas de détail"}`))] as string[],
+  })));
+  // Marqué seulement une fois parti : coupé ou raté, on réessaie au passage suivant. La clé suit le contenu, donc un même
+  // mail n'est jamais envoyé deux fois par Resend, et un contenu qui a changé n'est pas refusé.
+  const empreinte = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html))), (o) => o.toString(16).padStart(2, "0")).join("");
+  await envoyerA(pour.map(adresseReelle), sujet, html, `veille-panne-${empreinte}`);
+  await verifie(db.from("admin_veille_rapports").update({ alerte_le: new Date().toISOString() }).in("id", enPanne.map((r) => r.id)).select("id"));
+}
+
+/**
  * Le budget du mois (Veille › CPR) : un mail à 80 % puis à 100 %, une fois chacun par mois, aux adresses de « prevenir »
  * (l'administrateur qui l'a réglé, ou la liste posée à la mise en route), sinon aux destinataires du rapport. Rien n'est coupé (décision d'Olivier, 30/10). Un budget à 0 $ : pas de suivi.
  */
@@ -763,6 +793,7 @@ Deno.serve(async (req) => {
     for (const r of ouverts) await avancer(db, r, maintenant, t0);
     await alerterUrgents(db).catch((err) => console.error("alertes « À ne pas rater » :", err instanceof Error ? err.message : String(err)));
     await alerter(db, maintenant);
+    await surveillerTournees(db, maintenant).catch((err) => console.error("tournées :", err instanceof Error ? err.message : String(err)));
     await surveillerBudget(db, maintenant).catch((err) => console.error("budget :", err instanceof Error ? err.message : String(err)));
     return json({ ok: true, ouverts: ouverts.map((r) => ({ fin: r.periode_fin, statut: r.statut })), ms: Date.now() - t0 });
   } catch (err) {
