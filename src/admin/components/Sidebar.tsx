@@ -101,7 +101,7 @@ const MENU: Entree[] = [
   ] },
   { module: null, label: "Contacts Médicaux", icon: Users, enfants: [
     { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, module: "contacts", end: true },
-    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "infirmieres" },
+    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "contacts" },
     { to: "/contacts/requis", label: "Requis", icon: Users, module: "contacts" },
     { to: "/contacts/reseau", label: "Réseau d'aval", icon: Building2, module: "contacts" },
   ] },
