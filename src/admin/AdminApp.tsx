@@ -108,8 +108,8 @@ function Gate() {
           <Route path="/contacts/requis" element={<Garde module="contacts"><Contacts fixedType="Requis" /></Garde>} />
           <Route path="/contacts/reseau" element={<Garde module="contacts"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
-          <Route path="/infirmieres" element={<Garde module="infirmieres"><Infirmieres /></Garde>} />
-          <Route path="/infirmieres/:id" element={<Garde module="infirmieres"><InfirmiereFiche /></Garde>} />
+          <Route path="/infirmieres" element={<Garde module="contacts"><Infirmieres /></Garde>} />
+          <Route path="/infirmieres/:id" element={<Garde module="contacts"><InfirmiereFiche /></Garde>} />
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
           <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
           <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />

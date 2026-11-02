@@ -101,7 +101,7 @@ const MENU: Entree[] = [
   ] },
   { module: null, label: "Contacts Médicaux", icon: Users, enfants: [
     { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, module: "contacts", end: true },
-    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "infirmieres" },
+    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "contacts" },
     { to: "/contacts/requis", label: "Requis", icon: Users, module: "contacts" },
     { to: "/contacts/reseau", label: "Réseau d'aval", icon: Building2, module: "contacts" },
   ] },
@@ -112,8 +112,8 @@ const MENU: Entree[] = [
   { module: "documents", label: "Documents", icon: FileText, to: "/documents" },
   { module: "admin", label: "Admin", icon: Settings, enfants: [
     { to: "/settings", label: "Réglages", icon: SlidersHorizontal },
-    { to: "/droits", label: "Droits d'accès", icon: KeyRound, superadmin: true },
-    { to: "/audit", label: "Auditabilité", icon: ScrollText, superadmin: true },
+    { to: "/droits", label: "Droits d'accès", icon: KeyRound },
+    { to: "/audit", label: "Auditabilité", icon: ScrollText },
   ] },
 ];
 
