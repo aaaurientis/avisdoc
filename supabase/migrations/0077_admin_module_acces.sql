@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0065 — Le module « Admin » ouvre TOUT l'onglet Admin
+-- 0077 — Le module « Admin » ouvre TOUT l'onglet Admin
 -- ----------------------------------------------------------------------------
 -- Jusqu'ici, consulter le journal d'audit (admin_audit_log) et gérer les droits
 -- (admin_droits) était réservé aux super-admins (table admin_superadmins). Sur

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0066 — Fusion des droits « Contacts Médicaux » et « Requérants »
+-- 0078 — Fusion des droits « Contacts Médicaux » et « Requérants »
 -- ----------------------------------------------------------------------------
 -- Le module « infirmieres » (Requérants) disparaît : « contacts » (Contacts
 -- Médicaux) couvre désormais aussi les Requérants. On met à niveau les lignes

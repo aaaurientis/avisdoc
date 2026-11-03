@@ -66,10 +66,10 @@ export default function Dashboard() {
       <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Demandes ce mois" value="0" foot="—" />
         <Kpi label="Délai moyen d'avis" value="—" foot="Objectif : 96 h" />
-        {peut("contacts") && (
+        {peut("sante") && (
           <Kpi label="Contacts actifs" value={String(contacts.length)} foot={contactBreakdown} />
         )}
-        {peut("crm") && (
+        {peut("commercial") && (
           <Kpi
             label="Relances à traiter"
             value={String(relances.total)}
@@ -79,7 +79,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className={peut("contacts")
+      <div className={peut("sante")
         ? "grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_340px]"
         : "grid grid-cols-1 items-start gap-5"}>
         <Card className="p-[22px]">
@@ -99,7 +99,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {peut("contacts") && (
+        {peut("sante") && (
         <Card className="p-[22px]">
           <h2 className="mb-4 font-display text-lg font-semibold text-avisdoc-ink">
             Répartition du réseau

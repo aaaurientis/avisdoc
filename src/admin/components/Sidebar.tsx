@@ -38,6 +38,14 @@ import {
   Newspaper,
   Archive,
   Calculator,
+  Landmark,
+  Handshake,
+  Umbrella,
+  Star,
+  Bell,
+  Swords,
+  FlaskConical,
+  HeartPulse,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -79,19 +87,33 @@ interface Entree {
 
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
-  { module: "crm", label: "Commercial", icon: Building2, enfants: [
-    { to: "/merx", label: "Merx", icon: Sparkles, module: "merx" },
-    { to: "/planning", label: "Planning", icon: CalendarDays, module: "merx" },
-    { to: "/commercial-veille", label: "Veille", icon: Newspaper, module: "veille", pastille: "commercial-veille" },
-    { to: "/prospects", label: "Prospection", icon: Target, module: "merx" },
+  // 2 — Commercial : un seul droit pour tout le bloc (les enfants héritent).
+  { module: "commercial", label: "Commercial", icon: Building2, enfants: [
+    { to: "/merx", label: "Merx", icon: Sparkles },
+    { to: "/planning", label: "Planning", icon: CalendarDays },
+    { to: "/commercial-veille", label: "Veille", icon: Newspaper, pastille: "commercial-veille" },
+    { to: "/prospects", label: "Prospection", icon: Target },
     { to: "/crm", label: "Pipeline", icon: LayoutGrid },
-    { to: "/fichier-client", label: "Clients", icon: BookUser, module: "merx" },
-    { to: "/debrief", label: "Débrief", icon: MessagesSquare, module: "merx" },
-    { to: "/couts", label: "CAP", icon: Coins, module: "merx" },
+    { to: "/fichier-client", label: "Clients", icon: BookUser },
+    { to: "/debrief", label: "Débrief", icon: MessagesSquare },
+    { to: "/couts", label: "CAP", icon: Coins },
     { to: "/aide", label: "Aide", icon: LifeBuoy },
-    { to: "/corbeille", label: "Corbeille", icon: Trash2, module: "merx" },
+    { to: "/corbeille", label: "Corbeille", icon: Trash2 },
   ] },
-  { module: "veille", label: "Veille", icon: Radar, enfants: [
+  // 3 — Veille à démarcher : prospection par type de cible (écrans à venir).
+  { module: "demarche", label: "Veille à démarcher", icon: Megaphone, enfants: [
+    { to: "/demarche/entreprises", label: "Entreprises", icon: Building2 },
+    { to: "/demarche/collectivites", label: "Collectivités", icon: Landmark },
+    { to: "/demarche/intermediaires", label: "Intermédiaires", icon: Handshake },
+    { to: "/demarche/mutuelles", label: "Mutuelle Assurance", icon: Umbrella },
+  ] },
+  // 4 — Veille Marché : 4 thèmes (écrans à venir) + les écrans de veille actuels,
+  // conservés le temps de leur rangement dans les thèmes (phase B).
+  { module: "veille", label: "Veille Marché", icon: Radar, enfants: [
+    { to: "/marche/avis", label: "Les avis sur AvisDoc", icon: Star },
+    { to: "/marche/incontournables", label: "À ne pas manquer", icon: Bell },
+    { to: "/marche/concurrence", label: "Concurrence & Évènements", icon: Swords },
+    { to: "/marche/publications", label: "Publi Scientifiques", icon: FlaskConical },
     { to: "/veille/vigile", label: "Vigile", icon: MessageCircle },
     { to: "/veille/surveiller", label: "Réglages", icon: Eye },
     { to: "/veille/direct", label: "En direct", icon: Activity },
@@ -99,13 +121,13 @@ const MENU: Entree[] = [
     { to: "/veille/archives", label: "Archivés", icon: Archive },
     { to: "/veille/cpr", label: "CPR", icon: Calculator },
   ] },
-  { module: null, label: "Contacts Médicaux", icon: Users, enfants: [
-    { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, module: "contacts", end: true },
-    { to: "/infirmieres", label: "Requérants", icon: Stethoscope, module: "contacts" },
-    { to: "/contacts/requis", label: "Requis", icon: Users, module: "contacts" },
-    { to: "/contacts/reseau", label: "Réseau d'aval", icon: Building2, module: "contacts" },
+  // 5 — Professionnels de Santé (ex Contacts Médicaux).
+  { module: "sante", label: "Professionnels de Santé", icon: HeartPulse, enfants: [
+    { to: "/contacts", label: "Vue d'ensemble", icon: LayoutGrid, end: true },
+    { to: "/infirmieres", label: "Requérants", icon: Stethoscope },
+    { to: "/contacts/requis", label: "Requis", icon: Users },
+    { to: "/contacts/reseau", label: "Réseau Aval", icon: Building2 },
   ] },
-  { module: "marketing", label: "Marketing", icon: Megaphone, aVenir: true },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
     { to: "/clients", label: "Facturation", icon: Receipt },
   ] },
