@@ -25,6 +25,7 @@ import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
 import Droits from "./pages/Droits";
+import EnConstruction from "./pages/EnConstruction";
 import Veille from "./pages/Veille";
 import VeilleSurveiller from "./pages/VeilleSurveiller";
 import Vigile from "./pages/Vigile";
@@ -79,24 +80,34 @@ function Gate() {
       <Routes>
         {/* Hors de la coquille : un dictaphone se tient à l'écran entier, sans menu.
             Le bouton Retour, en haut à droite, ramène au Débrief. */}
-        <Route path="/dictee" element={<Garde module="merx"><Dictee /></Garde>} />
+        <Route path="/dictee" element={<Garde module="commercial"><Dictee /></Garde>} />
 
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/crm" element={<Garde module="crm"><Crm /></Garde>} />
-          <Route path="/crm/:clientId" element={<Garde module="crm"><Crm /></Garde>} />
-          <Route path="/merx" element={<Garde module="merx"><Merx /></Garde>} />
-          <Route path="/prospects" element={<Garde module="merx"><Prospects /></Garde>} />
+          <Route path="/crm" element={<Garde module="commercial"><Crm /></Garde>} />
+          <Route path="/crm/:clientId" element={<Garde module="commercial"><Crm /></Garde>} />
+          <Route path="/merx" element={<Garde module="commercial"><Merx /></Garde>} />
+          <Route path="/prospects" element={<Garde module="commercial"><Prospects /></Garde>} />
           <Route path="/clients" element={<Garde module="finance"><Clients /></Garde>} />
-          <Route path="/fichier-client" element={<Garde module="merx"><FichierClient /></Garde>} />
-          <Route path="/debrief" element={<Garde module="merx"><Debrief /></Garde>} />
+          <Route path="/fichier-client" element={<Garde module="commercial"><FichierClient /></Garde>} />
+          <Route path="/debrief" element={<Garde module="commercial"><Debrief /></Garde>} />
           {/* L'écran a fusionné avec le Débrief : un lien gardé ne tombe pas dans le vide. */}
           <Route path="/notes-dictees" element={<Navigate to="/debrief" replace />} />
-          <Route path="/couts" element={<Garde module="merx"><Couts /></Garde>} />
-          <Route path="/planning" element={<Garde module="merx"><Planning /></Garde>} />
-          <Route path="/aide" element={<Garde module="crm"><Aide /></Garde>} />
-          <Route path="/corbeille" element={<Garde module="merx"><Corbeille /></Garde>} />
-          <Route path="/commercial-veille" element={<Garde module="veille"><CommercialVeille /></Garde>} />
+          <Route path="/couts" element={<Garde module="commercial"><Couts /></Garde>} />
+          <Route path="/planning" element={<Garde module="commercial"><Planning /></Garde>} />
+          <Route path="/aide" element={<Garde module="commercial"><Aide /></Garde>} />
+          <Route path="/corbeille" element={<Garde module="commercial"><Corbeille /></Garde>} />
+          <Route path="/commercial-veille" element={<Garde module="commercial"><CommercialVeille /></Garde>} />
+          {/* Veille à démarcher (bloc 3) — écrans à venir (phase B). */}
+          <Route path="/demarche/entreprises" element={<Garde module="demarche"><EnConstruction titre="Entreprises" sousTitre="Veille à démarcher" /></Garde>} />
+          <Route path="/demarche/collectivites" element={<Garde module="demarche"><EnConstruction titre="Collectivités" sousTitre="Veille à démarcher" /></Garde>} />
+          <Route path="/demarche/intermediaires" element={<Garde module="demarche"><EnConstruction titre="Intermédiaires" sousTitre="Veille à démarcher" /></Garde>} />
+          <Route path="/demarche/mutuelles" element={<Garde module="demarche"><EnConstruction titre="Mutuelle Assurance" sousTitre="Veille à démarcher" /></Garde>} />
+          {/* Veille Marché (bloc 4) — 4 thèmes à venir (phase B) + écrans de veille actuels ci-dessous. */}
+          <Route path="/marche/avis" element={<Garde module="veille"><EnConstruction titre="Les avis sur AvisDoc" sousTitre="Veille Marché" /></Garde>} />
+          <Route path="/marche/incontournables" element={<Garde module="veille"><EnConstruction titre="À ne pas manquer" sousTitre="Veille Marché" /></Garde>} />
+          <Route path="/marche/concurrence" element={<Garde module="veille"><EnConstruction titre="Concurrence & Évènements" sousTitre="Veille Marché" /></Garde>} />
+          <Route path="/marche/publications" element={<Garde module="veille"><EnConstruction titre="Publi Scientifiques" sousTitre="Veille Marché" /></Garde>} />
           <Route path="/veille" element={<Garde module="veille"><Veille /></Garde>} />
           <Route path="/veille/direct" element={<Garde module="veille"><VeilleDirect /></Garde>} />
           <Route path="/veille/vigile" element={<Garde module="veille"><Vigile /></Garde>} />
@@ -104,12 +115,12 @@ function Gate() {
           <Route path="/veille/archives" element={<Garde module="veille"><VeilleArchives /></Garde>} />
           <Route path="/veille/cpr" element={<Garde module="veille"><VeilleCpr /></Garde>} />
           <Route path="/veille/:rapportId" element={<Garde module="veille"><Veille /></Garde>} />
-          <Route path="/contacts" element={<Garde module="contacts"><ContactsDashboard /></Garde>} />
-          <Route path="/contacts/requis" element={<Garde module="contacts"><Contacts fixedType="Requis" /></Garde>} />
-          <Route path="/contacts/reseau" element={<Garde module="contacts"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
+          <Route path="/contacts" element={<Garde module="sante"><ContactsDashboard /></Garde>} />
+          <Route path="/contacts/requis" element={<Garde module="sante"><Contacts fixedType="Requis" /></Garde>} />
+          <Route path="/contacts/reseau" element={<Garde module="sante"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
-          <Route path="/infirmieres" element={<Garde module="contacts"><Infirmieres /></Garde>} />
-          <Route path="/infirmieres/:id" element={<Garde module="contacts"><InfirmiereFiche /></Garde>} />
+          <Route path="/infirmieres" element={<Garde module="sante"><Infirmieres /></Garde>} />
+          <Route path="/infirmieres/:id" element={<Garde module="sante"><InfirmiereFiche /></Garde>} />
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
           <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
           <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />
