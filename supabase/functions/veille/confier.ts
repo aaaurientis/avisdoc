@@ -28,10 +28,16 @@ export async function confier(jeton: string, entree: { articleId?: unknown; refe
   const { data: u } = await db.auth.getUser(jeton);
   const par = u?.user?.email?.toLowerCase() ?? "";
   if (!par.endsWith("@avisdoc.fr")) throw new Erreur("non autorisé", 401);
-  const [{ data: droit }, { data: prospection }] = await Promise.all([db.rpc("a_le_module", { m: "veille" }), db.rpc("a_le_module", { m: "merx" })]);
+  // Depuis 0079, l'accès à la Prospection est le bloc « commercial » (ex-« merx »).
+  const [{ data: droit }, { data: commercial }, { data: merx }] = await Promise.all([
+    db.rpc("a_le_module", { m: "veille" }),
+    db.rpc("a_le_module", { m: "commercial" }),
+    db.rpc("a_le_module", { m: "merx" }),
+  ]);
+  const prospection = commercial || merx;
   if (!droit) throw new Erreur("Le module Veille n'est pas ouvert pour ce compte.", 403);
   // Confier crée ou réattribue une fiche de Prospection : il faut soi-même y avoir accès.
-  if (!prospection) throw new Erreur("Il faut avoir accès à la Prospection (module Merx) pour confier une entreprise.", 403);
+  if (!prospection) throw new Erreur("Il faut avoir accès à la Prospection (bloc Commercial) pour confier une entreprise.", 403);
 
   // Le commercial doit être un membre d'AvisDoc, et pouvoir ouvrir la Prospection (module merx) : sinon le lien du mail ne s'ouvrirait pas.
   const { data: membres } = await db.from("admin_membres").select("email");
@@ -41,8 +47,8 @@ export async function confier(jeton: string, entree: { articleId?: unknown; refe
     service.from("admin_superadmins").select("email").ilike("email", referent).maybeSingle(),
     service.from("admin_droits").select("modules").ilike("email", referent).maybeSingle(),
   ]);
-  if (!sa && !((dr?.modules ?? []) as string[]).includes("merx")) {
-    throw new Erreur(`${nomLisible(referent)} n'a pas accès à la Prospection : ouvrez-lui le module Merx dans les droits d'accès d'abord.`, 400);
+  if (!sa && !((dr?.modules ?? []) as string[]).some((m) => m === "commercial" || m === "merx")) {
+    throw new Erreur(`${nomLisible(referent)} n'a pas accès à la Prospection : ouvrez-lui le bloc Commercial dans les droits d'accès d'abord.`, 400);
   }
 
   const { data: a } = await db.from("admin_veille_articles").select("id, entreprise, ville, url, titre, titre_fr, resume, pour_avisdoc").eq("id", articleId).eq("verdict", "retenu").is("retire_le", null).maybeSingle();
