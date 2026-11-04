@@ -5,6 +5,7 @@
 // et on ne laisse pas une erreur d'oreille modifier un dossier tout seul.
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { messageErreurFonction } from "./erreurFonction";
 import { ajouterEchange, type GenreEchange } from "./echanges";
 
 export interface Objection {
@@ -92,7 +93,7 @@ export function compte(r: Retenu, e?: EntrepriseVue): number {
  */
 export async function transcrireNote(noteId: string): Promise<string> {
   const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "transcrire", noteId } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await messageErreurFonction(error));
   const r = data as { transcription?: string; error?: string };
   if (r.error) throw new Error(r.error);
   if (!r.transcription) throw new Error("La transcription est revenue vide.");
@@ -165,7 +166,7 @@ export function resumerBilan(b: Bilan): string {
 /** Demande à Merx de trier un débrief. Rien n'est écrit : il rend seulement sa lecture. */
 export async function lireDebrief(texte: string): Promise<Extraction> {
   const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "debrief", texte } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await messageErreurFonction(error));
   const r = data as Extraction & { error?: string };
   if (r.error) throw new Error(r.error);
   return { entreprises: r.entreprises ?? [], non_rattachees: r.non_rattachees ?? [] };
@@ -323,13 +324,13 @@ export async function enregistrer(
         au: maintenant,
       })),
     );
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await messageErreurFonction(error));
   }
 
   // L'avancement du Pipeline, seulement pour une affaire.
   if (r.etape && vue.etape.trim() && vue.fiche_type === "affaire" && vue.fiche_id) {
     const { error } = await supabaseAdmin.from("admin_clients").update({ stage: vue.etape.trim() }).eq("id", vue.fiche_id);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await messageErreurFonction(error));
   }
 
   return { creee };

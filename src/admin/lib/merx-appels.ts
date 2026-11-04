@@ -4,6 +4,7 @@
 // l'accès à Merx en changeant d'écran.
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { messageErreurFonction } from "./erreurFonction";
 
 export interface BrouillonRendu {
   objet: string;
@@ -13,7 +14,7 @@ export interface BrouillonRendu {
 
 async function appeler<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabaseAdmin.functions.invoke("merx", { body });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await messageErreurFonction(error));
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
   return data as T;
 }

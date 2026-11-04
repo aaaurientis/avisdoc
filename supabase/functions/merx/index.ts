@@ -24,7 +24,7 @@ import { demandeSociete, runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
 import { transcrire } from "./transcription.ts";
 import { chercherTerrain, lireFiche } from "./consulter.ts";
-import { complete, converse, model, type LlmUsage } from "./llm.ts";
+import { causeLisible, complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
   ACTIVITE_SCHEMA,
   ACTIVITE_SYSTEM,
@@ -175,7 +175,8 @@ Deno.serve(async (req: Request) => {
             .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
-        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+        console.error("resumer", e);
+        return json({ error: `Le résumé n'a pas pu être fait : ${causeLisible(e)}. Il sera retenté à la prochaine ouverture.` }, 500);
       }
     }
 
@@ -598,7 +599,8 @@ Deno.serve(async (req: Request) => {
             .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
-        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+        console.error("resumer", e);
+        return json({ error: `Le résumé n'a pas pu être fait : ${causeLisible(e)}. Il sera retenté à la prochaine ouverture.` }, 500);
       }
     }
 
@@ -651,7 +653,8 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (demande) await sb.from("admin_merx_demandes").update({ status: "echec", message, usage, model: model("chat"), finished_at: new Date().toISOString() }).eq("id", demande.id);
-        return json({ error: "Merx n'a pas pu répondre. Réessayez." }, 500);
+        console.error("fiche_discuter", e);
+        return json({ error: `Merx n'a pas pu répondre : ${causeLisible(e)}.` }, 500);
       }
     }
 
@@ -796,6 +799,6 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Action inconnue." }, 400);
   } catch (e) {
     console.error(e);
-    return json({ error: e instanceof Error ? e.message : "Erreur interne." }, 500);
+    return json({ error: causeLisible(e) }, 500);
   }
 });
