@@ -3,7 +3,12 @@ import "@/index.css"; // design system partagé (fonts + tokens du site vitrine)
 import "./admin.css"; // ajustements responsive du back-office
 import { initTheme } from "./lib/theme";
 import AdminApp from "./AdminApp";
+import EcranErreur from "@/components/EcranErreur";
 
 initTheme(); // avant le rendu — évite le flash clair en mode sombre
 
-createRoot(document.getElementById("admin-root")!).render(<AdminApp />);
+createRoot(document.getElementById("admin-root")!).render(
+  <EcranErreur>
+    <AdminApp />
+  </EcranErreur>,
+);
