@@ -85,6 +85,24 @@ const requestOptions = (options?: LlmOptions) => (options?.timeoutMs ? { timeout
 const timeoutMessage = (e: unknown, options?: LlmOptions) =>
   e instanceof APIConnectionTimeoutError && options?.timeoutMs ? new Error(`Modèle de langage : pas de réponse en ${options.timeoutMs / 1000} s.`) : e;
 
+/**
+ * Pourquoi l'appel au modèle a échoué, en une phrase qu'un commercial peut lire
+ * (et transmettre) : crédit épuisé, clé refusée, modèle inconnu, surcharge…
+ */
+export function causeLisible(e: unknown): string {
+  if (e instanceof Anthropic.APIError) {
+    const m = e.message ?? "";
+    if (/credit balance/i.test(m)) return "le crédit Anthropic est épuisé (à recharger dans la console Anthropic, rubrique Billing)";
+    if (e.status === 401) return "la clé ANTHROPIC_API_KEY est refusée par Anthropic";
+    if (e.status === 403) return "la clé ANTHROPIC_API_KEY n'a pas accès à ce service";
+    if (e.status === 404 || (e.status === 400 && /model/i.test(m))) return `le modèle demandé est refusé par Anthropic (${m})`;
+    if (e.status === 429) return "trop de demandes en même temps chez Anthropic ; réessayez dans une minute";
+    if (e.status === 529 || /overloaded/i.test(m)) return "Anthropic est surchargé en ce moment ; réessayez dans quelques minutes";
+    return `Anthropic a répondu une erreur ${e.status ?? ""} : ${m}`.trim();
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 function usageOf(r: any): LlmUsage {
