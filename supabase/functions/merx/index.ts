@@ -72,7 +72,9 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-const MODULE = "merx";
+// Depuis la migration 0079 (menu à 8 blocs), le droit s'appelle « commercial » ;
+// « merx » reste accepté pour les comptes pas encore remappés.
+const MODULES = ["commercial", "merx"];
 const CHAT_TIMEOUT_MS = 30_000;
 
 /** Le module est-il ouvert à cette personne ? Super-admin : tout ; sinon, sa ligne de admin_droits. */
@@ -82,7 +84,7 @@ async function peutMerx(email: string): Promise<boolean> {
   if (sa) return true;
   const { data: droits } = await sb.from("admin_droits").select("modules").ilike("email", email).maybeSingle();
   // Une personne non listée a les modules par défaut, qui ne comprennent pas Merx.
-  return Array.isArray(droits?.modules) && droits.modules.includes(MODULE);
+  return Array.isArray(droits?.modules) && droits.modules.some((m: string) => MODULES.includes(m));
 }
 
 Deno.serve(async (req: Request) => {
@@ -180,8 +182,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Tout le reste de Merx reste réservé au module « merx ».
-    if (!(await peutMerx(email))) return json({ error: "Le module Merx n'est pas ouvert sur ce compte." }, 403);
+    // Tout le reste de Merx reste réservé au bloc « commercial » (ex-module « merx »).
+    if (!(await peutMerx(email))) return json({ error: "Le bloc Commercial (Merx) n'est pas ouvert sur ce compte." }, 403);
 
     // ── Traiter une demande en attente ───────────────────────────────────
     if (body.action === "traiter") {
