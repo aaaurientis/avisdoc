@@ -326,3 +326,40 @@ export function manques(j: JourneeDepistage): string[] {
   if (!j.envoiDermatoscope) m.push("dermatoscope");
   return m;
 }
+
+// ── Calendrier ───────────────────────────────────────────────────────────────
+
+/** Le lundi de la semaine d'une date (AAAA-MM-JJ). */
+export function lundiDe(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return aujourdhuiISO(d);
+}
+
+export const plusJours = (iso: string, n: number) => decaler(iso, n);
+
+/** Les journées entre deux dates incluses, dans l'ordre du temps. */
+export function journeesEntre(journees: JourneeDepistage[], debut: string, fin: string): JourneeDepistage[] {
+  return journees
+    .filter((j) => j.date >= debut && j.date <= fin)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.client.localeCompare(b.client));
+}
+
+/** Les 42 jours (6 semaines, du lundi au dimanche) qui couvrent le mois `AAAA-MM`. */
+export function grilleDuMois(mois: string): string[] {
+  const premier = `${mois}-01`;
+  const debut = lundiDe(premier);
+  return Array.from({ length: 42 }, (_, i) => plusJours(debut, i));
+}
+
+/** Le mois `AAAA-MM` décalé de n mois. */
+export function moisDecale(mois: string, n: number): string {
+  const [a, m] = mois.split("-").map(Number);
+  const d = new Date(a, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** État d'une journée pour l'affichage : passée, prête (tout est confirmé) ou à confirmer. */
+export type EtatJournee = "passee" | "prete" | "a-confirmer";
+export const etatDe = (j: JourneeDepistage, aujourdhui = aujourdhuiISO()): EtatJournee =>
+  estPassee(j, aujourdhui) ? "passee" : manques(j).length ? "a-confirmer" : "prete";

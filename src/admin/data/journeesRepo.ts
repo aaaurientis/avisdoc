@@ -94,7 +94,8 @@ function demo(): string {
   for (const c of clients) {
     for (let n = 1; n <= c.nb - (c.nb > 4 ? 2 : 0); n++, k++) {
       const d = new Date();
-      d.setDate(d.getDate() + (k % 2 ? 1 : -1) * ((k * 5) % 70) + 3);
+      // La 2e journée tombe aujourd'hui : l'encart du tableau de bord a de quoi s'afficher.
+      if (k !== 1) d.setDate(d.getDate() + (k % 2 ? 1 : -1) * ((k * 5) % 70) + 3);
       const date = d.toISOString().slice(0, 10);
       const avenir = date >= aujourdhui();
       const oui = (v: boolean) => (v ? "Oui" : "Non");

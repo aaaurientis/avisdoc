@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   compterPar,
+  etatDe,
+  grilleDuMois,
+  journeesEntre,
+  lundiDe,
+  moisDecale,
   contrats,
   dansLaPeriode,
   dateDansLeNom,
@@ -104,5 +109,32 @@ describe("extraction", () => {
     ]);
     expect(preparation(journees)).toEqual({ total: 3, confClient: 1, confConsentements: 0, confRequerant: 1, dermatoscopeEnvoye: 1 });
     expect(manques(journees[1])).toEqual(["consentements"]);
+  });
+});
+
+describe("calendrier", () => {
+  it("lundi de la semaine", () => {
+    expect(lundiDe("2026-11-05")).toBe("2026-11-02"); // jeudi → lundi
+    expect(lundiDe("2026-11-08")).toBe("2026-11-02"); // dimanche → lundi d'avant
+    expect(lundiDe("2026-11-02")).toBe("2026-11-02");
+  });
+
+  it("grille de 6 semaines commençant un lundi", () => {
+    const g = grilleDuMois("2026-11");
+    expect(g).toHaveLength(42);
+    expect(g[0]).toBe("2026-10-26");
+    expect(g).toContain("2026-11-30");
+  });
+
+  it("mois décalé, à cheval sur l'année", () => {
+    expect(moisDecale("2026-12", 1)).toBe("2027-01");
+    expect(moisDecale("2026-01", -1)).toBe("2025-12");
+  });
+
+  it("journées entre deux dates, état", () => {
+    const { journees } = lireExtraction(CSV);
+    expect(journeesEntre(journees, "2026-11-02", "2026-11-08").map((j) => j.client)).toEqual(["Mairie"]);
+    expect(etatDe(journees[0], "2026-11-05")).toBe("passee");
+    expect(etatDe(journees[1], "2026-11-05")).toBe("a-confirmer");
   });
 });

@@ -1,8 +1,16 @@
-# Journée — extractions des journées de dépistage (AWS S3)
+# Journée — journées de dépistage (extractions CSV, AWS S3)
 
-L'onglet **Journée** du Hub (`/journees`) lit les extractions CSV déposées dans un bucket
-AWS S3. Il affiche le nombre de journées, de lignes, la moyenne par journée, un graphique
-des lignes par journée, la répartition des valeurs d'une colonne et le détail de chaque fichier.
+Le bloc **Journée** du Hub a deux pages, et un encart sur le tableau de bord :
+
+- **Statistiques** (`/journees`) : journées, passées, à venir, clients ; journées par mois ;
+  préparation des journées à venir (confirmations, dermatoscope) ; avancement par contrat
+  (client + devis) ; répartition par expert, dermatologue, lieu ou client.
+- **Calendrier** (`/journees/calendrier`) : le mois en grille (à confirmer / prête / passée),
+  le détail du jour choisi, puis la liste complète (à venir, puis passées).
+- **Tableau de bord** : les journées d'aujourd'hui et de la semaine (lundi → dimanche),
+  pour les personnes qui ont le droit « Journée ».
+
+L'extraction est lue une fois par session et partagée par ces trois écrans.
 
 ## Comment c'est branché
 
