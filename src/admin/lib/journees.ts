@@ -315,12 +315,6 @@ export function acquis(j: JourneeDepistage, cle: keyof Regles): boolean {
       return j.confRequerant;
     case "expert":
       return !!j.expert;
-    case "client":
-      return j.confClient;
-    case "consentements":
-      return j.confConsentements;
-    case "dermatoscope":
-      return !!j.envoiDermatoscope;
   }
 }
 

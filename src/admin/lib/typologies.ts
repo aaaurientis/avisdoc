@@ -2,24 +2,22 @@
 // et le rapprochement entre le nom d'un client dans l'extraction et son client Qonto.
 // Fonctions pures : testées dans typologies.test.ts.
 
-/** Ce qui doit être acquis pour qu'une journée soit confirmée. */
+/**
+ * Ce qui doit être acquis pour qu'une journée soit confirmée : requérant et/ou expert.
+ * (Client, consentements et dermatoscope restent visibles dans le détail d'une journée,
+ * mais ne comptent pas pour la confirmation.)
+ */
 export interface Regles {
   requerant: boolean;
   expert: boolean;
-  client: boolean;
-  consentements: boolean;
-  dermatoscope: boolean;
 }
 
 /** Client non affecté et pas de typologie par défaut en base : requérant + expert. */
-export const REGLES_DEFAUT: Regles = { requerant: true, expert: true, client: false, consentements: false, dermatoscope: false };
+export const REGLES_DEFAUT: Regles = { requerant: true, expert: true };
 
 export const CRITERES: { cle: keyof Regles; label: string; court: string }[] = [
   { cle: "requerant", label: "Requérant confirmé", court: "requérant" },
   { cle: "expert", label: "Expert désigné", court: "expert" },
-  { cle: "client", label: "Confirmée par le client", court: "client" },
-  { cle: "consentements", label: "Consentements confirmés", court: "consentements" },
-  { cle: "dermatoscope", label: "Dermatoscope envoyé", court: "dermatoscope" },
 ];
 
 export interface Typologie {
@@ -28,9 +26,10 @@ export interface Typologie {
   description: string;
   exige_requerant: boolean;
   exige_expert: boolean;
-  exige_client: boolean;
-  exige_consentements: boolean;
-  exige_dermatoscope: boolean;
+  /** Colonnes conservées en base (migration 0081) mais plus utilisées. */
+  exige_client?: boolean;
+  exige_consentements?: boolean;
+  exige_dermatoscope?: boolean;
   par_defaut: boolean;
   position: number;
 }
@@ -44,13 +43,7 @@ export interface Affectation {
 
 export const reglesDe = (t: Typologie | null | undefined): Regles =>
   t
-    ? {
-        requerant: t.exige_requerant,
-        expert: t.exige_expert,
-        client: t.exige_client,
-        consentements: t.exige_consentements,
-        dermatoscope: t.exige_dermatoscope,
-      }
+    ? { requerant: t.exige_requerant, expert: t.exige_expert }
     : REGLES_DEFAUT;
 
 /** Ce qu'exige une typologie, en clair : « requérant, expert ». */

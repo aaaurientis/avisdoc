@@ -82,7 +82,8 @@ navigateur (rien n'est envoyé ni enregistré) et affiche les mêmes statistique
 à exécuter une fois dans le SQL Editor.
 
 - Une **typologie** dit ce qui doit être acquis pour qu'une journée soit confirmée :
-  requérant confirmé, expert désigné, et au besoin client, consentements, dermatoscope.
+  requérant confirmé et/ou expert désigné. (Client, consentements et dermatoscope restent
+  visibles dans le détail d'une journée mais ne comptent pas.)
   Exemple : « Partenaire sans CPS » (Viabeez fournit les requérants) → expert seulement.
 - Chaque **client Qonto** reçoit une typologie ; sinon la typologie **par défaut** s'applique
   (au départ « Client direct » : requérant + expert).
