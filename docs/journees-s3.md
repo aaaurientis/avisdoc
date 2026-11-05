@@ -14,14 +14,26 @@ des lignes par journée, la répartition des valeurs d'une colonne et le détail
 
 ## Mise en place (une seule fois)
 
-1. **AWS IAM** : créer un utilisateur dédié, avec une clé d'accès, et seulement cette politique :
+Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par défaut de la fonction).
+
+1. **AWS IAM** : créer un utilisateur dédié, avec une clé d'accès, et seulement cette politique
+   (lecture seule, limitée au dossier des journées) :
 
    ```json
    {
      "Version": "2012-10-17",
      "Statement": [
-       { "Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::NOM_DU_BUCKET" },
-       { "Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::NOM_DU_BUCKET/*" }
+       {
+         "Effect": "Allow",
+         "Action": "s3:ListBucket",
+         "Resource": "arn:aws:s3:::avisdoc-exports",
+         "Condition": { "StringLike": { "s3:prefix": "journees-depistage/*" } }
+       },
+       {
+         "Effect": "Allow",
+         "Action": "s3:GetObject",
+         "Resource": "arn:aws:s3:::avisdoc-exports/journees-depistage/*"
+       }
      ]
    }
    ```
@@ -32,9 +44,9 @@ des lignes par journée, la répartition des valeurs d'une colonne et le détail
    |---|---|
    | `AWS_ACCESS_KEY_ID` | clé de l'utilisateur IAM |
    | `AWS_SECRET_ACCESS_KEY` | secret de cette clé |
-   | `AWS_REGION` | région du bucket, ex. `eu-west-3` (Paris) — défaut `eu-west-3` |
-   | `JOURNEES_S3_BUCKET` | nom du bucket |
-   | `JOURNEES_S3_PREFIX` | dossier des extractions, ex. `extractions/` (facultatif) |
+   | `AWS_REGION` | facultatif — défaut `eu-west-3` ; une autre région est détectée seule |
+   | `JOURNEES_S3_BUCKET` | facultatif — défaut `avisdoc-exports` |
+   | `JOURNEES_S3_PREFIX` | facultatif — défaut `journees-depistage/` |
 
 3. La fonction est déployée automatiquement avec le reste (push sur `main`).
 

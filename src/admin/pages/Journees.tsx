@@ -94,9 +94,8 @@ export default function Journees() {
           <div className="mt-1 text-muted-foreground">{erreur.message}</div>
           {erreur.nonConfigure && (
             <div className="mt-3 text-[13px] text-muted-foreground">
-              À renseigner dans Supabase → Edge Functions → Secrets : <code>AWS_ACCESS_KEY_ID</code>,{" "}
-              <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>JOURNEES_S3_BUCKET</code> et, si les
-              fichiers sont dans un dossier, <code>JOURNEES_S3_PREFIX</code>.
+              À renseigner dans Supabase → Edge Functions → Secrets : <code>AWS_ACCESS_KEY_ID</code> et{" "}
+              <code>AWS_SECRET_ACCESS_KEY</code> (clé IAM en lecture seule sur avisdoc-exports/journees-depistage/).
             </div>
           )}
         </Card>
