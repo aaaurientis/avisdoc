@@ -34,9 +34,6 @@ import { cn } from "@/lib/utils";
 const CHAMP: Record<(typeof CRITERES)[number]["cle"], keyof Typologie> = {
   requerant: "exige_requerant",
   expert: "exige_expert",
-  client: "exige_client",
-  consentements: "exige_consentements",
-  dermatoscope: "exige_dermatoscope",
 };
 
 const inputCls =
@@ -163,9 +160,6 @@ function BlocTypologies({
           description: "",
           exige_requerant: true,
           exige_expert: true,
-          exige_client: false,
-          exige_consentements: false,
-          exige_dermatoscope: false,
           par_defaut: typologies.length === 0,
           position: typologies.length + 1,
         }),
@@ -194,7 +188,7 @@ function BlocTypologies({
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-[13px]">
+        <table className="w-full min-w-[680px] text-left text-[13px]">
           <thead>
             <tr className="text-[11.5px] text-muted-foreground">
               <th className="px-5 py-2.5 font-semibold">Typologie</th>

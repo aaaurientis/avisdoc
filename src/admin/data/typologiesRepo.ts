@@ -23,8 +23,8 @@ function erreur(e: { message: string }): Error {
 
 // ── Démo ─────────────────────────────────────────────────────────────────────
 let demoTypologies: Typologie[] = [
-  { id: "t1", nom: "Client direct", description: "AvisDoc fournit le requérant et l'expert.", exige_requerant: true, exige_expert: true, exige_client: false, exige_consentements: false, exige_dermatoscope: false, par_defaut: true, position: 1 },
-  { id: "t2", nom: "Partenaire sans CPS", description: "Le partenaire fournit les requérants : seul l'expert est exigé.", exige_requerant: false, exige_expert: true, exige_client: false, exige_consentements: false, exige_dermatoscope: false, par_defaut: false, position: 2 },
+  { id: "t1", nom: "Client direct", description: "AvisDoc fournit le requérant et l'expert.", exige_requerant: true, exige_expert: true, par_defaut: true, position: 1 },
+  { id: "t2", nom: "Partenaire sans CPS", description: "Le partenaire fournit les requérants : seul l'expert est exigé.", exige_requerant: false, exige_expert: true, par_defaut: false, position: 2 },
 ];
 let demoAffectations: Affectation[] = [{ qonto_client_id: "c2", nom_qonto: "Mutuelle Démo", typologie_id: "t2", alias: [] }];
 const DEMO_CLIENTS: ClientQonto[] = [
