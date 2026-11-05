@@ -119,3 +119,8 @@ verify_jwt = false
 # Veille (cron) — protégée par un secret partagé (x-secret), comme rappels-actions.
 [functions.veille]
 verify_jwt = false
+
+# Journées de dépistage — lit les extractions CSV d'un bucket AWS S3 (lecture seule).
+# Compte @avisdoc.fr + droit « journee » vérifiés dans la fonction ; clés AWS côté serveur.
+[functions.journees-s3]
+verify_jwt = true

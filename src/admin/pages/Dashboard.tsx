@@ -5,6 +5,7 @@ import { useAdminData } from "../data/AdminDataContext";
 import { todayISO } from "../lib/format";
 import { TYPE_DOT, typesDe } from "../lib/ui-tokens";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
+import EncartJournees from "./journees/EncartTableauDeBord";
 
 const TYPE_LABELS: { type: ContactType; label: string }[] = [
   { type: "Requis", label: "Requis" },
@@ -78,6 +79,9 @@ export default function Dashboard() {
           />
         )}
       </div>
+
+      {/* Journées de dépistage du jour et de la semaine : seulement pour qui a le droit « Journée ». */}
+      {peut("journee") && <EncartJournees />}
 
       <div className={peut("sante")
         ? "grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_340px]"

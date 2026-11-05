@@ -43,6 +43,8 @@ import {
   Umbrella,
   Star,
   Bell,
+  CalendarCheck,
+  BarChart3,
   Swords,
   FlaskConical,
   HeartPulse,
@@ -127,6 +129,11 @@ const MENU: Entree[] = [
     { to: "/infirmieres", label: "Requérants", icon: Stethoscope },
     { to: "/contacts/requis", label: "Requis", icon: Users },
     { to: "/contacts/reseau", label: "Réseau Aval", icon: Building2 },
+  ] },
+  // Journée : suivi et statistiques des journées de dépistage (extractions S3).
+  { module: "journee", label: "Journée", icon: CalendarCheck, enfants: [
+    { to: "/journees", label: "Statistiques", icon: BarChart3, end: true },
+    { to: "/journees/calendrier", label: "Calendrier", icon: CalendarDays },
   ] },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
     { to: "/clients", label: "Facturation", icon: Receipt },
