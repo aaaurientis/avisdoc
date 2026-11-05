@@ -29,7 +29,7 @@ const TEINTE: Record<EtatJournee, string> = {
 };
 const LEGENDE: { etat: EtatJournee; label: string }[] = [
   { etat: "a-confirmer", label: "À confirmer" },
-  { etat: "prete", label: "Prête" },
+  { etat: "prete", label: "Confirmée" },
   { etat: "passee", label: "Passée" },
 ];
 

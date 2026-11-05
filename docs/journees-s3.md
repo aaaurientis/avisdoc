@@ -5,7 +5,7 @@ Le bloc **Journée** du Hub a deux pages, et un encart sur le tableau de bord :
 - **Statistiques** (`/journees`) : journées, passées, à venir, clients ; journées par mois ;
   préparation des journées à venir (confirmations, dermatoscope) ; avancement par contrat
   (client + devis) ; répartition par expert, dermatologue, lieu ou client.
-- **Calendrier** (`/journees/calendrier`) : le mois en grille (à confirmer / prête / passée),
+- **Calendrier** (`/journees/calendrier`) : le mois en grille (à confirmer / confirmée / passée — confirmée = requérant confirmé et expert désigné),
   le détail du jour choisi, puis la liste complète (à venir, puis passées).
 - **Tableau de bord** : les journées d'aujourd'hui et de la semaine (lundi → dimanche),
   pour les personnes qui ont le droit « Journée ».

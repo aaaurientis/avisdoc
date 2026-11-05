@@ -123,14 +123,14 @@ export function CadreJournees({ titre, children }: { titre: string; children: Re
   );
 }
 
-/** Passée, prête, ou ce qui reste à confirmer. Toujours un texte : la couleur n'est pas seule à parler. */
+/** Passée, confirmée, ou ce qui reste à confirmer. Toujours un texte : la couleur n'est pas seule à parler. */
 export function PastilleEtat({ j, court = false }: { j: JourneeDepistage; court?: boolean }) {
   const etat = etatDe(j);
   if (etat === "passee") return <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground">Passée</span>;
   if (etat === "prete")
     return (
       <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-avisdoc-teal-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-avisdoc-ink">
-        <Check className="size-3.5" /> Prête
+        <Check className="size-3.5" /> Confirmée
       </span>
     );
   return (
@@ -177,7 +177,7 @@ export function LigneJournee({
       </button>
       {ouverte && (
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 border-t border-border bg-background px-5 py-4 text-[12.5px] sm:grid-cols-2 lg:grid-cols-3">
-          <Info label="État" valeur={etatDe(j) === "a-confirmer" ? `À confirmer : ${manques(j).join(", ")}` : etatDe(j) === "prete" ? "Prête" : "Passée"} />
+          <Info label="État" valeur={etatDe(j) === "a-confirmer" ? `À confirmer : ${manques(j).join(", ")}` : etatDe(j) === "prete" ? "Confirmée" : "Passée"} />
           <Info label="Devis" valeur={j.devis} />
           <Info label="Dermatologue" valeur={j.dermatologue} />
           <Info label="Expert" valeur={j.expert} />

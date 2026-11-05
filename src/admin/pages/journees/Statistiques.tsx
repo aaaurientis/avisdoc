@@ -1,5 +1,5 @@
 // Journée › Statistiques — combien de journées et quand, où en est chaque contrat,
-// les journées à venir sont-elles prêtes. Le détail jour par jour est dans le Calendrier.
+// les journées à venir sont-elles confirmées (requérant + expert). Le détail jour par jour est dans le Calendrier.
 
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "../../components/ui";
@@ -106,7 +106,7 @@ function Contenu() {
               <BarresMois journees={journees} />
             </Card>
             <Card className="p-[22px]">
-              <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Préparation des journées à venir</h2>
+              <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Confirmation des journées à venir</h2>
               <PreparationCarte journees={aVenir} />
             </Card>
           </div>
@@ -195,15 +195,14 @@ function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
   const p = preparation(journees);
   if (!p.total) return <p className="mt-3 text-sm text-muted-foreground">Aucune journée à venir sur ces filtres.</p>;
   const lignes = [
-    { label: "Confirmées par le client", n: p.confClient },
-    { label: "Consentements confirmés", n: p.confConsentements },
-    { label: "Confirmées par le requérant", n: p.confRequerant },
-    { label: "Dermatoscope envoyé", n: p.dermatoscopeEnvoye },
+    { label: "Journées confirmées", n: p.confirmees },
+    { label: "Requérant confirmé", n: p.requerant },
+    { label: "Expert désigné", n: p.expert },
   ];
   return (
     <div className="mt-1">
       <p className="mb-4 text-[12.5px] text-muted-foreground">
-        {nombre(p.total)} journée{p.total > 1 ? "s" : ""} à venir.
+        {nombre(p.total)} journée{p.total > 1 ? "s" : ""} à venir. Confirmée = requérant confirmé et expert désigné.
       </p>
       <div className="flex flex-col gap-3.5">
         {lignes.map((l) => (

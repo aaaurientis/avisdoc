@@ -107,8 +107,11 @@ describe("extraction", () => {
       { cle: "2026-10", nombre: 0 },
       { cle: "2026-11", nombre: 2 },
     ]);
-    expect(preparation(journees)).toEqual({ total: 3, confClient: 1, confConsentements: 0, confRequerant: 1, dermatoscopeEnvoye: 1 });
-    expect(manques(journees[1])).toEqual(["consentements"]);
+    expect(preparation(journees)).toEqual({ total: 3, confirmees: 1, requerant: 1, expert: 3 });
+    // Requérant confirmé + expert désigné : confirmée, même sans consentements.
+    expect(manques(journees[1])).toEqual([]);
+    expect(manques(journees[0])).toEqual(["requérant"]);
+    expect(manques({ ...journees[1], expert: "" })).toEqual(["expert"]);
   });
 });
 
@@ -135,6 +138,7 @@ describe("calendrier", () => {
     const { journees } = lireExtraction(CSV);
     expect(journeesEntre(journees, "2026-11-02", "2026-11-08").map((j) => j.client)).toEqual(["Mairie"]);
     expect(etatDe(journees[0], "2026-11-05")).toBe("passee");
-    expect(etatDe(journees[1], "2026-11-05")).toBe("a-confirmer");
+    expect(etatDe(journees[1], "2026-11-05")).toBe("prete");
+    expect(etatDe(journees[2], "2026-11-05")).toBe("a-confirmer");
   });
 });
