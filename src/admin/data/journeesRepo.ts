@@ -1,12 +1,12 @@
-// Journées de dépistage — accès aux extractions du bucket S3, via la fonction journees-s3.
-// En mode démo (sans base), des extractions fictives permettent de voir l'écran.
+// Journées de dépistage — d'où vient l'extraction.
+//
+// - S3 : la fonction journees-s3 liste le dossier ; on lit le fichier le plus récent
+//   (date dans le nom, sinon date de dépôt). Les plus anciens restent consultables.
+// - Import manuel : un CSV choisi sur l'ordinateur, lu dans le navigateur. Rien n'est envoyé.
+// - Mode démo (sans base) : une extraction fictive au même format que l'export réel.
 import { supabaseAdmin } from "./supabaseAdmin";
 import { ADMIN_BACKEND } from "../lib/config";
-import { journeeDepuis, type FichierS3, type JourneeExtraite } from "../lib/journees";
-
-/** Au-delà, l'écran se limite aux plus récentes (le reste reste dans le bucket). */
-export const MAX_JOURNEES = 200;
-const PAR_LOT = 25;
+import { dateDansLeNom, type FichierS3 } from "../lib/journees";
 
 export class ErreurJournees extends Error {
   constructor(message: string, readonly nonConfigure = false) {
@@ -14,10 +14,10 @@ export class ErreurJournees extends Error {
   }
 }
 
-/** Le message utile d'une erreur de fonction : le corps JSON renvoyé, pas « non-2xx status code ». */
 async function appeler<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabaseAdmin.functions.invoke("journees-s3", { body });
   if (error) {
+    // Le message utile est dans le corps JSON, pas dans « non-2xx status code ».
     let detail: { error?: string; nonConfigure?: boolean } = {};
     try {
       const ctx = (error as { context?: Response }).context;
@@ -33,60 +33,81 @@ async function appeler<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-export interface Chargement {
-  bucket: string;
-  prefixe: string;
-  /** Nombre total de fichiers CSV dans le bucket. */
-  total: number;
-  journees: JourneeExtraite[];
+/** Date d'un fichier d'extraction : celle de son nom, sinon son dépôt. */
+export const dateDuFichier = (f: FichierS3) => dateDansLeNom(f.key) ?? f.modifie.slice(0, 10);
+
+export interface Source {
+  /** Libellé affiché : « S3 · avisdoc-exports/journees-depistage/ », « Fichier importé », « Démo ». */
+  origine: string;
+  nom: string;
+  date: string;
+  texte: string;
 }
 
-export async function chargerJournees(): Promise<Chargement> {
-  if (ADMIN_BACKEND !== "supabase") return demo();
-
-  const liste = await appeler<{ bucket: string; prefixe: string; fichiers: FichierS3[] }>({ action: "lister" });
-  // Les plus récentes d'abord (dépôt), dans la limite affichable.
-  const fichiers = [...liste.fichiers].sort((a, b) => b.modifie.localeCompare(a.modifie)).slice(0, MAX_JOURNEES);
-
-  const lots: FichierS3[][] = [];
-  for (let i = 0; i < fichiers.length; i += PAR_LOT) lots.push(fichiers.slice(i, i + PAR_LOT));
-  const contenus = new Map<string, { contenu?: string; erreur?: string }>();
-  await Promise.all(
-    lots.map(async (lot) => {
-      const r = await appeler<{ fichiers: { key: string; contenu?: string; erreur?: string }[] }>({
-        action: "lire",
-        keys: lot.map((f) => f.key),
-      });
-      for (const f of r.fichiers) contenus.set(f.key, f);
-    }),
-  );
-
-  const journees = fichiers
-    .map((f) => journeeDepuis(f, contenus.get(f.key)?.contenu, contenus.get(f.key)?.erreur))
-    .sort((a, b) => b.date.localeCompare(a.date));
-  return { bucket: liste.bucket, prefixe: liste.prefixe, total: liste.fichiers.length, journees };
+/** Les extractions du bucket, la plus récente d'abord. */
+export async function listerExtractions(): Promise<{ bucket: string; prefixe: string; fichiers: FichierS3[] }> {
+  if (ADMIN_BACKEND !== "supabase") {
+    return { bucket: "démo", prefixe: "", fichiers: [{ key: `demo-${aujourdhui()}.csv`, taille: 0, modifie: new Date().toISOString() }] };
+  }
+  const r = await appeler<{ bucket: string; prefixe: string; fichiers: FichierS3[] }>({ action: "lister" });
+  r.fichiers.sort((a, b) => dateDuFichier(b).localeCompare(dateDuFichier(a)) || b.modifie.localeCompare(a.modifie));
+  return r;
 }
 
-/** Extractions fictives : 14 journées sur les quatre derniers mois. */
-function demo(): Chargement {
-  const lieux = ["Lyon — Siège", "Grenoble — Usine", "Annecy — Agence", "Valence — Entrepôt"];
-  const resultats = ["Bénin", "Bénin", "Bénin", "À surveiller", "Avis demandé"];
-  const journees: JourneeExtraite[] = [];
-  let id = 1;
-  for (let k = 0; k < 14; k++) {
-    const d = new Date();
-    d.setDate(d.getDate() - k * 9 - 2);
-    const date = d.toISOString().slice(0, 10);
-    const n = 18 + ((k * 7) % 23);
-    const lignes = ["id;date;lieu;sexe;age;phototype;resultat"];
-    for (let i = 0; i < n; i++, id++) {
+export async function lireExtractionS3(f: FichierS3, bucket: string, prefixe: string): Promise<Source> {
+  const nom = f.key.split("/").pop() ?? f.key;
+  if (ADMIN_BACKEND !== "supabase") return { origine: "Démo", nom, date: dateDuFichier(f), texte: demo() };
+  const r = await appeler<{ fichiers: { key: string; contenu?: string; erreur?: string }[] }>({ action: "lire", keys: [f.key] });
+  const lu = r.fichiers[0];
+  if (!lu || lu.contenu === undefined) throw new ErreurJournees(lu?.erreur ?? "Fichier illisible.");
+  return { origine: `S3 · ${bucket}/${prefixe}`, nom, date: dateDuFichier(f), texte: lu.contenu };
+}
+
+/** Un CSV choisi sur l'ordinateur. UTF-8 d'abord ; à défaut Windows-1252 (export Excel). */
+export async function lireFichierLocal(fichier: File): Promise<Source> {
+  const octets = new Uint8Array(await fichier.arrayBuffer());
+  let texte: string;
+  try {
+    texte = new TextDecoder("utf-8", { fatal: true }).decode(octets);
+  } catch {
+    texte = new TextDecoder("windows-1252").decode(octets);
+  }
+  const date = dateDansLeNom(fichier.name) ?? new Date(fichier.lastModified).toISOString().slice(0, 10);
+  return { origine: "Fichier importé", nom: fichier.name, date, texte };
+}
+
+const aujourdhui = () => new Date().toISOString().slice(0, 10);
+
+/** Extraction fictive au format de l'export réel : 3 clients, 26 journées autour d'aujourd'hui. */
+function demo(): string {
+  const entete =
+    '"Date création","Client","Nombre de journées","Numéro devis","Dermatologue","Expert","Date événement","Date facture","Lieu","Numéro journée","Nom du contact","Téléphone du contact","Email du contact","Salle","Accès","Autres informations","Confirmation client","Date confirmation client","Confirmation consentements","Date confirmation consentements","Confirmation requérant","Date confirmation requérant","Numéro envoi dermatoscope","Date envoi dermatoscope","Numéro retour dermatoscope","Date retour dermatoscope"';
+  const clients = [
+    { nom: "Société Exemple", devis: "DEV 2026 001", nb: 12, lieux: ["Lyon", "Villeurbanne"] },
+    { nom: "Mutuelle Démo", devis: "DEV 2026 002", nb: 10, lieux: ["Nantes", "Rennes", "Brest"] },
+    { nom: "Mairie Fictive", devis: "D-2026-003", nb: 4, lieux: ["Mairie Fictive"] },
+  ];
+  const experts = ["Dr Alice Martin", "Dr Bruno Petit", "Dr Chloé Durand", "Dr David Leroy"];
+  const infirmieres = ["Infirmière A", "Infirmière B", "Infirmière C"];
+  const lignes = [entete];
+  let k = 0;
+  for (const c of clients) {
+    for (let n = 1; n <= c.nb - (c.nb > 4 ? 2 : 0); n++, k++) {
+      const d = new Date();
+      d.setDate(d.getDate() + (k % 2 ? 1 : -1) * ((k * 5) % 70) + 3);
+      const date = d.toISOString().slice(0, 10);
+      const avenir = date >= aujourdhui();
+      const oui = (v: boolean) => (v ? "Oui" : "Non");
       lignes.push(
-        [id, date, lieux[k % 4], i % 3 ? "F" : "H", 25 + ((i * 13) % 40), ["II", "III", "IV"][i % 3], resultats[(i + k) % 5]].join(";"),
+        [
+          `"2026-09-01T08:00:00.000Z"`, `"${c.nom}"`, c.nb, `"${c.devis}"`, `"${infirmieres[k % 3]}"`, `"${experts[k % 4]}"`,
+          `"${date}T00:00:00.000Z"`, `"${date}T02:00:00.000Z"`, `"${c.lieux[n % c.lieux.length]}"`, n,
+          `"Contact ${k}"`, `"=""0600000000"""`, `"contact${k}@exemple.fr"`, `""`, `""`, `""`,
+          `"${oui(!avenir || k % 2 === 0)}"`, `""`, `"${oui(!avenir || k % 3 === 0)}"`, `""`, `"${oui(!avenir || k % 4 !== 1)}"`, `""`,
+          `"${!avenir || k % 3 !== 2 ? 100 + k : ""}"`, `""`, `"${!avenir ? 200 + k : ""}"`, `""`,
+        ].join(","),
       );
     }
-    journees.push(
-      journeeDepuis({ key: `extractions/journee_${date}.csv`, taille: 0, modifie: `${date}T18:00:00Z` }, lignes.join("\n")),
-    );
   }
-  return { bucket: "démo", prefixe: "extractions/", total: journees.length, journees };
+  return lignes.join("\n");
 }

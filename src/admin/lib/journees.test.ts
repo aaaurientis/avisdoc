@@ -1,75 +1,108 @@
 import { describe, expect, it } from "vitest";
 import {
-  colonneARepartir,
+  compterPar,
+  contrats,
   dansLaPeriode,
   dateDansLeNom,
   decouperCsv,
-  journeeDepuis,
-  lireCsv,
-  repartition,
+  jourDe,
+  lireExtraction,
+  manques,
+  nettoyer,
+  parMois,
+  preparation,
   separateurProbable,
 } from "./journees";
 
+// Même forme que l'export réel (en-têtes, guillemets, ="…" d'Excel), avec des données fictives.
+const ENTETE =
+  '"Date création","Client","Nombre de journées","Numéro devis","Dermatologue","Expert","Date événement","Date facture","Lieu","Numéro journée","Nom du contact","Téléphone du contact","Email du contact","Salle","Accès","Autres informations","Confirmation client","Date confirmation client","Confirmation consentements","Date confirmation consentements","Confirmation requérant","Date confirmation requérant","Numéro envoi dermatoscope","Date envoi dermatoscope","Numéro retour dermatoscope","Date retour dermatoscope"';
+const ligne = (o: { client: string; devis: string; nb: number; date: string; num: number; expert: string; conf?: string; envoi?: string }) =>
+  `"2026-09-01T08:00:00.000Z","${o.client}",${o.nb},"${o.devis}","Infirmière Test","${o.expert}","${o.date}T00:00:00.000Z","2026-09-01T02:00:00.000Z","Ville",${o.num},"Contact","=""0600000000""","c@exemple.fr","","","","${o.conf ?? "Non"}","2026-09-01T02:00:00.000Z","Non","2026-09-01T02:00:00.000Z","${o.conf ?? "Non"}","2026-09-01T02:00:00.000Z","${o.envoi ?? ""}","2026-09-01T02:00:00.000Z","","2026-09-01T02:00:00.000Z"`;
+
+const CSV = [
+  ENTETE,
+  ligne({ client: "ACME", devis: "DEV 1", nb: 3, date: "2026-09-10", num: 1, expert: "Dr A" }),
+  ligne({ client: "ACME", devis: "DEV 1", nb: 3, date: "2026-11-20", num: 2, expert: "Dr B", conf: "Oui", envoi: "42" }),
+  ligne({ client: "Mairie", devis: "D-2", nb: 1, date: "2026-11-05", num: 1, expert: "Dr A" }),
+].join("\n");
+
 describe("lecture CSV", () => {
-  it("devine le séparateur (Excel FR : point-virgule)", () => {
-    expect(separateurProbable("nom;age;resultat\nA;3;ok")).toBe(";");
-    expect(separateurProbable("nom,age\nA,3")).toBe(",");
-    expect(separateurProbable("nom\tage")).toBe("\t");
+  it("devine le séparateur", () => {
+    expect(separateurProbable("nom;age\nA;3")).toBe(";");
     expect(separateurProbable('"a;b",c,d')).toBe(",");
   });
 
-  it("gère guillemets, guillemets doublés, retours à la ligne et BOM", () => {
+  it("gère guillemets doublés, retours à la ligne et BOM", () => {
     const csv = '\uFEFFnom;commentaire\r\n"Dupont";"dit ""bonjour""\nsur 2 lignes"\r\n\r\n';
     expect(decouperCsv(csv)).toEqual([["nom", "commentaire"], ["Dupont", 'dit "bonjour"\nsur 2 lignes']]);
   });
 
-  it("nomme les colonnes vides ou en double", () => {
-    const t = lireCsv("nom;;nom\nA;B;C");
-    expect(t.colonnes).toEqual(["nom", "Colonne 2", "nom (2)"]);
-    expect(t.lignes[0]).toEqual({ nom: "A", "Colonne 2": "B", "nom (2)": "C" });
+  it("retire l'enrobage Excel des numéros", () => {
+    expect(nettoyer('="1234567899"')).toBe("1234567899");
+    expect(nettoyer('=""')).toBe("");
+  });
+
+  it("lit les dates sans glisser de jour", () => {
+    expect(jourDe("2026-09-21T00:00:00.000Z")).toBe("2026-09-21");
+    expect(jourDe("2026-11-01T03:00:00.000Z")).toBe("2026-11-01");
+    expect(jourDe("21/09/2026")).toBe("2026-09-21");
+    expect(jourDe("")).toBe("");
+  });
+
+  it("date du fichier dans son nom", () => {
+    expect(dateDansLeNom("journees-depistage/2026-11-05.csv")).toBe("2026-11-05");
+    expect(dateDansLeNom("export.csv")).toBeNull();
   });
 });
 
-describe("date de la journée", () => {
-  it("lit les formats courants dans le nom du fichier", () => {
-    expect(dateDansLeNom("extractions/journee_2026-11-05_lyon.csv")).toBe("2026-11-05");
-    expect(dateDansLeNom("20261105.csv")).toBe("2026-11-05");
-    expect(dateDansLeNom("depistage-05-11-2026.csv")).toBe("2026-11-05");
-    expect(dateDansLeNom("2026/export.csv")).toBeNull();
-    expect(dateDansLeNom("journee-2026-13-40.csv")).toBeNull();
+describe("extraction", () => {
+  const { journees, colonnesManquantes } = lireExtraction(CSV);
+
+  it("une ligne = une journée, colonnes reconnues par leur nom", () => {
+    expect(colonnesManquantes).toEqual([]);
+    expect(journees).toHaveLength(3);
+    expect(journees[1]).toMatchObject({
+      client: "ACME",
+      commandees: 3,
+      devis: "DEV 1",
+      expert: "Dr B",
+      date: "2026-11-20",
+      numero: 2,
+      contactTel: "0600000000",
+      confClient: true,
+      confConsentements: false,
+      envoiDermatoscope: "42",
+    });
   });
 
-  it("se rabat sur la date de dépôt", () => {
-    const j = journeeDepuis({ key: "x/export.csv", taille: 1, modifie: "2026-10-01T09:00:00Z" }, "a\n1");
-    expect(j.date).toBe("2026-10-01");
-    expect(j.dateDuNom).toBe(false);
-  });
-});
-
-describe("statistiques", () => {
-  const j1 = journeeDepuis({ key: "2026-10-01.csv", taille: 1, modifie: "" }, "id;resultat\n1;Bénin\n2;Bénin\n3;Suspect");
-  const j2 = journeeDepuis({ key: "2026-11-01.csv", taille: 1, modifie: "" }, "id;resultat\n4;Bénin\n5;");
-
-  it("choisit une colonne à peu de valeurs pour la répartition", () => {
-    expect(colonneARepartir([j1, j2])).toBe("resultat");
+  it("signale les colonnes absentes", () => {
+    expect(lireExtraction('"Client","Lieu"\n"X","Y"').colonnesManquantes).toContain("date evenement");
   });
 
-  it("compte la répartition, vides compris", () => {
-    expect(repartition([j1, j2], "resultat")).toEqual([
-      { valeur: "Bénin", nombre: 3 },
-      { valeur: "Suspect", nombre: 1 },
-      { valeur: "(vide)", nombre: 1 },
+  it("contrats : commandées, planifiées, passées, prochaine", () => {
+    expect(contrats(journees, "2026-11-05")).toEqual([
+      { client: "ACME", devis: "DEV 1", commandees: 3, planifiees: 2, passees: 1, prochaine: "2026-11-20" },
+      { client: "Mairie", devis: "D-2", commandees: 1, planifiees: 1, passees: 0, prochaine: "2026-11-05" },
     ]);
   });
 
-  it("regroupe la queue en « Autres »", () => {
-    const parts = repartition([j1, j2], "id", 2);
-    expect(parts).toHaveLength(3);
-    expect(parts[2]).toEqual({ valeur: "Autres", nombre: 3 });
+  it("période : à venir compte la journée du jour", () => {
+    expect(dansLaPeriode(journees, "avenir", "2026-11-05").map((j) => j.date)).toEqual(["2026-11-20", "2026-11-05"]);
+    expect(dansLaPeriode(journees, "30j", "2026-11-05")).toHaveLength(2);
   });
 
-  it("filtre par période", () => {
-    expect(dansLaPeriode([j1, j2], "30j", new Date("2026-11-05")).map((j) => j.date)).toEqual(["2026-11-01"]);
-    expect(dansLaPeriode([j1, j2], "tout")).toHaveLength(2);
+  it("comptes, mois sans trou, préparation", () => {
+    expect(compterPar(journees, (j) => j.expert)).toEqual([
+      { cle: "Dr A", nombre: 2 },
+      { cle: "Dr B", nombre: 1 },
+    ]);
+    expect(parMois(journees)).toEqual([
+      { cle: "2026-09", nombre: 1 },
+      { cle: "2026-10", nombre: 0 },
+      { cle: "2026-11", nombre: 2 },
+    ]);
+    expect(preparation(journees)).toEqual({ total: 3, confClient: 1, confConsentements: 0, confRequerant: 1, dermatoscopeEnvoye: 1 });
+    expect(manques(journees[1])).toEqual(["consentements"]);
   });
 });

@@ -52,8 +52,18 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
 
 ## Format attendu des fichiers
 
-- Un fichier `.csv` par journée ; la première ligne donne les noms de colonnes.
-- Séparateur `;`, `,`, tabulation ou `|` : détecté tout seul. UTF-8 ou Windows-1252 (export Excel).
-- **Date de la journée** : lue dans le nom du fichier (`2026-11-05`, `20261105`, `05-11-2026`) ;
-  sinon, c'est la date de dépôt dans le bucket (signalée « date de dépôt » à l'écran).
-- L'écran analyse les 200 fichiers les plus récents.
+- Une **extraction** = un fichier `.csv` daté (ex. `journees-depistage/2026-11-05.csv`) qui liste
+  **toutes** les journées : **une ligne par journée**. L'écran lit la plus récente ; les autres
+  restent consultables (menu « Extraction du … »).
+- Colonnes reconnues par leur nom (ordre libre, accents et majuscules indifférents) :
+  Date création, Client, Nombre de journées, Numéro devis, Dermatologue, Expert, Date événement,
+  Date facture, Lieu, Numéro journée, Nom / Téléphone / Email du contact, Salle, Accès,
+  Autres informations, Confirmation client / consentements / requérant (Oui/Non),
+  Numéro et date d'envoi / de retour du dermatoscope. Une colonne absente est signalée à l'écran.
+- Séparateur `;` ou `,` détecté tout seul ; UTF-8 ou Windows-1252 ; l'enrobage Excel `="0612…"` est retiré.
+- Une journée est « passée » à partir du lendemain de sa date ; celle du jour est encore « à venir ».
+
+## Sans S3
+
+Tant que le bucket n'est pas branché, le bouton **Importer un CSV** lit l'extraction dans le
+navigateur (rien n'est envoyé ni enregistré) et affiche les mêmes statistiques.
