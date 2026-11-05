@@ -25,6 +25,7 @@ import JourneesStatistiques from "./pages/journees/Statistiques";
 import JourneesCalendrier from "./pages/journees/Calendrier";
 import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
+import TypologiesClients from "./pages/TypologiesClients";
 import Audit from "./pages/Audit";
 import Droits from "./pages/Droits";
 import EnConstruction from "./pages/EnConstruction";
@@ -128,6 +129,7 @@ function Gate() {
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
           <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
           <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />
+          <Route path="/typologies" element={<Garde module="admin"><TypologiesClients /></Garde>} />
           <Route path="*" element={<Accueil />} />
         </Route>
       </Routes>

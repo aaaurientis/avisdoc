@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useJournees } from "../../data/journeesStore";
+import { useJournees, useRegles } from "../../data/journeesStore";
 import {
   aujourdhuiISO,
   compterPar,
@@ -43,6 +43,7 @@ export default function Calendrier() {
 
 function Contenu() {
   const { extraction } = useJournees();
+  const { reglesDe } = useRegles();
   const auj = aujourdhuiISO();
   const [mois, setMois] = useState(auj.slice(0, 7));
   const [choisi, setChoisi] = useState(auj);
@@ -144,14 +145,14 @@ function Contenu() {
                 {/* Grand écran : le client de chaque journée. Téléphone : le nombre seulement. */}
                 <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
                   {liste.slice(0, 3).map((j) => (
-                    <span key={j.id} className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj)])} title={`${j.client} · ${j.lieu}`}>
+                    <span key={j.id} className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))])} title={`${j.client} · ${j.lieu}`}>
                       {j.client}
                     </span>
                   ))}
                   {liste.length > 3 && <span className="px-1.5 text-[11px] text-muted-foreground">+{liste.length - 3}</span>}
                 </span>
                 {liste.length > 0 && (
-                  <span className={cn("self-start rounded-full px-1.5 text-[11px] font-bold sm:hidden", TEINTE[etatDe(liste[0], auj)])}>{liste.length}</span>
+                  <span className={cn("self-start rounded-full px-1.5 text-[11px] font-bold sm:hidden", TEINTE[etatDe(liste[0], auj, reglesDe(liste[0]))])}>{liste.length}</span>
                 )}
               </button>
             );

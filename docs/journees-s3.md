@@ -75,3 +75,18 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
 
 Tant que le bucket n'est pas branché, le bouton **Importer un CSV** lit l'extraction dans le
 navigateur (rien n'est envoyé ni enregistré) et affiche les mêmes statistiques.
+
+## Typologies de clients (règles de confirmation)
+
+**Admin › Typologies clients** (`/typologies`, module Admin) — migration `0081_typologies_clients.sql`
+à exécuter une fois dans le SQL Editor.
+
+- Une **typologie** dit ce qui doit être acquis pour qu'une journée soit confirmée :
+  requérant confirmé, expert désigné, et au besoin client, consentements, dermatoscope.
+  Exemple : « Partenaire sans CPS » (Viabeez fournit les requérants) → expert seulement.
+- Chaque **client Qonto** reçoit une typologie ; sinon la typologie **par défaut** s'applique
+  (au départ « Client direct » : requérant + expert).
+- Les noms de l'extraction (« VIABEEZ ») sont rapprochés des clients Qonto : nom identique
+  (sans accents, casse ni forme juridique), alias, ou nom proche s'il n'y a qu'un candidat.
+  Un nom non rattaché se rattache à la main ; il devient un alias du client.
+- Tant que la migration n'est pas jouée, les écrans Journée appliquent requérant + expert.

@@ -2,9 +2,10 @@
 import { useRef, type ReactNode } from "react";
 import { Check, ChevronRight, Loader2, RefreshCw, Upload } from "lucide-react";
 import { Card, PageHeader } from "../../components/ui";
-import { chargerJournees, choisirExtraction, importerJournees, useJournees } from "../../data/journeesStore";
+import { chargerJournees, choisirExtraction, importerJournees, useJournees, useRegles } from "../../data/journeesStore";
 import { dateDuFichier } from "../../data/journeesRepo";
 import { etatDe, manques, type JourneeDepistage } from "../../lib/journees";
+import { exigences } from "../../lib/typologies";
 import { cn } from "@/lib/utils";
 
 export const jour = (iso: string, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }) =>
@@ -125,7 +126,9 @@ export function CadreJournees({ titre, children }: { titre: string; children: Re
 
 /** Passée, confirmée, ou ce qui reste à confirmer. Toujours un texte : la couleur n'est pas seule à parler. */
 export function PastilleEtat({ j, court = false }: { j: JourneeDepistage; court?: boolean }) {
-  const etat = etatDe(j);
+  const { reglesDe } = useRegles();
+  const regles = reglesDe(j);
+  const etat = etatDe(j, undefined, regles);
   if (etat === "passee") return <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground">Passée</span>;
   if (etat === "prete")
     return (
@@ -135,7 +138,7 @@ export function PastilleEtat({ j, court = false }: { j: JourneeDepistage; court?
     );
   return (
     <span className="shrink-0 rounded-full bg-avisdoc-coral-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-avisdoc-ink">
-      {court ? "À confirmer" : `À confirmer : ${manques(j).join(", ")}`}
+      {court ? "À confirmer" : `À confirmer : ${manques(j, regles).join(", ")}`}
     </span>
   );
 }
@@ -152,6 +155,10 @@ export function LigneJournee({
   basculer: () => void;
   avecDate?: boolean;
 }) {
+  const { reglesDe, typologieDe } = useRegles();
+  const regles = reglesDe(j);
+  const etat = etatDe(j, undefined, regles);
+  const typologie = typologieDe(j.client);
   return (
     <div className="border-b border-border last:border-b-0">
       <button type="button" onClick={basculer} className="flex w-full items-center gap-3 px-5 py-3 text-left text-[13px] transition-colors hover:bg-accent">
@@ -177,7 +184,11 @@ export function LigneJournee({
       </button>
       {ouverte && (
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 border-t border-border bg-background px-5 py-4 text-[12.5px] sm:grid-cols-2 lg:grid-cols-3">
-          <Info label="État" valeur={etatDe(j) === "a-confirmer" ? `À confirmer : ${manques(j).join(", ")}` : etatDe(j) === "prete" ? "Confirmée" : "Passée"} />
+          <Info label="État" valeur={etat === "a-confirmer" ? `À confirmer : ${manques(j, regles).join(", ")}` : etat === "prete" ? "Confirmée" : "Passée"} />
+          <Info
+            label="Typologie du client"
+            valeur={`${typologie?.nom ?? "Règle par défaut"} — exige : ${exigences(regles).join(", ") || "rien"}`}
+          />
           <Info label="Devis" valeur={j.devis} />
           <Info label="Dermatologue" valeur={j.dermatologue} />
           <Info label="Expert" valeur={j.expert} />

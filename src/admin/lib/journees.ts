@@ -4,6 +4,8 @@
 // une ligne par journée (client, devis, expert, lieu, confirmations, dermatoscope…).
 // Fonctions pures (sans réseau) : testées dans journees.test.ts.
 
+import { CRITERES, REGLES_DEFAUT, type Regles } from "./typologies";
+
 export interface FichierS3 {
   key: string;
   taille: number;
@@ -300,33 +302,48 @@ export function contrats(journees: JourneeDepistage[], aujourdhui = aujourdhuiIS
 
 export interface Preparation {
   total: number;
-  /** Requérant confirmé ET expert désigné. */
+  /** Journées dont toutes les conditions exigées (selon la typologie du client) sont remplies. */
   confirmees: number;
-  requerant: number;
-  expert: number;
+  /** Par critère : combien de journées l'exigent, et combien l'ont. Seuls les critères exigés au moins une fois. */
+  criteres: { cle: keyof Regles; label: string; exigees: number; acquises: number }[];
 }
 
-/** Où en est la confirmation des journées données (en pratique : celles à venir). */
-export function preparation(journees: JourneeDepistage[]): Preparation {
-  return {
-    total: journees.length,
-    confirmees: journees.filter((j) => manques(j).length === 0).length,
-    requerant: journees.filter((j) => j.confRequerant).length,
-    expert: journees.filter((j) => j.expert).length,
-  };
+/** Le critère est-il acquis pour cette journée ? */
+export function acquis(j: JourneeDepistage, cle: keyof Regles): boolean {
+  switch (cle) {
+    case "requerant":
+      return j.confRequerant;
+    case "expert":
+      return !!j.expert;
+    case "client":
+      return j.confClient;
+    case "consentements":
+      return j.confConsentements;
+    case "dermatoscope":
+      return !!j.envoiDermatoscope;
+  }
 }
 
 /**
- * Ce qui manque pour qu'une journée soit confirmée. Deux conditions seulement : le requérant
- * a confirmé, et un expert est désigné (l'export n'a pas de colonne « confirmation expert » :
- * l'expert compte dès que la colonne Expert est remplie). Client, consentements et
- * dermatoscope restent visibles dans le détail mais ne bloquent pas la confirmation.
+ * Ce qui manque pour qu'une journée soit confirmée, selon ce qu'exige la typologie de son client.
+ * Par défaut : requérant confirmé et expert désigné (l'export n'a pas de colonne « confirmation
+ * expert » : l'expert compte dès que la colonne Expert est remplie).
  */
-export function manques(j: JourneeDepistage): string[] {
-  const m: string[] = [];
-  if (!j.confRequerant) m.push("requérant");
-  if (!j.expert) m.push("expert");
-  return m;
+export function manques(j: JourneeDepistage, regles: Regles = REGLES_DEFAUT): string[] {
+  return CRITERES.filter((c) => regles[c.cle] && !acquis(j, c.cle)).map((c) => c.court);
+}
+
+/** Où en est la confirmation des journées données (en pratique : celles à venir). */
+export function preparation(journees: JourneeDepistage[], reglesDe: (j: JourneeDepistage) => Regles = () => REGLES_DEFAUT): Preparation {
+  const criteres = CRITERES.map((c) => {
+    const exigeants = journees.filter((j) => reglesDe(j)[c.cle]);
+    return { cle: c.cle, label: c.label, exigees: exigeants.length, acquises: exigeants.filter((j) => acquis(j, c.cle)).length };
+  }).filter((c) => c.exigees > 0);
+  return {
+    total: journees.length,
+    confirmees: journees.filter((j) => manques(j, reglesDe(j)).length === 0).length,
+    criteres,
+  };
 }
 
 // ── Calendrier ───────────────────────────────────────────────────────────────
@@ -363,5 +380,5 @@ export function moisDecale(mois: string, n: number): string {
 
 /** État d'une journée pour l'affichage : passée, confirmée (« prete ») ou à confirmer. */
 export type EtatJournee = "passee" | "prete" | "a-confirmer";
-export const etatDe = (j: JourneeDepistage, aujourdhui = aujourdhuiISO()): EtatJournee =>
-  estPassee(j, aujourdhui) ? "passee" : manques(j).length ? "a-confirmer" : "prete";
+export const etatDe = (j: JourneeDepistage, aujourdhui = aujourdhuiISO(), regles: Regles = REGLES_DEFAUT): EtatJournee =>
+  estPassee(j, aujourdhui) ? "passee" : manques(j, regles).length ? "a-confirmer" : "prete";
