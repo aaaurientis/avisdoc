@@ -18,6 +18,7 @@ import {
   preparation,
   separateurProbable,
 } from "./journees";
+import { REGLES_DEFAUT } from "./typologies";
 
 // Même forme que l'export réel (en-têtes, guillemets, ="…" d'Excel), avec des données fictives.
 const ENTETE =
@@ -107,7 +108,18 @@ describe("extraction", () => {
       { cle: "2026-10", nombre: 0 },
       { cle: "2026-11", nombre: 2 },
     ]);
-    expect(preparation(journees)).toEqual({ total: 3, confirmees: 1, requerant: 1, expert: 3 });
+    expect(preparation(journees)).toEqual({
+      total: 3,
+      confirmees: 1,
+      criteres: [
+        { cle: "requerant", label: "Requérant confirmé", exigees: 3, acquises: 1 },
+        { cle: "expert", label: "Expert désigné", exigees: 3, acquises: 3 },
+      ],
+    });
+    // Typologie sans requérant (partenaire sans CPS) : l'expert suffit.
+    const sansRequerant = { ...REGLES_DEFAUT, requerant: false };
+    expect(manques(journees[0], sansRequerant)).toEqual([]);
+    expect(preparation(journees, () => sansRequerant).confirmees).toBe(3);
     // Requérant confirmé + expert désigné : confirmée, même sans consentements.
     expect(manques(journees[1])).toEqual([]);
     expect(manques(journees[0])).toEqual(["requérant"]);

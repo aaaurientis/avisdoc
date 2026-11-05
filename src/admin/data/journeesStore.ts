@@ -6,9 +6,11 @@
 // changement d'écran et au rechargement, et disparaît à la fermeture de l'onglet — l'extraction
 // contient des coordonnées de contacts, elle n'a pas à rester sur le poste.
 
-import { useSyncExternalStore } from "react";
-import { lireExtraction, type Extraction, type FichierS3 } from "../lib/journees";
+import { useMemo, useSyncExternalStore } from "react";
+import { lireExtraction, type Extraction, type FichierS3, type JourneeDepistage } from "../lib/journees";
+import { reglesDe, typologieDuClient, type Affectation, type Regles, type Typologie } from "../lib/typologies";
 import { ErreurJournees, listerExtractions, lireExtractionS3, lireFichierLocal, type Source } from "./journeesRepo";
+import { listerAffectations, listerTypologies } from "./typologiesRepo";
 
 export interface EtatJournees {
   statut: "initial" | "chargement" | "pret";
@@ -18,11 +20,14 @@ export interface EtatJournees {
   /** Pourquoi S3 n'a rien donné (pas branché, vide, erreur). */
   s3Info: { message: string; nonConfigure: boolean } | null;
   erreur: string | null;
+  /** Typologies de clients et affectations (Admin › Typologies clients) : elles fixent les règles de confirmation. */
+  typologies: Typologie[];
+  affectations: Affectation[];
 }
 
 const CLE_IMPORT = "avisdoc.journees.import";
 
-let etat: EtatJournees = { statut: "initial", source: null, extraction: null, s3: null, s3Info: null, erreur: null };
+let etat: EtatJournees = { statut: "initial", source: null, extraction: null, s3: null, s3Info: null, erreur: null, typologies: [], affectations: [] };
 const abonnes = new Set<() => void>();
 
 function changer(p: Partial<EtatJournees>) {
@@ -40,9 +45,23 @@ function importGarde(): Source | null {
   }
 }
 
+/**
+ * Relit les typologies et affectations (après une modification dans Admin).
+ * Table absente (migration pas jouée) ou erreur : on garde la règle par défaut, requérant + expert.
+ */
+export async function rechargerTypologies(): Promise<void> {
+  try {
+    const [typologies, affectations] = await Promise.all([listerTypologies(), listerAffectations()]);
+    changer({ typologies, affectations });
+  } catch {
+    changer({ typologies: [], affectations: [] });
+  }
+}
+
 /** Relit le bucket (bouton Actualiser, ou premier écran ouvert). */
 export async function chargerJournees(): Promise<void> {
   changer({ statut: "chargement", erreur: null });
+  void rechargerTypologies();
   try {
     const s3 = await listerExtractions();
     if (s3.fichiers.length) {
@@ -100,4 +119,23 @@ function abonner(f: () => void) {
 
 export function useJournees(): EtatJournees {
   return useSyncExternalStore(abonner, () => etat);
+}
+
+/**
+ * La règle de confirmation de chaque journée, selon la typologie de son client.
+ * Calculée une fois par nom de client (l'extraction répète les mêmes clients).
+ */
+export function useRegles() {
+  const { typologies, affectations } = useJournees();
+  return useMemo(() => {
+    const cache = new Map<string, Typologie | null>();
+    const typologieDe = (client: string) => {
+      if (!cache.has(client)) cache.set(client, typologieDuClient(client, affectations, typologies));
+      return cache.get(client) ?? null;
+    };
+    return {
+      typologieDe,
+      reglesDe: (j: JourneeDepistage): Regles => reglesDe(typologieDe(j.client)),
+    };
+  }, [typologies, affectations]);
 }

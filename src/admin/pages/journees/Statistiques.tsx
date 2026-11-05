@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useJournees } from "../../data/journeesStore";
+import { useJournees, useRegles } from "../../data/journeesStore";
 import {
   aujourdhuiISO,
   compterPar,
@@ -26,8 +26,9 @@ const PERIODES: { cle: Periode; label: string }[] = [
   { cle: "tout", label: "Tout" },
 ];
 
-type Axe = "expert" | "dermatologue" | "lieu" | "client";
+type Axe = "expert" | "dermatologue" | "lieu" | "client" | "typologie";
 const AXES: { cle: Axe; label: string }[] = [
+  { cle: "typologie", label: "Typologie" },
   { cle: "expert", label: "Expert" },
   { cle: "dermatologue", label: "Dermatologue" },
   { cle: "lieu", label: "Lieu" },
@@ -192,17 +193,18 @@ function BarresMois({ journees }: { journees: JourneeDepistage[] }) {
 }
 
 function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
-  const p = preparation(journees);
+  const { reglesDe } = useRegles();
+  const p = preparation(journees, reglesDe);
   if (!p.total) return <p className="mt-3 text-sm text-muted-foreground">Aucune journée à venir sur ces filtres.</p>;
+  // Chaque critère est compté sur les seules journées dont la typologie l'exige.
   const lignes = [
-    { label: "Journées confirmées", n: p.confirmees },
-    { label: "Requérant confirmé", n: p.requerant },
-    { label: "Expert désigné", n: p.expert },
+    { label: "Journées confirmées", n: p.confirmees, sur: p.total },
+    ...p.criteres.map((c) => ({ label: c.label, n: c.acquises, sur: c.exigees })),
   ];
   return (
     <div className="mt-1">
       <p className="mb-4 text-[12.5px] text-muted-foreground">
-        {nombre(p.total)} journée{p.total > 1 ? "s" : ""} à venir. Confirmée = requérant confirmé et expert désigné.
+        {nombre(p.total)} journée{p.total > 1 ? "s" : ""} à venir. Ce qui est exigé dépend de la typologie du client (Admin › Typologies clients).
       </p>
       <div className="flex flex-col gap-3.5">
         {lignes.map((l) => (
@@ -210,11 +212,11 @@ function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
             <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
               <span className="font-semibold text-avisdoc-ink">{l.label}</span>
               <span className="shrink-0 text-muted-foreground">
-                {l.n} / {p.total}
+                {l.n} / {l.sur}
               </span>
             </div>
             <div className="h-2 rounded-full bg-muted">
-              <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${pct(l.n, p.total)}%` }} />
+              <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${pct(l.n, l.sur)}%` }} />
             </div>
           </div>
         ))}
@@ -225,6 +227,7 @@ function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
 
 function Contrats({ journees }: { journees: JourneeDepistage[] }) {
   const liste = useMemo(() => contrats(journees), [journees]);
+  const { typologieDe } = useRegles();
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-left text-[13px]">
@@ -245,7 +248,9 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
               <tr key={`${c.client}|${c.devis}`} className="border-t border-border">
                 <td className="px-5 py-2.5">
                   <div className="font-semibold text-avisdoc-ink">{c.client || "(sans client)"}</div>
-                  <div className="text-[11.5px] text-muted-foreground">{c.devis || "sans n° de devis"}</div>
+                  <div className="text-[11.5px] text-muted-foreground">
+                    {c.devis || "sans n° de devis"} · {typologieDe(c.client)?.nom ?? "règle par défaut"}
+                  </div>
                 </td>
                 <td className="px-3 py-2.5 text-right text-avisdoc-ink">{c.commandees ?? "—"}</td>
                 <td className="px-3 py-2.5 text-right text-avisdoc-ink">{c.planifiees}</td>
@@ -266,11 +271,12 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
 }
 
 function Repartition({ journees, axe }: { journees: JourneeDepistage[]; axe: Axe }) {
+  const { typologieDe } = useRegles();
   const parts = useMemo(() => {
-    const toutes = compterPar(journees, (j) => j[axe]);
+    const toutes = compterPar(journees, (j) => (axe === "typologie" ? typologieDe(j.client)?.nom ?? "Règle par défaut" : j[axe]));
     if (toutes.length <= 10) return toutes;
     return [...toutes.slice(0, 10), { cle: "Autres", nombre: toutes.slice(10).reduce((s, p) => s + p.nombre, 0) }];
-  }, [journees, axe]);
+  }, [journees, axe, typologieDe]);
   const total = parts.reduce((s, p) => s + p.nombre, 0);
   const max = Math.max(1, ...parts.map((p) => p.nombre));
   return (
