@@ -8,6 +8,7 @@ export type Module =
   | "demarche" // Bloc Veille à démarcher (Entreprises, Collectivités, Intermédiaires, Mutuelle Assurance)
   | "veille" // Bloc Veille Marché (avis AvisDoc, à ne pas manquer, concurrence, publications)
   | "sante" // Bloc Professionnels de Santé (ex-Contacts Médicaux : Requérants, Requis, Aval)
+  | "journee" // Bloc Journée : extractions des journées de dépistage (bucket S3)
   | "finance"
   | "documents"
   | "admin";
@@ -17,12 +18,16 @@ export const MODULES: { key: Module; label: string }[] = [
   { key: "demarche", label: "Veille à démarcher" },
   { key: "veille", label: "Veille Marché" },
   { key: "sante", label: "Professionnels de Santé" },
+  { key: "journee", label: "Journée" },
   { key: "finance", label: "Finance" },
   { key: "documents", label: "Documents" },
   { key: "admin", label: "Admin" },
 ];
 
-/** Droits par défaut d'un utilisateur @avisdoc.fr non listé : tout sauf admin. */
+/**
+ * Droits par défaut d'un utilisateur @avisdoc.fr non listé : tout sauf admin et journee.
+ * « journee » s'ouvre au cas par cas (Droits d'accès) : les extractions touchent aux dépistés.
+ */
 export const MODULES_DEFAUT: Module[] = [
   "commercial",
   "demarche",

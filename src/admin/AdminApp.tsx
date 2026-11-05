@@ -21,6 +21,7 @@ import Contacts from "./pages/Contacts";
 import ContactsDashboard from "./pages/ContactsDashboard";
 import Documents from "./pages/Documents";
 import Infirmieres from "./pages/Infirmieres";
+import Journees from "./pages/Journees";
 import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
@@ -118,6 +119,7 @@ function Gate() {
           <Route path="/contacts" element={<Garde module="sante"><ContactsDashboard /></Garde>} />
           <Route path="/contacts/requis" element={<Garde module="sante"><Contacts fixedType="Requis" /></Garde>} />
           <Route path="/contacts/reseau" element={<Garde module="sante"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
+          <Route path="/journees" element={<Garde module="journee"><Journees /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
           <Route path="/infirmieres" element={<Garde module="sante"><Infirmieres /></Garde>} />
           <Route path="/infirmieres/:id" element={<Garde module="sante"><InfirmiereFiche /></Garde>} />
