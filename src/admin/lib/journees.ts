@@ -300,30 +300,32 @@ export function contrats(journees: JourneeDepistage[], aujourdhui = aujourdhuiIS
 
 export interface Preparation {
   total: number;
-  confClient: number;
-  confConsentements: number;
-  confRequerant: number;
-  dermatoscopeEnvoye: number;
+  /** Requérant confirmé ET expert désigné. */
+  confirmees: number;
+  requerant: number;
+  expert: number;
 }
 
-/** Où en est la préparation des journées données (en pratique : celles à venir). */
+/** Où en est la confirmation des journées données (en pratique : celles à venir). */
 export function preparation(journees: JourneeDepistage[]): Preparation {
   return {
     total: journees.length,
-    confClient: journees.filter((j) => j.confClient).length,
-    confConsentements: journees.filter((j) => j.confConsentements).length,
-    confRequerant: journees.filter((j) => j.confRequerant).length,
-    dermatoscopeEnvoye: journees.filter((j) => j.envoiDermatoscope).length,
+    confirmees: journees.filter((j) => manques(j).length === 0).length,
+    requerant: journees.filter((j) => j.confRequerant).length,
+    expert: journees.filter((j) => j.expert).length,
   };
 }
 
-/** Ce qui manque encore pour qu'une journée soit prête. */
+/**
+ * Ce qui manque pour qu'une journée soit confirmée. Deux conditions seulement : le requérant
+ * a confirmé, et un expert est désigné (l'export n'a pas de colonne « confirmation expert » :
+ * l'expert compte dès que la colonne Expert est remplie). Client, consentements et
+ * dermatoscope restent visibles dans le détail mais ne bloquent pas la confirmation.
+ */
 export function manques(j: JourneeDepistage): string[] {
   const m: string[] = [];
-  if (!j.confClient) m.push("client");
-  if (!j.confConsentements) m.push("consentements");
   if (!j.confRequerant) m.push("requérant");
-  if (!j.envoiDermatoscope) m.push("dermatoscope");
+  if (!j.expert) m.push("expert");
   return m;
 }
 
@@ -359,7 +361,7 @@ export function moisDecale(mois: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** État d'une journée pour l'affichage : passée, prête (tout est confirmé) ou à confirmer. */
+/** État d'une journée pour l'affichage : passée, confirmée (« prete ») ou à confirmer. */
 export type EtatJournee = "passee" | "prete" | "a-confirmer";
 export const etatDe = (j: JourneeDepistage, aujourdhui = aujourdhuiISO()): EtatJournee =>
   estPassee(j, aujourdhui) ? "passee" : manques(j).length ? "a-confirmer" : "prete";
