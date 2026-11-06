@@ -88,20 +88,24 @@ const timeoutMessage = (e: unknown, options?: LlmOptions) =>
 /**
  * Pourquoi l'appel au modèle a échoué, en une phrase qu'un commercial peut lire
  * (et transmettre) : crédit épuisé, clé refusée, modèle inconnu, surcharge…
- * Le message brut d'Anthropic ne part jamais à l'écran : il reste dans les journaux.
+ * Le message brut d'Anthropic ne part jamais à l'écran : il reste dans les journaux
+ * et dans admin_merx_demandes.message.
  */
 export function causeLisible(e: unknown): string {
   if (e instanceof Anthropic.APIError) {
     const m = e.message ?? "";
-    if (/credit balance/i.test(m)) return "le crédit de l'IA est épuisé, prévenez un administrateur";
-    if (e.status === 401 || e.status === 403) return "l'IA refuse la clé du Hub, prévenez un administrateur";
-    if (e.status === 404 || (e.status === 400 && /model/i.test(m))) return "le modèle d'IA demandé n'est plus disponible, prévenez un administrateur";
+    if (/credit balance/i.test(m)) return "le crédit de l'IA est épuisé, contactez un administrateur";
+    if (e.status === 401 || e.status === 403) return "l'IA refuse l'accès du Hub, contactez un administrateur";
+    if (e.status === 404 || (e.status === 400 && /model/i.test(m))) return "la version de l'IA demandée n'est plus disponible, contactez un administrateur";
     if (e.status === 429) return "trop de demandes en même temps, réessayez dans une minute";
     if (e.status === 529 || /overloaded/i.test(m)) return "l'IA est surchargée, réessayez dans quelques minutes";
-    return `l'IA a répondu une erreur${e.status ? ` (${e.status})` : ""}, réessayez et prévenez un administrateur si ça continue`;
+    return `l'IA a renvoyé une erreur${e.status ? ` (${e.status})` : ""}, réessayez ou contactez un administrateur`;
   }
   if (e instanceof SyntaxError) return "la réponse de l'IA était illisible, réessayez";
-  return e instanceof Error ? e.message : String(e);
+  const m = e instanceof Error ? e.message : String(e);
+  if (/pas de réponse en \d+ s/.test(m)) return "l'IA n'a pas répondu à temps, réessayez";
+  // Les gabarits ajoutent leur propre point final.
+  return m.replace(/\.+\s*$/, "");
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

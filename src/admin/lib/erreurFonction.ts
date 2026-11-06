@@ -19,7 +19,7 @@ export async function messageErreurFonction(error: unknown): Promise<string> {
     if (statut === 401) return "Votre session a expiré : reconnectez-vous.";
     if (statut === 403) return "Votre compte n'a pas accès à cette fonction : prévenez un administrateur.";
     if (statut === 504 || statut === 546) return "Le serveur a mis trop de temps à répondre. Réessayez.";
-    return `Le serveur a répondu une erreur${statut ? ` (${statut})` : ""}. Réessayez.`;
+    return `Le serveur a renvoyé une erreur${statut ? ` (${statut})` : ""}. Réessayez.`;
   }
   return error instanceof Error ? error.message : String(error);
 }

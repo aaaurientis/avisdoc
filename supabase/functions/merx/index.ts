@@ -802,6 +802,6 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     console.error(e);
     const cause = causeLisible(e);
-    return json({ error: cause.charAt(0).toUpperCase() + cause.slice(1) }, 500);
+    return json({ error: `${cause.charAt(0).toUpperCase()}${cause.slice(1)}.` }, 500);
   }
 });
