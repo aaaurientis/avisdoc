@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Lightbulb, Loader2, MessageSquare, Play, Plus, Search, Send } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { messageErreurFonction } from "../lib/erreurFonction";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { cn } from "@/lib/utils";
 import BoutonMicro from "../components/BoutonMicro";
@@ -82,7 +83,7 @@ export default function Merx() {
 
   const appeler = useCallback(async (body: Record<string, unknown>) => {
     const { data, error } = await supabaseAdmin.functions.invoke("merx", { body });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await messageErreurFonction(error));
     if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
     return data as { conversationId?: string; reply?: string; demandeId?: string | null };
   }, []);

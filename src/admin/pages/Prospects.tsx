@@ -33,6 +33,7 @@ import { confirmer } from "../components/Confirmation";
 import { useActualisation } from "../lib/actualisation";
 import FiltresRepliables from "../components/FiltresRepliables";
 import BarreDefilement from "../components/BarreDefilement";
+import { messageErreurFonction } from "../lib/erreurFonction";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -460,7 +461,7 @@ export default function Prospects() {
   const approfondir = useCallback(
     async (p: Prospect) => {
       const { data, error } = await supabaseAdmin.functions.invoke("merx", { body: { action: "approfondir", prospectId: p.id } });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await messageErreurFonction(error));
       const r = data as { error?: string; demandeId?: string };
       if (r?.error) throw new Error(r.error);
       // Le serveur travaille de son côté : on suit l'avancement dans la table. Fermer

@@ -24,7 +24,7 @@ import { demandeSociete, runAgentTick } from "./agent.ts";
 import { admin } from "./db.ts";
 import { transcrire } from "./transcription.ts";
 import { chercherTerrain, lireFiche } from "./consulter.ts";
-import { complete, converse, model, type LlmUsage } from "./llm.ts";
+import { causeLisible, complete, converse, model, type LlmUsage } from "./llm.ts";
 import {
   ACTIVITE_SCHEMA,
   ACTIVITE_SYSTEM,
@@ -72,7 +72,9 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-const MODULE = "merx";
+// Depuis la migration 0079 (menu à 8 blocs), le droit s'appelle « commercial » ;
+// « merx » reste accepté pour les comptes pas encore remappés.
+const MODULES = ["commercial", "merx"];
 const CHAT_TIMEOUT_MS = 30_000;
 
 /** Le module est-il ouvert à cette personne ? Super-admin : tout ; sinon, sa ligne de admin_droits. */
@@ -82,7 +84,7 @@ async function peutMerx(email: string): Promise<boolean> {
   if (sa) return true;
   const { data: droits } = await sb.from("admin_droits").select("modules").ilike("email", email).maybeSingle();
   // Une personne non listée a les modules par défaut, qui ne comprennent pas Merx.
-  return Array.isArray(droits?.modules) && droits.modules.includes(MODULE);
+  return Array.isArray(droits?.modules) && droits.modules.some((m: string) => MODULES.includes(m));
 }
 
 Deno.serve(async (req: Request) => {
@@ -175,12 +177,13 @@ Deno.serve(async (req: Request) => {
             .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
-        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+        console.error("resumer", e);
+        return json({ error: `Le résumé n'a pas pu être fait : ${causeLisible(e)}. Il sera retenté à la prochaine ouverture.` }, 500);
       }
     }
 
-    // Tout le reste de Merx reste réservé au module « merx ».
-    if (!(await peutMerx(email))) return json({ error: "Le module Merx n'est pas ouvert sur ce compte." }, 403);
+    // Tout le reste de Merx reste réservé au bloc « commercial » (ex-module « merx »).
+    if (!(await peutMerx(email))) return json({ error: "Votre compte n'a pas accès à Merx : demandez à un administrateur d'ouvrir le droit « Commercial »." }, 403);
 
     // ── Traiter une demande en attente ───────────────────────────────────
     if (body.action === "traiter") {
@@ -598,7 +601,8 @@ Deno.serve(async (req: Request) => {
             .update({ status: "echec", message, usage, model: model("email"), finished_at: new Date().toISOString() })
             .eq("id", demande.id);
         }
-        return json({ error: "Le résumé n'a pas pu être fait. Il sera retenté à la prochaine ouverture." }, 500);
+        console.error("resumer", e);
+        return json({ error: `Le résumé n'a pas pu être fait : ${causeLisible(e)}. Il sera retenté à la prochaine ouverture.` }, 500);
       }
     }
 
@@ -651,7 +655,8 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (demande) await sb.from("admin_merx_demandes").update({ status: "echec", message, usage, model: model("chat"), finished_at: new Date().toISOString() }).eq("id", demande.id);
-        return json({ error: "Merx n'a pas pu répondre. Réessayez." }, 500);
+        console.error("fiche_discuter", e);
+        return json({ error: `Merx n'a pas pu répondre : ${causeLisible(e)}.` }, 500);
       }
     }
 
@@ -796,6 +801,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Action inconnue." }, 400);
   } catch (e) {
     console.error(e);
-    return json({ error: e instanceof Error ? e.message : "Erreur interne." }, 500);
+    const cause = causeLisible(e);
+    return json({ error: `${cause.charAt(0).toUpperCase()}${cause.slice(1)}.` }, 500);
   }
 });
