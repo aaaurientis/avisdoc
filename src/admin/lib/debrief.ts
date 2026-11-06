@@ -324,13 +324,13 @@ export async function enregistrer(
         au: maintenant,
       })),
     );
-    if (error) throw new Error(await messageErreurFonction(error));
+    if (error) throw new Error(error.message);
   }
 
   // L'avancement du Pipeline, seulement pour une affaire.
   if (r.etape && vue.etape.trim() && vue.fiche_type === "affaire" && vue.fiche_id) {
     const { error } = await supabaseAdmin.from("admin_clients").update({ stage: vue.etape.trim() }).eq("id", vue.fiche_id);
-    if (error) throw new Error(await messageErreurFonction(error));
+    if (error) throw new Error(error.message);
   }
 
   return { creee };

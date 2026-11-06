@@ -183,7 +183,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Tout le reste de Merx reste réservé au bloc « commercial » (ex-module « merx »).
-    if (!(await peutMerx(email))) return json({ error: "Le bloc Commercial (Merx) n'est pas ouvert sur ce compte." }, 403);
+    if (!(await peutMerx(email))) return json({ error: "Votre compte n'a pas accès à Merx : demandez à un administrateur d'ouvrir le droit « Commercial »." }, 403);
 
     // ── Traiter une demande en attente ───────────────────────────────────
     if (body.action === "traiter") {
@@ -801,6 +801,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Action inconnue." }, 400);
   } catch (e) {
     console.error(e);
-    return json({ error: causeLisible(e) }, 500);
+    const cause = causeLisible(e);
+    return json({ error: cause.charAt(0).toUpperCase() + cause.slice(1) }, 500);
   }
 });

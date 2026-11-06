@@ -88,18 +88,19 @@ const timeoutMessage = (e: unknown, options?: LlmOptions) =>
 /**
  * Pourquoi l'appel au modèle a échoué, en une phrase qu'un commercial peut lire
  * (et transmettre) : crédit épuisé, clé refusée, modèle inconnu, surcharge…
+ * Le message brut d'Anthropic ne part jamais à l'écran : il reste dans les journaux.
  */
 export function causeLisible(e: unknown): string {
   if (e instanceof Anthropic.APIError) {
     const m = e.message ?? "";
-    if (/credit balance/i.test(m)) return "le crédit Anthropic est épuisé (à recharger dans la console Anthropic, rubrique Billing)";
-    if (e.status === 401) return "la clé ANTHROPIC_API_KEY est refusée par Anthropic";
-    if (e.status === 403) return "la clé ANTHROPIC_API_KEY n'a pas accès à ce service";
-    if (e.status === 404 || (e.status === 400 && /model/i.test(m))) return `le modèle demandé est refusé par Anthropic (${m})`;
-    if (e.status === 429) return "trop de demandes en même temps chez Anthropic ; réessayez dans une minute";
-    if (e.status === 529 || /overloaded/i.test(m)) return "Anthropic est surchargé en ce moment ; réessayez dans quelques minutes";
-    return `Anthropic a répondu une erreur ${e.status ?? ""} : ${m}`.trim();
+    if (/credit balance/i.test(m)) return "le crédit de l'IA est épuisé, prévenez un administrateur";
+    if (e.status === 401 || e.status === 403) return "l'IA refuse la clé du Hub, prévenez un administrateur";
+    if (e.status === 404 || (e.status === 400 && /model/i.test(m))) return "le modèle d'IA demandé n'est plus disponible, prévenez un administrateur";
+    if (e.status === 429) return "trop de demandes en même temps, réessayez dans une minute";
+    if (e.status === 529 || /overloaded/i.test(m)) return "l'IA est surchargée, réessayez dans quelques minutes";
+    return `l'IA a répondu une erreur${e.status ? ` (${e.status})` : ""}, réessayez et prévenez un administrateur si ça continue`;
   }
+  if (e instanceof SyntaxError) return "la réponse de l'IA était illisible, réessayez";
   return e instanceof Error ? e.message : String(e);
 }
 

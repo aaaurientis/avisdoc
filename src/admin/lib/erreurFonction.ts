@@ -16,7 +16,8 @@ export async function messageErreurFonction(error: unknown): Promise<string> {
     } catch {
       // Corps absent ou pas en JSON : la fonction n'a pas démarré, ou l'hébergeur a coupé.
     }
-    if (statut === 401 || statut === 403) return "Accès refusé par le serveur : reconnectez-vous.";
+    if (statut === 401) return "Votre session a expiré : reconnectez-vous.";
+    if (statut === 403) return "Votre compte n'a pas accès à cette fonction : prévenez un administrateur.";
     if (statut === 504 || statut === 546) return "Le serveur a mis trop de temps à répondre. Réessayez.";
     return `Le serveur a répondu une erreur${statut ? ` (${statut})` : ""}. Réessayez.`;
   }
