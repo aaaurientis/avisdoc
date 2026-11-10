@@ -1,4 +1,4 @@
-// Vigile, l'agent de veille : il lit les articles collectés, écarte le hors-sujet, range
+// Scope, l'agent de veille : il lit les articles collectés, écarte le hors-sujet, range
 // chaque article dans une rubrique, le résume, dit ce qu'il change pour AvisDoc,
 // puis tire les trois points clés du rapport.
 //
@@ -45,7 +45,12 @@ export interface ArticleATrier {
   nature: string;
   publie_le: string | null;
   extrait: string;
+  /** Le site d'où vient l'article (son adresse sans le chemin) : pour dire d'où il vient vraiment. */
+  site: string;
 }
+
+/** D'où vient une publication, vraiment (02/11, Olivier : « il ne faut pas mettre presse partout »). Les réseaux sociaux se reconnaissent à leur adresse. */
+export const GENRES_SOURCE = ["presse", "communique", "revue", "officiel", "collectivite", "entreprise", "association", "site"] as const;
 
 export interface Tri {
   n: number;
@@ -60,6 +65,7 @@ export interface Tri {
   ville: string;
   urgent: boolean;
   urgence: string;
+  genre_source: (typeof GENRES_SOURCE)[number];
 }
 
 export async function trier(articles: ArticleATrier[], rubriques: { nom: string; description: string; axe?: string }[], surveilles: string[]) {
@@ -76,7 +82,7 @@ export async function trier(articles: ArticleATrier[], rubriques: { nom: string;
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["n", "verdict", "raison", "rubrique", "importance", "titre_fr", "resume", "pour_avisdoc", "entreprise", "ville", "urgent", "urgence"],
+          required: ["n", "verdict", "raison", "rubrique", "importance", "titre_fr", "resume", "pour_avisdoc", "entreprise", "ville", "urgent", "urgence", "genre_source"],
           properties: {
             n: { type: "integer" },
             verdict: { type: "string", enum: ["retenu", "ecarte"] },
@@ -88,7 +94,8 @@ export async function trier(articles: ArticleATrier[], rubriques: { nom: string;
             pour_avisdoc: { type: "string", description: "Une phrase d'analyse. Vide si écarté." },
             entreprise: { type: "string", description: `Rubriques ${aDemarcher} seulement : le nom de l'entreprise ou de la collectivité (mairie, commune, département, région) visée, tel qu'écrit dans le titre ou l'extrait. Vide sinon.` },
             ville: { type: "string", description: `Rubriques ${aDemarcher} seulement : la ville ou le département, s'il figure dans le titre ou l'extrait. Vide sinon.` },
-            urgent: { type: "boolean", description: "Vrai seulement si AvisDoc doit agir dans les jours qui viennent sous peine de rater une occasion (voir les règles « À ne pas rater »). Faux dans presque tous les cas." },
+            urgent: { type: "boolean", description: "Vrai seulement si AvisDoc doit agir dans les jours qui viennent sous peine de rater une occasion (voir les règles « À ne pas manquer »). Faux dans presque tous les cas." },
+            genre_source: { type: "string", enum: [...GENRES_SOURCE], description: "Qui publie, d'après le site et l'extrait : presse = un journal, un magazine, une radio, une télé ou un média professionnel ; communique = un communiqué diffusé par l'entreprise ou un site de communiqués ; revue = une revue scientifique ou médicale à comité de lecture ; officiel = un ministère, une agence de santé (HAS, ANSM, Santé publique France, ameli…) ou un texte officiel ; collectivite = le site d'une mairie, d'un département, d'une région ; entreprise = le site d'une entreprise (dont un cabinet) ; association = le site d'une association, d'une ligue, d'une fondation ; site = un autre site d'information ou de conseil (santé grand public, blog…)." },
             urgence: { type: "string", description: "Si urgent : pourquoi, et ce qu'il faut faire, en une phrase (ex. « Appel d'offres de dépistage ouvert : réponse à préparer »). Vide sinon." },
           },
         },
@@ -114,7 +121,7 @@ Qui va où, sans exception :
 - une mutuelle, une complémentaire santé ou un assureur santé va dans « Mutuelles et prévoyance », quel que soit le sujet ;
 - une association ou une ligue n'est ni une entreprise ni une collectivité : range-la dans la rubrique de son sujet (événement, nouveauté…), ou écarte-la.
 
-« À ne pas rater » (urgent = vrai) : rare, seulement quand attendre le prochain rapport ferait rater l'occasion :
+« À ne pas manquer » (urgent = vrai) : rare, seulement quand attendre le prochain rapport ferait rater l'occasion :
 - un appel d'offres ou un appel à projets ouvert qui correspond à ce que fait AvisDoc (dépistage, prévention santé, télé-expertise, téléconsultation, santé des agents ou des habitants), y compris un marché de médecine du travail ou de médecine préventive générale : AvisDoc peut y répondre en partenaire ;
 - une entreprise ou une collectivité qui DEMANDE ou CHERCHE une solution de dépistage, de prévention ou d'accès aux dermatologues, ou annonce une action de santé à venir avec une date ;
 - un concurrent qui signe ou s'installe chez un client ou sur un territoire d'AvisDoc ;
@@ -127,7 +134,7 @@ Pour CHAQUE article ci-dessous, décide s'il est utile à AvisDoc (retenu) ou ho
 
 ${REGLES}`;
   const prompt = `<articles>
-${articles.map((a) => `[${a.n}] ${a.titre}\n    source : ${a.source} · nature : ${a.nature} · publié : ${a.publie_le?.slice(0, 10) ?? "date inconnue"}\n    extrait : ${a.extrait || "(aucun)"}`).join("\n\n")}
+${articles.map((a) => `[${a.n}] ${a.titre}\n    site : ${a.site} · source : ${a.source} · nature : ${a.nature} · publié : ${a.publie_le?.slice(0, 10) ?? "date inconnue"}\n    extrait : ${a.extrait || "(aucun)"}`).join("\n\n")}
 </articles>`;
   let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   const r = await complete<{ articles: Tri[] }>(prompt, schema, { system: consignes, systemEnCache: true, model: modeleTri(), timeoutMs: 110_000, onUsage: (u) => (usage = u) });
@@ -140,7 +147,7 @@ export interface PointCle {
   articles: number[];
 }
 
-/** Une idée de post LinkedIn pour les dirigeants d'AvisDoc : jamais publiée par Vigile, relue et publiée par eux. */
+/** Une idée de post LinkedIn pour les dirigeants d'AvisDoc : jamais publiée par Scope, relue et publiée par eux. */
 export interface IdeePost {
   titre: string;
   accroche: string;
@@ -150,8 +157,11 @@ export interface IdeePost {
 
 type Retenu = { n: number; titre: string; rubrique: string; importance: number; resume: string; pour_avisdoc: string; extrait: string };
 
-/** Les 3 points à retenir et 2 ou 3 idées de posts, en un seul appel au modèle de synthèse. */
-export async function pointsCles(retenus: Retenu[]) {
+/**
+ * Les 3 points à retenir et 2 ou 3 idées de posts, en un seul appel au modèle de synthèse.
+ * `avecPosts` faux (le rapport de la veille commerciale, 02/11) : les points seulement, la liste des posts reste vide.
+ */
+export async function pointsCles(retenus: Retenu[], avecPosts = true) {
   const schema = {
     type: "object",
     additionalProperties: false,
@@ -191,9 +201,9 @@ Voici les articles retenus pour le rapport de veille, avec leur extrait original
 
 1. Tire-en les TROIS points clés qu'un dirigeant d'AvisDoc doit connaître en ouvrant le rapport : ce qui est nouveau, ce qui ouvre une occasion, ce qui menace. Chaque point tient en deux phrases courtes (45 mots au plus) et s'appuie sur un ou plusieurs articles, cités par leur numéro. S'il y a moins de trois choses importantes, donne-en moins : n'en fabrique pas.
 
-2. Propose DEUX ou TROIS idées de posts LinkedIn que les dirigeants d'AvisDoc pourraient publier sur leur propre compte, chacune appuyée sur un ou deux articles (par leur numéro) : réagir à une étude, à un avis officiel, à une actualité qui montre l'intérêt du dépistage en entreprise. Ton : professionnel, humain, sans jargon, à la première personne du pluriel (« chez AvisDoc, nous… »). Le post cite sa source. S'il n'y a pas de matière, propose-en moins.
+${avecPosts ? `2. Propose DEUX ou TROIS idées de posts LinkedIn que les dirigeants d'AvisDoc pourraient publier sur leur propre compte, chacune appuyée sur un ou deux articles (par leur numéro) : réagir à une étude, à un avis officiel, à une actualité qui montre l'intérêt du dépistage en entreprise. Ton : professionnel, humain, sans jargon, à la première personne du pluriel (« chez AvisDoc, nous… »). Le post cite sa source. S'il n'y a pas de matière, propose-en moins.
 
-Règles propres aux posts : tout fait, chiffre ou résultat cité doit figurer dans l'extrait ou le résumé de l'article ; aucune promesse médicale (« sauve des vies », « détecte tous les cancers ») ; aucun client d'AvisDoc nommé ; aucun concurrent dénigré.
+Règles propres aux posts : tout fait, chiffre ou résultat cité doit figurer dans l'extrait ou le résumé de l'article ; aucune promesse médicale (« sauve des vies », « détecte tous les cancers ») ; aucun client d'AvisDoc nommé ; aucun concurrent dénigré.` : "2. Ne propose aucun post : laisse la liste des posts vide."}
 
 ${REGLES}
 
@@ -206,6 +216,6 @@ ${retenus.map((a) => `[${a.n}] (${a.rubrique}, importance ${a.importance}) ${a.t
   const fondes = <T extends { articles: number[] }>(x: T) => ({ ...x, articles: x.articles.filter((n) => connus.has(n)) });
   // Trois au plus : la limite se pose ici, l'API ne l'accepte pas dans le schéma. Un point ou un post sans article connu est écarté.
   const points = r.points.map(fondes).filter((p) => p.articles.length).slice(0, 3);
-  const posts = (r.posts ?? []).map(fondes).filter((p) => p.articles.length && p.brouillon.trim()).slice(0, 3);
+  const posts = (avecPosts ? r.posts ?? [] : []).map(fondes).filter((p) => p.articles.length && p.brouillon.trim()).slice(0, 3);
   return { points, posts, coutUsd: coutClaude(modeleSynthese(), usage) };
 }

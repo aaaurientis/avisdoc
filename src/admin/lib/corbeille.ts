@@ -34,6 +34,8 @@ export interface Jetee {
   nom: string;
   detail: string | null;
   supprimeLe: string;
+  /** Le CRM de la fiche (migration 0085) ; un débrief reste à CRM Entreprise. */
+  crm: string;
 }
 
 /** Le jour où une fiche jetée aujourd'hui partira définitivement. */
@@ -87,28 +89,30 @@ export async function chargerCorbeille(monEmail?: string): Promise<Jetee[]> {
     .not("deleted_at", "is", null);
 
   const [prospects, affaires, clients, notes] = await Promise.all([
-    supabaseAdmin.from("admin_prospects").select("id, name, city, activity, deleted_at").not("deleted_at", "is", null),
-    supabaseAdmin.from("admin_clients").select("id, company, ville, stage, deleted_at").not("deleted_at", "is", null),
-    supabaseAdmin.from("admin_accounts").select("id, name, sector, deleted_at").not("deleted_at", "is", null),
+    supabaseAdmin.from("admin_prospects").select("id, name, city, activity, deleted_at, crm").not("deleted_at", "is", null),
+    supabaseAdmin.from("admin_clients").select("id, company, ville, stage, deleted_at, crm").not("deleted_at", "is", null),
+    supabaseAdmin.from("admin_accounts").select("id, name, sector, deleted_at, crm").not("deleted_at", "is", null),
     monEmail ? mesNotes.ilike("owner_email", monEmail) : mesNotes,
   ]);
 
   const lignes: Jetee[] = [
-    ...((prospects.data ?? []) as { id: string; name: string; city: string | null; activity: string | null; deleted_at: string }[]).map(
+    ...((prospects.data ?? []) as { id: string; name: string; city: string | null; activity: string | null; deleted_at: string; crm?: string }[]).map(
       (p) => ({
         id: p.id,
         origine: "prospect" as const,
         nom: p.name,
         detail: [p.activity, p.city].filter(Boolean).join(" · ") || null,
         supprimeLe: p.deleted_at,
+        crm: p.crm ?? "demarcher",
       }),
     ),
-    ...((affaires.data ?? []) as { id: string; company: string; ville: string | null; stage: string; deleted_at: string }[]).map((c) => ({
+    ...((affaires.data ?? []) as { id: string; company: string; ville: string | null; stage: string; deleted_at: string; crm?: string }[]).map((c) => ({
       id: c.id,
       origine: "affaire" as const,
       nom: c.company,
       detail: [c.stage, c.ville].filter(Boolean).join(" · ") || null,
       supprimeLe: c.deleted_at,
+      crm: c.crm ?? "demarcher",
     })),
     ...((notes.data ?? []) as { id: string; titre: string | null; duree_s: number | null; audio_path: string | null; deleted_at: string }[]).map(
       (n) => ({
@@ -119,14 +123,16 @@ export async function chargerCorbeille(monEmail?: string): Promise<Jetee[]> {
           .filter(Boolean)
           .join(" · "),
         supprimeLe: n.deleted_at,
+        crm: "demarcher",
       }),
     ),
-    ...((clients.data ?? []) as { id: string; name: string; sector: string | null; deleted_at: string }[]).map((a) => ({
+    ...((clients.data ?? []) as { id: string; name: string; sector: string | null; deleted_at: string; crm?: string }[]).map((a) => ({
       id: a.id,
       origine: "client" as const,
       nom: a.name,
       detail: a.sector,
       supprimeLe: a.deleted_at,
+      crm: a.crm ?? "demarcher",
     })),
   ];
 

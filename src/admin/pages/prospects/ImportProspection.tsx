@@ -43,6 +43,7 @@ import {
   type LigneProspection,
 } from "../../lib/import-prospection";
 import { cn } from "@/lib/utils";
+import { crmPourFiche } from "../../lib/crm";
 
 const champCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-[13.5px] text-avisdoc-ink outline-none focus:border-avisdoc-teal";
@@ -267,6 +268,7 @@ export default function ImportProspection({
           const { data, error } = await supabaseAdmin
             .from("admin_prospects")
             .insert({
+              crm: crmPourFiche(),
               name: e.nom,
               department: principal.departement,
               city: principal.ville,

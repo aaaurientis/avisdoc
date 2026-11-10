@@ -22,7 +22,7 @@ export interface LlmUsage {
 
 export interface LlmOptions {
   system?: string;
-  /** Les consignes `system` sont les mêmes d'un appel à l'autre : on les met en cache 5 minutes (Vigile, tri par lots). `complete()` seulement. */
+  /** Les consignes `system` sont les mêmes d'un appel à l'autre : on les met en cache 5 minutes (Scope, tri par lots). `complete()` seulement. */
   systemEnCache?: boolean;
   model?: string;
   /** À défaut de modèle explicite, celui de cet usage. */

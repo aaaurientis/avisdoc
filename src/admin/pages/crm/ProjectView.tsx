@@ -37,6 +37,7 @@ import { chargerMembres } from "../../lib/membres";
 import { colonnesProspect, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, type FicheSaisie } from "../../lib/fiche-saisie";
 import { champsAffaire, saisieDepuisAffaire, synchroniserContacts } from "../../lib/affaire-saisie";
 import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
+import { crmPourFiche } from "../../lib/crm";
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -235,6 +236,7 @@ export default function ProjectView({
           .from("admin_prospects")
           .insert({
             owner_email: user?.email ?? "",
+            crm: client.crm ?? crmPourFiche(),
             name: client.company,
             city: client.ville || null,
             department: (client.codePostal ?? "").slice(0, 2) || null,
@@ -325,6 +327,7 @@ export default function ProjectView({
         const { error } = await supabaseAdmin.from("admin_prospects").insert({
           ...colonnesProspect(saisie),
           owner_email: user?.email ?? "",
+          crm: client.crm ?? crmPourFiche(),
           status: "contacte",
           converted_client_id: client.id,
           converted_at: new Date().toISOString(),

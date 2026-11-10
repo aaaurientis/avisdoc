@@ -4,8 +4,14 @@ import { useAdminData } from "../data/AdminDataContext";
 import { catPalette } from "../lib/ui-tokens";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
+import Onglets from "../components/Onglets";
+import { ESPACES_CRM, ESPACES_VEILLE } from "../lib/espaces";
+import ReglagesEspaces from "./reglages/ReglagesEspaces";
 
 const SEP = "␟";
+
+type Bloc = "documents" | "crm" | "veille";
+const BLOCS: { cle: Bloc; label: string }[] = [{ cle: "documents", label: "Documents" }, { cle: "crm", label: "CRM" }, { cle: "veille", label: "Veille" }];
 
 export default function Settings() {
   const {
@@ -18,6 +24,7 @@ export default function Settings() {
   // Saisie de nouvelle sous-catégorie, une par catégorie.
   const [subDraft, setSubDraft] = useState<Record<string, string>>({});
   const [newTag, setNewTag] = useState("");
+  const [bloc, setBloc] = useState<Bloc>("documents");
   // Renommage en ligne : clé de l'élément en cours d'édition + valeur saisie.
   const [editKey, setEditKey] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
@@ -54,10 +61,14 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader
-        title="Réglages"
-        subtitle="Arborescence documentaire — catégories et sous-catégories"
-      />
+      <PageHeader title="Réglages" subtitle="Les documents, les quatre CRM et la veille : qui reçoit quels mails. Qui voit quoi se règle dans Droits d'accès." />
+      {/* Trois blocs (Olivier, 09/11) : Documents (l'arborescence et les tags d'avant), CRM, Veille. */}
+      <div className="mb-5">
+        <Onglets onglets={BLOCS} actif={bloc} onChange={(c) => setBloc(c as Bloc)} />
+      </div>
+      {bloc === "crm" && <ReglagesEspaces espaces={ESPACES_CRM} explication="Pour chaque CRM : « Reçoit les mails » lui envoie les mails de ce CRM (aujourd'hui, ceux de sa veille : alertes et récapitulatifs) ; « Reçoit le Weekly » lui envoie le Weekly de ce CRM, le vendredi." />}
+      {bloc === "veille" && <ReglagesEspaces espaces={ESPACES_VEILLE} explication="La Veille Marché : « Reçoit les mails » lui envoie ses mails (alertes, récapitulatifs) ; « Reçoit le Weekly » lui envoie son Weekly, le vendredi." />}
+      {bloc === "documents" && <>
 
       <Card className="max-w-[680px] p-6">
         <h2 className="font-display text-lg font-semibold text-avisdoc-ink">
@@ -316,6 +327,7 @@ export default function Settings() {
           </button>
         </div>
       </Card>
+      </>}
     </div>
   );
 }

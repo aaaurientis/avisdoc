@@ -1,4 +1,4 @@
-// Veille › Vigile : on lui pose des questions sur ce qu'il surveille et sur ce que
+// Veille › Scope : on lui pose des questions sur ce qu'il surveille et sur ce que
 // ses rapports ont trouvé. « Sortez-moi les articles sur le soleil et le cancer de la
 // peau parus ces 30 derniers jours » : il cherche dans sa base et répond, chaque
 // article avec son lien.
@@ -8,10 +8,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, MessageSquare, Plus, Send } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { supabaseAdmin } from "../data/supabaseAdmin";
+import { CRMS } from "../lib/veille";
+import { useVeille } from "./veille/useVeille";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -28,7 +31,7 @@ interface Conversation {
 
 const quand = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" });
 
-/** Le texte de Vigile, avec ses liens [titre](url) cliquables et son gras **…**. Rien d'autre n'est interprété. */
+/** Le texte de Scope, avec ses liens [titre](url) cliquables et son gras **…**. Rien d'autre n'est interprété. */
 function Texte({ texte }: { texte: string }) {
   const morceaux = texte.split(/(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*)/g);
   return (
@@ -50,7 +53,7 @@ function Texte({ texte }: { texte: string }) {
   );
 }
 
-// Des questions toutes prêtes, par métier : un clic les pose à Vigile.
+// Des questions toutes prêtes, par métier : un clic les pose à Scope.
 const EXEMPLES: { qui: string; questions: string[] }[] = [
   { qui: "Pour les commerciaux", questions: [
     "Quelles entreprises ont parlé de la santé de leurs salariés ces 15 derniers jours ?",
@@ -72,8 +75,13 @@ const EXEMPLES: { qui: string; questions: string[] }[] = [
   ] },
 ];
 
-export default function Vigile() {
+export default function Scope() {
   const { user } = useAuth();
+  // D'où l'on vient (Olivier, 09/11 : « je ne sais pas où je suis, pas moyen de faire retour »).
+  const veille = useVeille();
+  const seul = useSearchParams()[0].get("seul");
+  const ici = veille === "marche" ? "Veille Marché" : CRMS.find((c) => c.axe === seul)?.label ?? "Veille Commerciale";
+  const retour = `/veille/${veille}/direct${seul ? `?seul=${encodeURIComponent(seul)}` : ""}`;
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [historique, setHistorique] = useState<Conversation[] | null>(null);
@@ -118,8 +126,9 @@ export default function Vigile() {
     setErreur(null);
   };
 
+  // Sans conversation, on reste en haut : le titre et « Retour » doivent se voir en arrivant.
   useEffect(() => {
-    bas.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (messages.length) bas.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, enCours]);
 
   const envoyer = async (posee?: string) => {
@@ -142,7 +151,7 @@ export default function Vigile() {
       setMessages(fin);
       setConversationId(await garder(conversationId, fin));
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : "Vigile n'a pas pu répondre.");
+      setErreur(e instanceof Error ? e.message : "Scope n'a pas pu répondre.");
     } finally {
       setEnCours(false);
     }
@@ -150,9 +159,12 @@ export default function Vigile() {
 
   return (
     <div>
+      <Link to={retour} className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-avisdoc-ink">
+        <ArrowLeft className="size-3.5" /> Retour à la veille · {ici}
+      </Link>
       <PageHeader
-        title="Vigile"
-        subtitle="Posez vos questions sur ce que Vigile surveille et sur ce que ses rapports ont trouvé."
+        title="Scope"
+        subtitle="Posez vos questions sur ce que Scope surveille et sur ce que ses rapports ont trouvé."
         action={
           <button type="button" onClick={nouvelle} disabled={enCours} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             <Plus className="size-4" /> Nouvelle conversation
@@ -195,7 +207,7 @@ export default function Vigile() {
           ))}
           {enCours && (
             <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <Loader2 className="size-4 animate-spin text-avisdoc-teal" /> Vigile cherche dans ses rapports…
+              <Loader2 className="size-4 animate-spin text-avisdoc-teal" /> Scope cherche dans ses rapports…
             </div>
           )}
           {erreur && <p className="text-[13px] text-red-600">{erreur}</p>}
@@ -218,7 +230,7 @@ export default function Vigile() {
               }
             }}
             rows={2}
-            placeholder="Votre question à Vigile…"
+            placeholder="Votre question à Scope…"
             className="ad-input min-w-0 flex-1 resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13.5px] outline-none focus:border-avisdoc-teal"
           />
           <button

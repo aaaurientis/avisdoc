@@ -73,8 +73,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 // Depuis la migration 0079 (menu à 8 blocs), le droit s'appelle « commercial » ;
-// « merx » reste accepté pour les comptes pas encore remappés.
-const MODULES = ["commercial", "merx"];
+// « merx » reste accepté pour les comptes pas encore remappés. Depuis 0085, chaque CRM a son droit (Olivier, 09/11).
+const MODULES = ["commercial", "merx", "crm_collectivites", "crm_mutuelles", "crm_intermediaires"];
+const CRMS_FICHES = ["demarcher", "collectivites", "mutuelles", "intermediaires"];
 const CHAT_TIMEOUT_MS = 30_000;
 
 /** Le module est-il ouvert à cette personne ? Super-admin : tout ; sinon, sa ligne de admin_droits. */
@@ -86,6 +87,17 @@ async function peutMerx(email: string): Promise<boolean> {
   // Une personne non listée a les modules par défaut, qui ne comprennent pas Merx.
   return Array.isArray(droits?.modules) && droits.modules.some((m: string) => MODULES.includes(m));
 }
+
+/** Ce CRM est-il ouvert à cette personne ? Super-admin : tous ; « merx » (ancien droit) vaut CRM Entreprise. */
+async function peutLeCrm(email: string, crm: string): Promise<boolean> {
+  const sb = admin();
+  const { data: sa } = await sb.from("admin_superadmins").select("email").ilike("email", email).maybeSingle();
+  if (sa) return true;
+  const { data: droits } = await sb.from("admin_droits").select("modules").ilike("email", email).maybeSingle();
+  const modules: string[] = Array.isArray(droits?.modules) ? droits.modules : [];
+  return modules.includes(DROIT_DU_CRM[crm]) || (crm === "demarcher" && modules.includes("merx"));
+}
+const DROIT_DU_CRM: Record<string, string> = { demarcher: "commercial", collectivites: "crm_collectivites", mutuelles: "crm_mutuelles", intermediaires: "crm_intermediaires" };
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -663,7 +675,10 @@ Deno.serve(async (req: Request) => {
     // ── Chat ─────────────────────────────────────────────────────────────
     if (body.action === "chat") {
       const message = String(body.message ?? "").trim();
+      // Le CRM de la page Merx (?crm=…) : les fiches de ses recherches y sont rangées ; sinon, CRM Entreprise.
+      const crmDuChat = CRMS_FICHES.includes(body.crm) ? String(body.crm) : "demarcher";
       if (!message) return json({ error: "Message vide." }, 400);
+      if (!(await peutLeCrm(email, crmDuChat))) return json({ error: "Votre compte n'a pas accès à ce CRM : demandez à un administrateur de le cocher dans Droits d'accès." }, 403);
 
       // Conversation : celle indiquée (et à cette personne), sinon une nouvelle.
       let conversationId: string | null = body.conversationId ?? null;
@@ -765,7 +780,7 @@ Deno.serve(async (req: Request) => {
             }
             const { data, error } = await sb
               .from("admin_merx_demandes")
-              .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email })
+              .insert({ kind: "recherche", request: demande, conversation_id: conversationId, requested_by: email, crm: crmDuChat })
               .select("id")
               .single();
             if (error) return `La recherche n'a pas pu être enregistrée : ${error.message}`;

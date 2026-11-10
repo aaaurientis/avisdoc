@@ -15,6 +15,7 @@ import { chargerMembres } from "../../lib/membres";
 import { colonnesProspect, erreurSaisie, fermerSiRienAPerdre, FICHE_VIDE, saisieDepuisProspect, type FicheSaisie } from "../../lib/fiche-saisie";
 import type { Prospect } from "../../lib/merx";
 import { lancerApprofondissement } from "../../lib/merx-appels";
+import { crmPourFiche } from "../../lib/crm";
 
 export default function NouveauProspect({
   fiche,
@@ -51,7 +52,7 @@ export default function NouveauProspect({
       const valeurs = colonnesProspect(saisie, fiche);
       const { data, error } = fiche
         ? await supabaseAdmin.from("admin_prospects").update(valeurs).eq("id", fiche.id).select("id").single()
-        : await supabaseAdmin.from("admin_prospects").insert({ ...valeurs, owner_email: user?.email ?? "" }).select("id").single();
+        : await supabaseAdmin.from("admin_prospects").insert({ ...valeurs, owner_email: user?.email ?? "", crm: crmPourFiche() }).select("id").single();
       if (error) throw new Error(error.message);
       if (avecMerx && data?.id) {
         // La fiche est enregistrée quoi qu'il arrive : si Merx ne peut pas partir, on le

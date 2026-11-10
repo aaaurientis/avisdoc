@@ -662,7 +662,7 @@ async function runSearchSociete(sb: SupabaseClient, req: Demande, nom: string, z
   // l'insertion passent aussi dedans) : jamais plus que pour une recherche par métier.
   const reste = BUDGET_MS - (Date.now() - debut) - 45_000;
   const fiches = await versFiches(retenues, Math.max(10_000, Math.min(90_000, reste)), true);
-  const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true });
+  const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { parVille: true, crm: req.crm });
   const deja = agences.length - nouvelles.length + (fiches.length - inserted);
   const restantes = nouvelles.length - retenues.length;
   const constat = [
@@ -718,7 +718,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     }
     const fiches = await versFiches(trouvees);
     if (fiches.length > 0) {
-      const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches);
+      const inserted = await insertLightProspects(sb, req.id, req.requestedBy, fiches, { crm: req.crm });
       const deja = fiches.length - inserted;
 
       // Pappers a-t-il servi à quelque chose ? Sinon on le dit, avec ce qu'il a envoyé.
@@ -781,7 +781,7 @@ async function runSearch(sb: SupabaseClient, req: Demande, onUsage: (u: LlmUsage
     // Une entreprise qu'aucune page consultée ne mentionne est écartée : elle pourrait être inventée.
     .filter((p) => p.name && p.sources.length > 0);
 
-  const inserted = await insertLightProspects(sb, req.id, req.requestedBy, prospects);
+  const inserted = await insertLightProspects(sb, req.id, req.requestedBy, prospects, { crm: req.crm });
   const rejected = out.prospects.length - prospects.length;
   const notes = [
     prospects.length > inserted && `${prospects.length - inserted} déjà dans les fiches`,

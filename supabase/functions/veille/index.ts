@@ -20,7 +20,7 @@ import type { Article, Periode } from "./sources.ts";
 import * as pplx from "./perplexity.ts";
 import { aVerifier, type Verification, verifier } from "./verifier.ts";
 import { modeleSynthese, modeleTri, pointsCles, PROMPT_VERSION, trier } from "./agent.ts";
-import { type ArticleMail, composer, composerAlerte, composerBudget, composerPanne, composerRecap, composerUrgent, envoyer, envoyerA, type Suite } from "./mail.ts";
+import { type ArticleMail, composer, composerAlerte, composerPlusieurs, type RapportMail, composerBudget, composerPanne, composerRecap, composerUrgent, destinataires, envoyer, envoyerA, type Suite } from "./mail.ts";
 import { partDuJour, reduire } from "./linkup.ts";
 import { tourneesEnPanne } from "./pannes.ts";
 import { Erreur, repondre } from "./vigile.ts";
@@ -56,20 +56,20 @@ const ALERTE_APRES_MIN = 15;
 const PAUSE_PANNES_H = 6;
 /**
  * Qui suit quelle case (30/10) : les entreprises à démarcher vont à Stéphane, les collectivités à Laurent.
- * Chacun reçoit tout de suite les « À ne pas rater » de sa case, et un récapitulatif du reste à la fin de chaque tournée.
+ * Chacun reçoit tout de suite les « À ne pas manquer » de sa case, et un récapitulatif du reste à la fin de chaque tournée.
  * Les adresses sont posées côté serveur (VEILLE_RESPONSABLE_…), jamais dans le code.
  */
 const RESPONSABLES: { axe: string; env: string; quoi: string; suite: Suite }[] = [
   { axe: "demarcher", env: "VEILLE_RESPONSABLE_ENTREPRISES", quoi: "entreprises à démarcher", suite: {
     lien: "/commercial-veille", libelle: "Ouvrir Commercial › Veille",
-    pourquoi: "Vous recevez ce mail parce que vous suivez les entreprises à démarcher repérées par Vigile.",
+    pourquoi: "Vous recevez ce mail parce que vous suivez les entreprises à démarcher repérées par Scope.",
   } },
   { axe: "collectivites", env: "VEILLE_RESPONSABLE_COLLECTIVITES", quoi: "collectivités à démarcher", suite: {
-    lien: "/veille/direct?onglet=collectivites", libelle: "Ouvrir les collectivités dans « En direct »",
-    pourquoi: "Vous recevez ce mail parce que vous suivez les collectivités repérées par Vigile.",
+    lien: "/veille/commerciale/direct?onglet=collectivites", libelle: "Ouvrir les collectivités dans « En direct »",
+    pourquoi: "Vous recevez ce mail parce que vous suivez les collectivités repérées par Scope.",
   } },
 ];
-/** Essais en local seulement : tous les mails de Vigile vont à cette seule adresse, à la place des vraies. */
+/** Essais en local seulement : tous les mails de Scope vont à cette seule adresse, à la place des vraies. */
 const adresseReelle = (e: string) => Deno.env.get("VEILLE_ALERTES_ESSAI_A")?.trim().toLowerCase() || e;
 const responsableDe = (axe: string) => {
   const r = RESPONSABLES.find((x) => x.axe === axe);
@@ -201,7 +201,7 @@ async function creerEtapesDeCollecte(db: Db, id: string, nature: Nature) {
         const qui = c.genre === "personne" ? `Publications, interventions et déclarations récentes de ${c.nom}` : `Actualités et annonces récentes de ${c.nom}`;
         etapes.push({ rapport_id: id, genre: "collecte", cle: `linkup:compte:${c.id}`, params: { source: "linkup", q: `${qui}${c.notes ? ` (${c.notes})` : ""}` } });
       }
-      // Réseaux : Vigile ne lit pas LinkedIn ou Facebook ; il cherche ce que le web en a indexé.
+      // Réseaux : Scope ne lit pas LinkedIn ou Facebook ; il cherche ce que le web en a indexé.
       const DOMAINES: Record<string, string> = { linkedin: "linkedin.com", facebook: "facebook.com", instagram: "instagram.com", x: "x.com", youtube: "youtube.com" };
       for (const r of reseaux as any[]) {
         etapes.push({ rapport_id: id, genre: "collecte", cle: `linkup:reseau:${r.id}`, params: { source: "linkup", q: `Publications récentes de ${r.nom}${r.url ? ` (page ${r.url})` : ""}${r.notes ? ` — ${r.notes}` : ""}`, domaines: DOMAINES[r.plateforme] ? [DOMAINES[r.plateforme]] : undefined } });
@@ -236,8 +236,10 @@ async function creerEtapesDeCollecte(db: Db, id: string, nature: Nature) {
   await creerEtapes(db, gardees);
 }
 
-async function compterEtapes(db: Db, rapportId: string, genres: string[]) {
-  const { count, error } = await db.from("admin_veille_etapes").select("id", { count: "exact", head: true }).eq("rapport_id", rapportId).in("genre", genres);
+async function compterEtapes(db: Db, rapportId: string, genres: string[], cles?: string[]) {
+  let q = db.from("admin_veille_etapes").select("id", { count: "exact", head: true }).eq("rapport_id", rapportId).in("genre", genres);
+  if (cles) q = q.in("cle", cles);
+  const { count, error } = await q;
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
@@ -369,7 +371,8 @@ async function verifierLot(db: Db, _r: Rapport, e: Etape): Promise<Issue> {
 
 async function trierLot(db: Db, r: Rapport, e: Etape): Promise<Issue> {
   if (await plafondAtteint(db, r.id)) return { abandon: `plafond de ${PLAFOND_USD} $ atteint pour ce rapport` };
-  const lot = await verifie(db.from("admin_veille_articles").select("id, titre, source, nature, publie_le, extrait").in("id", e.params.ids)) as any[];
+  const lot = (await verifie(db.from("admin_veille_articles").select("id, titre, source, nature, publie_le, extrait, url").in("id", e.params.ids)) as any[])
+    .map(({ url, ...a }) => ({ ...a, site: (() => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } })() }));
   const [rubriques, comptes, expressions] = await Promise.all([
     verifie(db.from("admin_veille_rubriques").select("nom, description, axe").eq("actif", true).order("ordre")),
     verifie(db.from("admin_veille_comptes").select("nom").eq("actif", true)),
@@ -386,19 +389,28 @@ async function trierLot(db: Db, r: Rapport, e: Etape): Promise<Issue> {
     if (!a) continue;
     await verifie(db.from("admin_veille_articles").update(
       t.verdict === "retenu"
-        ? { verdict: "retenu", raison: t.raison, rubrique: t.rubrique, importance: t.importance, titre_fr: t.titre_fr || null, resume: t.resume, pour_avisdoc: t.pour_avisdoc, entreprise: t.entreprise || null, ville: t.ville || null, urgent: Boolean(t.urgent), urgence: t.urgent ? (t.urgence || null) : null, trie_le: new Date().toISOString() }
+        ? { verdict: "retenu", raison: t.raison, rubrique: t.rubrique, importance: t.importance, titre_fr: t.titre_fr || null, resume: t.resume, pour_avisdoc: t.pour_avisdoc, entreprise: t.entreprise || null, ville: t.ville || null, urgent: Boolean(t.urgent), urgence: t.urgent ? (t.urgence || null) : null, genre_source: t.genre_source || null, trie_le: new Date().toISOString() }
         : { verdict: "ecarte", raison: t.raison, trie_le: new Date().toISOString() },
     ).eq("id", a.id));
   }
   return { fait: true, cout: coutUsd, resultat: { retenus: tris.filter((t) => t.verdict === "retenu").length, ecartes: tris.filter((t) => t.verdict === "ecarte").length } };
 }
 
-async function tirerPointsCles(db: Db, r: Rapport, _e: Etape): Promise<Issue> {
+/** Les axes de chaque veille (02/11) : le rapport du vendredi en fait deux, un par veille, chacun avec ses destinataires. */
+type NomVeille = "commerciale" | "marche";
+const AXES_VEILLE: Record<NomVeille, string[]> = { commerciale: ["demarcher", "collectivites", "intermediaires", "mutuelles"], marche: ["publications", "concurrents", "evenements", "nous"] };
+const VEILLES = Object.keys(AXES_VEILLE) as NomVeille[];
+
+async function tirerPointsCles(db: Db, r: Rapport, e: Etape): Promise<Issue> {
+  // Une étape par veille : « points-commerciale », « points-marche » (« points » : celle d'avant le 02/11, commerciale).
+  const veille: NomVeille = e.cle === "points-marche" ? "marche" : "commerciale";
   // Le rapport reprend d'un seul geste tout ce qui a été retenu depuis le précédent (tournées comprises),
   // juste avant de le lire : ce qu'il reprend et ce qu'il écrit sont la même chose.
   await verifie(db.rpc("veille_rattacher", { p_rapport: r.id }));
   const retenus = await verifie(db.from("admin_veille_articles").select("id, titre, titre_fr, rubrique, importance, resume, pour_avisdoc, publie_le, extrait").eq("rapport_envoye_id", r.id).eq("verdict", "retenu").is("retire_le", null)) as any[];
   const rubriques = await verifie(db.from("admin_veille_rubriques").select("nom, axe").eq("actif", true).order("ordre")) as any[];
+  const axeDe = new Map<string, string>(rubriques.map((x) => [x.nom, x.axe]));
+  const siens = retenus.filter((a) => AXES_VEILLE[veille].includes(axeDe.get(a.rubrique) ?? ""));
   const ordre = (a: any, b: any) => (b.importance ?? 0) - (a.importance ?? 0) || String(b.publie_le ?? "").localeCompare(String(a.publie_le ?? ""));
   const noms = new Set(rubriques.map((x) => x.nom));
   // Une rubrique renommée ou retirée pendant la préparation ne fait pas disparaître ses articles.
@@ -411,15 +423,17 @@ async function tirerPointsCles(db: Db, r: Rapport, _e: Etape): Promise<Issue> {
   let points: { texte: string; articles: string[] }[] = [];
   let posts: { titre: string; accroche: string; brouillon: string; articles: string[] }[] = [];
   let cout = 0;
-  if (retenus.length && !(await plafondAtteint(db, r.id))) {
-    const numerotes = retenus.slice().sort(ordre).slice(0, 80).map((a, i) => ({ n: i + 1, ...a, titre: a.titre_fr || a.titre, extrait: String(a.extrait ?? "").slice(0, 600) }));
-    const res = await pointsCles(numerotes);
+  if (siens.length && !(await plafondAtteint(db, r.id))) {
+    const numerotes = siens.slice().sort(ordre).slice(0, 80).map((a, i) => ({ n: i + 1, ...a, titre: a.titre_fr || a.titre, extrait: String(a.extrait ?? "").slice(0, 600) }));
+    // Les idées de posts LinkedIn sont de la communication : seulement dans le rapport de la veille de marché.
+    const res = await pointsCles(numerotes, veille === "marche");
     cout = res.coutUsd;
-    points = res.points.map((p) => ({ texte: p.texte, articles: p.articles.map((n) => numerotes[n - 1].id) }));
-    posts = res.posts.map((p) => ({ titre: p.titre, accroche: p.accroche, brouillon: p.brouillon, articles: p.articles.map((n) => numerotes[n - 1].id) }));
+    points = res.points.map((p) => ({ texte: p.texte, articles: p.articles.map((n) => numerotes[n - 1].id), veille }));
+    posts = res.posts.map((p) => ({ titre: p.titre, accroche: p.accroche, brouillon: p.brouillon, articles: p.articles.map((n) => numerotes[n - 1].id), veille }));
   }
-  await verifie(db.from("admin_veille_rapports").update({ points_cles: points, posts }).eq("id", r.id));
-  return { fait: true, cout, resultat: { points: points.length, posts: posts.length, retenus: retenus.length } };
+  // Les deux étapes écrivent le même rapport : la base remplace seulement les points de cette veille, en une fois.
+  await verifie(db.rpc("veille_ecrire_points", { p_rapport: r.id, p_veille: veille, p_points: points, p_posts: posts }));
+  return { fait: true, cout, resultat: { veille, points: points.length, posts: posts.length, retenus: siens.length } };
 }
 
 const TRAVAUX: Record<string, (db: Db, r: Rapport, e: Etape) => Promise<Issue>> = {
@@ -522,7 +536,7 @@ async function avancer(db: Db, r: Rapport, maintenant: Date, t0: number) {
     if (!(await toutesFinies(db, r.id, ["verification"]))) return;
     const bons = await verifie(db.from("admin_veille_articles").select("id").eq("rapport_id", r.id).eq("verifie", true).is("verdict", null).order("publie_le", { ascending: false })) as any[];
     const etapes: any[] = lots(bons.map((a) => a.id), LOT_TRI).map((ids, i) => ({ rapport_id: r.id, genre: "tri", cle: `lot-${i + 1}`, params: { ids }, max_tentatives: 3 }));
-    if (r.nature === "rapport") etapes.push({ rapport_id: r.id, genre: "points_cles", cle: "points", max_tentatives: 3, prochain_passage: new Date(Date.now() + 365 * 86_400_000).toISOString() });
+    if (r.nature === "rapport") for (const v of VEILLES) etapes.push({ rapport_id: r.id, genre: "points_cles", cle: `points-${v}`, max_tentatives: 3, prochain_passage: new Date(Date.now() + 365 * 86_400_000).toISOString() });
     await creerEtapes(db, etapes);
     if (!(await passerA(db, r, "verification", "synthese"))) return;
   }
@@ -542,6 +556,11 @@ async function avancer(db: Db, r: Rapport, maintenant: Date, t0: number) {
       await passerA(db, r, "synthese", "termine");
       return;
     }
+    // Un rapport commencé avant les deux veilles (02/11) n'a qu'une étape « points » : il reçoit les deux nouvelles.
+    if (!(await compterEtapes(db, r.id, ["points_cles"], ["points-commerciale", "points-marche"]))) {
+      await creerEtapes(db, VEILLES.map((v) => ({ rapport_id: r.id, genre: "points_cles", cle: `points-${v}`, max_tentatives: 3 })));
+      await db.from("admin_veille_etapes").update({ statut: "fait", resultat: { remplacee_par: "points-commerciale, points-marche" } }).eq("rapport_id", r.id).eq("cle", "points").neq("statut", "fait");
+    }
     // Les points clés attendaient la fin du tri : on les libère.
     await db.from("admin_veille_etapes").update({ prochain_passage: new Date().toISOString() }).eq("rapport_id", r.id).eq("genre", "points_cles").eq("statut", "a_faire");
     await traiter(db, r, ["points_cles"], t0);
@@ -553,20 +572,112 @@ async function avancer(db: Db, r: Rapport, maintenant: Date, t0: number) {
     // Un seul passage gagne le droit d'envoyer.
     if (!(await passerA(db, r, "pret", "envoi"))) return;
     try {
-      const { sujet, html } = await composerRapport(db, r);
-      const mailId = await envoyer(sujet, html, `veille-${r.id}`);
-      await verifie(db.from("admin_veille_rapports").update({ statut: "envoye", mail_id: mailId, envoye_le: new Date().toISOString(), erreur: null }).eq("id", r.id));
+      // Chaque mail est noté dès qu'il part (« commerciale:<id> » à l'ancienne, « <adresse>:<id> » avec les réglages) :
+      // repris après une coupure, seul celui qui manque repart. Sa clé d'envoi suit son contenu : pas de doublon.
+      const lu = await verifie(db.from("admin_veille_rapports").select("mail_id").eq("id", r.id).single()) as any;
+      const partis = String(lu?.mail_id ?? "").split(",").filter(Boolean);
+      const noter = async (jeton: string) => {
+        partis.push(jeton);
+        await verifie(db.from("admin_veille_rapports").update({ mail_id: partis.join(",") }).eq("id", r.id));
+      };
+      const empreinteDe = async (html: string) =>
+        Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html))), (o) => o.toString(16).padStart(2, "0")).join("").slice(0, 16);
+      const reglages = await abonnesEspaces(db);
+      // Un envoi commencé avant les réglages (« commerciale:… », « marche:… ») se finit à l'ancienne : rien ne part en double.
+      const commenceAvant = partis.some((x) => x.startsWith("commerciale:") || x.startsWith("marche:"));
+      if (reglages.regle && !commenceAvant) {
+        // Réglages renseignés (Olivier, 09/11) : un seul mail par personne, avec le Weekly de chaque CRM coché
+        // « Reçoit le Weekly » (et celui de la Veille Marché), l'un sous l'autre, dans l'ordre du menu.
+        const espaces = [
+          ...AXES_VEILLE.commerciale.map((axe) => ({ cle: `crm:${axe}`, veille: "commerciale" as NomVeille, axe })),
+          { cle: "veille:marche", veille: "marche" as NomVeille, axe: undefined as string | undefined },
+        ];
+        const parPersonne = new Map<string, typeof espaces>();
+        for (const e of espaces) {
+          for (const qui of reglages.w.get(e.cle) ?? []) {
+            const a = adresseReelle(qui);
+            const siens = parPersonne.get(a) ?? [];
+            if (!siens.includes(e)) parPersonne.set(a, [...siens, e]);
+          }
+        }
+        const donnees = new Map<string, RapportMail>();
+        for (const [a, siens] of parPersonne) {
+          if (partis.some((x) => x.startsWith(`${a}:`))) continue;
+          const parts: RapportMail[] = [];
+          for (const e of espaces.filter((x) => siens.includes(x))) {
+            if (!donnees.has(e.cle)) donnees.set(e.cle, await donneesRapport(db, r, e.veille, e.axe));
+            parts.push(donnees.get(e.cle)!);
+          }
+          const { sujet, html } = composerPlusieurs(parts);
+          await noter(`${a}:${await envoyerA([a], sujet, html, `veille-${r.id}-${a}-${await empreinteDe(html)}`)}`);
+        }
+      } else {
+        // Sans réglages, comme avant : un Weekly par veille, aux destinataires posés côté serveur.
+        for (const v of VEILLES) {
+          if (partis.some((x) => x.startsWith(`${v}:`))) continue;
+          const { sujet, html } = composer(await donneesRapport(db, r, v));
+          await noter(`${v}:${await envoyerA(destinatairesDe(v), sujet, html, `veille-${r.id}-${v}-${await empreinteDe(html)}`)}`);
+        }
+      }
+      await verifie(db.from("admin_veille_rapports").update({ statut: "envoye", envoye_le: new Date().toISOString(), erreur: null }).eq("id", r.id));
     } catch (err) {
       await verifie(db.from("admin_veille_rapports").update({ statut: "pret", erreur: `Envoi : ${err instanceof Error ? err.message : String(err)}`.slice(0, 1000) }).eq("id", r.id));
     }
   }
 }
 
-async function composerRapport(db: Db, r: Rapport) {
+/**
+ * Admin › Réglages (migration 0083) : par espace (« crm:<axe> », « veille:marche »), qui reçoit les mails.
+ * Table absente ou vide : une carte vide, et chaque envoi garde son ancien fonctionnement.
+ */
+async function abonnesEspaces(db: Db) {
+  // « regle » : au moins une ligne dans la table, cochée ou non. Alors les cases décident seules, même si
+  // plus personne n'a « Reçoit les mails » (décocher tout le monde coupe les mails, ne relance pas l'ancien envoi).
+  const m = new Map<string, string[]>();
+  const w = new Map<string, string[]>();
+  const { data, error } = await db.from("admin_espaces_membres").select("espace, email, recoit_mails, recoit_weekly");
+  // Seule une table absente (migration 0083 pas encore jouée) ramène l'ancien envoi ; toute autre erreur arrête,
+  // pour ne jamais rendre les mails à des gens décochés.
+  if (error?.code === "42P01") return { regle: false, m, w };
+  if (error) throw new Error(`Réglages des mails illisibles : ${error.message}`);
+  for (const x of (data ?? []) as any[]) {
+    const e = String(x.email).toLowerCase();
+    if (!e.endsWith("@avisdoc.fr")) continue;
+    if (x.recoit_mails) m.set(x.espace, [...(m.get(x.espace) ?? []), e]);
+    if (x.recoit_weekly) w.set(x.espace, [...(w.get(x.espace) ?? []), e]);
+  }
+  // La ligne de la CRM Synthèse (qui la voit) ne touche pas aux mails : elle ne compte pas pour basculer.
+  return { regle: ((data ?? []) as any[]).some((x) => x.espace !== "crm:synthese"), m, w };
+}
+const espaceDe = (axe: string) => (AXES_VEILLE.commerciale.includes(axe) ? `crm:${axe}` : AXES_VEILLE.marche.includes(axe) ? "veille:marche" : "");
+const QUOI_ESPACE: Record<string, string> = {
+  "crm:demarcher": "entreprises à démarcher", "crm:collectivites": "collectivités à démarcher", "crm:mutuelles": "mutuelles et assurances",
+  "crm:intermediaires": "intermédiaires", "veille:marche": "la Veille Marché",
+};
+
+const NOM_CRM: Record<string, string> = {
+  demarcher: "CRM Entreprise", collectivites: "CRM Collectivités Locales", mutuelles: "CRM Assurance Mutuelle", intermediaires: "CRM Intermédiaire",
+};
+
+/** Les destinataires du rapport d'une veille (VEILLE_DESTINATAIRES_COMMERCIALE ou _MARCHE), sinon ceux d'avant le 02/11. */
+function destinatairesDe(v: NomVeille) {
+  const propres = (Deno.env.get(`VEILLE_DESTINATAIRES_${v.toUpperCase()}`) ?? "").split(",").map((s) => s.trim()).filter((s) => s.includes("@"));
+  const a = propres.length ? propres : destinataires();
+  if (!a.length) throw new Error(`Aucun destinataire pour le rapport de la veille ${v}`);
+  return a;
+}
+
+async function donneesRapport(db: Db, r: Rapport, veille: NomVeille, axe?: string): Promise<RapportMail> {
+  // Le Weekly d'un CRM : seulement les publications de son marché, et les points clés qui en citent une.
+  const axesVus = axe ? [axe] : AXES_VEILLE[veille];
   const plein = await verifie(db.from("admin_veille_rapports").select("points_cles, posts, rubriques, sources_en_panne").eq("id", r.id).single()) as any;
   // Les rapports d'avant les axes : l'axe se retrouve par le nom de la rubrique.
   const axes = new Map((await verifie(db.from("admin_veille_rubriques").select("nom, axe")) as any[]).map((x) => [x.nom, x.axe]));
-  const articles = await verifie(db.from("admin_veille_articles").select("id, titre, titre_fr, url, source, publie_le, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence").eq("rapport_envoye_id", r.id).eq("verdict", "retenu").is("retire_le", null)) as any[];
+  // Seulement les articles des axes de cette veille : l'axe noté dans le rapport d'abord (une rubrique renommée
+  // ou retirée depuis ne fait rien perdre), sinon celui de la rubrique aujourd'hui.
+  const axeNote = new Map<string, string>((plein.rubriques ?? []).flatMap((x: any) => x.articles.map((id: string) => [id, x.axe ?? axes.get(x.nom)])));
+  const tous = await verifie(db.from("admin_veille_articles").select("id, titre, titre_fr, url, source, publie_le, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, rubrique").eq("rapport_envoye_id", r.id).eq("verdict", "retenu").is("retire_le", null)) as any[];
+  const articles = tous.filter((a) => axesVus.includes(axeNote.get(a.id) ?? axes.get(a.rubrique) ?? ""));
   const sources = await verifie(db.from("admin_veille_sources").select("cle, nom")) as any[];
   // Pour le web, le nom du site dit plus que le moteur qui l'a trouvé.
   const nomSource = (c: string, url: string) =>
@@ -574,16 +685,21 @@ async function composerRapport(db: Db, r: Rapport) {
   const n = new Map<string, number>(articles.map((a, i) => [a.id, i + 1]));
   const enMail = (a: any): ArticleMail => ({ n: n.get(a.id)!, titre: a.titre_fr || a.titre, url: a.url, source: nomSource(a.source, a.url), publie_le: a.publie_le, importance: a.importance ?? 1, resume: a.resume ?? "", pour_avisdoc: a.pour_avisdoc ?? "", protege: Boolean(a.lien_protege), entreprise: a.entreprise ?? null, ville: a.ville ?? null, urgent: Boolean(a.urgent), urgence: a.urgence ?? null });
   const parId = new Map(articles.map((a) => [a.id, a]));
-  return composer({
+  const rubriques = (plein.rubriques ?? []).map((x: any) => ({ nom: x.nom, axe: x.axe ?? axes.get(x.nom) ?? "nouveautes", articles: x.articles.map((id: string) => parId.get(id)).filter(Boolean).map(enMail) }))
+    .filter((x: any) => axesVus.includes(x.axe));
+  return {
     id: r.id,
+    veille,
+    crm: axe ? { axe, label: NOM_CRM[axe] ?? axe } : undefined,
     debut: new Date(r.periode_debut),
     fin: new Date(r.periode_fin),
-    points: (plein.points_cles ?? []).map((p: any) => ({ texte: p.texte, articles: p.articles.map((id: string) => n.get(id)).filter(Boolean) })),
-    rubriques: (plein.rubriques ?? []).map((x: any) => ({ nom: x.nom, axe: x.axe ?? axes.get(x.nom) ?? "nouveautes", articles: x.articles.map((id: string) => parId.get(id)).filter(Boolean).map(enMail) })),
-    posts: (plein.posts ?? []).map((p: any) => ({ titre: p.titre, accroche: p.accroche, brouillon: p.brouillon, sources: p.articles.map((id: string) => parId.get(id)).filter(Boolean).map(enMail) })),
+    points: (plein.points_cles ?? []).filter((p: any) => (p.veille ?? "commerciale") === veille && (!axe || p.articles.some((id: string) => n.has(id))))
+      .map((p: any) => ({ texte: p.texte, articles: p.articles.map((id: string) => n.get(id)).filter(Boolean) })),
+    rubriques,
+    posts: (plein.posts ?? []).filter((p: any) => (p.veille ?? "marche") === veille).map((p: any) => ({ titre: p.titre, accroche: p.accroche, brouillon: p.brouillon, sources: p.articles.map((id: string) => parId.get(id)).filter(Boolean).map(enMail) })),
     enPanne: plein.sources_en_panne ?? [],
     total: articles.length,
-  });
+  };
 }
 
 /** L'axe de chaque rubrique (par son nom), et le nom d'une source tel qu'on l'écrit dans un mail. */
@@ -605,16 +721,17 @@ async function reperes(db: Db) {
 const CHAMPS_MAIL = "id, titre, titre_fr, url, source, publie_le, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgence, rubrique, alerte_essais";
 
 /**
- * Les « À ne pas rater » tout juste triés : un mail par publication et par destinataire, tout de suite. Les destinataires :
+ * Les « À ne pas manquer » tout juste triés : un mail par publication et par destinataire, tout de suite. Les destinataires :
  * celui qui suit la case (Stéphane pour une entreprise, Laurent pour une collectivité), et ceux qui ont coché l'alerte.
  * Chaque publication est réservée 10 minutes, et ne compte comme signalée qu'une fois tous les mails partis :
  * un envoi coupé en route est repris au passage suivant (5 essais au plus), et la clé d'envoi, fixe pour
  * une publication et une adresse, empêche Resend d'envoyer deux fois le même mail.
  */
 async function alerterUrgents(db: Db) {
+  const reglages = await abonnesEspaces(db);
   const abonnes = ((await verifie(db.from("admin_veille_alertes").select("email"))) as any[]).map((x) => String(x.email).toLowerCase()).filter((e) => e.endsWith("@avisdoc.fr"));
   // Personne à prévenir : on ne réserve rien, ils restent visibles dans « En direct ».
-  if (!abonnes.length && !RESPONSABLES.some((r) => responsableDe(r.axe))) return;
+  if (!reglages.regle && !abonnes.length && !RESPONSABLES.some((r) => responsableDe(r.axe))) return;
   const ids = (await verifie(db.rpc("veille_prendre_alertes")) as any[]).map((x) => (typeof x === "string" ? x : x.veille_prendre_alertes ?? x.id)).filter(Boolean);
   if (!ids.length) return;
   const articles = await verifie(db.from("admin_veille_articles").select(CHAMPS_MAIL).in("id", ids).is("retire_le", null)) as any[];
@@ -622,9 +739,14 @@ async function alerterUrgents(db: Db) {
   for (const a of articles) {
     try {
       // Celui qui suit la case d'abord : son mail mène à son écran. Une adresse ne reçoit qu'un mail.
-      const resp = responsableDe(axeDe.get(a.rubrique ?? "") ?? "");
+      const axe = axeDe.get(a.rubrique ?? "") ?? "";
+      const resp = responsableDe(axe);
       const pour = new Map<string, Suite | undefined>();
-      for (const [e, suite] of [...(resp ? [[resp.email, resp.suite] as const] : []), ...abonnes.map((e) => [e, undefined] as const)]) {
+      // Réglages renseignés : ils décident seuls. Sinon, l'ancien envoi (responsable de la case, puis abonnés).
+      const liste = reglages.regle
+        ? (reglages.m.get(espaceDe(axe)) ?? []).map((e) => [e, RESPONSABLES.find((x) => x.axe === axe)?.suite] as const)
+        : [...(resp ? [[resp.email, resp.suite] as const] : []), ...abonnes.map((e) => [e, undefined] as const)];
+      for (const [e, suite] of liste) {
         if (!pour.has(adresseReelle(e))) pour.set(adresseReelle(e), suite);
       }
       // Personne pour celle-ci (sa case n'a pas de responsable, et nul n'a coché l'alerte) : on la rend, sans compter
@@ -640,17 +762,31 @@ async function alerterUrgents(db: Db) {
       await verifie(db.from("admin_veille_articles").update({ alerte_envoyee_le: new Date().toISOString() }).eq("id", a.id));
     } catch (err) {
       // Laissée réservée : elle sera reprise dans 10 minutes, jusqu'à 5 essais.
-      console.error(`alerte « À ne pas rater » ${a.id} non envoyée :`, err instanceof Error ? err.message : String(err));
+      console.error(`alerte « À ne pas manquer » ${a.id} non envoyée :`, err instanceof Error ? err.message : String(err));
     }
   }
 }
 
-/** À la fin d'une tournée : à chacun, ce qu'elle a trouvé dans sa case, hors « À ne pas rater » (déjà signalés), en un seul mail. */
+/** À la fin d'une tournée : à chacun, ce qu'elle a trouvé dans sa case, hors « À ne pas manquer » (déjà signalés), en un seul mail. */
 async function envoyerRecaps(db: Db, r: Rapport) {
+  const reglages = await abonnesEspaces(db);
   const suivis = RESPONSABLES.map((x) => responsableDe(x.axe)).filter((x) => x !== null);
-  if (!suivis.length) return;
+  if (!reglages.regle && !suivis.length) return;
   const { axeDe, enMail } = await reperes(db);
   const articles = await verifie(db.from("admin_veille_articles").select(CHAMPS_MAIL).eq("rapport_id", r.id).eq("verdict", "retenu").eq("urgent", false).is("retire_le", null).order("importance", { ascending: false })) as any[];
+  // Réglages renseignés : chaque espace coché envoie son récapitulatif à ses abonnés, et rien d'autre ne part.
+  if (reglages.regle) {
+    for (const [espace, emails] of reglages.m) {
+      const siens = articles.filter((a) => espaceDe(axeDe.get(a.rubrique ?? "") ?? "") === espace);
+      if (!siens.length) continue;
+      const suite = RESPONSABLES.find((x) => `crm:${x.axe}` === espace)?.suite;
+      for (const e of new Set(emails.map(adresseReelle))) {
+        const { sujet, html } = composerRecap(QUOI_ESPACE[espace] ?? "votre veille", siens.map((a, i) => enMail(a, i + 1)), suite);
+        await envoyerA([e], sujet, html, `veille-recap-${r.id}-${espace}-${e}`);
+      }
+    }
+    return;
+  }
   for (const s of suivis) {
     const siens = articles.filter((a) => axeDe.get(a.rubrique ?? "") === s.axe);
     if (!siens.length) continue;
@@ -751,7 +887,7 @@ function memeSecret(a: string, b: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
-  // Une question posée à Vigile depuis le Hub : la personne connectée, pas la tâche planifiée.
+  // Une question posée à Scope depuis le Hub : la personne connectée, pas la tâche planifiée.
   if (!req.headers.get("x-secret")) {
     const jeton = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
     if (!jeton) return json({ error: "non autorisé" }, 401);
@@ -791,7 +927,7 @@ Deno.serve(async (req) => {
     const ouverts = (await verifie(db.from("admin_veille_rapports").select("id, nature, periode_debut, periode_fin, statut, cout_usd, alerte_le, updated_at").not("statut", "in", "(envoye,termine,echec)").order("periode_fin")) as Rapport[])
       .sort((a, b) => Number(b.nature === "rapport") - Number(a.nature === "rapport"));
     for (const r of ouverts) await avancer(db, r, maintenant, t0);
-    await alerterUrgents(db).catch((err) => console.error("alertes « À ne pas rater » :", err instanceof Error ? err.message : String(err)));
+    await alerterUrgents(db).catch((err) => console.error("alertes « À ne pas manquer » :", err instanceof Error ? err.message : String(err)));
     await alerter(db, maintenant);
     await surveillerTournees(db, maintenant).catch((err) => console.error("tournées :", err instanceof Error ? err.message : String(err)));
     await surveillerBudget(db, maintenant).catch((err) => console.error("budget :", err instanceof Error ? err.message : String(err)));

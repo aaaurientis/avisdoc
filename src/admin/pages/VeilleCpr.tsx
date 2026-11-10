@@ -1,6 +1,6 @@
-// Veille › CPR — le coût par recherche de Vigile.
+// Veille › CPR — le coût par recherche de Scope.
 //
-// Rien n'est estimé : chaque montant est celui que Vigile a mesuré à chaque appel (jetons lus et écrits
+// Rien n'est estimé : chaque montant est celui que Scope a mesuré à chaque appel (jetons lus et écrits
 // pour Claude, coût rendu par Perplexity), en dollars comme les factures. Trois vues : par jour et par IA,
 // par tournée ou rapport, et les recherches Linkup du mois (gratuites sous le plafond).
 
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
-import { lireBudget, lireCpr, momentEnClair, reglerBudget, type Cpr } from "../lib/veille";
+import { coutParVeille, lireBudget, lireCpr, momentEnClair, reglerBudget, type Cpr, VEILLES } from "../lib/veille";
 import { cn } from "@/lib/utils";
 
 /** Le plafond mensuel des recherches Linkup, le même que celui de la fonction (VEILLE_LINKUP_PAR_MOIS). */
@@ -19,7 +19,7 @@ const POSTES = [
   { cle: "tri", label: "Tri (Sonnet)", detail: "Claude Sonnet lit et range chaque publication trouvée, aux tournées comme au rapport" },
   { cle: "rapport", label: "Synthèse (Opus)", detail: "Claude Opus écrit les points à retenir et les idées de posts du rapport" },
   { cle: "perplexity", label: "Perplexity", detail: "Recherche sur le web pour le rapport" },
-  { cle: "questions", label: "Questions (Sonnet)", detail: "Claude Sonnet répond à vos conversations avec Vigile" },
+  { cle: "questions", label: "Questions (Sonnet)", detail: "Claude Sonnet répond à vos conversations avec Scope" },
 ] as const;
 
 const dollars = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
@@ -31,8 +31,10 @@ export default function VeilleCpr() {
   const { isSuperAdmin } = useAuth();
   const [cpr, setCpr] = useState<Cpr | null>(null);
   const [budget, setBudget] = useState<number | null>(null);
+  const [parVeille, setParVeille] = useState<{ commerciale: number; marche: number; commun: number } | null>(null);
 
   useEffect(() => {
+    coutParVeille().then(setParVeille, () => setParVeille(null));
     lireBudget().then((b) => setBudget(b ? Number(b.montant_usd) : null), () => setBudget(null));
     lireCpr(31).then(setCpr, (err) => {
       toast.error(err instanceof Error ? err.message : "Les coûts n'ont pas pu être lus.");
@@ -71,11 +73,28 @@ export default function VeilleCpr() {
   return (
     <div>
       <PageHeader
-        title="CPR"
-        subtitle="Le coût par recherche de Vigile, en dollars comme les factures : ce que chaque IA a réellement coûté, par jour et par tournée."
+        title="CPR · Scope"
+        subtitle="Le coût par recherche de Scope, en dollars comme les factures : ce que chaque IA a réellement coûté, par jour et par tournée. Un seul budget pour les deux veilles."
       />
 
       <Budget depense={somme((j) => j.jour.startsWith(mois))} budget={budget} modifiable={isSuperAdmin} onRegle={setBudget} />
+
+      {parVeille && (
+        <Card className="mb-5 px-5 py-4">
+          <SectionLabel>Ce mois-ci, par veille</SectionLabel>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {([["commerciale", VEILLES.commerciale.titre], ["marche", VEILLES.marche.titre], ["commun", "Commun aux deux"]] as const).map(([cle, label]) => (
+              <div key={cle} className={cn("rounded-xl px-4 py-3", "bg-muted/50")}>
+                <p className="text-[12px] font-bold text-muted-foreground">{label}</p>
+                <p className="mt-0.5 font-display text-xl font-semibold text-avisdoc-ink">{dollars(Number(parVeille[cle]))}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Les deux veilles partagent la même recherche : son coût et celui du tri sont répartis selon le nombre de publications retenues dans chacune. Les points clés de chaque rapport sont comptés à leur veille. « Commun » : les questions à Scope, les tournées sans publication retenue et les anciennes Nouveautés.
+          </p>
+        </Card>
+      )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tuiles.map((t) => (
@@ -115,7 +134,7 @@ export default function VeilleCpr() {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
             <div className={cn("h-full rounded-full", cpr.linkup_mois > PLAFOND_LINKUP * 0.85 ? "bg-red-600" : "bg-avisdoc-teal")} style={{ width: `${Math.min(100, (cpr.linkup_mois / PLAFOND_LINKUP) * 100)}%` }} />
           </div>
-          <p className="mt-2 text-[12px] text-muted-foreground">Presse et web, sites sans flux, réseaux sociaux. Gratuites sous ce plafond, donc 0 $ ; au-delà, la tournée de 7 h s'en passe jusqu'au mois suivant.</p>
+          <p className="mt-2 text-[12px] text-muted-foreground">Presse et web, sites sans flux, réseaux sociaux. Gratuites sous ce plafond, donc 0 $ ; chaque tournée de 7 h n'en prend que sa part du mois, en laissant de côté d'abord les réseaux sociaux.</p>
         </Card>
       </div>
 
@@ -234,7 +253,7 @@ function Budget({ depense, budget, modifiable, onRegle }: { depense: number; bud
         </div>
       ) : null}
       <p className="mt-2 text-[12px] text-muted-foreground">
-        Un mail prévient à 80 % puis à 100 % du budget. Vigile continue normalement : rien n'est coupé.{modifiable ? " Faites glisser le curseur (0 à 500 $), puis Enregistrer ; 0 $ retire le budget." : " Seul un administrateur règle le montant."}
+        Un mail prévient à 80 % puis à 100 % du budget. Scope continue normalement : rien n'est coupé.{modifiable ? " Faites glisser le curseur (0 à 500 $), puis Enregistrer ; 0 $ retire le budget." : " Seul un administrateur règle le montant."}
       </p>
     </Card>
   );

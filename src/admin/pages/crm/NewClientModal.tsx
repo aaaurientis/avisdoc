@@ -21,6 +21,7 @@ import { useAdminData } from "../../data/AdminDataContext";
 import { devisRepo } from "../../espace/devisRepo";
 import { Modal, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
+import { crmPourFiche } from "../../lib/crm";
 
 const inputCls =
   "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -150,7 +151,7 @@ export default function NewClientModal({
       // le site. Saisie à la main : Merx n'y touche pas tant qu'on ne le lui demande pas.
       const { data: fiche, error } = await supabaseAdmin
         .from("admin_prospects")
-        .insert({ ...colonnesProspect(saisie), owner_email: user?.email ?? "", status: "contacte" })
+        .insert({ ...colonnesProspect(saisie), owner_email: user?.email ?? "", status: "contacte", crm: crmPourFiche() })
         .select("id")
         .single();
       if (error) throw new Error(error.message);

@@ -20,6 +20,8 @@ export interface Demande {
   prospectId: string | null;
   conversationId: string | null;
   requestedBy: string;
+  /** Le CRM d'où part la demande (Olivier, 09/11) : les fiches trouvées y sont rangées. */
+  crm: string;
 }
 
 export interface LightProspect {
@@ -62,7 +64,7 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
   const stale = new Date(Date.now() - STALE_MINUTES * 60_000).toISOString();
   let q = sb
     .from("admin_merx_demandes")
-    .select("id, kind, request, prospect_id, conversation_id, requested_by, status, started_at")
+    .select("id, kind, request, prospect_id, conversation_id, requested_by, status, started_at, crm")
     .or(`status.eq.en_attente,and(status.eq.en_cours,started_at.lt.${stale})`)
     .order("created_at", { ascending: true })
     .limit(1);
@@ -90,6 +92,7 @@ export async function claimRequest(sb: SupabaseClient, id?: string): Promise<Dem
     prospectId: row.prospect_id,
     conversationId: row.conversation_id,
     requestedBy: row.requested_by,
+    crm: row.crm ?? "demarcher",
   };
 }
 
@@ -120,7 +123,7 @@ export async function insertLightProspects(
   owner: string,
   prospects: LightProspect[],
   /** Agences d'une société : connue seulement si MÊME nom ET MÊME ville (sinon c'est une autre agence). */
-  options: { parVille?: boolean } = {},
+  options: { parVille?: boolean; crm?: string } = {},
 ): Promise<number> {
   if (!prospects.length) return 0;
 
@@ -191,6 +194,7 @@ export async function insertLightProspects(
     connus.push({ nom: nu(p.name), ville: nu(p.city ?? ""), siren: chiffres(p.siren ?? null), siret: chiffres(siret) });
     const ligne = (secteur: string) => ({
       found_by: demandeId,
+      crm: options.crm ?? "demarcher",
       owner_email: owner,
       name: p.name,
       city: p.city,

@@ -1,4 +1,4 @@
-// Vigile répond aux questions de l'équipe sur ce qu'il surveille et sur ce que ses
+// Scope répond aux questions de l'équipe sur ce qu'il surveille et sur ce que ses
 // rapports ont trouvé : « sortez-moi les articles sur le soleil et le cancer de la
 // peau parus ces 30 derniers jours ».
 //
@@ -21,7 +21,7 @@ const QUESTIONS_PAR_JOUR = () => {
   return Number.isFinite(n) ? Math.min(500, Math.max(1, n)) : 60;
 };
 
-const SYSTEME = (aujourdhui: string) => `Tu es Vigile, l'agent de veille d'AvisDoc (téléexpertise dermatologique : campagnes de dépistage des cancers de la peau en entreprise et pour les collectivités). Chaque vendredi à 9 h, tu publies le rapport de veille de la semaine ; entre deux, l'équipe te pose des questions. Nous sommes le ${aujourdhui}.
+const SYSTEME = (aujourdhui: string) => `Tu es Scope, l'agent de veille d'AvisDoc (téléexpertise dermatologique : campagnes de dépistage des cancers de la peau en entreprise et pour les collectivités). Chaque vendredi à 9 h, tu publies le rapport de veille de la semaine ; entre deux, l'équipe te pose des questions. Nous sommes le ${aujourdhui}.
 
 Tu réponds UNIQUEMENT à partir de ce que rendent tes outils :
 - chercher_articles : les articles retenus dans tes rapports. Donne plusieurs mots, en français ET en anglais, avec leurs variantes (ex. soleil, solaire, UV, ultraviolet, sun, photoprotection). Pour « les 30 derniers jours », passe depuis_jours = 30.
@@ -52,7 +52,7 @@ const OUTILS: ChatTool[] = [
       required: ["mots"],
     },
   },
-  { name: "surveillance", description: "Ce que suit Vigile : presse, sources scientifiques et officielles, réseaux, concurrents, expressions, influenceurs, moteurs de recherche, rubriques (suivis ou non).", inputSchema: { type: "object", properties: {} } },
+  { name: "surveillance", description: "Ce que suit Scope : presse, sources scientifiques et officielles, réseaux, concurrents, expressions, influenceurs, moteurs de recherche, rubriques (suivis ou non).", inputSchema: { type: "object", properties: {} } },
   {
     name: "rapports",
     description: "Les derniers rapports de veille : période, nombre d'articles, points clés.",
@@ -106,7 +106,7 @@ async function executerOutil(db: SupabaseClient<any, "public", any>, nom: string
   return "Outil inconnu.";
 }
 
-/** Une question à Vigile. `jeton` : celui de la personne connectée. */
+/** Une question à Scope. `jeton` : celui de la personne connectée. */
 export async function repondre(jeton: string, messages: ChatMessage[]) {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: `Bearer ${jeton}` } },
@@ -114,7 +114,8 @@ export async function repondre(jeton: string, messages: ChatMessage[]) {
   }) as SupabaseClient<any, "public", any>;
   const { data: u } = await db.auth.getUser(jeton);
   if (!u?.user?.email?.toLowerCase().endsWith("@avisdoc.fr")) throw new Erreur("non autorisé", 401);
-  const { data: droit } = await db.rpc("a_le_module", { m: "veille" });
+  // La Veille Marché ou un CRM (chaque CRM a sa veille) : migration 0085.
+  const { data: droit } = await db.rpc("voit_la_veille");
   if (!droit) throw new Erreur("Le module Veille n'est pas ouvert pour ce compte.", 403);
 
   const propres = messages
@@ -130,7 +131,7 @@ export async function repondre(jeton: string, messages: ChatMessage[]) {
   if (!reservee) throw new Erreur(`Vous avez posé ${QUESTIONS_PAR_JOUR()} questions en 24 heures : c'est le plafond, réessayez demain.`, 429);
   const question = { id: reservee as string };
 
-  // Les liens que les outils ont rendus pendant CETTE réponse : les seuls que Vigile a le droit de citer.
+  // Les liens que les outils ont rendus pendant CETTE réponse : les seuls que Scope a le droit de citer.
   const liensVus = new Set<string>();
   let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });

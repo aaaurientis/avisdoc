@@ -32,13 +32,17 @@ export interface ArticleMail {
   /** Signaux d'entreprises : qui, et où. */
   entreprise: string | null;
   ville: string | null;
-  /** « À ne pas rater » et sa raison. */
+  /** « À ne pas manquer » et sa raison. */
   urgent?: boolean;
   urgence?: string | null;
 }
 
 export interface RapportMail {
   id: string;
+  /** Depuis le 02/11, un rapport par veille. */
+  veille: "commerciale" | "marche";
+  /** Un Weekly par CRM (09/11) : le nom du CRM en titre (« CRM Collectivités Locales ») et son marché dans le lien. */
+  crm?: { axe: string; label: string };
   debut: Date;
   fin: Date;
   points: { texte: string; articles: number[] }[];
@@ -50,22 +54,27 @@ export interface RapportMail {
 
 /** Les axes du rapport, dans l'ordre voulu par AvisDoc (26/10) : on agit d'abord, on s'informe ensuite. */
 export const AXES: { cle: string; titre: string; sousTitre: string }[] = [
-  { cle: "demarcher", titre: "Entreprises à démarcher", sousTitre: "Entreprises et mutuelles qui parlent de la santé de leurs salariés : des clients potentiels." },
-  { cle: "collectivites", titre: "Collectivités à démarcher", sousTitre: "Mairies, départements, régions : déserts médicaux, besoins de soins de leurs habitants, appels d'offres." },
-  { cle: "mutuelles", titre: "Mutuelles et assurance santé", sousTitre: "Complémentaires santé et assureurs : offres, forfaits prévention, partenariats." },
+  { cle: "demarcher", titre: "Entreprises", sousTitre: "Entreprises et mutuelles qui parlent de la santé de leurs salariés : des clients potentiels." },
+  { cle: "collectivites", titre: "Collectivités", sousTitre: "Mairies, départements, régions : déserts médicaux, besoins de soins de leurs habitants, appels d'offres." },
+  { cle: "intermediaires", titre: "Intermédiaires", sousTitre: "Ceux qui peuvent apporter des clients à AvisDoc." },
+  { cle: "mutuelles", titre: "Mutuelle Assurance", sousTitre: "Complémentaires santé et assureurs : offres, forfaits prévention, partenariats." },
   { cle: "publier", titre: "À publier", sousTitre: "Idées de posts LinkedIn, à relire avant de les publier." },
   { cle: "evenements", titre: "Événements", sousTitre: "Salons, congrès, courses contre le cancer : où exposer, aller, sponsoriser, ou quoi relayer." },
   { cle: "concurrents", titre: "Concurrents", sousTitre: "Ce qu'ils font, et ce que ça change pour AvisDoc." },
   { cle: "publications", titre: "Publications scientifiques", sousTitre: "Études et avis : les arguments qu'on peut en tirer." },
   { cle: "nouveautes", titre: "Nouveautés", sousTitre: "Réglementation, santé au travail, IA et dispositifs, presse." },
-  { cle: "nous", titre: "Ce qu'on dit de nous", sousTitre: "Ce que d'autres disent d'AvisDoc : presse, avis, commentaires, réseaux sociaux." },
+  { cle: "nous", titre: "Les avis sur AvisDoc", sousTitre: "Ce que d'autres disent d'AvisDoc : presse, avis, commentaires, réseaux sociaux." },
 ];
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }) : "");
 
-export function composer(r: RapportMail) {
+const NOM_VEILLE = { commerciale: "Veille Commerciale", marche: "Veille Marché" };
+
+/** Une partie de mail : un Weekly (une veille, ou un CRM), avec son titre, ses points, ses cases et son lien. */
+function partie(r: RapportMail, signature: boolean, ancre?: string) {
   const urgents = r.rubriques.flatMap((x) => x.articles).filter((a) => a.urgent).length;
-  const sujet = `Vigile · Veille AvisDoc du ${momentEnClair(r.fin).replace(/, 9 h$/, "")} — ${r.total} publication${r.total > 1 ? "s" : ""}${urgents ? ` dont ${urgents} à ne pas rater` : ""}`;
+  const nom = r.crm ? `Weekly · ${r.crm.label}` : NOM_VEILLE[r.veille];
+  const sujet = `Scope · ${nom} AvisDoc du ${momentEnClair(r.fin).replace(/, 9 h$/, "")} — ${r.total} publication${r.total > 1 ? "s" : ""}${urgents ? ` dont ${urgents} à ne pas manquer` : ""}`;
   const lienArticle = (a: ArticleMail) => `<a href="${echapper(a.url)}" style="color:${BLEU};text-decoration:none;">${echapper(a.source)}${a.publie_le ? `, ${date(a.publie_le)}` : ""}</a>`;
   // Les points à retenir disent l'essentiel en deux phrases ; leurs articles se lisent plus bas, une seule fois.
   const points = r.points.map((p, i) => `
@@ -89,7 +98,7 @@ export function composer(r: RapportMail) {
     const plusieurs = rubs.length > 1;
     return rubs.map((x) => {
       // Tout ce qui compte (importance 2 et 3) est dans le mail ; le reste, pour mémoire, dans le Hub.
-      // Un « À ne pas rater » est toujours dans le mail, et en tête de sa case.
+      // Un « À ne pas manquer » est toujours dans le mail, et en tête de sa case.
       const visibles = x.articles.filter((a) => a.importance >= 2 || a.urgent).sort((a, b) => Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)));
       const reste = x.articles.length - visibles.length;
       return `${plusieurs ? `<tr><td style="padding:10px 0 2px;"><p style="margin:0;font-size:12px;font-weight:bold;color:${ENCRE};">${echapper(x.nom)}</p></td></tr>` : ""}
@@ -110,18 +119,45 @@ export function composer(r: RapportMail) {
   const panne = r.enPanne.length
     ? `<tr><td style="padding:16px 0 0;font-size:12px;color:${ORANGE};">Sources qui n'ont pas répondu cette fois : ${echapper(r.enPanne.join(", "))}. Ce qu'elles auraient trouvé manque à ce rapport.</td></tr>`
     : "";
-  const html = `
-  <div style="font-family:Arial,Helvetica,sans-serif;background:#F4F7FA;padding:24px 12px;">
-    <table role="presentation" width="100%" style="max-width:620px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;" cellpadding="0" cellspacing="0">
-      <tr><td style="padding:0 0 4px;"><p style="margin:0;font-size:20px;font-weight:bold;color:${ENCRE};">Veille AvisDoc</p><p style="margin:2px 0 0;font-size:12px;color:${GRIS};">par Vigile, votre agent de veille</p></td></tr>
+  const rangees = `
+      <tr><td style="padding:0 0 4px;">${ancre ? `<a id="${ancre}" name="${ancre}"></a>` : ""}<p style="margin:0;font-size:20px;font-weight:bold;color:${ENCRE};">${echapper(nom)}${r.crm ? "" : " AvisDoc"}</p>${signature ? `<p style="margin:2px 0 0;font-size:12px;color:${GRIS};">par Scope, votre agent de veille</p>` : ""}</td></tr>
       <tr><td style="padding:0 0 18px;"><p style="margin:0;font-size:13px;color:${GRIS};">Du ${echapper(momentEnClair(r.debut))} au ${echapper(momentEnClair(r.fin))} · ${r.total} publication${r.total > 1 ? "s" : ""} retenue${r.total > 1 ? "s" : ""}</p></td></tr>
       ${r.points.length ? `<tr><td style="padding:0 0 8px;"><p style="margin:0;font-size:13px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:${BLEU};">À retenir</p></td></tr>${points}` : `<tr><td style="font-size:14px;color:${ENCRE};">Rien de marquant sur la période.</td></tr>`}
       ${corps}
-      ${panne}
-      <tr><td style="padding:22px 0 0;"><a href="${hub()}/veille/${r.id}" style="color:${BLEU};font-size:14px;font-weight:bold;">Ouvrir le rapport dans le Hub (créer une fiche prospect, voir le reste)</a></td></tr>
+      <tr><td style="padding:22px 0 0;"><a href="${hub()}/veille/${r.veille}/${r.id}${r.crm ? `?crm=${r.crm.axe}` : ""}" style="color:${BLEU};font-size:14px;font-weight:bold;">Ouvrir ${r.crm ? "ce Weekly" : "le rapport"} dans le Hub (créer une fiche prospect, voir le reste)</a></td></tr>`;
+  return { sujet, nom, urgents, rangees, panne };
+}
+
+const enveloppe = (rangees: string) => `
+  <div style="font-family:Arial,Helvetica,sans-serif;background:#F4F7FA;padding:24px 12px;">
+    <table role="presentation" width="100%" style="max-width:620px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;" cellpadding="0" cellspacing="0">
+      ${rangees}
     </table>
   </div>`;
-  return { sujet, html };
+
+export function composer(r: RapportMail) {
+  const p = partie(r, true);
+  return { sujet: p.sujet, html: enveloppe(`${p.rangees}${p.panne}`) };
+}
+
+/**
+ * Le mail du vendredi d'une personne (Olivier, 09/11) : un seul mail, avec le Weekly de chaque CRM (et de la
+ * Veille Marché) qu'elle a coché, l'un sous l'autre. Avec un seul Weekly, c'est le mail habituel.
+ */
+export function composerPlusieurs(rs: RapportMail[]) {
+  if (rs.length === 1) return composer(rs[0]);
+  const parts = rs.map((r, i) => partie(r, false, `weekly-${i + 1}`));
+  const total = rs.reduce((n, r) => n + r.total, 0);
+  const urgents = parts.reduce((n, p) => n + p.urgents, 0);
+  const sujet = `Scope · Weekly AvisDoc du ${momentEnClair(rs[0].fin).replace(/, 9 h$/, "")} — ${parts.map((p) => p.nom.replace(/^Weekly · /, "")).join(", ")} — ${total} publication${total > 1 ? "s" : ""}${urgents ? ` dont ${urgents} à ne pas manquer` : ""}`;
+  const separateur = `<tr><td style="padding:28px 0 20px;"><div style="border-top:3px solid ${BLEU};"></div></td></tr>`;
+  // Le sommaire (Gemini, 09/11) : un clic mène au Weekly de ce CRM, plus bas dans le mail.
+  const sommaire = parts.map((p, i) => `
+      <tr><td style="padding:3px 0;"><a href="#weekly-${i + 1}" style="color:${BLEU};font-size:14px;font-weight:bold;text-decoration:none;">→ ${echapper(p.nom.replace(/^Weekly · /, ""))}</a> <span style="font-size:12px;color:${GRIS};">· ${rs[i].total} publication${rs[i].total > 1 ? "s" : ""}</span></td></tr>`).join("");
+  const entete = `<tr><td style="padding:0 0 6px;"><p style="margin:0;font-size:20px;font-weight:bold;color:${ENCRE};">Vos Weekly AvisDoc</p><p style="margin:2px 0 0;font-size:12px;color:${GRIS};">par Scope, votre agent de veille · du ${echapper(momentEnClair(rs[0].debut))} au ${echapper(momentEnClair(rs[0].fin))}</p></td></tr>
+      <tr><td style="padding:8px 0 4px;"><p style="margin:0;font-size:13px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:${BLEU};">Sommaire</p></td></tr>${sommaire}
+      <tr><td style="padding:20px 0 20px;"><div style="border-top:3px solid ${BLEU};"></div></td></tr>`;
+  return { sujet, html: enveloppe(`${entete}${parts.map((p) => p.rangees).join(separateur)}${parts[0].panne}`) };
 }
 
 /** Où mène le mail, et pourquoi on le reçoit. */
@@ -151,32 +187,32 @@ const cadre = (titre: string, couleur: string, chapeau: string, lignes: string, 
     </table>
   </div>`;
 
-/** Le mail immédiat des « À ne pas rater » : ce qui ne peut pas attendre le prochain rapport. */
+/** Le mail immédiat des « À ne pas manquer » : ce qui ne peut pas attendre le prochain rapport. */
 export function composerUrgent(articles: (ArticleMail & { urgence: string | null })[], suite: Suite = SUITE_ABONNE) {
   const n = articles.length;
   const premier = articles[0];
-  const sujet = `Vigile · À ne pas rater : ${n === 1 ? (premier.entreprise ?? premier.titre) : `${n} publications`}`;
-  return { sujet, html: cadre("À ne pas rater", "#C2410C", "Vigile vient de le trouver : ça n'attend pas le prochain rapport.", lignesArticles(articles), suite) };
+  const sujet = `Scope · À ne pas manquer : ${n === 1 ? (premier.entreprise ?? premier.titre) : `${n} publications`}`;
+  return { sujet, html: cadre("À ne pas manquer", "#C2410C", "Scope vient de le trouver : ça n'attend pas le prochain rapport.", lignesArticles(articles), suite) };
 }
 
 /** Le récapitulatif d'une tournée : les nouveautés d'une case, en un seul mail, pour celui qui les suit. */
 export function composerRecap(quoi: string, articles: ArticleMail[], suite: Suite) {
   const n = articles.length;
-  const sujet = `Vigile · ${n} nouveauté${n > 1 ? "s" : ""} : ${quoi}`;
-  return { sujet, html: cadre(`${n} nouveauté${n > 1 ? "s" : ""} : ${quoi}`, ENCRE, "Ce que Vigile vient de trouver à sa dernière tournée.", lignesArticles(articles), suite) };
+  const sujet = `Scope · ${n} nouveauté${n > 1 ? "s" : ""} : ${quoi}`;
+  return { sujet, html: cadre(`${n} nouveauté${n > 1 ? "s" : ""} : ${quoi}`, ENCRE, "Ce que Scope vient de trouver à sa dernière tournée.", lignesArticles(articles), suite) };
 }
 
 /** Le budget du mois de la veille est atteint à 80 % ou à 100 % : on prévient, rien n'est coupé. */
 export function composerBudget(depense: number, budget: number, seuil: 80 | 100) {
   const d = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
   const sujet = seuil === 100
-    ? `Vigile · Budget du mois atteint : ${d(depense)} sur ${d(budget)}`
-    : `Vigile · 80 % du budget du mois : ${d(depense)} sur ${d(budget)}`;
+    ? `Scope · Budget du mois atteint : ${d(depense)} sur ${d(budget)}`
+    : `Scope · 80 % du budget du mois : ${d(depense)} sur ${d(budget)}`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${ENCRE};max-width:520px;">
     <p style="font-size:16px;font-weight:bold;margin:0 0 8px;">${echapper(sujet)}</p>
     <p style="font-size:14px;margin:0 0 8px;">Depuis le 1er du mois, la veille a coûté ${d(depense)} pour un budget de ${d(budget)}.</p>
-    <p style="font-size:14px;margin:0 0 12px;color:${GRIS};">Vigile continue normalement : rien n'est coupé. Le détail par jour, par IA et par tournée est dans CPR, où vous pouvez aussi déplacer le curseur du budget.</p>
-    <p style="margin:0;"><a href="${hub()}/veille/cpr" style="color:${BLEU};">Ouvrir CPR dans le Hub</a></p></div>`;
+    <p style="font-size:14px;margin:0 0 12px;color:${GRIS};">Scope continue normalement : rien n'est coupé. Le détail par jour, par IA et par tournée est dans CPR, où vous pouvez aussi déplacer le curseur du budget.</p>
+    <p style="margin:0;"><a href="${hub()}/veille/commerciale/cpr" style="color:${BLEU};">Ouvrir CPR dans le Hub</a></p></div>`;
   return { sujet, html };
 }
 
@@ -185,7 +221,7 @@ export interface Panne { nature: string; fin: Date; statut: string; bloquee: boo
 /** Le mail technique d'une tournée en panne : ce qui s'est passé, ce que ça change, ce qu'il faut faire. */
 export function composerPanne(liste: Panne[]) {
   const nom = (p: Panne) => `${p.nature === "quotidienne" ? "la tournée complète" : "la tournée légère"} de ${momentEnClair(p.fin)}`;
-  const sujet = liste.length > 1 ? `Vigile · ${liste.length} tournées ont eu un problème` : `Vigile · Problème sur ${nom(liste[0])}`;
+  const sujet = liste.length > 1 ? `Scope · ${liste.length} tournées ont eu un problème` : `Scope · Problème sur ${nom(liste[0])}`;
   const blocs = liste.map((p) => {
     const quoi = p.bloquee ? `Elle n'est pas terminée et n'avance plus (étape : ${p.statut}).` : p.statut === "echec" ? "Elle a échoué." : "Elle est terminée, mais il manque ce qui suit.";
     const lignes = [p.erreur, ...p.pannes.slice(0, 10), ...(p.pannes.length > 10 ? [`… et ${p.pannes.length - 10} autres`] : [])].filter(Boolean) as string[];
@@ -198,17 +234,17 @@ export function composerPanne(liste: Panne[]) {
     ${blocs}
     <p style="font-size:14px;margin:0 0 8px;"><b>Ce que ça change :</b> les publications de ces recherches peuvent manquer. Le reste de la veille continue, et la tournée suivante repart normalement.</p>
     <p style="font-size:14px;margin:0 0 12px;"><b>Que faire :</b> si le message parle de clé, de quota, de 401, 402, 403 ou 429, vérifiez le compte du service concerné. Sinon, regardez si la tournée suivante passe avant d'intervenir. Vous ne recevrez pas d'autre mail avant 6 heures.</p>
-    <p style="margin:0;"><a href="${hub()}/veille/cpr" style="color:${BLEU};">Voir les tournées dans CPR</a></p></div>`;
+    <p style="margin:0;"><a href="${hub()}/veille/commerciale/cpr" style="color:${BLEU};">Voir les tournées dans CPR</a></p></div>`;
   return { sujet, html };
 }
 
 export function composerAlerte(fin: Date, statut: string, detail: string) {
-  const sujet = `Vigile · Veille AvisDoc : le rapport de ${momentEnClair(fin)} n'est pas parti`;
+  const sujet = `Scope · Veille AvisDoc : le rapport de ${momentEnClair(fin)} n'est pas parti`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${ENCRE};max-width:520px;">
     <p style="font-size:16px;font-weight:bold;margin:0 0 8px;">${echapper(sujet)}</p>
     <p style="font-size:14px;margin:0 0 8px;">Où il en est : ${echapper(statut)}.</p>
     <p style="font-size:14px;margin:0 0 12px;white-space:pre-wrap;color:${GRIS};">${echapper(detail)}</p>
-    <p style="margin:0;"><a href="${hub()}/veille" style="color:${BLEU};">Voir la veille dans le Hub</a></p></div>`;
+    <p style="margin:0;"><a href="${hub()}/veille/commerciale" style="color:${BLEU};">Voir la veille dans le Hub</a></p></div>`;
   return { sujet, html };
 }
 
@@ -221,7 +257,7 @@ export async function envoyer(sujet: string, html: string, cle: string): Promise
 
 /** Envoie à ces adresses-là (déjà contrôlées par l'appelant). */
 export async function envoyerA(a: string[], sujet: string, html: string, cle: string): Promise<string> {
-  const from = Deno.env.get("VEILLE_FROM") ?? "Vigile · Veille AvisDoc <noreply@avisdoc.fr>";
+  const from = Deno.env.get("VEILLE_FROM") ?? "Scope · Veille AvisDoc <noreply@avisdoc.fr>";
   const mailpit = Deno.env.get("VEILLE_MAILPIT_URL");
   if (mailpit) {
     const m = from.match(/^(.*)<(.+)>$/);

@@ -22,6 +22,7 @@ import { useAuth } from "../auth/AuthContext";
 import { prenomDe } from "../lib/actions-fiche";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
+import { dansLeCrm, useCrm } from "../lib/crm";
 
 const ICONES: Record<GenreEchange, typeof Phone> = {
   appel: Phone,
@@ -90,7 +91,10 @@ export default function Planning() {
   const [vue, setVue] = useState<"semaine" | "mois">("semaine");
   const [debut, setDebut] = useState(() => lundiDe(new Date()));
   const [mois, setMois] = useState(() => premierDuMois(new Date()));
-  const [lignes, setLignes] = useState<Rendezvous[]>([]);
+  const [toutesLignes, setLignes] = useState<Rendezvous[]>([]);
+  // Chaque CRM ne montre que les actions de ses fiches (Olivier, 09/11).
+  const crm = useCrm();
+  const lignes = useMemo(() => toutesLignes.filter((l) => dansLeCrm(l.crm, crm)), [toutesLignes, crm]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [aModifier, setAModifier] = useState<Rendezvous | null>(null);

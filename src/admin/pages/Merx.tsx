@@ -15,6 +15,7 @@ import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { cn } from "@/lib/utils";
 import BoutonMicro from "../components/BoutonMicro";
 import PanneauRecherche from "./merx/PanneauRecherche";
+import { crmPourFiche } from "../lib/crm";
 
 interface Message {
   role: "user" | "assistant";
@@ -97,7 +98,8 @@ export default function Merx() {
       setMessages((m) => [...m, { role: "user", content: message }]);
       setEnvoiEnCours(true);
       try {
-        const res = await appeler({ action: "chat", conversationId: conversation?.id, message });
+        // Les fiches trouvées vont dans le CRM de la page (Olivier, 09/11).
+        const res = await appeler({ action: "chat", conversationId: conversation?.id, message, crm: crmPourFiche() });
         const id = res.conversationId ?? conversation?.id ?? null;
         if (id && id !== conversation?.id) setConversation({ id, title: message.slice(0, 80), messages: [] });
         if (res.reply) setMessages((m) => [...m, { role: "assistant", content: res.reply! }]);

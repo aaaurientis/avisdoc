@@ -119,7 +119,7 @@ interface DataValue {
   accounts: Account[];
   accountFields: AccountField[];
   /** Rend `true` une fois la fiche réellement écrite en base — l'appelant peut en dépendre. */
-  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null }) => Promise<boolean>;
+  addAccount: (fiche: { name: string; signedOn: string | null; sector: string | null; data: Record<string, string>; clientId?: string | null; crm?: string }) => Promise<boolean>;
   /** Écrit une case : `key` est celle de la colonne (les trois du socle ont leur champ propre). */
   setAccountCell: (id: string, key: string, value: string) => void;
   /** Enregistre une fiche entière (formulaire de modification), en une seule écriture. */
@@ -865,6 +865,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         sector: saisie.sector,
         data: saisie.data,
         clientId: saisie.clientId ?? null,
+        crm: saisie.crm,
       };
       setAccounts((prev) => [...prev, fiche]);
       return persist(() => repo.createAccount(fiche));
@@ -927,6 +928,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             sector: secteur,
             data: {},
             clientId: affaire.id,
+            // Le client signé reste dans le CRM de son affaire (Olivier, 09/11).
+            crm: affaire.crm,
           }),
         )
         .then((ecrite) => {

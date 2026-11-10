@@ -8,14 +8,12 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
-  Coins,
   FileText,
   KeyRound,
   LayoutDashboard,
   LayoutGrid,
   LifeBuoy,
   Megaphone,
-  MessagesSquare,
   Mic,
   Moon,
   Power,
@@ -32,22 +30,20 @@ import {
   Users,
   Wallet,
   Radar,
-  Eye,
-  MessageCircle,
-  Activity,
   Newspaper,
   Archive,
-  Calculator,
+  TrendingUp,
   Landmark,
-  Handshake,
   Umbrella,
+  Handshake,
   Star,
+  Swords,
+  FlaskConical,
+  Calculator,
   Bell,
   CalendarCheck,
   BarChart3,
   Tags,
-  Swords,
-  FlaskConical,
   HeartPulse,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
@@ -56,9 +52,10 @@ import { useAuth } from "../auth/AuthContext";
 import { useAdminData } from "../data/AdminDataContext";
 import { initials } from "../lib/format";
 import { ecrireArrivee, lireArrivee, type Arrivee } from "../lib/arrivee";
-import type { Module } from "../lib/modules";
+import { MODULE_DU_CRM, type Module } from "../lib/modules";
 import { appliquerTheme, themeCourant, type Theme } from "../lib/theme";
-import { nouveautesCommercial } from "../lib/veille";
+import { CRMS, nouveautesCommercial } from "../lib/veille";
+import { lectureSeuleActive, reglerLectureSeule } from "../lib/lectureSeule";
 import { Avatar } from "./ui";
 
 interface Enfant {
@@ -88,41 +85,57 @@ interface Entree {
   aVenir?: boolean;
 }
 
+// Les quatre CRM (lib/veille), chacun avec son pictogramme.
+const ICONE_CRM: Record<string, LucideIcon> = { demarcher: Building2, collectivites: Landmark, mutuelles: Umbrella, intermediaires: Handshake };
+
+/** Un lien du menu est actif si le chemin correspond et que chacun de ses paramètres (?crm=…, ?seul=…) est dans l'adresse. */
+function lienActif(to: string, end: boolean | undefined, pathname: string, search: string) {
+  // Scope, ouvert depuis une page de veille, garde allumée l'entrée d'où l'on vient.
+  pathname = pathname.replace(/^\/veille\/(\w+)\/vigile\/?$/, "/veille/$1/direct");
+  const [chemin, requete = ""] = to.split("?");
+  if (end ? pathname !== chemin : !(pathname === chemin || pathname.startsWith(`${chemin}/`))) return false;
+  const ici = new URLSearchParams(search);
+  return [...new URLSearchParams(requete)].every(([k, v]) => ici.get(k) === v);
+}
+
 const MENU: Entree[] = [
   { module: null, label: "Tableau de bord", icon: LayoutDashboard, to: "/dashboard" },
-  // 2 — Commercial : un seul droit pour tout le bloc (les enfants héritent).
-  { module: "commercial", label: "Commercial", icon: Building2, enfants: [
-    { to: "/merx", label: "Merx", icon: Sparkles },
-    { to: "/planning", label: "Planning", icon: CalendarDays },
-    { to: "/commercial-veille", label: "Veille", icon: Newspaper, pastille: "commercial-veille" },
-    { to: "/prospects", label: "Prospection", icon: Target },
-    { to: "/crm", label: "Pipeline", icon: LayoutGrid },
-    { to: "/fichier-client", label: "Clients", icon: BookUser },
-    { to: "/debrief", label: "Débrief", icon: MessagesSquare },
-    { to: "/couts", label: "CAP", icon: Coins },
-    { to: "/aide", label: "Aide", icon: LifeBuoy },
-    { to: "/corbeille", label: "Corbeille", icon: Trash2 },
+  // Organigramme de Laurent et Irène (Olivier, 09/11) : un CRM par marché, chacun avec les mêmes entrées et son propre droit.
+  // CRM Entreprise est l'ancien bloc Commercial : même droit (« commercial »), mêmes fiches ; Débrief et CAP quittent le menu.
+  // Derrière, les écrans restent communs ; chacun ne montre que les fiches et la veille de son marché.
+  ...CRMS.map((c): Entree => ({ module: MODULE_DU_CRM[c.axe], label: c.label, icon: ICONE_CRM[c.axe], enfants: [
+    { to: `/planning?crm=${c.axe}`, label: "Planning", icon: CalendarDays },
+    { to: `/veille/commerciale/direct?seul=${c.axe}`, label: "Veille", icon: Newspaper },
+    { to: `/merx?crm=${c.axe}`, label: "Merx", icon: Sparkles },
+    { to: `/prospects?crm=${c.axe}`, label: "Prospection", icon: Target },
+    { to: `/crm?crm=${c.axe}`, label: "Pipeline", icon: LayoutGrid },
+    { to: `/fichier-client?crm=${c.axe}`, label: "Clients", icon: BookUser },
+    { to: `/veille/commerciale?crm=${c.axe}`, label: "Weekly", icon: Radar, end: true },
+    { to: `/veille/commerciale/archives?seul=${c.axe}`, label: "Archivés", icon: Archive },
+    { to: `/corbeille?crm=${c.axe}`, label: "Corbeille", icon: Trash2 },
+    { to: `/aide?crm=${c.axe}`, label: "Aide", icon: LifeBuoy },
+  ] })),
+  { module: "veille", label: "Veille Marché", icon: TrendingUp, enfants: [
+    { to: "/veille/marche/direct?seul=nous", label: "Les avis sur AvisDoc", icon: Star },
+    { to: "/veille/marche/direct?seul=evenements", label: "Évènements", icon: CalendarDays },
+    { to: "/veille/marche/direct?seul=concurrents", label: "Concurrence", icon: Swords },
+    { to: "/veille/marche/direct?seul=publications", label: "Publi Scientifiques", icon: FlaskConical },
+    { to: "/veille/marche", label: "Weekly", icon: Radar, end: true },
+    { to: "/veille/marche/archives", label: "Archivés", icon: Archive },
+    { to: "/corbeille?veille=marche", label: "Corbeille", icon: Trash2 },
+    { to: "/aide?veille=marche", label: "Aide", icon: LifeBuoy },
   ] },
-  // 3 — Veille à démarcher : prospection par type de cible (écrans à venir).
-  { module: "demarche", label: "Veille à démarcher", icon: Megaphone, enfants: [
-    { to: "/demarche/entreprises", label: "Entreprises", icon: Building2 },
-    { to: "/demarche/collectivites", label: "Collectivités", icon: Landmark },
-    { to: "/demarche/intermediaires", label: "Intermédiaires", icon: Handshake },
-    { to: "/demarche/mutuelles", label: "Mutuelle Assurance", icon: Umbrella },
-  ] },
-  // 4 — Veille Marché : 4 thèmes (écrans à venir) + les écrans de veille actuels,
-  // conservés le temps de leur rangement dans les thèmes (phase B).
-  { module: "veille", label: "Veille Marché", icon: Radar, enfants: [
-    { to: "/marche/avis", label: "Les avis sur AvisDoc", icon: Star },
-    { to: "/marche/incontournables", label: "À ne pas manquer", icon: Bell },
-    { to: "/marche/concurrence", label: "Concurrence & Évènements", icon: Swords },
-    { to: "/marche/publications", label: "Publi Scientifiques", icon: FlaskConical },
-    { to: "/veille/vigile", label: "Vigile", icon: MessageCircle },
-    { to: "/veille/surveiller", label: "Réglages", icon: Eye },
-    { to: "/veille/direct", label: "En direct", icon: Activity },
-    { to: "/veille", label: "Rapports", icon: Radar, end: true },
-    { to: "/veille/archives", label: "Archivés", icon: Archive },
-    { to: "/veille/cpr", label: "CPR", icon: Calculator },
+  // CRM Synthèse : les mêmes entrées que chaque CRM, tous marchés ensemble, et sa Vue d'ensemble en tête (Olivier, 09/11).
+  { module: "crm_synthese", label: "CRM Synthèse", icon: LayoutGrid, enfants: [
+    { to: "/crm-synthese", label: "Vue d'ensemble", icon: LayoutDashboard },
+    { to: "/planning?crm=synthese", label: "Planning", icon: CalendarDays },
+    { to: "/prospects?crm=synthese", label: "Prospection", icon: Target },
+    { to: "/crm?crm=synthese", label: "Pipeline", icon: LayoutGrid },
+    { to: "/fichier-client?crm=synthese", label: "Clients", icon: BookUser },
+    { to: "/veille/commerciale?crm=synthese", label: "Weekly", icon: Radar, end: true },
+    { to: "/veille/commerciale/archives?crm=synthese", label: "Archivés", icon: Archive },
+    { to: "/corbeille?crm=synthese", label: "Corbeille", icon: Trash2 },
+    { to: "/aide?crm=synthese", label: "Aide", icon: LifeBuoy },
   ] },
   // 5 — Professionnels de Santé (ex Contacts Médicaux).
   { module: "sante", label: "Professionnels de Santé", icon: HeartPulse, enfants: [
@@ -143,6 +156,8 @@ const MENU: Entree[] = [
   { module: "admin", label: "Admin", icon: Settings, enfants: [
     { to: "/settings", label: "Réglages", icon: SlidersHorizontal },
     { to: "/typologies", label: "Typologies clients", icon: Tags },
+    { to: "/parametrage-veille", label: "Paramétrage veille", icon: Radar },
+    { to: "/cpr", label: "CPR veille", icon: Calculator },
     { to: "/droits", label: "Droits d'accès", icon: KeyRound },
     { to: "/audit", label: "Auditabilité", icon: ScrollText },
   ] },
@@ -175,9 +190,9 @@ const Pastille = ({ n }: { n: number }) =>
   n > 0 ? <span className="ml-auto min-w-[18px] shrink-0 rounded-full bg-red-600 px-1.5 text-center text-[10px] font-bold leading-[18px] text-white">{n}</span> : null;
 
 function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: boolean; peut: (m: Module) => boolean }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const enfants = (entree.enfants ?? []).filter((e) => (!e.superadmin || isSuperAdmin) && (!e.module || peut(e.module)));
-  const enfantActif = enfants.some((e) => pathname.startsWith(e.to));
+  const enfantActif = enfants.some((e) => lienActif(e.to, e.end, pathname, search));
   const [ouvert, setOuvert] = useState(enfantActif);
   const Icon = entree.icon;
   const nouveautes = useNouveautesCommercial(enfants.some((e) => e.pastille === "commercial-veille"));
@@ -212,10 +227,10 @@ function Groupe({ entree, isSuperAdmin, peut }: { entree: Entree; isSuperAdmin: 
                 key={e.to}
                 to={e.to}
                 end={e.end}
-                className={({ isActive }) =>
+                className={() =>
                   cn(
                     "flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
-                    isActive
+                    lienActif(e.to, e.end, pathname, search)
                       ? "bg-avisdoc-ink text-white"
                       : "text-muted-foreground hover:bg-accent hover:text-avisdoc-ink",
                   )
@@ -302,12 +317,28 @@ export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
     setTheme(t);
   };
 
+  // Chaque CRM, la Veille Marché et la CRM Synthèse ont leur case dans Admin › Droits d'accès (Olivier, 09/11).
   const menu = MENU.filter((m) => m.module === null || peut(m.module));
 
+  // CRM Synthèse = vue seule : allumée sur ses pages (?crm=synthese, Vue d'ensemble), éteinte dès qu'on ouvre un autre CRM
+  // (?crm=… ou ?seul=…) ou une page hors CRM ; une fiche ouverte depuis la Synthèse reste en vue seule.
+  const { pathname: ici, search: requete } = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(requete);
+    let v = lectureSeuleActive();
+    if (ici.startsWith("/crm-synthese")) v = true;
+    else if (q.has("crm") || q.has("seul")) v = q.get("crm") === "synthese";
+    else if (!/^\/(crm|prospects|planning|merx|fichier-client|corbeille|aide|veille\/commerciale)(\/|$)/.test(ici)) v = false;
+    reglerLectureSeule(v);
+  }, [ici, requete]);
+  // Une page sans menu (la dictée) : la vue seule ne la suit pas.
+  useEffect(() => () => reglerLectureSeule(false), []);
+
   return (
+    <>
     <aside
       data-ouvert={ouvert ? "oui" : "non"}
-      className="ad-sidebar sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6"
+      className="ad-sidebar sticky top-0 flex h-screen w-[19rem] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6"
     >
       <div className="flex flex-col gap-1.5 px-2.5 pb-6">
         <AvisdocLogo className="h-12 w-auto self-start" />
@@ -396,5 +427,6 @@ export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

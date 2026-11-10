@@ -1,33 +1,47 @@
 // Veille › Archivés : les publications retirées avec « Archiver ». Cachées pour tout le monde (écrans,
-// rapports, alertes, Vigile), elles se remettent d'un clic ; « Supprimer » les efface pour de bon.
+// rapports, alertes, Scope), elles se remettent d'un clic ; « Supprimer » les efface pour de bon.
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Card, PageHeader } from "../components/ui";
 import CarteArticle from "./veille/CarteArticle";
-import { listerArchives, sourcesNommees, type Article } from "../lib/veille";
+import { AXES, ouvrirDansCrm, listerArchives, listerRubriques, sourcesNommees, type Article, VEILLES, veilleDe } from "../lib/veille";
+import { useVeille } from "./veille/useVeille";
 
 type Archivee = Article & { trie_le: string | null; retire_le: string };
 
 export default function VeilleArchives() {
+  const veille = useVeille();
+  // ?seul=<marché> : les archivés d'un seul marché, depuis le CRM de ce marché.
+  const [params] = useSearchParams();
+  const seul = AXES.find((x) => x.cle === params.get("seul") && (VEILLES[veille].axes as string[]).includes(x.cle));
   const [articles, setArticles] = useState<Archivee[] | null>(null);
   const [noms, setNoms] = useState<Map<string, string>>(new Map());
+  const [axeDe, setAxeDe] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    Promise.all([listerArchives(), sourcesNommees()]).then(([a, s]) => {
-      setArticles(a);
+    setArticles(null);
+    // Chaque veille ne montre que ses archivés : l'axe de la rubrique dit à quelle veille appartient une publication.
+    Promise.all([listerArchives(), sourcesNommees(), listerRubriques()]).then(([a, s, r]) => {
+      const axeDe = new Map(r.map((x) => [x.nom, x.axe]));
+      setAxeDe(axeDe);
+      setArticles(a.filter((x) => {
+        const ax = x.rubrique ? axeDe.get(x.rubrique) : undefined;
+        return seul ? ax === seul.cle : veilleDe(ax) === veille;
+      }));
       setNoms(new Map(s.map((x) => [x.cle, x.nom])));
     }, (err) => {
       toast.error(err instanceof Error ? err.message : "Les archivés n'ont pas pu être lus.");
       setArticles([]);
     });
-  }, []);
+  }, [veille, seul]);
 
   return (
     <div>
       <PageHeader
-        title="Archivés"
+        title={`Archivés · ${seul ? seul.titre : VEILLES[veille].titre}`}
         subtitle="Les publications retirées avec « Archiver » : cachées pour tout le monde. « Remettre » les rend à leur case ; « Supprimer » les efface pour de bon."
       />
       <Card className="overflow-hidden">
@@ -46,6 +60,7 @@ export default function VeilleArchives() {
                 noms={noms}
                 demarcher={false}
                 archivee
+                ouvrirDans={ouvrirDansCrm(a.rubrique ? axeDe.get(a.rubrique) : undefined)}
                 onConfie={() => {}}
                 onRetrait={(x) => setArticles((l) => (l ?? []).filter((y) => y.id !== x.id))}
               />

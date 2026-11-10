@@ -21,6 +21,8 @@ export interface Rendezvous {
   fiche: string;
   origine: Origine;
   ficheId: string;
+  /** Le CRM de la fiche (migration 0085) ; une action sans fiche reste à CRM Entreprise. */
+  crm: string;
 }
 
 /** Le lundi de la semaine d'une date, à minuit. */
@@ -67,25 +69,29 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
     [...new Set(lignes.map((l) => l[cle]).filter((v): v is string => Boolean(v)))];
 
   const [prospects, affaires, clients] = await Promise.all([
-    ids("prospect_id").length ? supabaseAdmin.from("admin_prospects").select("id, name, deleted_at").in("id", ids("prospect_id")) : { data: [] },
-    ids("client_id").length ? supabaseAdmin.from("admin_clients").select("id, company, deleted_at").in("id", ids("client_id")) : { data: [] },
-    ids("account_id").length ? supabaseAdmin.from("admin_accounts").select("id, name, deleted_at").in("id", ids("account_id")) : { data: [] },
+    ids("prospect_id").length ? supabaseAdmin.from("admin_prospects").select("id, name, deleted_at, crm").in("id", ids("prospect_id")) : { data: [] },
+    ids("client_id").length ? supabaseAdmin.from("admin_clients").select("id, company, deleted_at, crm").in("id", ids("client_id")) : { data: [] },
+    ids("account_id").length ? supabaseAdmin.from("admin_accounts").select("id, name, deleted_at, crm").in("id", ids("account_id")) : { data: [] },
   ]);
 
   const nom = new Map<string, string>();
+  const crmDe = new Map<string, string>();
   // Une fiche partie à la corbeille emporte ses actions hors du planning. Elles ne
   // sont pas effacées : la fiche restaurée les retrouve (Olivier, 12/10).
   const jetees = new Set<string>();
-  for (const p of (prospects.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+  for (const p of (prospects.data ?? []) as { id: string; name: string; deleted_at: string | null; crm?: string }[]) {
     nom.set(p.id, p.name);
+    crmDe.set(p.id, p.crm ?? "demarcher");
     if (p.deleted_at) jetees.add(p.id);
   }
-  for (const c of (affaires.data ?? []) as { id: string; company: string; deleted_at: string | null }[]) {
+  for (const c of (affaires.data ?? []) as { id: string; company: string; deleted_at: string | null; crm?: string }[]) {
     nom.set(c.id, c.company);
+    crmDe.set(c.id, c.crm ?? "demarcher");
     if (c.deleted_at) jetees.add(c.id);
   }
-  for (const a of (clients.data ?? []) as { id: string; name: string; deleted_at: string | null }[]) {
+  for (const a of (clients.data ?? []) as { id: string; name: string; deleted_at: string | null; crm?: string }[]) {
     nom.set(a.id, a.name);
+    crmDe.set(a.id, a.crm ?? "demarcher");
     if (a.deleted_at) jetees.add(a.id);
   }
 
@@ -106,6 +112,7 @@ export async function chargerPlanning(du: Date, au: Date): Promise<Rendezvous[]>
       fiche: ficheId ? (nom.get(ficheId) ?? "Fiche supprimée") : "",
       origine,
       ficheId,
+      crm: crmDe.get(ficheId) ?? "demarcher",
     };
   });
 }

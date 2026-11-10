@@ -3,7 +3,21 @@
 
 import { supabaseAdmin } from "../data/supabaseAdmin";
 
-export type Axe = "demarcher" | "collectivites" | "mutuelles" | "evenements" | "concurrents" | "publications" | "nouveautes" | "nous";
+export type Axe = "demarcher" | "collectivites" | "intermediaires" | "mutuelles" | "evenements" | "concurrents" | "publications" | "nouveautes" | "nous";
+/**
+ * Deux veilles depuis le 02/11 (décision d'Olivier) : la commerciale (ceux à démarcher) et celle de marché
+ * (ce qui s'informe). Chaque axe appartient à l'une des deux ; « Nouveautés » est débranché.
+ */
+export type NomVeille = "commerciale" | "marche";
+export const VEILLES: Record<NomVeille, { titre: string; axes: Axe[] }> = {
+  commerciale: { titre: "Veille Commerciale", axes: ["demarcher", "collectivites", "intermediaires", "mutuelles"] },
+  marche: { titre: "Veille Marché", axes: ["publications", "concurrents", "evenements", "nous"] },
+};
+export const estVeille = (v: string | undefined): v is NomVeille => v === "commerciale" || v === "marche";
+export const veilleDe = (axe: Axe | undefined): NomVeille | null =>
+  axe && VEILLES.commerciale.axes.includes(axe) ? "commerciale" : axe && VEILLES.marche.axes.includes(axe) ? "marche" : null;
+/** Le début des adresses d'une veille dans le Hub. */
+export const baseVeille = (v: NomVeille) => `/veille/${v}`;
 /** Les deux cases « à démarcher » : on peut y confier une entreprise ou une collectivité à un commercial. */
 export const A_DEMARCHER = new Set<string>(["demarcher", "collectivites"]);
 export interface Rubrique { id: string; nom: string; description: string; ordre: number; actif: boolean; axe: Axe }
@@ -45,27 +59,30 @@ export const genreEnClair = (g: Genre) => GENRES.find((x) => x.cle === g)?.label
 
 export interface Rapport {
   id: string; periode_debut: string; periode_fin: string; statut: string;
-  points_cles: { texte: string; articles: string[] }[];
+  /** `veille` : la veille dont viennent ces points (depuis le 02/11, un rapport par veille). */
+  points_cles: { texte: string; articles: string[]; veille?: NomVeille }[];
   rubriques: { nom: string; axe?: Axe; articles: string[] }[];
-  posts: { titre: string; accroche: string; brouillon: string; articles: string[] }[];
+  posts: { titre: string; accroche: string; brouillon: string; articles: string[]; veille?: NomVeille }[];
   sources_en_panne: string[]; cout_usd: number; envoye_le: string | null; erreur: string | null;
 }
 export interface Article {
   id: string; url: string; titre: string; titre_fr: string | null; source: string; nature: string; publie_le: string | null;
   rubrique: string | null; importance: number | null; resume: string | null; pour_avisdoc: string | null;
   entreprise: string | null; ville: string | null;
-  /** « À ne pas rater » : à traiter sans attendre le rapport, et pourquoi. */
+  /** « À ne pas manquer » : à traiter sans attendre le rapport, et pourquoi. */
   urgent?: boolean; urgence?: string | null;
-  /** Quand Vigile l'a trouvée et ajoutée : c'est son arrivée chez AvisDoc. */
+  /** Quand Scope l'a trouvée et ajoutée : c'est son arrivée chez AvisDoc. */
   trie_le?: string | null;
   /** Le site refuse les robots : le lien s'ouvre dans un navigateur, on propose aussi de le copier. */
   lien_protege: boolean;
+  /** Qui publie, dit par Scope au tri (presse, revue, officiel, site…) ; vide pour les publications d'avant le 02/11. */
+  genre_source?: string | null;
 }
 
 export const STATUTS: Record<string, string> = {
   collecte: "Collecte en cours",
   verification: "Vérification des liens",
-  synthese: "Vigile rédige",
+  synthese: "Scope rédige",
   pret: "Prêt, part à 9 h",
   envoi: "Envoi en cours",
   envoye: "Envoyé",
@@ -89,7 +106,7 @@ export const listerExpressions = () => lire<Expression[]>(supabaseAdmin.from("ad
 export const listerSources = () => lire<Source[]>(supabaseAdmin.from("admin_veille_sources").select("cle, nom, genre, categorie, params, actif, dernier_succes, derniere_erreur").order("nom"));
 export const listerReseaux = () => lire<Reseau[]>(supabaseAdmin.from("admin_veille_reseaux").select("*").order("nom"));
 
-/** `url` absente : une base intégrée, dont on ne touche que le nom et le suivi (ses réglages restent ceux de Vigile). */
+/** `url` absente : une base intégrée, dont on ne touche que le nom et le suivi (ses réglages restent ceux de Scope). */
 export async function enregistrerSource(cle: string | null, valeurs: { nom: string; url?: string; categorie: string; actif: boolean }, auteur: string) {
   const ligne = { nom: valeurs.nom, categorie: valeurs.categorie, actif: valeurs.actif, ...(valeurs.url !== undefined && { params: { url: valeurs.url } }) };
   if (cle) await lire(supabaseAdmin.from("admin_veille_sources").update(ligne).eq("cle", cle));
@@ -119,15 +136,15 @@ export const listerRapports = () =>
 export const lireRapport = (id: string) =>
   lire<Rapport | null>(supabaseAdmin.from("admin_veille_rapports").select("id, periode_debut, periode_fin, statut, points_cles, rubriques, posts, sources_en_panne, cout_usd, envoye_le, erreur").eq("id", id).maybeSingle());
 export const articlesDu = (rapportId: string) =>
-  lire<Article[]>(supabaseAdmin.from("admin_veille_articles").select("id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le").eq("rapport_envoye_id", rapportId).eq("verdict", "retenu").is("retire_le", null));
+  lire<Article[]>(supabaseAdmin.from("admin_veille_articles").select("id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le, genre_source").eq("rapport_envoye_id", rapportId).eq("verdict", "retenu").is("retire_le", null));
 export const sourcesNommees = () => lire<{ cle: string; nom: string }[]>(supabaseAdmin.from("admin_veille_sources").select("cle, nom"));
 
-export async function rapportsLus(email: string) {
-  const l = await lire<{ rapport_id: string }[]>(supabaseAdmin.from("admin_veille_lectures").select("rapport_id").eq("email", email.toLowerCase()));
+export async function rapportsLus(email: string, veille: NomVeille) {
+  const l = await lire<{ rapport_id: string }[]>(supabaseAdmin.from("admin_veille_lectures").select("rapport_id").eq("email", email.toLowerCase()).eq("veille", veille));
   return new Set(l.map((x) => x.rapport_id));
 }
-export async function marquerLu(rapportId: string, email: string) {
-  await supabaseAdmin.from("admin_veille_lectures").upsert({ rapport_id: rapportId, email: email.toLowerCase() }, { onConflict: "rapport_id,email", ignoreDuplicates: true });
+export async function marquerLu(rapportId: string, email: string, veille: NomVeille) {
+  await supabaseAdmin.from("admin_veille_lectures").upsert({ rapport_id: rapportId, email: email.toLowerCase(), veille }, { onConflict: "rapport_id,email,veille", ignoreDuplicates: true });
 }
 
 /** Pour le web, le nom du site dit plus que le moteur qui l'a trouvé. */
@@ -151,20 +168,35 @@ export const periodeEnClair = (r: Pick<Rapport, "periode_debut" | "periode_fin">
   `Du ${momentEnClair(r.periode_debut)} au ${momentEnClair(r.periode_fin)}`;
 
 /** Les axes du rapport, dans l'ordre voulu par AvisDoc (26/10) : on agit d'abord, on s'informe ensuite. */
+/** Les quatre CRM du menu (organigramme de Laurent et Irène, 09/11), chacun lié à son marché dans la Veille Commerciale. */
+export const CRMS: { label: string; axe: Axe }[] = [
+  { label: "CRM Entreprise", axe: "demarcher" },
+  { label: "CRM Collectivités Locales", axe: "collectivites" },
+  { label: "CRM Assurance Mutuelle", axe: "mutuelles" },
+  { label: "CRM Intermédiaire", axe: "intermediaires" },
+];
+
+/** CRM Synthèse : où traiter une publication de ce marché (sa Veille dans son CRM). */
+export const ouvrirDansCrm = (axe: string | undefined) => {
+  const c = CRMS.find((x) => x.axe === axe);
+  return c ? { to: `/veille/commerciale/direct?seul=${c.axe}`, label: c.label } : undefined;
+};
+
 export const AXES: { cle: Axe | "publier"; titre: string; sousTitre: string }[] = [
-  { cle: "demarcher", titre: "Entreprises à démarcher", sousTitre: "Des clients potentiels : entreprises et mutuelles qui parlent publiquement de la santé de leurs salariés. À confier à un commercial." },
-  { cle: "collectivites", titre: "Collectivités à démarcher", sousTitre: "Des clients potentiels : mairies, départements, régions qui manquent de médecins (surtout de dermatologues) ou lancent un appel d'offres de santé. À confier à un commercial." },
-  { cle: "mutuelles", titre: "Mutuelles et assurance santé", sousTitre: "Tout ce que Vigile trouve sur les mutuelles, complémentaires santé et assureurs santé : forfaits prévention, offres, contrats collectifs, partenariats." },
+  { cle: "demarcher", titre: "Entreprises", sousTitre: "Des clients potentiels : entreprises et mutuelles qui parlent publiquement de la santé de leurs salariés. À confier à un commercial." },
+  { cle: "collectivites", titre: "Collectivités", sousTitre: "Des clients potentiels : mairies, départements, régions qui manquent de médecins (surtout de dermatologues) ou lancent un appel d'offres de santé. À confier à un commercial." },
+  { cle: "intermediaires", titre: "Intermédiaires", sousTitre: "Ceux qui peuvent revendre AvisDoc (courtiers, plateformes médicales…). Il manque un mot ou une cible ? « Suggérer un mot ou une cible », en haut de la page." },
+  { cle: "mutuelles", titre: "Mutuelle Assurance", sousTitre: "Tout ce que Scope trouve sur les mutuelles, complémentaires santé et assureurs santé : forfaits prévention, offres, contrats collectifs, partenariats." },
   { cle: "publier", titre: "À publier", sousTitre: "Idées de posts LinkedIn, à relire avant de les publier." },
-  { cle: "evenements", titre: "Événements", sousTitre: "Salons, congrès, conférences, courses et journées contre le cancer à venir : où AvisDoc peut exposer, aller rencontrer des clients, sponsoriser, ou ce qu'elle peut relayer sur LinkedIn. Date et lieu dans le résumé quand ils sont connus." },
-  { cle: "concurrents", titre: "Concurrents", sousTitre: "Ce que font les concurrents d'AvisDoc (annonces, contrats, levées de fonds, posts), et ce que ça change pour AvisDoc." },
-  { cle: "publications", titre: "Publications scientifiques", sousTitre: "Études, essais cliniques et avis scientifiques sur la peau et le dépistage : des arguments chiffrés pour vendre et pour publier." },
+  { cle: "evenements", titre: "Évènements", sousTitre: "Salons, congrès, conférences, courses et journées contre le cancer à venir : où AvisDoc peut exposer, aller rencontrer des clients, sponsoriser, ou ce qu'elle peut relayer sur LinkedIn. Date et lieu dans le résumé quand ils sont connus." },
+  { cle: "concurrents", titre: "Concurrence", sousTitre: "Ce que font les concurrents d'AvisDoc (annonces, contrats, levées de fonds, posts), et ce que ça change pour AvisDoc." },
+  { cle: "publications", titre: "Publi Scientifiques", sousTitre: "Études, essais cliniques et avis scientifiques sur la peau et le dépistage : des arguments chiffrés pour vendre et pour publier." },
   { cle: "nouveautes", titre: "Nouveautés", sousTitre: "Tout ce qui fait bouger le métier d'AvisDoc sans être un client, un concurrent ni une étude : nouvelles règles (décrets, Assurance maladie, HAS), santé au travail, IA et appareils de dépistage, soleil et métiers d'extérieur, articles de presse. À lire pour rester à jour, pas à démarcher." },
-  { cle: "nous", titre: "Ce qu'on dit de nous", sousTitre: "Ce que d'autres disent d'AvisDoc, partout sur le web et les réseaux sociaux : presse, avis, commentaires, posts de clients, de médecins ou de concurrents. Ce qu'AvisDoc publie elle-même n'y est pas." },
+  { cle: "nous", titre: "Les avis sur AvisDoc", sousTitre: "Ce que d'autres disent d'AvisDoc, partout sur le web et les réseaux sociaux : presse, avis, commentaires, posts de clients, de médecins ou de concurrents. Ce qu'AvisDoc publie elle-même n'y est pas." },
 ];
 export const AXES_RUBRIQUE: { cle: Axe; label: string }[] = [
-  { cle: "demarcher", label: "Entreprises à démarcher" }, { cle: "collectivites", label: "Collectivités à démarcher" }, { cle: "mutuelles", label: "Mutuelles et assurance santé" }, { cle: "evenements", label: "Événements" }, { cle: "concurrents", label: "Concurrents" },
-  { cle: "publications", label: "Publications scientifiques" }, { cle: "nouveautes", label: "Nouveautés" }, { cle: "nous", label: "Ce qu'on dit de nous" },
+  { cle: "demarcher", label: "Entreprises" }, { cle: "collectivites", label: "Collectivités" }, { cle: "intermediaires", label: "Intermédiaires" }, { cle: "mutuelles", label: "Mutuelle Assurance" }, { cle: "evenements", label: "Événements" }, { cle: "concurrents", label: "Concurrents" },
+  { cle: "publications", label: "Publications scientifiques" }, { cle: "nouveautes", label: "Nouveautés" }, { cle: "nous", label: "Les avis sur AvisDoc" },
 ];
 
 const echappeLike = (t: string) => t.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -176,7 +208,7 @@ export interface StatutEntreprise {
   lien: string;
   /** Le commercial qui la suit (« Suivi par »), s'il y en a un. */
   referent: string | null;
-  /** Confiée depuis Vigile : à qui et quand. */
+  /** Confiée depuis Scope : à qui et quand. */
   confiee?: { referent: string; le: string };
 }
 
@@ -223,20 +255,20 @@ export async function confierArticle(articleId: string, referent: string) {
   return data as { prospectId: string; existait: boolean; mail: "envoye" | "deja" };
 }
 
-/** « En direct » : tout ce que Vigile a retenu, du plus récent au plus ancien. */
+/** « En direct » : tout ce que Scope a retenu, du plus récent au plus ancien. */
 export const listerDirect = (limite = 600) =>
   lire<(Article & { trie_le: string | null })[]>(supabaseAdmin.from("admin_veille_articles")
-    .select("id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le")
+    .select("id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le, genre_source")
     .eq("verdict", "retenu").is("retire_le", null).order("trie_le", { ascending: false, nullsFirst: false }).limit(limite));
 
-const CHAMPS_ARTICLE = "id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le";
+const CHAMPS_ARTICLE = "id, url, titre, titre_fr, source, nature, publie_le, rubrique, importance, resume, pour_avisdoc, lien_protege, entreprise, ville, urgent, urgence, trie_le, genre_source";
 
 /** Les publications archivées (« Retirer › Archiver ») : cachées partout, elles se remettent d'un clic. */
 export const listerArchives = (limite = 300) =>
   lire<(Article & { trie_le: string | null; retire_le: string })[]>(supabaseAdmin.from("admin_veille_articles")
     .select(`${CHAMPS_ARTICLE}, retire_le`).eq("verdict", "retenu").not("retire_le", "is", null).order("retire_le", { ascending: false }).limit(limite));
 
-/** Les entreprises à démarcher, pour Commercial › Veille : « À ne pas rater » en tête, puis les plus récentes. */
+/** Les entreprises à démarcher, pour Commercial › Veille : « À ne pas manquer » en tête, puis les plus récentes. */
 export async function listerCommercial(limite = 300) {
   const rubriques = (await listerRubriques()).filter((r) => r.axe === "demarcher").map((r) => r.nom);
   if (!rubriques.length) return [];
@@ -277,16 +309,6 @@ export const confiee = (prospectId: string, referent: string): StatutEntreprise 
   type: "prospection", lien: `/prospects?fiche=${prospectId}`, referent, confiee: { referent, le: new Date().toISOString() },
 });
 
-/** Recevoir par mail, tout de suite, les « À ne pas rater » : chacun l'active ou le coupe pour lui-même. */
-export async function alerteActive(email: string) {
-  return Boolean(await lire(supabaseAdmin.from("admin_veille_alertes").select("email").eq("email", email.toLowerCase()).maybeSingle()));
-}
-export async function changerAlerte(email: string, active: boolean) {
-  const e = email.toLowerCase();
-  if (active) await lire(supabaseAdmin.from("admin_veille_alertes").upsert({ email: e }, { onConflict: "email" }));
-  else await lire(supabaseAdmin.from("admin_veille_alertes").delete().eq("email", e));
-}
-
 /** Archiver une publication lue et sans intérêt (pour tout le monde), ou la remettre. */
 export async function retirerArticle(id: string, retirer: boolean) {
   await lire(supabaseAdmin.rpc("veille_retirer", { p_id: id, p_retirer: retirer }));
@@ -320,8 +342,82 @@ export const lireBudget = () =>
   lire<{ montant_usd: number } | null>(supabaseAdmin.from("admin_veille_budget").select("montant_usd").maybeSingle());
 export const reglerBudget = (montant: number) => lire(supabaseAdmin.rpc("veille_regler_budget", { p_montant: montant }));
 export const lireCpr = (jours = 30) => lire<Cpr>(supabaseAdmin.rpc("veille_cpr", { p_jours: jours }));
+/** Ce que chaque veille a coûté ce mois-ci : au mieux, la recherche et le tri étant communs (réparti au prorata des publications retenues). */
+export const coutParVeille = () => lire<{ commerciale: number; marche: number; commun: number }>(supabaseAdmin.rpc("veille_cout_par_veille"));
 
 /** Supprimer pour de bon : seule son adresse reste, pour qu'aucune tournée ne la ramène. */
 export async function supprimerArticle(id: string) {
   await lire(supabaseAdmin.rpc("veille_supprimer", { p_id: id }));
 }
+
+// ---------------------------------------------------------------------------
+// D'où vient vraiment une publication (02/11, Olivier : « il ne faut pas mettre presse partout »).
+// L'ordre : le réseau social se lit dans l'adresse ; les bases (PubMed, BOAMP…) disent ce qu'elles donnent ;
+// les sites connus ensuite ; puis ce que Scope a dit au tri ; à défaut, « Site web ».
+// ---------------------------------------------------------------------------
+export type Logo = "linkedin" | "facebook" | "instagram" | "x" | "youtube" | "tiktok" | "threads";
+const RESEAUX_SOCIAUX: [RegExp, Logo, string][] = [
+  [/(^|\.)linkedin\.com$/, "linkedin", "LinkedIn"], [/(^|\.)(facebook\.com|fb\.com)$/, "facebook", "Facebook"],
+  [/(^|\.)instagram\.com$/, "instagram", "Instagram"], [/(^|\.)(x\.com|twitter\.com)$/, "x", "X (Twitter)"],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, "youtube", "YouTube"], [/(^|\.)tiktok\.com$/, "tiktok", "TikTok"], [/(^|\.)threads\.net$/, "threads", "Threads"],
+];
+/** Journaux, magazines, radios, télés et médias professionnels relevés (les titres suivis dans le Paramétrage, et ceux déjà trouvés). */
+const PRESSE = new Set([
+  "actu.fr", "argusdelassurance.com", "bienpublic.com", "centrepresseaveyron.fr", "charentelibre.fr", "clicanoo.re", "corsematin.com", "courrier-picard.fr",
+  "dna.fr", "egora.fr", "estrepublicain.fr", "franceinfo.fr", "franceantilles.fr", "hospimedia.fr", "ici.fr", "ladepeche.fr", "lagazettedescommunes.com",
+  "lalsace.fr", "lamontagne.fr", "lanouvellerepublique.fr", "laprovence.com", "larep.fr", "larepubliquedespyrenees.fr", "lavoixdunord.fr", "leberry.fr",
+  "lechorepublicain.fr", "ledauphine.com", "lejournaldemayotte.yt", "lejsl.com", "leparisien.fr", "lepopulaire.fr", "leprogres.fr", "lequotidiendumedecin.fr",
+  "letelegramme.fr", "lindependant.fr", "linfo.re", "lunion.fr", "lyonne.fr", "midilibre.fr", "nicematin.com", "ouest-france.fr", "paris-normandie.fr",
+  "republicain-lorrain.fr", "sante-et-travail.fr", "sudouest.fr", "ticsante.com", "vosgesmatin.fr", "whatsupdoc-lemag.fr",
+  "lemonde.fr", "lefigaro.fr", "liberation.fr", "lesechos.fr", "latribune.fr", "capital.fr", "challenges.fr", "lexpress.fr", "lepoint.fr", "nouvelobs.com",
+  "20minutes.fr", "bfmtv.com", "tf1info.fr", "francetvinfo.fr", "rtl.fr", "europe1.fr", "radiofrance.fr", "zonebourse.com", "boursorama.com", "usinenouvelle.com",
+  "lardennais.fr", "lamanchelibre.fr", "tvvendee.fr", "lacommere43.fr", "santematin.fr", "science-et-vie.com", "marieclaire.fr", "lemoniteurdespharmacies.fr",
+  "dermatologytimes.com", "managedhealthcareexecutive.com", "fr.qz.com", "qz.com", "todoalicante.es", "bicesteradvertiser.net", "actusoins.com", "infirmiers.com",
+  "decision-sante.fr", "lequotidiendupharmacien.fr", "topsante.com", "lejdd.fr", "humanite.fr", "la-croix.com", "maire-info.com", "acteurspublics.fr",
+]);
+const COMMUNIQUES = new Set(["titrespresse.com", "presseagence.fr", "prnewswire.com", "businesswire.com", "globenewswire.com", "newswire.ca", "communiques.info"]);
+const REVUES = new Set(["pubmed.ncbi.nlm.nih.gov", "europepmc.org", "doi.org", "jaad.org", "academic.oup.com", "medrxiv.org", "biorxiv.org", "nature.com", "thelancet.com",
+  "nejm.org", "bmj.com", "jamanetwork.com", "sciencedirect.com", "springer.com", "link.springer.com", "wiley.com", "onlinelibrary.wiley.com", "frontiersin.org",
+  "mdpi.com", "plos.org", "journals.plos.org", "larevuedupraticien.fr", "rspublisher.org", "cairn.info", "em-consulte.com", "jle.com"]);
+const OFFICIELS = /(^|\.)(gouv\.fr|has-sante\.fr|ansm\.sante\.fr|sante\.fr|ameli\.fr|santepubliquefrance\.fr|e-cancer\.fr|cancer\.fr|inrs\.fr|anses\.fr|legifrance\.gouv\.fr|service-public\.fr|europa\.eu|who\.int|boamp\.fr|clinicaltrials\.gov)$/;
+const GENRES_ECRITS: Record<string, string> = {
+  presse: "Presse", communique: "Communiqué de presse", revue: "Revue scientifique", officiel: "Officiel", collectivite: "Collectivité",
+  entreprise: "Site d'entreprise", association: "Association", site: "Site web",
+};
+const NATURES_PROPRES: Record<string, string> = { etude: "Étude", preprint: "Prépublication", essai: "Essai clinique", appel_offres: "Appel d'offres" };
+
+/** L'étiquette d'une publication : d'où elle vient (et pour un réseau social, son logo). */
+export function origineDe(a: Pick<Article, "url" | "nature" | "genre_source">): { label: string; logo?: Logo } {
+  let site = "";
+  try { site = new URL(a.url).hostname.replace(/^www\./, "").toLowerCase(); } catch { /* adresse illisible */ }
+  const reseau = RESEAUX_SOCIAUX.find(([re]) => re.test(site));
+  if (reseau) return { label: reseau[2], logo: reseau[1] };
+  if (NATURES_PROPRES[a.nature]) return { label: NATURES_PROPRES[a.nature] };
+  const connu = (l: Set<string>) => [...l].some((d) => site === d || site.endsWith(`.${d}`));
+  if (connu(REVUES)) return { label: "Revue scientifique" };
+  if (connu(COMMUNIQUES)) return { label: "Communiqué de presse" };
+  if (connu(PRESSE)) return { label: "Presse" };
+  if (OFFICIELS.test(site)) return { label: "Officiel" };
+  return { label: GENRES_ECRITS[a.genre_source ?? ""] ?? "Site web" };
+}
+
+// Les suggestions des commerciaux (migration 0084) : un mot, un concurrent, un site que Scope devrait suivre.
+// Elles partent de la page de veille d'un CRM et arrivent en tête du Paramétrage, dans Admin.
+export type EspaceSuggestion = `crm:${(typeof CRMS)[number]["axe"]}` | "veille:marche";
+export interface Suggestion {
+  id: string; espace: EspaceSuggestion; texte: string; email: string;
+  statut: "a_traiter" | "fait" | "refuse"; traite_par: string | null; traite_le: string | null; created_at: string;
+}
+export const ESPACES_SUGGESTION: { espace: EspaceSuggestion; label: string }[] = [
+  ...CRMS.map((c) => ({ espace: `crm:${c.axe}` as EspaceSuggestion, label: c.label })),
+  { espace: "veille:marche", label: "Veille Marché" },
+];
+/** L'espace d'une page de veille : le CRM de l'onglet ouvert, sinon la Veille Marché ou le CRM Entreprise. */
+export const espaceDePage = (veille: NomVeille, onglet: string | null | undefined): EspaceSuggestion =>
+  veille === "marche" ? "veille:marche" : CRMS.some((c) => c.axe === onglet) ? `crm:${onglet}` as EspaceSuggestion : "crm:demarcher";
+export const suggerer = (espace: EspaceSuggestion, texte: string, email: string) =>
+  lire(supabaseAdmin.from("admin_veille_suggestions").insert({ espace, texte: texte.trim(), email: email.toLowerCase() }));
+export const listerSuggestionsATraiter = () =>
+  lire<Suggestion[]>(supabaseAdmin.from("admin_veille_suggestions").select("*").eq("statut", "a_traiter").order("created_at", { ascending: false }));
+export const traiterSuggestion = (id: string, statut: "fait" | "refuse", email: string) =>
+  lire(supabaseAdmin.from("admin_veille_suggestions").update({ statut, traite_par: email.toLowerCase(), traite_le: new Date().toISOString() }).eq("id", id));

@@ -34,6 +34,8 @@ export function clientDepuisProspect(p: Prospect, etape: string, pipelineId: str
     pipelineId,
     // Merx a déjà classé ce prospect : le secteur le suit, personne ne le ressaisit.
     secteur: p.sector ?? null,
+    // L'affaire reste dans le CRM de son prospect (Olivier, 09/11).
+    crm: p.crm ?? "demarcher",
     jours: 1,
     tarif: 0,
     depistes: 0,
