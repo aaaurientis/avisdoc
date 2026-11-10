@@ -178,7 +178,7 @@ export default function CarteArticle({
         </p>
       )}
       <p className="mt-1.5 text-[12px] text-muted-foreground">
-        {nomDeSource(a, noms)}{a.publie_le ? ` · publié le ${dateCourte(a.publie_le)}` : ""}
+        {nomDeSource(a, noms)}{a.publie_le ? ` · publié le ${dateCourte(a.publie_le)}` : <> · <span className="font-bold text-avisdoc-ink">date de parution inconnue</span></>}
         {a.trie_le && <> · <span className="font-bold text-avisdoc-ink">arrivé dans Scope le {dateEtHeure(a.trie_le)}</span></>}
       </p>
       {a.lien_protege && <LienProtege url={a.url} />}

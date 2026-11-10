@@ -130,10 +130,15 @@ Qui va où, sans exception :
 - un employeur d'au moins 250 salariés ou agents (groupe, ETI, bailleur social, hôpital, administration) qui lance ou prépare un programme durable de santé ou de prévention pour ses salariés, ou qui emploie des salariés au soleil (BTP, voirie, espaces verts, agriculture) et annonce une action de prévention.
 N'est PAS urgent : une marche, une course ou une journée solidaire ponctuelle (Octobre Rose, Movember…), une association ou une ligue contre le cancer (ce ne sont pas des acheteurs), un événement déjà passé sans suite annoncée, un article sur tout un secteur sans employeur nommé, une actualité seulement intéressante. En cas de doute : faux.
 
+Date (Olivier, 10/11) : un article marqué « publié : date inconnue » n'est retenu que si son titre ou son extrait montre qu'il date des 30 derniers jours (une date écrite, un événement daté, « cette semaine », « hier »…). Sinon, écarte-le, raison : « Date inconnue, rien ne montre que c'est récent. » Un vieux post repartagé ou remonté par un moteur de recherche n'est pas une nouvelle.
+
 Pour CHAQUE article ci-dessous, décide s'il est utile à AvisDoc (retenu) ou hors sujet, trop général, en double d'un autre article du lot, ou sans rapport avec ses métiers (écarté). Range chaque article retenu dans la rubrique qui lui va le mieux.
 
 ${REGLES}`;
-  const prompt = `<articles>
+  // La date du jour hors des consignes : elles restent identiques d'un jour à l'autre, donc en cache.
+  const prompt = `Nous sommes le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" })}.
+
+<articles>
 ${articles.map((a) => `[${a.n}] ${a.titre}\n    site : ${a.site} · source : ${a.source} · nature : ${a.nature} · publié : ${a.publie_le?.slice(0, 10) ?? "date inconnue"}\n    extrait : ${a.extrait || "(aucun)"}`).join("\n\n")}
 </articles>`;
   let usage: LlmUsage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
