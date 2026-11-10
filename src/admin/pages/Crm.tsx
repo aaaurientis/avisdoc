@@ -294,7 +294,7 @@ export default function Crm() {
       {!selected && <BarreDefilement cible={zoneKanban} />}
 
       {selected ? (
-        <ProjectView client={selected} onClose={() => navigate(`/crm${search}`)} />
+        <ProjectView client={selected} onClose={() => navigate(crm ? `/crm?crm=${crm}` : "/crm")} />
       ) : stages.length === 0 ? (
         /* Un tableau sans colonne n'affiche rien : il faut le dire, et dire où aller. */
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
