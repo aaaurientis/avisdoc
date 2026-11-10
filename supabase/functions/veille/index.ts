@@ -285,11 +285,15 @@ async function noterSource(db: Db, cle: string, erreur: string | null) {
   await db.from("admin_veille_sources").update(maj).eq("cle", cle);
 }
 
+/** Un demi-caractère (emoji coupé) ou un caractère nul fait refuser tout le lot par la base : on les retire. */
+const sain = (v: unknown) =>
+  typeof v === "string" ? v.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|\u0000/g, "") : v;
+
 async function enregistrerArticles(db: Db, rapportId: string, articles: Article[]) {
   articles = articles.filter((a) => !DE_NOUS(a.url));
   if (!articles.length) return 0;
   // Un article déjà vu (dans ce rapport ou un précédent) n'est pas repris : jamais republié.
-  const lignes = articles.map((a) => ({ ...a, rapport_id: rapportId }));
+  const lignes = articles.map((a) => ({ ...Object.fromEntries(Object.entries(a).map(([k, v]) => [k, sain(v)])), rapport_id: rapportId }));
   const nouveaux = await verifie(db.from("admin_veille_articles").upsert(lignes, { onConflict: "cle", ignoreDuplicates: true }).select("id"));
   return (nouveaux as any[]).length;
 }

@@ -30,7 +30,12 @@ const AGENT = "AvisDoc-Veille/1.0 (+https://admin.avisdoc.fr)";
 
 const jour = (d: Date) => d.toISOString().slice(0, 10);
 const nettoyer = (t: string) => t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-const couper = (t: string, n = 600) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
+// On coupe par caractère entier : couper un emoji en deux laisse un demi-caractère que la base refuse
+// (« invalid input syntax for type json » : tout le lot d'articles était perdu, Linkup chaque matin, 10/11).
+const couper = (t: string, n = 600) => {
+  const c = Array.from(t);
+  return c.length > n ? c.slice(0, n - 1).join("") + "…" : t;
+};
 
 const clients = new Map<string, unknown>();
 /** Un client qui connaît l'intermédiaire manquant, pour les sites qui l'oublient (voir certificats.ts). */
