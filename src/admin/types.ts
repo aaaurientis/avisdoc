@@ -134,6 +134,8 @@ export interface Client {
   pipelineId: string;
   /** Son secteur, repris du prospect d'origine ou posé à la main (migration 0053). */
   secteur?: string | null;
+  /** Son CRM (« demarcher » = CRM Entreprise…), migration 0085. */
+  crm?: string;
   /** Le commercial qui suit l'affaire. */
   referent?: string | null;
   /** La fiche du fichier client a déjà été créée : ne pas la recréer. */
@@ -236,4 +238,6 @@ export interface Account {
   data: Record<string, string>;
   /** L'affaire du Pipeline dont la fiche est née, s'il y en a une. */
   clientId: string | null;
+  /** Son CRM (« demarcher » = CRM Entreprise…), migration 0085. */
+  crm?: string;
 }

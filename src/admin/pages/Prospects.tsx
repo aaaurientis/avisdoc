@@ -34,6 +34,7 @@ import { useActualisation } from "../lib/actualisation";
 import FiltresRepliables from "../components/FiltresRepliables";
 import BarreDefilement from "../components/BarreDefilement";
 import { messageErreurFonction } from "../lib/erreurFonction";
+import { dansLeCrm, useCrm } from "../lib/crm";
 
 /** Une demande passée à Merx : ce qu’elle a coûté, et pour un e-mail, ce qu’elle a écrit. */
 interface Demande {
@@ -130,7 +131,10 @@ export default function Prospects() {
   const { user } = useAuth();
   const nomDuCommercial = user?.name ?? user?.email ?? "";
   const { stages, pipelines, clients, addClient, addProjectContact } = useAdminData();
-  const [prospects, setProspects] = useState<Prospect[]>([]);
+  // Chaque CRM ne montre que ses fiches (Olivier, 09/11).
+  const crm = useCrm();
+  const [toutesFiches, setProspects] = useState<Prospect[]>([]);
+  const prospects = useMemo(() => toutesFiches.filter((p) => dansLeCrm(p.crm, crm)), [toutesFiches, crm]);
   const [chargement, setChargement] = useState(true);
   /** Une recherche de Merx est en route : les fiches vont arriver. */
   const [enRecherche, setEnRecherche] = useState(false);
@@ -424,7 +428,7 @@ export default function Prospects() {
     },
     [charger],
   );
-  // Arrivée depuis un lien (le rapport de Vigile : « Voir sa fiche prospect ») : la fiche demandée s'ouvre, une fois.
+  // Arrivée depuis un lien (le rapport de Scope : « Voir sa fiche prospect ») : la fiche demandée s'ouvre, une fois.
   const [params, setParams] = useSearchParams();
   useEffect(() => {
     const id = params.get("fiche");

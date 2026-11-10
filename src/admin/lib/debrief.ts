@@ -7,6 +7,7 @@
 import { supabaseAdmin } from "../data/supabaseAdmin";
 import { messageErreurFonction } from "./erreurFonction";
 import { ajouterEchange, type GenreEchange } from "./echanges";
+import { crmPourFiche } from "./crm";
 
 export interface Objection {
   verbatim: string;
@@ -213,6 +214,7 @@ async function creerLaFiche(e: EntrepriseVue, par: string, etapeDeDepart?: strin
         jours: 1,
         tarif: 0,
         statut_propo: "Brouillon",
+        crm: crmPourFiche(),
       })
       .select("id")
       .single();
@@ -223,7 +225,7 @@ async function creerLaFiche(e: EntrepriseVue, par: string, etapeDeDepart?: strin
   if (ou === "client") {
     const { data, error } = await supabaseAdmin
       .from("admin_accounts")
-      .insert({ name: nom, signed_on: new Date().toISOString().slice(0, 10), data: {} })
+      .insert({ name: nom, signed_on: new Date().toISOString().slice(0, 10), data: {}, crm: crmPourFiche() })
       .select("id")
       .single();
     if (error) throw new Error(`${nom} n’a pas pu être créée au fichier client : ${error.message}`);
@@ -235,6 +237,7 @@ async function creerLaFiche(e: EntrepriseVue, par: string, etapeDeDepart?: strin
     .from("admin_prospects")
     .insert({
       owner_email: par,
+      crm: crmPourFiche(),
       name: nom,
       city: e.ville?.trim() || null,
       rationale: e.resume?.trim() || null,

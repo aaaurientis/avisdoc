@@ -1,6 +1,6 @@
 // Droits d'accès par module (réservé aux comptes ayant le module Admin).
-// Chaque utilisateur @avisdoc.fr non listé a les modules par défaut (tout sauf
-// Admin) ; une ligne ici remplace ces défauts. Les super-admins (table
+// Chaque utilisateur @avisdoc.fr non listé a les modules par défaut (MODULES_DEFAUT :
+// ni Admin, ni Journée, ni les trois nouveaux CRM, ni la Synthèse) ; une ligne ici remplace ces défauts. Les super-admins (table
 // admin_superadmins, gérée au SQL Editor) ont toujours tous les modules.
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
@@ -88,8 +88,9 @@ export default function Droits() {
       <Card className="mb-4 p-5 text-[13px] leading-relaxed text-muted-foreground">
         <p>
           <strong className="text-avisdoc-ink">Règles :</strong> un utilisateur
-          @avisdoc.fr <em>non listé</em> a accès à tout <em>sauf</em> Admin ; une
-          ligne ci-dessous remplace ces défauts ; les <strong>super-admins</strong>
+          @avisdoc.fr <em>non listé</em> a CRM Entreprise, Veille Marché, Professionnels de Santé,
+          Finance et Documents ; les autres CRM, la CRM Synthèse, Journée et Admin se cochent
+          ici, personne par personne. Une ligne ci-dessous remplace ces défauts ; les <strong>super-admins</strong>
           {" "}(dont {user?.email}) ont toujours tous les modules — leur liste se
           gère au SQL Editor (table <code>admin_superadmins</code>).
         </p>

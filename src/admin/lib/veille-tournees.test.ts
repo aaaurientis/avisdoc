@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { partDuJour, reduire } from "../../../supabase/functions/veille/linkup";
 import { tourneesEnPanne } from "../../../supabase/functions/veille/pannes";
-import { lignePassages } from "./veille";
+import { lignePassages, origineDe } from "./veille";
 
 const expression = (i: number, support?: string) => ({ cle: `linkup:expression:${i}${support ? `:${support}` : ""}` });
 
@@ -55,5 +55,28 @@ describe("tournées à signaler", () => {
   });
   it("attend la fin d'une tournée en cours avant de parler de ses étapes abandonnées", () => {
     expect(tourneesEnPanne([tournee("a", "collecte", "2026-10-31T09:00:00Z")], [{ rapport_id: "a" }], maintenant)).toEqual([]);
+  });
+});
+
+describe("d'où vient une publication", () => {
+  const o = (url: string, nature = "presse", genre_source: string | null = null) => origineDe({ url, nature, genre_source });
+  it("reconnaît un réseau social à son adresse, avec son logo", () => {
+    expect(o("https://www.linkedin.com/posts/skin-analytics_x")).toEqual({ label: "LinkedIn", logo: "linkedin" });
+    expect(o("https://fr.linkedin.com/company/cpam-95")).toEqual({ label: "LinkedIn", logo: "linkedin" });
+    expect(o("https://youtu.be/abc")).toEqual({ label: "YouTube", logo: "youtube" });
+  });
+  it("ne met « Presse » que sur la presse", () => {
+    expect(o("https://www.ladepeche.fr/2026/10/30/x", "web").label).toBe("Presse");
+    expect(o("https://www.lequotidiendumedecin.fr/a").label).toBe("Presse");
+    expect(o("https://www.titrespresse.com/c").label).toBe("Communiqué de presse");
+    expect(o("https://pubmed.ncbi.nlm.nih.gov/1", "etude").label).toBe("Étude");
+    expect(o("https://www.larevuedupraticien.fr/a").label).toBe("Revue scientifique");
+    expect(o("https://www.has-sante.fr/a").label).toBe("Officiel");
+    expect(o("https://www.boamp.fr/a", "appel_offres").label).toBe("Appel d'offres");
+  });
+  it("suit ce que Scope a dit au tri, sinon « Site web »", () => {
+    expect(o("https://www.allodocteurs.fr/a", "presse", "site").label).toBe("Site web");
+    expect(o("https://www.cannes.com/a", "presse", "collectivite").label).toBe("Collectivité");
+    expect(o("https://www.mablouseblanche.fr/a").label).toBe("Site web");
   });
 });

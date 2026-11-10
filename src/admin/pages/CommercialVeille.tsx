@@ -1,5 +1,5 @@
-// Commercial › Veille : les entreprises que Vigile a repérées (« À démarcher › Entreprises »), pour les
-// commerciaux. Les « À ne pas rater » en tête ; ce qui est arrivé depuis votre dernière visite porte la
+// Commercial › Veille : les entreprises que Scope a repérées (« À démarcher › Entreprises »), pour les
+// commerciaux. Les « À ne pas manquer » en tête ; ce qui est arrivé depuis votre dernière visite porte la
 // pastille « Nouveau » (et le compte rouge du menu). Rien ne va au Pipeline : on confie d'ici, si l'on veut.
 
 import { useEffect, useState } from "react";
@@ -45,13 +45,13 @@ export default function CommercialVeille() {
     <div>
       <PageHeader
         title="Veille"
-        subtitle="Les entreprises que Vigile a repérées parce qu'elles parlent publiquement de la santé de leurs salariés : des clients potentiels. Les « À ne pas rater » sont en tête. Un mail vous prévient dès qu'il en arrive."
+        subtitle="Les entreprises que Scope a repérées parce qu'elles parlent publiquement de la santé de leurs salariés : des clients potentiels. Les « À ne pas manquer » sont en tête. Un mail vous prévient dès qu'il en arrive."
       />
       <Card className="overflow-hidden">
         {articles !== null && articles.length > 0 && (
           <p className="border-b border-border bg-muted/40 px-5 py-2.5 text-[12px] text-muted-foreground">
             <b className="text-avisdoc-ink">{articles.length}</b> entreprise{articles.length > 1 ? "s" : ""}
-            {urgents > 0 && <> · <b className="text-red-600">{urgents} à ne pas rater</b></>}
+            {urgents > 0 && <> · <b className="text-red-600">{urgents} à ne pas manquer</b></>}
             {nouveaux > 0 && <> · <b className="text-avisdoc-orange">{nouveaux} nouvelle{nouveaux > 1 ? "s" : ""} depuis votre dernière visite</b></>}
             {" "}· « Confier à un commercial » crée sa fiche dans Prospection.
           </p>

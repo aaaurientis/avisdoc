@@ -26,6 +26,7 @@ import FicheClient from "./clients/FicheClient";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
 import FiltresRepliables from "../components/FiltresRepliables";
+import { dansLeCrm, useCrm } from "../lib/crm";
 
 /** Valeur d’une case : les trois colonnes du socle ont leur champ, les autres sont dans `data`. */
 function valeur(a: Account, f: AccountField): string {
@@ -61,7 +62,10 @@ const moisDe = (iso: string | null) =>
     : SANS_VALEUR;
 
 export default function FichierClient() {
-  const { accounts, accountFields, addManyAccounts, addFields, rafraichir } = useAdminData();
+  const { accounts: comptesDeTousLesCrm, accountFields, addManyAccounts, addFields, rafraichir } = useAdminData();
+  // Chaque CRM ne montre que ses clients (Olivier, 09/11).
+  const crm = useCrm();
+  const accounts = useMemo(() => comptesDeTousLesCrm.filter((a) => dansLeCrm(a.crm, crm)), [comptesDeTousLesCrm, crm]);
   const [recherche, setRecherche] = useState("");
   const [filtres, setFiltres] = useState<FiltresCompte>(FILTRES_COMPTE_VIDES);
   const [groupePar, setGroupePar] = useState("secteur");

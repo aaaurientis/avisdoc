@@ -1,4 +1,4 @@
-// Veille › Réglages (ex « À surveiller ») : tout ce que suit Vigile, l'agent de veille, rangé en six
+// Veille › Paramétrage (ex « À surveiller ») : tout ce que suit Scope, l'agent de veille, rangé en six
 // catégories (presse, sources scientifiques et officielles, réseaux, comptes,
 // expressions, influenceurs), plus les rubriques qui ordonnent le rapport.
 //
@@ -20,6 +20,7 @@ import {
   type Compte, type Expression, type Genre, type Reseau, type Rubrique, type Source,
 } from "../lib/veille";
 import { cn } from "@/lib/utils";
+import { SuggestionsATraiter } from "./veille/Suggestions";
 
 const champCls =
   "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
@@ -34,16 +35,16 @@ const CATEGORIES: { cle: Cat; label: string; un: string; vide: string }[] = [
   { cle: "reseaux", label: "Réseaux sociaux", un: "une page", vide: "Aucune page de réseau social suivie." },
   { cle: "comptes", label: "Concurrents", un: "un concurrent", vide: "Aucun concurrent suivi." },
   { cle: "expressions", label: "Expressions", un: "une expression", vide: "Aucune expression suivie." },
-  { cle: "nous", label: "Ce qu'on dit de nous", un: "un nom", vide: "Aucun nom cherché." },
+  { cle: "nous", label: "Les avis sur AvisDoc", un: "un nom", vide: "Aucun nom cherché." },
   { cle: "rubriques", label: "Rubriques", un: "une rubrique", vide: "Aucune rubrique." },
   { cle: "moteurs", label: "Moteurs de recherche", un: "", vide: "" },
 ];
 
-/** Ce que chaque catégorie veut dire : à quoi elle sert, ce que Vigile surveille, ce qu'il en rapporte. */
+/** Ce que chaque catégorie veut dire : à quoi elle sert, ce que Scope surveille, ce qu'il en rapporte. */
 const EXPLICATIONS: Record<Cat, { sert: string; surveille: string; rapporte: string }> = {
   presse: {
-    sert: "Les médias que Vigile lit pour suivre l'actualité qui touche AvisDoc : presse médicale, presse des métiers de vos clients, presse locale.",
-    surveille: "Chaque site ou flux sur On : Vigile lit son flux s'il en a un, sinon il cherche directement sur le site.",
+    sert: "Les médias que Scope lit pour suivre l'actualité qui touche AvisDoc : presse médicale, presse des métiers de vos clients, presse locale.",
+    surveille: "Chaque site ou flux sur On : Scope lit son flux s'il en a un, sinon il cherche directement sur le site.",
     rapporte: "Les articles parus depuis le rapport précédent qui concernent AvisDoc, résumés, avec leur lien, leur date et ce qu'ils changent pour AvisDoc.",
   },
   scientifique: {
@@ -53,7 +54,7 @@ const EXPLICATIONS: Record<Cat, { sert: string; surveille: string; rapporte: str
   },
   reseaux: {
     sert: "Des pages précises de réseaux sociaux à suivre : la page LinkedIn d'un concurrent, d'une mutuelle, d'une fédération… Vous suivez CE compte-là. Pour suivre un sujet sur tous les comptes, utilisez plutôt les Expressions.",
-    surveille: "Les publications de chaque page sur On. Vigile ne lit pas LinkedIn ou Facebook directement (il faudrait un compte connecté, ce que ces réseaux interdisent) : il retrouve ce qu'ils ont de public et que le web a indexé. Une publication réservée aux relations du compte lui échappe.",
+    surveille: "Les publications de chaque page sur On. Scope ne lit pas LinkedIn ou Facebook directement (il faudrait un compte connecté, ce que ces réseaux interdisent) : il retrouve ce qu'ils ont de public et que le web a indexé. Une publication réservée aux relations du compte lui échappe.",
     rapporte: "Les publications retrouvées, avec leur lien et leur date, quand elles concernent AvisDoc.",
   },
   comptes: {
@@ -67,24 +68,24 @@ const EXPLICATIONS: Record<Cat, { sert: string; surveille: string; rapporte: str
     rapporte: "Les articles qui les contiennent, s'ils concernent AvisDoc ; pour les signaux, l'entreprise, sa ville et pourquoi c'est une occasion.",
   },
   nous: {
-    sert: "Les noms que Vigile cherche pour savoir ce que les autres disent d'AvisDoc : la marque, le site, un produit, un dirigeant…",
+    sert: "Les noms que Scope cherche pour savoir ce que les autres disent d'AvisDoc : la marque, le site, un produit, un dirigeant…",
     surveille: "Chaque nom sur On est cherché chaque matin partout : presse, web, LinkedIn, Facebook, Instagram, X et YouTube (ce que ces réseaux ont de public et que le web a indexé). Ce qu'AvisDoc publie elle-même (son site, sa page LinkedIn) est laissé de côté.",
-    rapporte: "Les articles, avis, commentaires et posts qui parlent d'AvisDoc, dans l'onglet « Ce qu'on dit de nous » d'En direct et dans le rapport du vendredi.",
+    rapporte: "Les articles, avis, commentaires et posts qui parlent d'AvisDoc, dans l'onglet « Les avis sur AvisDoc » d'En direct et dans le rapport du vendredi.",
   },
   influenceurs: {
     sert: "Des personnes à suivre par leur nom : dermatologues, experts de la santé au travail, journalistes santé, dirigeants de mutuelles…",
-    surveille: "Ce qu'elles publient, disent ou signent : presse et web ; leurs nouvelles études dans PubMed, par leur nom d'auteur ; leurs publications LinkedIn si vous indiquez leur page. Indiquez leur spécialité et leur hôpital dans les notes : Vigile ne les confondra pas avec un homonyme.",
+    surveille: "Ce qu'elles publient, disent ou signent : presse et web ; leurs nouvelles études dans PubMed, par leur nom d'auteur ; leurs publications LinkedIn si vous indiquez leur page. Indiquez leur spécialité et leur hôpital dans les notes : Scope ne les confondra pas avec un homonyme.",
     rapporte: "Leurs prises de parole et leurs études qui concernent AvisDoc, avec le lien : un avis d'expert à citer, une personne à contacter.",
   },
   moteurs: {
-    sert: "Les outils qui font le travail de Vigile : ceux qui cherchent, celui qui vérifie, ceux qui trient et rédigent. Ce ne sont pas des sources : ils servent toutes les catégories.",
+    sert: "Les outils qui font le travail de Scope : ceux qui cherchent, celui qui vérifie, ceux qui trient et rédigent. Ce ne sont pas des sources : ils servent toutes les catégories.",
     surveille: "Chacun a son rôle, détaillé ci-dessous : où il cherche, jusqu'où, et ce qu'il apporte au rapport.",
     rapporte: "Rien ne se règle ici : c'est une page d'information. Les sources, elles, se règlent dans les autres onglets.",
   },
   rubriques: {
-    sert: "Les chapitres du rapport, comme les rubriques d'un journal. Quand Vigile écrit le rapport, il range chaque article sous l'un de ces titres : « Signaux d'entreprises », « Concurrence », « Dermatologie », « Santé au travail »…",
-    surveille: "Rien : une rubrique ne cherche pas. Elle dit à Vigile comment classer ce qu'il a trouvé. Sa description l'aide à choisir le bon chapitre. Vous pouvez en ajouter une (par exemple « Mutuelles »), la renommer ou changer l'ordre.",
-    rapporte: "Chaque rubrique va dans une case du rapport (Entreprises à démarcher, Collectivités à démarcher, Concurrents…). Le rapport et le mail sont découpés selon ces chapitres, dans l'ordre indiqué. Une rubrique sur Off disparaît du rapport : ses articles vont dans un autre chapitre.",
+    sert: "Les chapitres du rapport, comme les rubriques d'un journal. Quand Scope écrit le rapport, il range chaque article sous l'un de ces titres : « Signaux d'entreprises », « Concurrence », « Dermatologie », « Santé au travail »…",
+    surveille: "Rien : une rubrique ne cherche pas. Elle dit à Scope comment classer ce qu'il a trouvé. Sa description l'aide à choisir le bon chapitre. Vous pouvez en ajouter une (par exemple « Mutuelles »), la renommer ou changer l'ordre.",
+    rapporte: "Chaque rubrique va dans une case du rapport (Entreprises, Collectivités, Concurrents…). Le rapport et le mail sont découpés selon ces chapitres, dans l'ordre indiqué. Une rubrique sur Off disparaît du rapport : ses articles vont dans un autre chapitre.",
   },
 };
 
@@ -164,7 +165,7 @@ export default function VeilleSurveiller() {
     try {
       if (estSource(c)) await suspendreSource(l.id, !l.actif);
       else await suspendre(tableDe(c), l.id, !l.actif);
-      toast.success(l.actif ? "Suspendu : Vigile ne le suit plus." : "Repris : Vigile le suit de nouveau.");
+      toast.success(l.actif ? "Suspendu : Scope ne le suit plus." : "Repris : Scope le suit de nouveau.");
       await recharger();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Le changement a échoué.");
@@ -176,7 +177,7 @@ export default function VeilleSurveiller() {
   const effacer = async (c: Cat, id: string) => {
     const ok = await confirmer({
       titre: `Supprimer « ${nomDe(c, id)} » ?`,
-      message: "Vigile ne le suivra plus. Les rapports déjà envoyés ne changent pas. Pour l'arrêter sans le perdre, suspendez-le plutôt.",
+      message: "Scope ne le suivra plus. Les rapports déjà envoyés ne changent pas. Pour l'arrêter sans le perdre, suspendez-le plutôt.",
       action: "Supprimer",
       definitif: true,
     });
@@ -197,8 +198,8 @@ export default function VeilleSurveiller() {
   return (
     <div>
       <PageHeader
-        title="Réglages"
-        subtitle="Ce que Vigile suit pour ses rapports. Glissez l'interrupteur sur Off pour suspendre une ligne sans la perdre."
+        title="Paramétrage de la veille"
+        subtitle="Ce que Scope suit pour ses rapports, pour les quatre CRM et la Veille Marché. Glissez l'interrupteur sur Off pour suspendre une ligne sans la perdre."
         action={cat !== "moteurs" && (
           <button
             type="button"
@@ -210,6 +211,7 @@ export default function VeilleSurveiller() {
           </button>
         )}
       />
+      <SuggestionsATraiter />
       <Card className="overflow-hidden">
         <Onglets
           aLaLigne
@@ -219,7 +221,7 @@ export default function VeilleSurveiller() {
           onChange={(c) => setCat(c as Cat)}
         />
         <dl className="grid gap-3 border-b border-border bg-muted/40 px-4 py-3 text-[12px] leading-relaxed sm:px-5 md:grid-cols-3">
-          {([["À quoi ça sert", "sert"], ["Ce que Vigile surveille", "surveille"], ["Ce qu'il vous rapporte", "rapporte"]] as const).map(([titre, cle]) => (
+          {([["À quoi ça sert", "sert"], ["Ce que Scope surveille", "surveille"], ["Ce qu'il vous rapporte", "rapporte"]] as const).map(([titre, cle]) => (
             <div key={cle}>
               <dt className="font-bold text-avisdoc-ink">{titre}</dt>
               <dd className="text-muted-foreground">{EXPLICATIONS[cat][cle]}</dd>
@@ -303,7 +305,7 @@ interface Moteur {
   cout: string;
 }
 
-/** Qui fait quoi dans Vigile. Les réglages cités sont ceux du code (supabase/functions/veille) au 26/10/2026. */
+/** Qui fait quoi dans Scope. Les réglages cités sont ceux du code (supabase/functions/veille) au 26/10/2026. */
 const MOTEURS: Moteur[] = [
   {
     nom: "Linkup", role: "Cherche", cle: "linkup",
@@ -315,7 +317,7 @@ const MOTEURS: Moteur[] = [
   {
     nom: "Perplexity — veille générale", role: "Cherche", cle: "perplexity",
     ou: "Tout le web, en France d'abord puis en Europe.",
-    jusquou: "Une recherche approfondie par rapport, limitée à la période : il enchaîne lui-même des dizaines de recherches et lit les pages (jusqu'à environ 15 minutes). Vigile ne garde que les pages que ses recherches ont réellement fait apparaître.",
+    jusquou: "Une recherche approfondie par rapport, limitée à la période : il enchaîne lui-même des dizaines de recherches et lit les pages (jusqu'à environ 15 minutes). Scope ne garde que les pages que ses recherches ont réellement fait apparaître.",
     apporte: "Ce que les recherches simples ratent, dans toutes les rubriques.",
     cout: "Entre 0,16 et 0,87 $ par recherche, d'après les factures mesurées.",
   },
@@ -336,7 +338,7 @@ const MOTEURS: Moteur[] = [
   {
     nom: "Vérification des liens (sans IA)", role: "Vérifie",
     ou: "Chaque lien trouvé sur le web.",
-    jusquou: "Vigile ouvre la page : elle doit exister et parler de ce que dit son titre, sinon l'article est écarté. Un site qui refuse les robots est gardé et signalé « Copier le lien ».",
+    jusquou: "Scope ouvre la page : elle doit exister et parler de ce que dit son titre, sinon l'article est écarté. Un site qui refuse les robots est gardé et signalé « Copier le lien ».",
     apporte: "Aucun lien mort ni inventé dans le rapport.",
     cout: "Gratuit.",
   },
@@ -358,7 +360,7 @@ const MOTEURS: Moteur[] = [
     nom: "Claude Sonnet (Anthropic)", role: "Répond",
     ou: "Les articles déjà retenus dans tous les rapports, et ce que vous surveillez.",
     jusquou: "Il ne cherche pas sur le web pendant la conversation, et ne cite que des liens rendus par ses recherches dans la base.",
-    apporte: "Les réponses de l'écran Vigile : « sortez-moi les articles sur… ».",
+    apporte: "Les réponses de l'écran Scope : « sortez-moi les articles sur… ».",
     cout: "Environ 0,02 à 0,04 $ par question (60 questions par jour au plus et par personne).",
   },
   {
@@ -431,7 +433,7 @@ function Interrupteur({ actif, verrou, enCours, libelle, onBascule }: { actif: b
 function ligneSource(s: Source): Ligne {
   const adresse = s.params?.url?.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
   const genre = s.cle.startsWith("site-pqr-") ? "Presse locale" : genreDeSource(s);
-  if (NON_BRANCHE(s)) return { id: s.cle, titre: s.nom, detail: "Non actif : plus cher, en version d'essai, pas encore branché (voir la fiche)", actif: false, supprimable: false, verrou: s.params?.note ?? "Pas encore branché à Vigile." };
+  if (NON_BRANCHE(s)) return { id: s.cle, titre: s.nom, detail: "Non actif : plus cher, en version d'essai, pas encore branché (voir la fiche)", actif: false, supprimable: false, verrou: s.params?.note ?? "Pas encore branché à Scope." };
   return { id: s.cle, titre: s.nom, detail: [genre, adresse].filter(Boolean).join(" · "), actif: s.actif, supprimable: SOURCE_AJOUTABLE(s) };
 }
 
@@ -526,7 +528,7 @@ function FenetreFiche({
       } else {
         await enregistrer("admin_veille_rubriques", fiche.id, { nom: t("nom"), description: t("description"), ordre: Number(t("ordre")) || 0, actif: Boolean(v.actif), axe: t("axe") }, auteur);
       }
-      toast.success(fiche.id ? "Modifié." : "Ajouté. Vigile en tiendra compte dès le prochain rapport.");
+      toast.success(fiche.id ? "Modifié." : "Ajouté. Scope en tiendra compte dès le prochain rapport.");
       onEnregistre();
     } catch (err) {
       const m = err instanceof Error ? err.message : "";
@@ -559,7 +561,7 @@ function FenetreFiche({
             <Info label="Dernière lecture réussie">{source.dernier_succes ? new Date(source.dernier_succes).toLocaleString("fr-FR", { timeZone: "Europe/Paris" }) : ""}</Info>
             {source.derniere_erreur && <Info label="Dernière erreur">{source.derniere_erreur}</Info>}
             {source.params?.note && <Info label="Pourquoi il n'est pas actif">{source.params.note}</Info>}
-            {integree && !NON_BRANCHE(source) && <p className="mt-2 text-[12px] text-muted-foreground">Base intégrée à Vigile : elle se suspend, elle ne se supprime pas.</p>}
+            {integree && !NON_BRANCHE(source) && <p className="mt-2 text-[12px] text-muted-foreground">Base intégrée à Scope : elle se suspend, elle ne se supprime pas.</p>}
           </>
         )}
         {reseau && (
@@ -611,14 +613,14 @@ function FenetreFiche({
     <label className="block min-w-0">
       <span className={libelleCls}>Rubrique</span>
       <select value={String(v.rubrique_id ?? "")} onChange={maj("rubrique_id")} className={champCls}>
-        <option value="">Laisser Vigile choisir</option>
+        <option value="">Laisser Scope choisir</option>
         {rubriques.map((r) => <option key={r.id} value={r.id}>{r.nom}</option>)}
       </select>
     </label>
   );
   const notes = (
     <label className="block">
-      <span className={libelleCls}>Notes pour Vigile</span>
+      <span className={libelleCls}>Notes pour Scope</span>
       <textarea value={String(v.notes ?? "")} onChange={maj("notes")} rows={2} className={champCls} placeholder="Ce qu'il faut surveiller" />
     </label>
   );
@@ -634,11 +636,11 @@ function FenetreFiche({
             <>
               {champ("nom", "Nom *", { autoFocus: true, placeholder: cat === "presse" ? "Ouest-France" : "Santé publique France" })}
               {integree ? (
-                <p className="text-[12px] text-muted-foreground">Base intégrée à Vigile : son adresse ne se change pas.</p>
+                <p className="text-[12px] text-muted-foreground">Base intégrée à Scope : son adresse ne se change pas.</p>
               ) : (
                 <>
                   {champ("url", "Adresse du site ou de son flux RSS *", { placeholder: "https://…", inputMode: "url" })}
-                  <p className="-mt-2 text-[12px] text-muted-foreground">Vigile lit le flux du site s'il en a un ; sinon il cherche directement sur le site.</p>
+                  <p className="-mt-2 text-[12px] text-muted-foreground">Scope lit le flux du site s'il en a un ; sinon il cherche directement sur le site.</p>
                 </>
               )}
             </>
@@ -693,7 +695,7 @@ function FenetreFiche({
               {champ("nom", "Nom *", { autoFocus: true })}
               <label className="block">
                 <span className={libelleCls}>Ce qu'on y range</span>
-                <textarea value={String(v.description ?? "")} onChange={maj("description")} rows={3} className={champCls} placeholder="Vigile s'en sert pour classer chaque article." />
+                <textarea value={String(v.description ?? "")} onChange={maj("description")} rows={3} className={champCls} placeholder="Scope s'en sert pour classer chaque article." />
               </label>
               <label className="block min-w-0">
                 <span className={libelleCls}>Case du rapport</span>
@@ -710,7 +712,7 @@ function FenetreFiche({
           ) : (
           <label className="flex items-center gap-2.5 pt-1 text-[13px] text-avisdoc-ink">
             <input type="checkbox" checked={Boolean(v.actif)} onChange={(e) => setV((x) => ({ ...x, actif: e.target.checked }))} className="size-4 accent-avisdoc-teal" />
-            Suivi par Vigile (décocher pour le mettre en « Non suivi »)
+            Suivi par Scope (décocher pour le mettre en « Non suivi »)
           </label>
           )}
         </div>

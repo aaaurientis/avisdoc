@@ -3,11 +3,21 @@
 // écran. Le contenu vit dans lib/aide.ts.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Check, ChevronDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, PageHeader, SectionLabel } from "../components/ui";
 import { ECRANS, EXERCICES, PARCOURS, QUESTIONS, type ExerciceAide } from "../lib/aide";
+import AideVeille from "./AideVeille";
+
+/** Une phrase propre à chaque CRM, en tête de son Aide (Olivier, 09/11) ; le reste de l'Aide est commun. */
+const PHRASE_CRM: Record<string, { nom: string; phrase: string }> = {
+  demarcher: { nom: "CRM Entreprise", phrase: "Les entreprises qui veulent faire dépister leurs salariés. Scope signale dans la Veille celles qui parlent publiquement de la santé de leurs salariés : confiez-les à un commercial d'un clic." },
+  collectivites: { nom: "CRM Collectivités Locales", phrase: "Les mairies, départements et régions qui manquent de médecins, surtout de dermatologues, ou lancent un appel d'offres de santé. Repérées dans la Veille, elles se confient à un commercial d'un clic." },
+  mutuelles: { nom: "CRM Assurance Mutuelle", phrase: "Les mutuelles, complémentaires santé et assureurs : forfaits prévention, offres, contrats collectifs et partenariats, suivis dans la Veille." },
+  intermediaires: { nom: "CRM Intermédiaire", phrase: "Ceux qui peuvent revendre AvisDoc : courtiers, plateformes médicales… Il manque un mot ou une cible à Scope pour eux ? « Suggérer un mot ou une cible », sur la page de veille du CRM." },
+  synthese: { nom: "CRM Synthèse", phrase: "Les quatre CRM ensemble, en consultation seule : on regarde, rien ne se modifie. Pour changer une fiche, ouvrez le CRM concerné." },
+};
 
 /** Les exercices cochés, gardés dans ce navigateur : un confort, rien de plus. */
 const CLE_EXERCICES = "avisdoc-aide-exercices";
@@ -89,6 +99,12 @@ function Question({ question, reponse, ouverte }: { question: string; reponse: s
 }
 
 export default function Aide() {
+  const [params] = useSearchParams();
+  if (params.get("veille") === "marche") return <AideVeille />;
+  return <AideCrm crm={PHRASE_CRM[params.get("crm") ?? ""]} />;
+}
+
+function AideCrm({ crm }: { crm?: { nom: string; phrase: string } }) {
   const [recherche, setRecherche] = useState("");
   const [faits, setFaits] = useState<Set<string>>(lireFaits);
 
@@ -122,7 +138,10 @@ export default function Aide() {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Aide" subtitle="Comment fonctionne le bloc Commercial : le chemin d’une entreprise, des exercices, les questions qu’on se pose, et chaque écran." />
+      <PageHeader title={crm ? `Aide · ${crm.nom}` : "Aide"} subtitle="Comment fonctionne un CRM : le chemin d’une entreprise, des exercices, les questions qu’on se pose, et chaque écran." />
+      {crm && (
+        <p className="mb-6 rounded-xl border-l-4 border-avisdoc-teal bg-card px-4 py-3 text-sm leading-relaxed text-avisdoc-ink">{crm.phrase}</p>
+      )}
 
       {/* Le chemin d'une entreprise : la phrase qui rend les autres écrans lisibles. */}
       <Card className="mb-6 p-5">

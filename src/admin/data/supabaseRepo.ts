@@ -21,6 +21,7 @@ import { supabaseAdmin as sb } from "./supabaseAdmin";
 import { STAGES_DEFAUT } from "../lib/ui-tokens";
 import { SECTEURS } from "../lib/merx";
 import type { AdminRepo, AdminSnapshot } from "./repo";
+import { crmPourFiche } from "../lib/crm";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -161,6 +162,7 @@ export class SupabaseRepo implements AdminRepo {
       stage: r.stage as Stage,
       pipelineId: r.pipeline_id ?? "",
       secteur: r.secteur ?? null,
+      crm: r.crm ?? "demarcher",
       referent: r.referent ?? null,
       ficheClientCreee: r.fiche_client_creee ?? false,
       aRepondu: r.a_repondu ?? false,
@@ -217,7 +219,7 @@ export class SupabaseRepo implements AdminRepo {
       accounts: accountsRes.error
         ? []
         : (accountsRes.data ?? []).map((r: any): Account => ({
-            id: r.id, name: r.name, signedOn: r.signed_on, sector: r.sector, data: r.data ?? {}, clientId: r.client_id,
+            id: r.id, name: r.name, signedOn: r.signed_on, sector: r.sector, data: r.data ?? {}, clientId: r.client_id, crm: r.crm ?? "demarcher",
           })),
     };
   }
@@ -264,7 +266,7 @@ export class SupabaseRepo implements AdminRepo {
       naf: c.naf, adresse: c.adresse,
       code_postal: c.codePostal || null, ville: c.ville || null,
       effectif: c.effectif, stage: c.stage, pipeline_id: c.pipelineId || undefined,
-      secteur: c.secteur ?? null, jours: c.jours, tarif: c.tarif,
+      secteur: c.secteur ?? null, crm: c.crm ?? crmPourFiche(), jours: c.jours, tarif: c.tarif,
       depistes: c.depistes, orientes: c.orientes, resultat: c.resultat, statut_propo: c.statutPropo,
       // Posée seulement quand elle vaut : une création ordinaire ne dépend pas de la 0065.
       ...(c.aRepondu ? { a_repondu: true } : {}),
@@ -417,6 +419,7 @@ export class SupabaseRepo implements AdminRepo {
   async createAccount(a: Account): Promise<void> {
     const { error } = await sb.from("admin_accounts").insert({
       id: a.id, name: a.name, signed_on: a.signedOn, sector: a.sector, data: a.data, client_id: a.clientId,
+      crm: a.crm ?? crmPourFiche(),
     });
     this.assert(error);
   }

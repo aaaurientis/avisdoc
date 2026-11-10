@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Columns3, Download, Plus, Search, Upload } from "lucide-react";
 import { useAdminData } from "../data/AdminDataContext";
 import { supabaseAdmin } from "../data/supabaseAdmin";
@@ -28,11 +28,17 @@ import ImportProspection from "./prospects/ImportProspection";
 import BarreDefilement from "../components/BarreDefilement";
 import { COLONNES_MODELE, COLONNES_PIPELINE } from "../lib/import-prospection";
 import { secteurLisible, type Prospect } from "../lib/merx";
+import { dansLeCrm, useCrm } from "../lib/crm";
 
 export default function Crm() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { clients: toutesAffaires, stages: toutesColonnes, pipelines, setClientStage, rafraichir } = useAdminData();
+  const { clients: affairesDeTousLesCrm, stages: toutesColonnes, pipelines, setClientStage, rafraichir } = useAdminData();
+  // Chaque CRM ne montre que ses affaires (Olivier, 09/11).
+  const crm = useCrm();
+  // Les liens du Pipeline gardent le CRM de l'adresse : on reste dans ses affaires.
+  const { search } = useLocation();
+  const toutesAffaires = useMemo(() => affairesDeTousLesCrm.filter((c) => dansLeCrm(c.crm, crm)), [affairesDeTousLesCrm, crm]);
   /** Le pipeline ouvert. `null` au premier affichage : on ouvre alors sur le premier tableau. */
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0] ?? null;
@@ -288,7 +294,7 @@ export default function Crm() {
       {!selected && <BarreDefilement cible={zoneKanban} />}
 
       {selected ? (
-        <ProjectView client={selected} onClose={() => navigate("/crm")} />
+        <ProjectView client={selected} onClose={() => navigate(crm ? `/crm?crm=${crm}` : "/crm")} />
       ) : stages.length === 0 ? (
         /* Un tableau sans colonne n'affiche rien : il faut le dire, et dire où aller. */
         <div className="rounded-2xl bg-muted/60 p-8 text-center">
@@ -302,14 +308,14 @@ export default function Crm() {
         <Kanban
           clients={visibles}
           stages={stages}
-          onSelect={(id) => navigate(`/crm/${id}`)}
+          onSelect={(id) => navigate(`/crm/${id}${search}`)}
           onDeplacer={(id, stage) => setClientStage(id, stage)}
           origines={origines}
           coches={coches}
           onCocher={cocher}
           onChangerCoches={setCoches}
           onSupprimer={(c) => void supprimerUne(c)}
-          onModifier={(c) => navigate(`/crm/${c.id}?modifier=1`)}
+          onModifier={(c) => navigate(`/crm/${c.id}${search ? `${search}&` : "?"}modifier=1`)}
           prevues={prevues}
           zoneRef={setZoneKanban}
           {...(ensemble && pipeline

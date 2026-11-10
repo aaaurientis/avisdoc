@@ -6,6 +6,7 @@
 // pour tous les autres, ce qui a dépassé la garde attend qu'elle passe.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { PageHeader, SectionLabel } from "../components/ui";
 import CaseFiche from "../components/CaseFiche";
@@ -23,6 +24,7 @@ import FicheJetee from "./corbeille/FicheJetee";
 import { cn } from "@/lib/utils";
 import { confirmer } from "../components/Confirmation";
 import { useAuth } from "../auth/AuthContext";
+import { dansLeCrm, useCrm } from "../lib/crm";
 
 const leJour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
@@ -30,7 +32,11 @@ export default function Corbeille() {
   // La destruction définitive est réservée au super-admin, et la base le fait respecter :
   // masquer le bouton ne protège personne, c'est la règle SQL qui tient (migration 0036).
   const { isSuperAdmin, user } = useAuth();
-  const [lignes, setLignes] = useState<Jetee[]>([]);
+  const [toutesLignes, setLignes] = useState<Jetee[]>([]);
+  // Chaque CRM ne montre que ses fiches (Olivier, 09/11) ; la Veille Marché n'a pas de fiches.
+  const crm = useCrm();
+  const veilleMarche = useSearchParams()[0].get("veille") === "marche";
+  const lignes = useMemo(() => (veilleMarche ? [] : toutesLignes.filter((l) => dansLeCrm(l.crm, crm))), [toutesLignes, crm, veilleMarche]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [coches, setCoches] = useState<Set<string>>(new Set());

@@ -149,7 +149,7 @@ export async function suivre(id: string): Promise<Suivi> {
       source: "perplexity",
       nature: "web" as const,
       publie_le: /^\d{4}-\d{2}-\d{2}$/.test(l.date ?? "") ? new Date(l.date).toISOString() : null,
-      // Jamais le résumé écrit par Perplexity : seulement ce que la page affichait. Sans extrait, Vigile ne juge que sur le titre.
+      // Jamais le résumé écrit par Perplexity : seulement ce que la page affichait. Sans extrait, Scope ne juge que sur le titre.
       extrait: [l.source, extraits.get(normaliserUrl(l.url)) ?? ""].filter(Boolean).join(" — ").slice(0, 600),
     }));
   const coutUsd = Number(j.usage?.cost?.total_cost ?? j.usage?.total_cost ?? j.usage?.cost ?? 0) || 0;

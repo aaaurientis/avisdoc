@@ -1,4 +1,5 @@
-// Veille › Rapports : ce que Vigile, l'agent de veille, a trouvé, rapport par rapport.
+// Veille › Rapports : ce que Scope, l'agent de veille, a trouvé, rapport par rapport.
+// Depuis le 02/11, chaque veille (commerciale, de marché) a son rapport : ses axes, ses points clés, sa pastille.
 //
 // Chaque vendredi à 9 h, un rapport couvre la période écoulée depuis le
 // précédent. Il s'ouvre sur trois points clés, puis les rubriques, chaque publication
@@ -6,7 +7,7 @@
 // à chacun.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, Radar } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
@@ -14,22 +15,48 @@ import { Card, PageHeader, SectionLabel } from "../components/ui";
 import BoutonRetour from "../components/BoutonRetour";
 import CarteArticle from "./veille/CarteArticle";
 import {
-  A_DEMARCHER, articlesDu, AXES, statutsEntreprises, jourDe, listerRapports, listerRubriques, lireRapport, marquerLu, nomDeSource, periodeEnClair,
-  rapportsLus, sourcesNommees, STATUTS, type Article, type Axe, type Rapport, type StatutEntreprise, confiee,
+  A_DEMARCHER, articlesDu, AXES, CRMS, ouvrirDansCrm, statutsEntreprises, jourDe, listerRapports, listerRubriques, lireRapport, marquerLu, nomDeSource, periodeEnClair,
+  rapportsLus, sourcesNommees, STATUTS, type Article, type Axe, type NomVeille, type Rapport, type StatutEntreprise, confiee, baseVeille, VEILLES,
 } from "../lib/veille";
+import { useVeille } from "./veille/useVeille";
+
+/** Ce qui revient à une veille dans un rapport : ses points clés (ceux d'avant le 02/11, sans veille, restent à la commerciale) et ses idées de posts. */
+// Un Weekly par CRM (Olivier, 09/11) : ?crm=<marché> ne garde que ce marché ; ses points clés sont ceux qui citent ses publications.
+const crmDe = (v: NomVeille, cle: string | null) => (v === "commerciale" ? CRMS.find((c) => c.axe === cle) : undefined);
+const axesDe = (v: NomVeille, crm?: { axe: Axe }) => (crm ? [crm.axe] : VEILLES[v].axes);
+// Les rapports d'avant les axes : l'axe d'une rubrique se retrouve par son nom (axeNom).
+type AxeNom = Map<string, Axe>;
+const axeRub = (x: Rapport["rubriques"][number], axeNom: AxeNom) => x.axe ?? axeNom.get(x.nom);
+const idsDe = (r: Rapport, axes: Axe[], axeNom: AxeNom) => new Set(r.rubriques.filter((x) => { const a = axeRub(x, axeNom); return a && axes.includes(a); }).flatMap((x) => x.articles));
+const pointsDe = (r: Rapport, v: NomVeille, axeNom: AxeNom, crm?: { axe: Axe }) => {
+  const siens = r.points_cles.filter((p) => (p.veille ?? "commerciale") === v);
+  if (!crm) return siens;
+  const ids = idsDe(r, [crm.axe], axeNom);
+  return siens.filter((p) => p.articles.some((id) => ids.has(id)));
+};
+const postsDe = (r: Rapport, v: NomVeille) => (r.posts ?? []).filter((p) => (p.veille ?? "marche") === v);
+const totalDe = (r: Rapport, axes: Axe[], axeNom: AxeNom) => r.rubriques.filter((x) => { const a = axeRub(x, axeNom); return a && axes.includes(a); }).reduce((n, x) => n + x.articles.length, 0);
 import { cn } from "@/lib/utils";
 
 
 export default function Veille() {
   const { rapportId } = useParams();
   const { user } = useAuth();
+  const veille = useVeille();
+  const [params] = useSearchParams();
+  const crm = crmDe(veille, params.get("crm"));
+  const suite = crm ? `?crm=${crm.axe}` : "";
   const [rapports, setRapports] = useState<Rapport[] | null>(null);
   const [lus, setLus] = useState<Set<string>>(new Set());
+  const [axeNom, setAxeNom] = useState<AxeNom>(new Map());
+  useEffect(() => {
+    listerRubriques().then((r) => setAxeNom(new Map(r.map((x) => [x.nom, x.axe]))), () => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const [r, l] = await Promise.all([listerRapports(), user?.email ? rapportsLus(user.email) : Promise.resolve(new Set<string>())]);
+        const [r, l] = await Promise.all([listerRapports(), user?.email ? rapportsLus(user.email, veille) : Promise.resolve(new Set<string>())]);
         setRapports(r);
         setLus(l);
       } catch (err) {
@@ -37,7 +64,7 @@ export default function Veille() {
         setRapports([]);
       }
     })();
-  }, [user?.email]);
+  }, [user?.email, veille]);
 
   // Un vieux lien reçu par mail : le rapport n'est plus dans les derniers, on le lit seul.
   const [lointain, setLointain] = useState<Rapport | null | undefined>(undefined);
@@ -50,8 +77,8 @@ export default function Veille() {
 
   useEffect(() => {
     if (!ouvert || !user?.email || lus.has(ouvert.id)) return;
-    marquerLu(ouvert.id, user.email).then(() => setLus((s) => new Set(s).add(ouvert.id)));
-  }, [ouvert, user?.email, lus]);
+    marquerLu(ouvert.id, user.email, veille).then(() => setLus((s) => new Set(s).add(ouvert.id)));
+  }, [ouvert, user?.email, lus, veille]);
 
   if (rapports === null || (rapportId && !dansLaListe && lointain === undefined)) {
     return (
@@ -65,17 +92,17 @@ export default function Veille() {
     if (!ouvert) {
       return (
         <div>
-          <BoutonRetour vers="/veille" />
+          <BoutonRetour vers={`${baseVeille(veille)}${suite}`} />
           <p className="p-8 text-sm text-muted-foreground">Ce rapport n'existe pas ou plus.</p>
         </div>
       );
     }
-    return <RapportComplet rapport={ouvert} />;
+    return <RapportComplet rapport={ouvert} veille={veille} crm={crm} />;
   }
 
   return (
     <div>
-      <PageHeader title="Rapports de veille" subtitle="Chaque vendredi à 9 h, Vigile rapporte tout ce qui est paru dans la semaine." />
+      <PageHeader title={`Weekly · ${crm ? crm.label : params.get("crm") === "synthese" ? "CRM Synthèse" : VEILLES[veille].titre}`} subtitle={`Chaque vendredi à 9 h, Scope rapporte tout ce qui est paru dans la semaine pour ${crm ? "ce CRM" : "cette veille"}.`} />
       {!rapports.length ? (
         <Card className="p-10 text-center">
           <Radar className="mx-auto mb-3 size-8 text-avisdoc-teal" />
@@ -86,16 +113,17 @@ export default function Veille() {
           <ul className="divide-y divide-border">
             {rapports.map((r) => {
               const nonLu = r.statut === "envoye" && !lus.has(r.id);
-              const total = r.rubriques.reduce((n, x) => n + x.articles.length, 0);
+              const total = totalDe(r, axesDe(veille, crm), axeNom);
+              const premier = pointsDe(r, veille, axeNom, crm)[0];
               const pret = r.statut === "envoye" || r.statut === "pret" || r.statut === "envoi";
               return (
                 <li key={r.id}>
-                  <Link to={`/veille/${r.id}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 sm:px-5">
+                  <Link to={`${baseVeille(veille)}/${r.id}${suite}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 sm:px-5">
                     <span className={cn("size-2.5 shrink-0 rounded-full", nonLu ? "bg-avisdoc-orange" : "bg-transparent")} aria-label={nonLu ? "Non lu" : undefined} />
                     <span className="min-w-0 flex-1">
                       <span className={cn("block truncate text-[14px] text-avisdoc-ink first-letter:uppercase", nonLu ? "font-bold" : "font-semibold")}>{jourDe(r.periode_fin)}</span>
                       <span className="block truncate text-[12px] text-muted-foreground">
-                        {pret ? `${total} publication${total > 1 ? "s" : ""}${r.points_cles[0] ? ` · ${r.points_cles[0].texte}` : ""}` : STATUTS[r.statut] ?? r.statut}
+                        {pret ? `${total} publication${total > 1 ? "s" : ""}${premier ? ` · ${premier.texte}` : ""}` : STATUTS[r.statut] ?? r.statut}
                       </span>
                     </span>
                     {r.sources_en_panne.length > 0 && <AlertTriangle className="size-4 shrink-0 text-avisdoc-orange" aria-label="Des sources n'ont pas répondu" />}
@@ -112,7 +140,7 @@ export default function Veille() {
 }
 
 
-function RapportComplet({ rapport }: { rapport: Rapport }) {
+function RapportComplet({ rapport, veille, crm }: { rapport: Rapport; veille: NomVeille; crm?: { axe: Axe; label: string } }) {
   const [articles, setArticles] = useState<Article[] | null>(null);
   const [noms, setNoms] = useState<Map<string, string>>(new Map());
   const [axeDe, setAxeDe] = useState<Map<string, Axe>>(new Map());
@@ -139,17 +167,20 @@ function RapportComplet({ rapport }: { rapport: Rapport }) {
 
   const confie = (a: Article) => (prospectId: string, referent: string) => setStatuts((m) => new Map(m).set((a.entreprise ?? "").trim().toLowerCase(), confiee(prospectId, referent)));
   const carteArticle = (a: Article, cle: string) => (
-    <CarteArticle key={a.id} a={a} noms={noms} demarcher={A_DEMARCHER.has(cle)} statut={a.entreprise ? statuts.get(a.entreprise.trim().toLowerCase()) : undefined} onConfie={confie(a)} onRetrait={(x, quoi) => setArticles((l) => (quoi !== "remise" ? (l ?? []).filter((y) => y.id !== x.id) : [...(l ?? []), x]))} />
+    <CarteArticle key={a.id} a={a} noms={noms} demarcher={A_DEMARCHER.has(cle)} statut={a.entreprise ? statuts.get(a.entreprise.trim().toLowerCase()) : undefined} onConfie={confie(a)} onRetrait={(x, quoi) => setArticles((l) => (quoi !== "remise" ? (l ?? []).filter((y) => y.id !== x.id) : [...(l ?? []), x]))} ouvrirDans={ouvrirDansCrm(cle)} />
   );
 
-  const blocs = AXES.map((x) => {
+  const points = pointsDe(rapport, veille, axeDe, crm);
+  const posts = postsDe(rapport, veille);
+  const axes = axesDe(veille, crm);
+  const blocs = AXES.filter((x) => x.cle === "publier" || axes.includes(x.cle as Axe)).map((x) => {
     if (x.cle === "publier") {
-      if (!rapport.posts?.length) return null;
+      if (!posts.length) return null;
       return (
         <Card key={x.cle} className="overflow-hidden">
-          <EnteteAxe titre={x.titre} sousTitre={x.sousTitre} nombre={rapport.posts.length} />
+          <EnteteAxe titre={x.titre} sousTitre={x.sousTitre} nombre={posts.length} />
           <ul className="divide-y divide-border">
-            {rapport.posts.map((p, i) => (
+            {posts.map((p, i) => (
               <li key={i} className="px-5 py-4">
                 <p className="mb-1.5 text-[14px] font-bold text-avisdoc-ink">{p.titre}</p>
                 <p className="whitespace-pre-wrap rounded-xl bg-muted/60 px-4 py-3 text-[13px] leading-relaxed text-avisdoc-ink">{p.brouillon}</p>
@@ -184,8 +215,8 @@ function RapportComplet({ rapport }: { rapport: Rapport }) {
 
   return (
     <div>
-      <BoutonRetour vers="/veille" libelle="Tous les rapports" />
-      <PageHeader title={`Veille du ${jourDe(rapport.periode_fin)}`} subtitle={periodeEnClair(rapport)} />
+      <BoutonRetour vers={`${baseVeille(veille)}${crm ? `?crm=${crm.axe}` : ""}`} libelle="Tous les Weekly" />
+      <PageHeader title={`Weekly · ${crm ? crm.label : VEILLES[veille].titre} du ${jourDe(rapport.periode_fin)}`} subtitle={periodeEnClair(rapport)} />
 
       {rapport.sources_en_panne.length > 0 && (
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-avisdoc-orange/30 bg-avisdoc-orange/10 px-4 py-3 text-[13px] text-avisdoc-ink">
@@ -200,12 +231,12 @@ function RapportComplet({ rapport }: { rapport: Rapport }) {
         </div>
       ) : (
         <div className="space-y-5">
-          {rapport.points_cles.length > 0 && (
+          {points.length > 0 && (
             <Card className="p-5 sm:p-6">
               <SectionLabel className="mb-3 text-avisdoc-teal">À retenir</SectionLabel>
               {/* L'essentiel en deux phrases : les articles se lisent plus bas, une seule fois. */}
               <ol className="space-y-3">
-                {rapport.points_cles.map((p, i) => (
+                {points.map((p, i) => (
                   <li key={i} className="flex gap-3">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-avisdoc-teal text-[12px] font-bold text-white">{i + 1}</span>
                     <p className="min-w-0 text-[14px] leading-relaxed text-avisdoc-ink">{p.texte}</p>
@@ -217,7 +248,7 @@ function RapportComplet({ rapport }: { rapport: Rapport }) {
 
           {blocs}
 
-          {!rapport.rubriques.length && rapport.statut === "envoye" && (
+          {!totalDe(rapport, axes, axeDe) && rapport.statut === "envoye" && (
             <Card className="p-8 text-center text-sm text-muted-foreground">Rien de marquant sur la période.</Card>
           )}
           {rapport.statut !== "envoye" && rapport.statut !== "pret" && (

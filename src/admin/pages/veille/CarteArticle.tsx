@@ -1,17 +1,25 @@
-// Une publication trouvée par Vigile, telle qu'elle s'affiche dans un rapport ou « En direct » :
+// Une publication trouvée par Scope, telle qu'elle s'affiche dans un rapport ou « En direct » :
 // qui, quoi, ce que ça change pour AvisDoc, la source, et pour une entreprise à démarcher, de quoi
 // la confier à un commercial.
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Archive, ArrowRight, Copy, ExternalLink, Loader2, RotateCcw, Send, Trash2, X } from "lucide-react";
+import { Archive, ArrowRight, AtSign, Copy, ExternalLink, Facebook, Instagram, Linkedin, Loader2, Music2, RotateCcw, Send, Trash2, Twitter, X, Youtube, type LucideIcon } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { Modal } from "../../components/ui";
 import { confirmer } from "../../components/Confirmation";
 import { chargerMembres, nomLisible } from "../../lib/membres";
-import { confierArticle, dateCourte, dateEtHeure, NATURES, nomDeSource, retirerArticle, supprimerArticle, type Article, type StatutEntreprise } from "../../lib/veille";
+import { confierArticle, dateCourte, dateEtHeure, nomDeSource, origineDe, retirerArticle, supprimerArticle, type Article, type Logo, type StatutEntreprise } from "../../lib/veille";
+import { useVueSeule } from "../../lib/lectureSeule";
 import { cn } from "@/lib/utils";
+
+/** Le logo de chaque réseau social, à ses couleurs. */
+const LOGOS: Record<Logo, { icone: LucideIcon; cls: string }> = {
+  linkedin: { icone: Linkedin, cls: "bg-[#0A66C2] text-white" }, facebook: { icone: Facebook, cls: "bg-[#1877F2] text-white" },
+  instagram: { icone: Instagram, cls: "bg-[#E1306C] text-white" }, x: { icone: Twitter, cls: "bg-black text-white" },
+  youtube: { icone: Youtube, cls: "bg-[#FF0000] text-white" }, tiktok: { icone: Music2, cls: "bg-black text-white" }, threads: { icone: AtSign, cls: "bg-black text-white" },
+};
 
 const IMPORTANCE: Record<number, { label: string; cls: string }> = {
   3: { label: "À lire", cls: "bg-avisdoc-orange/15 text-avisdoc-orange" },
@@ -43,7 +51,7 @@ function LienProtege({ url }: { url: string }) {
 export type Retrait = "archivee" | "supprimee" | "remise";
 
 export default function CarteArticle({
-  a, noms, demarcher, statut, nouveau, archivee, onConfie, onRetrait,
+  a, noms, demarcher, statut, nouveau, archivee, onConfie, onRetrait, ouvrirDans,
 }: {
   a: Article;
   noms: Map<string, string>;
@@ -57,8 +65,14 @@ export default function CarteArticle({
   onConfie: (prospectId: string, referent: string) => void;
   /** La liste l'enlève (archivée, supprimée) ou la remet (remise). */
   onRetrait: (a: Article, quoi: Retrait) => void;
+  /** CRM Synthèse (vue seule) : le CRM où l'on peut la traiter. */
+  ouvrirDans?: { to: string; label: string };
 }) {
   const navigate = useNavigate();
+  // CRM Synthèse : les boutons de modification sont grisés, un lien mène au CRM du marché (Olivier, 09/11).
+  const vueSeule = useVueSeule();
+  const gris = vueSeule ? "cursor-not-allowed opacity-40" : "";
+  const titreGris = "CRM Synthèse : vue seule. Ouvrez le CRM du marché pour modifier.";
   const [fenetre, setFenetre] = useState(false);
   const [choix, setChoix] = useState(false);
   const [retrait, setRetrait] = useState<null | "archiver" | "supprimer" | "remettre">(null);
@@ -85,7 +99,7 @@ export default function CarteArticle({
     setChoix(false);
     const ok = await confirmer({
       titre: `Supprimer définitivement « ${titre} » ?`,
-      message: "Elle est effacée pour tout le monde et ne pourra pas être remise. Vigile ne la ramènera plus.",
+      message: "Elle est effacée pour tout le monde et ne pourra pas être remise. Scope ne la ramènera plus.",
       action: "Supprimer définitivement",
       definitif: true,
     });
@@ -115,16 +129,27 @@ export default function CarteArticle({
   return (
     <li className="px-5 py-4">
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
-        {a.urgent && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">À ne pas rater</span>}
+        {a.urgent && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">À ne pas manquer</span>}
         {nouveau && <span className="rounded-full bg-avisdoc-orange px-2 py-0.5 text-[11px] font-bold text-white">Nouveau</span>}
         {a.importance && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", IMPORTANCE[a.importance]?.cls)}>{IMPORTANCE[a.importance]?.label}</span>}
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{NATURES[a.nature] ?? a.nature}</span>
+        {(() => {
+          const o = origineDe(a);
+          const logo = o.logo && LOGOS[o.logo];
+          return logo ? (
+            <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold", logo.cls)}><logo.icone className="size-3" /> {o.label}</span>
+          ) : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{o.label}</span>;
+        })()}
+        {vueSeule && ouvrirDans && (
+          <Link to={ouvrirDans.to} className="ml-auto rounded-full border-2 border-avisdoc-ink px-2.5 py-0.5 text-[11px] font-bold text-avisdoc-ink hover:bg-avisdoc-ink hover:text-white">
+            Ouvrir dans le {ouvrirDans.label}
+          </Link>
+        )}
         {archivee ? (
-          <span className="ml-auto flex gap-1.5">
-            <button type="button" onClick={remettre} disabled={retrait !== null} title="Elle revient dans sa case, pour tout le monde." className={cn(petitBouton, "hover:border-avisdoc-teal hover:text-avisdoc-teal")}>
+          <span className={cn("flex gap-1.5", !(vueSeule && ouvrirDans) && "ml-auto")}>
+            <button type="button" onClick={remettre} disabled={retrait !== null || vueSeule} title={vueSeule ? titreGris : "Elle revient dans sa case, pour tout le monde."} className={cn(petitBouton, gris, "hover:border-avisdoc-teal hover:text-avisdoc-teal")}>
               {retrait === "remettre" ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />} Remettre
             </button>
-            <button type="button" onClick={supprimer} disabled={retrait !== null} title="Effacée pour de bon, pour tout le monde." className={cn(petitBouton, "hover:border-red-400 hover:text-red-600")}>
+            <button type="button" onClick={supprimer} disabled={retrait !== null || vueSeule} title={vueSeule ? titreGris : "Effacée pour de bon, pour tout le monde."} className={cn(petitBouton, gris, "hover:border-red-400 hover:text-red-600")}>
               {retrait === "supprimer" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} Supprimer
             </button>
           </span>
@@ -132,9 +157,9 @@ export default function CarteArticle({
           <button
             type="button"
             onClick={() => setChoix(true)}
-            disabled={retrait !== null}
-            title="Lue et sans intérêt : l'archiver ou la supprimer, pour tout le monde."
-            className={cn(petitBouton, "ml-auto hover:border-red-400 hover:text-red-600")}
+            disabled={retrait !== null || vueSeule}
+            title={vueSeule ? titreGris : "Lue et sans intérêt : l'archiver ou la supprimer, pour tout le monde."}
+            className={cn(petitBouton, gris, !(vueSeule && ouvrirDans) && "ml-auto", "hover:border-red-400 hover:text-red-600")}
           >
             {retrait ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" />} Retirer
           </button>
@@ -154,14 +179,14 @@ export default function CarteArticle({
       )}
       <p className="mt-1.5 text-[12px] text-muted-foreground">
         {nomDeSource(a, noms)}{a.publie_le ? ` · publié le ${dateCourte(a.publie_le)}` : ""}
-        {a.trie_le && <> · <span className="font-bold text-avisdoc-ink">arrivé dans Vigile le {dateEtHeure(a.trie_le)}</span></>}
+        {a.trie_le && <> · <span className="font-bold text-avisdoc-ink">arrivé dans Scope le {dateEtHeure(a.trie_le)}</span></>}
       </p>
       {a.lien_protege && <LienProtege url={a.url} />}
       {a.entreprise && statut && <Bandeau statut={statut} onOuvrir={() => navigate(statut.lien)} />}
       {/* Confier seulement une entreprise que personne ne suit encore. */}
       {demarcher && a.entreprise && (!statut || (statut.type === "prospection" && !statut.referent)) && (
         <div className="mt-2.5">
-          <button type="button" onClick={() => setFenetre(true)} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12px] font-bold text-white">
+          <button type="button" onClick={() => setFenetre(true)} disabled={vueSeule} title={vueSeule ? titreGris : undefined} className={cn("ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12px] font-bold text-white", gris)}>
             <Send className="size-3.5" /> Confier à un commercial
           </button>
         </div>
@@ -170,9 +195,9 @@ export default function CarteArticle({
         <Modal onClose={() => !retrait && setChoix(false)} width={480}>
           <h2 className="mb-1 font-display text-xl font-semibold leading-snug text-avisdoc-ink">Retirer « {titre} » ?</h2>
           <p className="mb-5 text-[13px] leading-relaxed text-muted-foreground">
-            Elle disparaît pour tout le monde : écrans, prochains rapports, alertes et réponses de Vigile.
+            Elle disparaît pour tout le monde : écrans, prochains rapports, alertes et réponses de Scope.
             <br /><b className="text-avisdoc-ink">Archiver</b> : elle part dans l'onglet « Archivés », d'où on la remet d'un clic.
-            <br /><b className="text-avisdoc-ink">Supprimer</b> : effacée pour de bon, Vigile ne la ramènera plus.
+            <br /><b className="text-avisdoc-ink">Supprimer</b> : effacée pour de bon, Scope ne la ramènera plus.
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" autoFocus disabled={retrait !== null} onClick={() => setChoix(false)} className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink hover:border-avisdoc-ink disabled:opacity-50">Annuler</button>
@@ -258,7 +283,7 @@ function FenetreConfier({ a, onFermer, onConfie }: { a: Article; onFermer: () =>
     <Modal onClose={() => !envoi && onFermer()} width={460}>
       <h2 className="mb-1 font-display text-xl font-semibold text-avisdoc-ink">Confier {a.entreprise}</h2>
       <p className="mb-4 text-[13px] text-muted-foreground">
-        Vigile crée sa fiche dans Prospection (ou la retrouve si elle existe), la met au nom du commercial choisi, et lui envoie un mail avec le lien.
+        Scope crée sa fiche dans Prospection (ou la retrouve si elle existe), la met au nom du commercial choisi, et lui envoie un mail avec le lien.
       </p>
       <label className="block">
         <span className="mb-1.5 block text-[12px] font-bold text-avisdoc-ink">Suivi par</span>

@@ -130,7 +130,7 @@ export default function ProspectFiche({
     () =>
       ([
         p.origine === "vigile"
-          ? { libelle: "Repérée par Vigile", au: p.created_at }
+          ? { libelle: "Repérée par Scope", au: p.created_at }
           : p.found_by
             ? { libelle: "Trouvée par Merx", detail: demandeOrigine ? `« ${demandeOrigine} »` : undefined, au: p.created_at }
             : { libelle: "Fiche créée à la main", au: p.created_at },
