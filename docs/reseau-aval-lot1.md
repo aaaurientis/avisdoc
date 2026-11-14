@@ -24,7 +24,16 @@ Dans **Professionnels de Santé › Trouver des médecins** :
    - la fiche résumée du praticien, avec tous ses lieux d'exercice et la source de ses
      données ;
    - l'exclusion définitive.
-3. **Liste existante.** Un praticien importé qui figure déjà dans les contacts (Requis,
+3. **Rafraîchir l'import ajoute, il ne remplace jamais** (décision du 14/11) :
+   - un nouveau praticien est ajouté ;
+   - un praticien déjà présent n'est pas modifié (nom, rôles, population, état, fiche
+     Google, signaux) : il est seulement complété de ses nouvelles spécialités, de ses
+     nouveaux lieux d'exercice et de la date d'extraction ;
+   - aucun lieu n'est supprimé ;
+   - un praticien absent de la nouvelle extraction reste dans la liste, avec le badge
+     « Absent de la dernière extraction ». S'il n'exerce nulle part ailleurs, son score
+     passe à 0 avec ce motif.
+4. **Liste existante.** Un praticien importé qui figure déjà dans les contacts (Requis,
    Réseau Aval…) avec le même RPPS y est relié et marqué « Déjà dans la liste ». Il n'est
    jamais dupliqué. Les candidats rejoindront la liste Réseau Aval à leur accord (lot 3).
 
@@ -88,7 +97,7 @@ déployées, droits). C'est l'objet de la recette ci-dessous.
 |---|---|---|
 | R1 | Ajouter l'Isère (38), ordre 1 | Le département apparaît « À ouvrir », 0 praticien, dernier import « Jamais » |
 | R2 | Ouvrir l'Isère, cliquer « Importer depuis le RPPS » | En moins d'une minute : environ 167 praticiens, l'état passe à « Importé », la date d'extraction s'affiche |
-| R3 (brief 1) | Cliquer « Rafraîchir l'import » | Même nombre de praticiens ; le résultat indique 0 créé et des mises à jour |
+| R3 (brief 1) | Cliquer « Rafraîchir l'import » | Même nombre de praticiens, aucun retiré ; le résultat indique 0 ajouté et des praticiens « déjà présents (complétés) » ; signaux, fiches Google et états inchangés |
 | R4 (brief 2) | Ajouter et importer la Savoie (73), puis chercher un praticien exerçant en Isère et en Savoie | Il apparaît dans les deux départements, et sa fiche montre ses lieux des deux départements. Un seul praticien en base (même RPPS) |
 | R5 | Filtrer par population « ORL », par rôle « Exérèse », par état | La liste se réduit en conséquence ; le compteur « affichés » suit |
 | R6 (brief 3) | Exclure un praticien (motif « Opposition »), confirmer, puis rafraîchir l'import | Il passe à « Exclu » ; le bouton d'exclusion est désactivé avec son motif ; après l'import, il est compté dans « exclus ignorés » et n'est pas recréé |

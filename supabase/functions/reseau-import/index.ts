@@ -3,8 +3,14 @@
 // data.gouv.fr, via l'API tabulaire : seules les lignes utiles sont lues, le
 // fichier (≈ 800 Mo) n'est jamais téléchargé.
 //
-// Rejouable : un RPPS déjà connu est mis à jour, jamais recréé. Un RPPS exclu est
-// ignoré. Un praticien déjà présent dans la liste des contacts y est relié.
+// Rafraîchir = AJOUTER, jamais annuler et remplacer (décision du 14/11) :
+//   • un nouveau praticien est ajouté ;
+//   • un praticien déjà présent n'est pas modifié (nom, rôles, population, état,
+//     fiche Google restent tels quels) : on lui ajoute seulement ses nouvelles
+//     spécialités et ses nouveaux lieux d'exercice, et la date d'extraction ;
+//   • aucun lieu n'est supprimé ; un praticien absent de la nouvelle extraction
+//     reste dans la liste, signalé « absent de la dernière extraction ».
+// Un RPPS exclu est ignoré. Un praticien déjà présent dans les contacts y est relié.
 //
 // Entrée : { departement: "38" }. Réservé au droit « sante ».
 //
@@ -23,6 +29,7 @@ import {
 import { dateExtraction, lignesSpecialiteDepartement } from "../_shared/tabulaire-rpps.ts";
 import { demarrerRechercheGoogle } from "../_shared/google-places.ts";
 
+/** Un NOUVEAU praticien (les praticiens déjà présents ne sont jamais réécrits). */
 function versLigne(p: PraticienRpps, extraitLe: string | null) {
   return {
     rpps: p.rpps,
@@ -80,12 +87,12 @@ serve(async (req) => {
     const rppsVus = praticiens.map((p) => p.rpps);
 
     // État connu : praticiens, exclusions, contacts existants (même RPPS).
-    const existants: { id: string; rpps: string; etat: string; contact_id: string | null }[] = [];
+    const existants: { id: string; rpps: string; etat: string; contact_id: string | null; specialites: string[] | null }[] = [];
     const exclus: string[] = [];
     const contacts = new Map<string, string>();
     for (const lot of paquets(rppsVus)) {
       const [a, b, c] = await Promise.all([
-        db.from("admin_reseau_praticiens").select("id, rpps, etat, contact_id").in("rpps", lot),
+        db.from("admin_reseau_praticiens").select("id, rpps, etat, contact_id, specialites").in("rpps", lot),
         db.from("admin_reseau_exclusions").select("rpps").in("rpps", lot),
         db.from("admin_network_contacts").select("id, rpps").in("rpps", lot),
       ]);
@@ -113,13 +120,13 @@ serve(async (req) => {
       for (const r of data ?? []) idParRpps.set(r.rpps, r.id);
     }
 
-    // Mises à jour (données open data seulement : l'état n'est jamais touché ici).
-    const contactExistant = new Map(existants.map((e) => [e.id, e.contact_id]));
+    // Praticiens déjà présents : on COMPLÈTE sans rien écraser.
+    const parId = new Map(existants.map((e) => [e.id, e]));
     for (const { id, praticien } of plan.aMettreAJour) {
-      const maj: Record<string, unknown> = versLigne(praticien, extraitLe);
-      delete maj.rpps;
-      delete maj.population; // une population saisie ou corrigée n'est pas écrasée
-      if (!contactExistant.get(id) && contacts.has(praticien.rpps)) {
+      const e = parId.get(id);
+      const specialites = [...new Set([...(e?.specialites ?? []), ...praticien.specialites])];
+      const maj: Record<string, unknown> = { specialites, rpps_extrait_le: extraitLe, vu_au_dernier_import: true };
+      if (!e?.contact_id && contacts.has(praticien.rpps)) {
         maj.contact_id = contacts.get(praticien.rpps);
         relies++;
       }
@@ -128,16 +135,18 @@ serve(async (req) => {
       idParRpps.set(praticien.rpps, id);
     }
 
-    // Lieux du département : on remplace ceux des praticiens vus par l'extraction du jour.
+    // Lieux : on ajoute ceux qu'on ne connaît pas encore, sans jamais en supprimer.
     const ids = [...idParRpps.values()];
+    const connus = new Set<string>();
     for (const lot of paquets(ids)) {
-      const { error } = await db.from("admin_reseau_lieux").delete().eq("departement", dep).in("praticien_id", lot);
+      const { data, error } = await db.from("admin_reseau_lieux").select("praticien_id, cle").in("praticien_id", lot);
       if (error) throw new Error(error.message);
+      for (const l of data ?? []) connus.add(`${l.praticien_id}|${l.cle}`);
     }
     const lieux = praticiens
       .filter((p) => idParRpps.has(p.rpps))
       .flatMap((p) => p.lieux.map((l) => ({
-        praticien_id: idParRpps.get(p.rpps),
+        praticien_id: idParRpps.get(p.rpps)!,
         departement: dep,
         cle: l.cle,
         raison_sociale: l.raisonSociale,
@@ -151,26 +160,29 @@ serve(async (req) => {
         finess: l.finess,
         siret: l.siret,
         rpps_extrait_le: extraitLe,
-      })));
+      })))
+      .filter((l) => !connus.has(`${l.praticien_id}|${l.cle}`));
     for (const lot of paquets(lieux, 200)) {
-      const { error } = await db.from("admin_reseau_lieux").insert(lot);
+      const { error } = await db.from("admin_reseau_lieux").upsert(lot, { onConflict: "praticien_id,cle", ignoreDuplicates: true });
       if (error) throw new Error(error.message);
     }
 
-    // Praticiens du département absents de cette extraction : leurs lieux ici disparaissent.
-    const { data: anciens } = await db.from("admin_reseau_lieux").select("praticien_id").eq("departement", dep);
+    // Praticiens du département absents de cette extraction : CONSERVÉS. Ceux qui n'exercent
+    // nulle part ailleurs sont seulement signalés « absent de la dernière extraction ».
+    const { data: ici } = await db.from("admin_reseau_lieux").select("praticien_id").eq("departement", dep).limit(20000);
     const exclusConnus = new Set(existants.filter((e) => e.etat === "exclu").map((e) => e.id));
-    const disparus = [...new Set((anciens ?? []).map((x: any) => x.praticien_id as string))]
-      .filter((id) => !ids.includes(id) && !exclusConnus.has(id));
-    for (const lot of paquets(disparus)) {
-      await db.from("admin_reseau_lieux").delete().eq("departement", dep).in("praticien_id", lot);
-    }
-    for (const lot of paquets(disparus)) {
-      // Sans plus aucun lieu nulle part : signalé « absent de la dernière extraction ».
-      const { data: restants } = await db.from("admin_reseau_lieux").select("praticien_id").in("praticien_id", lot);
-      const avecLieu = new Set((restants ?? []).map((x: any) => x.praticien_id));
-      const sansLieu = lot.filter((id) => !avecLieu.has(id));
-      if (sansLieu.length) await db.from("admin_reseau_praticiens").update({ vu_au_dernier_import: false }).in("id", sansLieu);
+    const vus = new Set(ids);
+    const absents = [...new Set<string>((ici ?? []).map((x: any) => x.praticien_id as string))]
+      .filter((id) => !vus.has(id) && !exclusConnus.has(id));
+    let signalesAbsents = 0;
+    for (const lot of paquets(absents)) {
+      const { data: ailleurs } = await db.from("admin_reseau_lieux").select("praticien_id").in("praticien_id", lot).neq("departement", dep);
+      const exerceAilleurs = new Set((ailleurs ?? []).map((x: any) => x.praticien_id));
+      const aSignaler = lot.filter((id) => !exerceAilleurs.has(id));
+      if (aSignaler.length) {
+        await db.from("admin_reseau_praticiens").update({ vu_au_dernier_import: false }).in("id", aSignaler);
+        signalesAbsents += aSignaler.length;
+      }
     }
 
     // Historique : une entrée par création.
@@ -187,9 +199,11 @@ serve(async (req) => {
       praticiens: praticiens.length,
       crees: plan.aCreer.length,
       mis_a_jour: plan.aMettreAJour.length,
+      lieux_ajoutes: lieux.length,
       exclus_ignores: plan.exclusIgnores.length,
       relies_liste: relies,
-      sortis_du_departement: disparus.length,
+      absents_extraction: absents.length,
+      signales_absents: signalesAbsents,
     };
     const fin = new Date().toISOString();
     await db.from("admin_reseau_imports")
