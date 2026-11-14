@@ -15,6 +15,26 @@ réels ; les valeurs approchées sont signalées.
 
 ---
 
+## Décisions d'AvisDoc (14 novembre 2026, Arthur)
+
+Elles priment sur les propositions du reste de la note.
+
+| Sujet | Décision |
+|---|---|
+| Implantation | Étendre l'existant : `admin_network_contacts`, projet admin |
+| Annuaire Ameli | **Non utilisé.** Le module repose sur le seul RPPS |
+| E-mails | **Non collectés** |
+| Empreinte web (niveau 3) | **Uniquement les informations de la fiche Google Maps** du praticien |
+| Chirurgie viscérale (SM14) | **Hors périmètre.** `CHIR` = SM05 seul |
+| Praticiens hospitaliers | **Dans le périmètre dès le lot 1** |
+| `MG_DERM` | **Ajout manuel par RPPS uniquement**, pas d'import |
+| Ordre des départements | Choisi dans la plateforme par l'administrateur (conforme au brief, §3) |
+
+Reste à préciser sur Google Maps : lecture par un opérateur (règle 2 du brief maintenue) ou
+affichage automatique par l'API Places (règle 2 levée). Voir §6.
+
+---
+
 ## 1. Avant tout : trois écarts avec le brief
 
 ### 1.1 Implantation : le schéma `prospection` n'existe pas
@@ -43,6 +63,7 @@ Le projet admin n'est pas le projet HDS ; le module reste hors périmètre HDS.
 
 Le brief fait du RPPS la clé de jointure entre l'Annuaire Santé et l'annuaire Ameli. **Le
 fichier PS Ameli ne contient ni RPPS, ni ADELI, ni FINESS** pour les praticiens. Voir §5.
+*Sans objet depuis la décision de ne pas utiliser Ameli.*
 
 ### 1.3 Le département n'est pas renseigné dans le RPPS
 
@@ -109,9 +130,7 @@ Le filtre du module porte sur le type `S`.
 **Proposition de filtre `ORL` : SM34 + SM39 + SM86.** Aucun praticien isérois ne cumule
 SM34 et SM39 : ce sont deux générations de qualification, il faut les deux.
 
-**À trancher par AvisDoc : SM14 dans `CHIR` ?** Les chirurgiens viscéraux font peu
-d'exérèse cutanée. Proposition : les exclure du filtre par défaut, mais les garder
-importables à la demande.
+**SM14 (chirurgie viscérale et digestive) : exclue** (décision du 14/11). `CHIR` = SM05.
 
 ### Ameli (`specialite_code`)
 
@@ -162,6 +181,9 @@ esthétique dominante. Jointure non testée sur un échantillon.
 
 ## 5. Point 3 — Ce que contient vraiment le fichier PS Ameli
 
+> **Ameli n'est pas utilisé** (décision du 14/11). Ce constat reste pour mémoire. Le
+> secteur conventionnel, que seul Ameli fournissait, sort donc du score (§8.8).
+
 Colonnes : nom, prénom, civilité, raison sociale, carte Vitale, appli carte Vitale (APCV),
 spécialité, activité particulière, type de PS, téléphone, adresse (voie, complément,
 lieu-dit, code postal, ville), option tarifaire, secteur conventionnel, nature d'exercice.
@@ -195,25 +217,48 @@ Test sur les dermatologues isérois : 44 noms Ameli face à 64 praticiens RPPS.
 Exemples d'écarts : PERRILLAT (Ameli) contre PERRILLAT-AMEDE (RPPS) ; LUCAS MOULLEC contre
 LUCAS ; BRUN LEVEQUE contre BRUN-LÉVÊQUE.
 
-**Proposition :**
-- le RPPS est la base et la seule clé du praticien ;
-- Ameli n'est qu'un **enrichissement** (secteur, option tarifaire, téléphone), rapproché
-  par nom normalisé + prénom + code postal ;
-- correspondance unique et exacte : appliquée et marquée « rapprochement automatique » ;
-- sinon : proposée à l'opérateur, qui confirme ;
-- l'absence d'Ameli n'est pas pénalisante (un hospitalier n'y figure pas, et son secteur
-  vaut alors « sans objet »).
+Sans clé commune, Ameli aurait demandé un rapprochement approché confirmé à la main.
+Avec le RPPS seul, la question disparaît : **le RPPS est la seule clé du praticien.**
 
 ---
 
-## 6. Point 4 — MSSanté et e-mails
+## 6. Point 4 — MSSanté, e-mails et Google Maps
 
 - L'extraction des boîtes MSSanté est réservée aux opérateurs de l'espace de confiance
   (confirmé sur data.gouv.fr). Hors d'atteinte.
-- **Le RPPS ne donne aucun e-mail** : 0 sur 81 lignes pour les dermatologues isérois.
-- Le premier contact passera donc par le **téléphone** (RPPS : 40 dermatologues sur 64 en
-  ont au moins un ; Ameli en complète une partie) ou par courrier au lieu d'exercice.
+- **Le RPPS ne donne aucun e-mail** : 0 sur 81 lignes pour les dermatologues isérois. Les
+  e-mails ne sont de toute façon pas collectés (décision du 14/11).
+- Le premier contact passera donc par le **téléphone** ou par courrier au lieu d'exercice.
+  Le RPPS donne un téléphone pour 40 dermatologues sur 64 ; la fiche Google Maps complète.
   Le canal de la lettre d'adressage se recueille au niveau 4.
+
+### Google Maps, seule source du niveau 3
+
+La grille du brief se réduit aux signaux lisibles sur une fiche Google Maps :
+
+| Signal | Lu sur la fiche |
+|---|---|
+| Fiche trouvée | lien de la fiche, ou « aucune fiche » (non pénalisant) |
+| Téléphone, site web, horaires | coordonnées de la fiche |
+| Catégorie affichée | « dermatologue », « centre de médecine esthétique »… → orientation de l'activité |
+| Plaintes répétées sur les délais | avis : valeur oui, non ou inconnu, **jamais de verbatim** (règle 3) |
+| Établissement fermé définitivement | mention de la fiche → signal de départ |
+
+Les signaux propres à Doctolib, au site du cabinet, à la presse ou à LinkedIn
+disparaissent : motif « exérèse », nouveaux patients, dermoscopie, circuit rapide,
+prévention, DU. Ce sont les plus informatifs sur la volonté ; c'est le contact du niveau 4
+qui les recueille.
+
+**Point ouvert — comment lire la fiche :**
+- **Lecture par un opérateur** (conforme à la règle 2 du brief). La fiche praticien ouvre
+  la recherche Google Maps en un clic, comme le fait déjà `mapsUrl()` dans
+  `src/admin/lib/maps.ts`. L'opérateur remplit la grille : valeur, URL, date.
+- **API Places, affichage en direct.** On associe le praticien à sa fiche et on ne stocke
+  que l'identifiant `place_id`. Les conditions de Google Maps Platform interdisent de
+  conserver le contenu des fiches. Les informations s'afficheraient à chaque ouverture, par
+  des appels facturés. Cette option lève la règle 2 du brief, et seule AvisDoc peut le
+  décider. La clé Google du projet (`GOOGLE_MAPS_KEY`, Edge Function `maps-cle`) sert
+  aujourd'hui à la carte ; l'API Places devrait y être activée.
 
 ---
 
@@ -221,32 +266,29 @@ LUCAS ; BRUN LEVEQUE contre BRUN-LÉVÊQUE.
 
 RPPS, `personne-activite`, code postal d'exercice commençant par 38, praticiens distincts.
 
-| Population | Codes | Praticiens | dont libéraux | dont salariés | Ameli (lignes / noms) |
-|---|---|---|---|---|---|
-| `DERM` | SM15 | **64** | 44 | 24 | 55 / 44 |
-| `ORL` | SM34 + SM39 | **37** | 28 | 15 | 48 / 29 |
-| `PLAST` | SM10 | **24** | 20 | 8 | 39 / 20 |
-| `CHIR` | SM05 | **42** | 28 | 17 | 46 / 24 |
-| (à trancher) | SM14 | 40 | 17 | 27 | non compté |
-| `MG_DERM` | — | **non détectable** | | | |
-| MG (pour mémoire) | SM53 / SM26 / SM54 | ≥ 2 129 lignes (SM53 1 652, SM26 477, SM54 non obtenu) | | | |
+| Population | Codes | Praticiens | dont libéraux | dont salariés |
+|---|---|---|---|---|
+| `DERM` | SM15 | **64** | 44 | 24 |
+| `ORL` | SM34 + SM39 | **37** | 28 | 15 |
+| `PLAST` | SM10 | **24** | 20 | 8 |
+| `CHIR` | SM05 | **42** | 28 | 17 |
+| `MG_DERM` | — | **ajout manuel** | | |
+| *Exclus : chirurgie viscérale* | *SM14* | *40* | | |
+| *MG, pour mémoire* | *SM53 / SM26 / SM54* | *≥ 2 129 lignes (SM53 1 652, SM26 477, SM54 non obtenu)* | | |
+
+Les salariés, hospitaliers pour la plupart, sont dans le périmètre (décision du 14/11).
 
 Les colonnes « libéraux » et « salariés » se recoupent : 4 dermatologues exercent des deux
 façons. Les praticiens sans activité déclarée (pas de lieu d'exercice) sont exclus.
 
-**Total sans `MG_DERM` : 167 praticiens** (207 avec la chirurgie viscérale). L'ordre de
+**Total sans `MG_DERM` : 167 praticiens.** L'ordre de
 grandeur d'un département moyen est donc **150 à 250 fiches**, ce qui se qualifie à la main
 en quelques semaines.
 
 Détail utile pour les dermatologues isérois :
 - **Lieu d'exercice** (lignes) : établissement public de santé 25, exercice en société 17,
   cabinet individuel 17, cabinet de groupe 15, établissement privé PSPH 6, autre 1.
-- **Secteur** (Ameli, 55 lignes) : secteur 2 41, secteur 1 13, non conventionné 1 ;
-  OPTAM 1.
-- **Chirurgiens** : plasticiens 38 sur 39 en secteur 2 ; généraux 46 sur 46 en secteur 2,
-  dont 25 en OPTAM-ACO.
-- **Centres de santé** : 155 lignes Ameli CDS, environ 63 centres distincts, un seul avec un
-  dermatologue (Échirolles).
+- **Secteur** (Ameli, pour mémoire) : 41 dermatologues libéraux sur 55 en secteur 2.
 
 L'orientation esthétique n'apparaît que dans le texte libre (une raison sociale
 « Centre dermatologique esthétique & laser… »). Elle reste un signal du niveau 3, lu par un
@@ -287,8 +329,8 @@ d'existence.
    plusieurs à plusieurs). Le champ `activites` (jsonb) reste l'affichage brut.
 4. **Exclusion.** Une table `admin_reseau_exclusions` keyée par RPPS, consultée par l'import
    avant toute création. Elle n'existe pas aujourd'hui.
-5. **Fraîcheur.** Chaque fiche porte la date de l'extraction RPPS et celle d'Ameli ; elles
-   sont marquées périmées au-delà de 90 jours.
+5. **Fraîcheur.** Chaque fiche porte la date de l'extraction RPPS ; elle est marquée
+   périmée au-delà de 90 jours.
 6. **Fonction `annuaire-sante`.** Réutilisée pour l'ajout manuel par RPPS (niveau 3) et le
    rafraîchissement d'une fiche à l'unité. Sa clé ANS (`ANNUAIRE_SANTE_API_KEY`) est un
    secret du projet admin, qui ne se relit pas dans Supabase. Arthur en détient la valeur
@@ -297,17 +339,20 @@ d'existence.
    états du brief. Proposition : un champ `etat_reseau` distinct. `statut` reste dérivé
    pour la liste existante (`accord` → Accepté, `refus` ou `exclu` → Refusé, le reste → En
    attente) ; seule une fonction serveur l'écrit.
+8. **Score (lot 2).** Le secteur conventionnel en sort, puisqu'il venait d'Ameli. Restent :
+   délai déclaré, plateau technique (hospitalier ou établissement privé, lu dans le RPPS),
+   proximité, signaux de volonté, signal de départ.
+9. **Hospitaliers.** Ils sont importés comme les libéraux. Le lieu d'exercice et le
+   standard viennent du RPPS (raison sociale, FINESS) ; le contact se fait par le service.
+10. **Rien d'Ameli, rien d'e-mail** dans le modèle ni dans l'import.
 
 ---
 
-## 9. Questions pour AvisDoc
+## 9. Questions encore ouvertes
 
-Celles du brief (§12) restent ouvertes. S'y ajoutent :
+Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
+restent ouvertes. S'y ajoutent :
 
-1. La chirurgie viscérale et digestive (SM14 / Ameli 49) entre-t-elle dans `CHIR` ?
-2. Les praticiens hospitaliers sont-ils dans le périmètre dès le lot 1 ? En Isère, c'est
-   plus d'un tiers des dermatologues, et ils ne figurent pas dans Ameli.
-3. `MG_DERM` en saisie manuelle uniquement : validé ?
-4. Le DIU de dermatologie esthétique affiché comme information sur la fiche, sans effet
+1. Google Maps : lecture par un opérateur, ou affichage par l'API Places ? (§6)
+2. Le DIU de dermatologie esthétique affiché comme information sur la fiche, sans effet
    sur le score : validé ?
-5. Département suivant à ouvrir après l'Isère.
