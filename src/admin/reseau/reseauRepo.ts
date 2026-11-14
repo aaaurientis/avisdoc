@@ -6,6 +6,7 @@
 import { supabaseAdmin as sb } from "../data/supabaseAdmin";
 import { messageErreurFonction } from "../lib/erreurFonction";
 import type { EtatDepartement, EtatPraticien, MotifExclusion, Population, Role } from "./libelles";
+import type { TypeSignal } from "../../../supabase/functions/_shared/reseau-signaux";
 
 export interface DepartementReseau {
   code: string;
@@ -40,7 +41,51 @@ export interface PraticienReseau {
   contactId: string | null;
   rppsExtraitLe: string | null;
   vuAuDernierImport: boolean;
+  googlePlaceId: string | null;
+  googleAucuneFiche: boolean;
   lieux: LieuReseau[];
+}
+
+export interface SignalReseau {
+  id: string;
+  praticienId: string;
+  type: TypeSignal;
+  valeur: string;
+  url: string;
+  origine: "operateur" | "ia";
+  statut: "propose" | "valide" | "rejete" | "remplace";
+  extrait: string | null;
+  proposePar: string;
+  proposeLe: string;
+  decidePar: string | null;
+  decideLe: string | null;
+}
+
+export interface RechercheIa {
+  id: string;
+  type: "praticien" | "mg_derm_departement";
+  statut: "en_cours" | "termine" | "echec";
+  debut: string;
+  fin: string | null;
+  resultat: { propositions?: number; retenues?: number; crees?: number; deja_la?: number; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
+  erreur: string | null;
+}
+
+export interface CandidatGoogle { place_id: string; nom: string; adresse: string; categorie: string | null; ferme: boolean }
+
+export interface FicheGoogle {
+  place_id: string;
+  nom: string;
+  adresse: string | null;
+  telephone: string | null;
+  site: string | null;
+  lien: string | null;
+  categorie: string | null;
+  horaires: string[];
+  note: number | null;
+  nombreAvis: number | null;
+  statut: string | null;
+  avis: { auteur: string; lienAuteur: string | null; note: number | null; quand: string; texte: string }[] | null;
 }
 
 export interface ImportReseau {
@@ -87,6 +132,8 @@ const toPraticien = (r: any): PraticienReseau => ({
   contactId: r.contact_id ?? null,
   rppsExtraitLe: r.rpps_extrait_le ?? null,
   vuAuDernierImport: r.vu_au_dernier_import !== false,
+  googlePlaceId: r.google_place_id ?? null,
+  googleAucuneFiche: r.google_aucune_fiche === true,
   lieux: (r.admin_reseau_lieux ?? []).map(toLieu),
 });
 
@@ -106,6 +153,16 @@ async function appeler(fonction: string, body: Record<string, unknown>): Promise
   if (error) throw new Error(await messageErreurFonction(error));
   return data;
 }
+
+const toSignal = (r: any): SignalReseau => ({
+  id: r.id, praticienId: r.praticien_id, type: r.type, valeur: r.valeur, url: r.url, origine: r.origine,
+  statut: r.statut, extrait: r.extrait ?? null, proposePar: r.propose_par, proposeLe: r.propose_le,
+  decidePar: r.decide_par ?? null, decideLe: r.decide_le ?? null,
+});
+
+const toRecherche = (r: any): RechercheIa => ({
+  id: r.id, type: r.type, statut: r.statut, debut: r.debut, fin: r.fin ?? null, resultat: r.resultat ?? null, erreur: r.erreur ?? null,
+});
 
 export const reseauRepo = {
   async departements(): Promise<DepartementReseau[]> {
@@ -180,6 +237,57 @@ export const reseauRepo = {
 
   exclure: (praticienId: string, motif: MotifExclusion, precision: string) =>
     appeler("reseau-action", { action: "exclure", praticien_id: praticienId, motif, precision }),
+
+  /** Signaux d'un praticien : validés et propositions en attente. */
+  async signaux(praticienId: string): Promise<SignalReseau[]> {
+    const { data, error } = await sb.from("admin_reseau_signaux").select("*")
+      .eq("praticien_id", praticienId).in("statut", ["valide", "propose"]).order("propose_le", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(toSignal);
+  },
+
+  /** Signaux validés et nombre de propositions en attente, pour une liste de praticiens (score de la liste). */
+  async signauxDe(ids: string[]): Promise<SignalReseau[]> {
+    const out: SignalReseau[] = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await sb.from("admin_reseau_signaux").select("id, praticien_id, type, valeur, url, origine, statut, propose_par, propose_le")
+        .in("praticien_id", ids.slice(i, i + 200)).in("statut", ["valide", "propose"]);
+      if (error) throw new Error(error.message);
+      out.push(...(data ?? []).map(toSignal));
+    }
+    return out;
+  },
+
+  async derniereRecherche(cible: { praticienId: string } | { departement: string }): Promise<RechercheIa | null> {
+    let q = sb.from("admin_reseau_recherches_ia").select("*").order("debut", { ascending: false }).limit(1);
+    q = "praticienId" in cible ? q.eq("praticien_id", cible.praticienId) : q.eq("departement", cible.departement);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data?.[0] ? toRecherche(data[0]) : null;
+  },
+
+  saisirSignal: (praticienId: string, type: TypeSignal, valeur: string, url: string) =>
+    appeler("reseau-action", { action: "signal_saisir", praticien_id: praticienId, type, valeur, url }),
+  validerSignal: (signalId: string) => appeler("reseau-action", { action: "signal_valider", signal_id: signalId }),
+  rejeterSignal: (signalId: string) => appeler("reseau-action", { action: "signal_rejeter", signal_id: signalId }),
+
+  rattacherGoogle: (praticienId: string, choix: { placeId: string } | { aucune: true } | { retirer: true }) =>
+    appeler("reseau-action", {
+      action: "google_rattacher", praticien_id: praticienId,
+      ...("placeId" in choix ? { place_id: choix.placeId } : "aucune" in choix ? { aucune: true } : { retirer: true }),
+    }),
+  chercherGoogle: (praticienId: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
+    appeler("reseau-google", { action: "chercher", praticien_id: praticienId }),
+  ficheGoogle: (praticienId: string, avis = false): Promise<FicheGoogle> =>
+    appeler("reseau-google", { action: "details", praticien_id: praticienId, avis }),
+
+  ajouterRpps: (rpps: string): Promise<{ statut: "cree" | "deja_la"; id: string; nom: string; population: Population; departements: string[] }> =>
+    appeler("reseau-action", { action: "ajouter_rpps", rpps }),
+
+  lancerIaPraticien: (praticienId: string): Promise<{ recherche_id: string }> =>
+    appeler("reseau-ia", { action: "praticien", praticien_id: praticienId }),
+  lancerIaMg: (departement: string): Promise<{ recherche_id: string }> =>
+    appeler("reseau-ia", { action: "mg_departement", departement }),
 
   importer: (code: string): Promise<{ compteurs: Record<string, number>; rpps_extrait_le: string | null }> =>
     appeler("reseau-import", { departement: code }),

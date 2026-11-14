@@ -106,3 +106,22 @@ describe("réseau d'aval : fraîcheur", () => {
     expect(estPerime(null, maintenant)).toBe(true);
   });
 });
+
+describe("réseau d'aval : ajout d'un praticien par son RPPS", () => {
+  it("reprend tous ses lieux, dans chaque département", async () => {
+    const { praticienDepuisLignes } = await import("../../../supabase/functions/_shared/reseau-rpps");
+    const r = praticienDepuisLignes(LIGNES_38, "19900000004");
+    expect("praticien" in r && r.praticien.lieux.map((l) => l.departement)).toEqual(["38", "73"]);
+  });
+
+  it("fait d'un généraliste un MG_DERM, et refuse ce qui n'entre pas dans le réseau", async () => {
+    const { praticienDepuisLignes } = await import("../../../supabase/functions/_shared/reseau-rpps");
+    const { ligne } = await import("./rpps-fictif");
+    const mg = [ligne({ rpps: "19900000020", nom: "KLEIN", prenom: "Sophie", code: "SM53", libelle: "Spécialiste en Médecine Générale", cp: "38000", commune: "Grenoble", cc: "38185", structure: "CABINET FICTIF KLEIN" })];
+    const r = praticienDepuisLignes(mg, "19900000020");
+    expect("praticien" in r && r.praticien).toMatchObject({ population: "MG_DERM", roles: ["consultation", "dermoscopie"] });
+    expect(praticienDepuisLignes(LIGNES_38, "19900000006")).toEqual({ refus: "Ce RPPS n'est pas celui d'un médecin." });
+    expect("refus" in praticienDepuisLignes(LIGNES_38, "19900000005")).toBe(true); // chirurgie viscérale
+    expect("refus" in praticienDepuisLignes([], "19900000099")).toBe(true);
+  });
+});

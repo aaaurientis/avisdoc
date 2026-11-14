@@ -14,55 +14,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, paquets, verifierAccesSante } from "../_shared/acces-sante.ts";
 import {
-  bornesCodePostal,
   estDepartement,
-  type LigneRpps,
   planifierImport,
   type PraticienRpps,
   regrouperParPraticien,
   SPECIALITES,
 } from "../_shared/reseau-rpps.ts";
-
-// Fichier « ps-libreacces-personne-activite » du jeu ANS sur data.gouv.fr.
-const RESSOURCE = Deno.env.get("RPPS_RESSOURCE_ID") ?? "fffda7e9-0ea2-4c35-bba0-4496f3af935d";
-const TABULAIRE = `https://tabular-api.data.gouv.fr/api/resources/${RESSOURCE}`;
-const COL_CP = "Code postal (coord. structure)";
-
-async function lireJson(url: string): Promise<any> {
-  let derniere = "";
-  for (let essai = 1; essai <= 4; essai++) {
-    try {
-      const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(60_000) });
-      if (r.ok) return await r.json();
-      derniere = `réponse ${r.status}`;
-      if (r.status < 500 && r.status !== 429) break; // erreur de requête : inutile d'insister
-    } catch (e) {
-      derniere = e instanceof Error ? e.message : String(e);
-    }
-    await new Promise((ok) => setTimeout(ok, 1500 * essai));
-  }
-  throw new Error(`L'API de data.gouv.fr ne répond pas (${derniere}). Réessayez dans quelques minutes.`);
-}
-
-/** Toutes les lignes d'une spécialité dont le code postal tombe dans le département. */
-async function lignesDe(code: string, departement: string): Promise<LigneRpps[]> {
-  const { min, max } = bornesCodePostal(departement);
-  // Bornes élargies d'une unité : le tri final se fait sur le département du lieu.
-  const params = new URLSearchParams({
-    "Code savoir-faire__exact": code,
-    [`${COL_CP}__greater`]: String(Number(min) - 1).padStart(5, "0"),
-    [`${COL_CP}__less`]: String(Number(max) + 1).padStart(5, "0"),
-    page_size: "200",
-  });
-  let url: string | null = `${TABULAIRE}/data/?${params}`;
-  const lignes: LigneRpps[] = [];
-  for (let page = 0; url && page < 100; page++) {
-    const d: any = await lireJson(url);
-    lignes.push(...(Array.isArray(d?.data) ? d.data : []));
-    url = d?.links?.next ?? null;
-  }
-  return lignes;
-}
+import { dateExtraction, lignesSpecialiteDepartement } from "../_shared/tabulaire-rpps.ts";
 
 function versLigne(p: PraticienRpps, extraitLe: string | null) {
   return {
@@ -113,10 +71,9 @@ serve(async (req) => {
 
   try {
     // Date de l'extraction indexée par l'API (fraîcheur affichée sur chaque fiche).
-    const meta = await lireJson(`${TABULAIRE}/`).catch(() => null);
-    const extraitLe: string | null = meta?.created_at ?? null;
+    const extraitLe = await dateExtraction();
 
-    const parCode = await Promise.all(Object.keys(SPECIALITES).map((c) => lignesDe(c, dep)));
+    const parCode = await Promise.all(Object.keys(SPECIALITES).map((c) => lignesSpecialiteDepartement(c, dep)));
     const lignes = parCode.flat();
     const praticiens = regrouperParPraticien(lignes, dep);
     const rppsVus = praticiens.map((p) => p.rpps);
