@@ -32,7 +32,8 @@ Elles priment sur les propositions du reste de la note.
 | Lecture de la fiche Google Maps | **Par l'API Google Places**, affichage en direct. La règle 2 du brief est levée pour Google Maps, et pour lui seul |
 | DIU de dermatologie esthétique | **Affiché comme information** sur la fiche, sans effet sur le score |
 | Sources | **Toute information affichée ou enregistrée porte son lien source.** Rien n'est inventé ni déduit : seule une information vérifiée et validée par un opérateur est retenue (§6) |
-| Score | **Probabilité d'adhésion au réseau**, explicable et calibrée sur les issues réelles (§8 bis) |
+| Score | **Probabilité d'adhésion au réseau**, explicable et calibrée sur les issues réelles (§8 bis) ; pondérations a priori à trancher plus tard |
+| Clé Google serveur | **Oui**, AvisDoc crée une seconde clé, réservée au serveur, avec l'API Places |
 | Autres signaux du niveau 3 | **Recherche assistée par IA**, lancée une fois le praticien identifié, propositions validées par un opérateur (§6) |
 
 ---
@@ -272,14 +273,53 @@ Ce que cela implique, conditions de Google Maps Platform comprises :
    enregistre la valeur (orientation, plaintes sur les délais, fermeture), avec l'URL de la
    fiche et la date. Le statut « fermé définitivement » peut être signalé à l'écran sans
    saisie, mais il n'est pas conservé.
-5. **Coût.** Chaque ouverture de fiche est un appel facturé. Le téléphone, le site, les
-   horaires et les avis relèvent des niveaux de données les plus chers. Les tarifs ne sont
-   pas vérifiés ici : à consulter dans la console Google Cloud avant le lot 2. On ne
-   demande que les champs utiles (masque de champs).
+5. **Coût.** Voir l'estimation ci-dessous.
 6. **Clé.** La clé du projet (`GOOGLE_MAPS_KEY`, Edge Function `maps-cle`) est une clé de
    navigateur, à restreindre au référent `admin.avisdoc.fr`. Les appels Places se font côté
    serveur : il faut une **seconde clé, réservée au serveur**, avec l'API Places (New)
-   activée. Secret proposé : `GOOGLE_PLACES_KEY`.
+   activée. Secret proposé : `GOOGLE_PLACES_KEY`. AvisDoc peut la créer (confirmé le 14/11).
+
+#### Estimation du coût de l'API Places
+
+Grille publique de Google Maps Platform, relevée le 14/11/2026, en dollars, au premier
+palier :
+
+| Appel | Usage dans le module | Gratuit par mois | Ensuite, pour 1 000 appels |
+|---|---|---|---|
+| Text Search Enterprise | proposer des fiches candidates au rattachement | 1 000 | 35 $ |
+| Place Details Enterprise | afficher téléphone, site, horaires, note | 1 000 | 20 $ |
+| Place Details Enterprise + Atmosphere | idem, avec les avis | 1 000 | 25 $ |
+
+Un appel est facturé au tarif du champ le plus cher qu'il demande : le masque de champs
+décide du prix.
+
+Hypothèses par département (Isère : 167 praticiens) :
+- **Rattachement** : environ 2 recherches par praticien, soit ~330 appels.
+- **Consultation** : la fiche est ouverte environ 5 fois pendant la qualification, soit
+  ~840 appels Place Details.
+- Total : **~1 200 appels par département**.
+
+| Rythme | Coût mensuel estimé |
+|---|---|
+| 1 département par mois | **~0 $** (sous les quotas gratuits) |
+| 3 départements par mois | **~20 à 40 $** |
+| Sans aucun quota gratuit, par département | ~30 $ au plus |
+
+Deux réglages pour rester bas :
+- **Les avis à la demande** : la fiche charge les informations sans les avis (20 $), et un
+  bouton « Voir les avis » les charge au tarif Atmosphere (25 $).
+- **Un appel par ouverture** : on ne recharge pas tant que la fiche reste ouverte. Les
+  conditions interdisent de stocker le contenu, pas de le garder à l'écran.
+
+**Plafond proposé : 50 € par mois**, avec des alertes de budget à 50 % et 90 % dans la
+console Google Cloud. On ajoute un quota de 300 appels Place Details par jour sur la clé
+serveur. Si le quota est atteint, la fiche affiche « Informations Google indisponibles
+aujourd'hui (quota atteint) » au lieu d'échouer en silence. À ajuster après le premier
+mois réel.
+
+Sources :
+[grille tarifaire Google Maps Platform](https://developers.google.com/maps/billing-and-pricing/pricing),
+[facturation de l'API Places (New)](https://developers.google.com/maps/documentation/places/web-service/usage-and-billing).
 
 ### Recherche assistée par IA, une fois le praticien identifié
 
@@ -536,10 +576,8 @@ utilisé.
 Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
 restent ouvertes. S'y ajoutent :
 
-1. Une seconde clé Google, réservée au serveur et avec l'API Places activée, est-elle
-   possible sur le compte Google Cloud d'AvisDoc ? (§6)
-2. Quel plafond mensuel de dépense Places fixer dans la console ?
-3. Score : le taux d'adhésion attendu de 20 % et les pondérations a priori du §8 bis
-   conviennent-ils ?
-4. Score : la « proximité » se mesure par rapport à quoi ? Lieux des journées de
+1. Plafond Places : 50 € par mois proposé (§6). À confirmer.
+2. Score : taux d'adhésion attendu de 20 % et pondérations a priori du §8 bis — **décision
+   reportée** (14/11). À trancher avant le lot 2.
+3. Score : la « proximité » se mesure par rapport à quoi ? Lieux des journées de
    dépistage, clients d'AvisDoc, centre du département ? Sans réponse, elle est retirée.
