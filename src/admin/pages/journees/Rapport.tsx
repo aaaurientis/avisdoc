@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Download, Loader2, Printer } from "lucide-react";
 import logo from "@/assets/avisdoc-logo.png";
+import { fabriquerPdfRapport, type ContenuRapport } from "./rapportPdf";
 import { useExpertises, useJournees } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resumer, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
 import type { JourneeDepistage } from "../../lib/journees";
@@ -61,75 +62,6 @@ function usePolicesCharte() {
 }
 
 const echapper = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
-
-/**
- * Fabrique le PDF dans le navigateur et le télécharge, sans passer par l'impression : sous Safari,
- * « Enregistrer au format PDF » depuis la boîte d'impression produisait un fichier vide.
- * La page est photographiée en haute définition (×2) puis posée sur des feuilles A4 ; quand le
- * rapport fait plusieurs pages, la coupure tombe entre deux lignes du tableau, jamais au milieu.
- * Les deux bibliothèques ne sont chargées qu'au clic.
- */
-async function fabriquerPdf(nom: string): Promise<Blob | null> {
-  const page = document.querySelector<HTMLElement>(".rapport-page");
-  if (!page) return null;
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-  // Les polices de la charte doivent être là avant la photo, sinon le PDF sort en police de secours.
-  const polices = (document as Document & { fonts?: FontFaceSet }).fonts;
-  if (polices) {
-    await Promise.race([
-      Promise.all(["600 30px 'Newsreader'", "400 12px 'Hanken Grotesk'", "700 12px 'Hanken Grotesk'"].map((f) => polices.load(f))).then(() => polices.ready),
-      new Promise((ok) => setTimeout(ok, 4000)),
-    ]);
-  }
-
-  // Points de coupure possibles (bas de chaque ligne et de chaque bloc), en pixels CSS depuis le haut de la page.
-  // Mesurés sur la copie elle-même (marges réduites), dans onclone ci-dessous.
-  let coupures: number[] = [];
-
-  const echelle = 2;
-  const canvas = await html2canvas(page, {
-    scale: echelle,
-    backgroundColor: "#ffffff",
-    useCORS: true,
-    logging: false,
-    // Sur la copie photographiée : pas d'ombre, pas de hauteur imposée.
-    onclone: (doc) => {
-      const p = doc.querySelector<HTMLElement>(".rapport-page");
-      if (!p) return;
-      Object.assign(p.style, { boxShadow: "none", minHeight: "0", padding: "12mm 15mm 10mm" });
-      const haut = p.getBoundingClientRect().top;
-      coupures = [...p.querySelectorAll<HTMLElement>("tr, .rapport-bloc")].map((el) => el.getBoundingClientRect().bottom - haut);
-    },
-  });
-
-  const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  const pxParMm = canvas.width / 210;
-  const hauteurFeuille = Math.floor(297 * pxParMm);
-  const limites = coupures.map((c) => Math.round(c * echelle)).sort((a, b) => a - b);
-  let y = 0;
-  let premiere = true;
-  while (y < canvas.height - 2 * pxParMm) {
-    let fin = Math.min(y + hauteurFeuille, canvas.height);
-    if (fin < canvas.height) {
-      const propre = limites.filter((l) => l > y + hauteurFeuille * 0.5 && l <= fin).pop();
-      if (propre) fin = propre;
-    }
-    const morceau = document.createElement("canvas");
-    morceau.width = canvas.width;
-    morceau.height = fin - y;
-    const ctx = morceau.getContext("2d");
-    if (!ctx) break;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, morceau.width, morceau.height);
-    ctx.drawImage(canvas, 0, y, canvas.width, fin - y, 0, 0, canvas.width, fin - y);
-    if (!premiere) pdf.addPage();
-    pdf.addImage(morceau.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, (fin - y) / pxParMm);
-    premiere = false;
-    y = fin;
-  }
-  pdf.setProperties({ title: nom, creator: "AvisDoc" });
-  return pdf.output("blob");
-}
 
 /**
  * Téléchargement par un lien nommé, dans le geste même du clic : un téléchargement lancé plusieurs
@@ -222,26 +154,20 @@ export default function Rapport() {
   );
   const avis = useMemo(() => lignes.flatMap((l) => l.avis), [lignes]);
 
-  // Le navigateur propose le titre de la page comme nom du PDF : on le rend précis.
-  // « AvisDoc - Bilan des journées - Groupama Rhône-Alpes-Auvergne - DEV 2026 051 - 2026-11-14 »
+  // Le navigateur propose le titre de la page comme nom du PDF (impression) : on le rend précis.
   useEffect(() => {
     if (!portee) return;
     const avant = document.title;
-    const auj = new Date().toISOString().slice(0, 10);
-    const j = portee.journees[0];
-    const morceaux = portee.uneJournee
-      ? ["AvisDoc", "Bilan de la journée", portee.titre, j?.date, j?.lieu]
-      : ["AvisDoc", "Bilan des journées", portee.titre, portee.sousTitre.replace(/^Devis /, ""), auj];
-    document.title = morceaux
-      .filter(Boolean)
-      .join(" - ")
-      .replace(/[\\/:*?"<>|]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    document.title = nomDuRapport(portee);
     return () => {
       document.title = avant;
     };
   }, [portee]);
+
+  const contenu = useMemo(
+    () => (portee && rapportPossible(avis.length) ? contenuRapport(portee, lignes, avis, sourceExp?.date ?? "", nomDuRapport(portee)) : null),
+    [portee, lignes, avis, sourceExp],
+  );
 
   if (statut !== "pret" || statutExp !== "pret") {
     return (
@@ -275,32 +201,31 @@ export default function Rapport() {
         }
         .rapport-page, .rapport-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       `}</style>
-      <Actions />
+      {contenu && <Actions contenu={contenu} />}
       <Page portee={portee} lignes={lignes} avis={avis} dateExport={sourceExp?.date ?? ""} />
     </div>
   );
 }
 
 /** Le PDF est préparé dès que le rapport est affiché (polices chargées) ; le clic l'enregistre aussitôt. */
-function Actions() {
+function Actions({ contenu }: { contenu: ContenuRapport }) {
   const [pdf, setPdf] = useState<{ blob: Blob; nom: string } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   useEffect(() => {
     let vivant = true;
     const t = window.setTimeout(async () => {
       try {
-        const nom = document.title || "AvisDoc - Bilan";
-        const blob = await fabriquerPdf(nom);
-        if (vivant && blob) setPdf({ blob, nom });
+        const blob = await fabriquerPdfRapport(contenu);
+        if (vivant) setPdf({ blob, nom: contenu.nomFichier });
       } catch (e) {
         if (vivant) setErreur(e instanceof Error ? e.message : String(e));
       }
-    }, 1000);
+    }, 300);
     return () => {
       vivant = false;
       window.clearTimeout(t);
     };
-  }, []);
+  }, [contenu]);
   const enCours = !pdf && !erreur;
   const telecharger = () => pdf && enregistrer(pdf.blob, pdf.nom);
   const bouton = { display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, padding: "10px 18px", fontWeight: 600, cursor: "pointer" } as const;
@@ -323,6 +248,73 @@ function Ecran({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/** Ce que dit le rapport, pour le PDF dessiné (mêmes calculs que la page affichée ci-dessous). */
+function contenuRapport(portee: Portee, lignes: { j: JourneeDepistage; avis: Expertise[] }[], avis: Expertise[], dateExport: string, nomFichier: string): ContenuRapport {
+  const r = resumer(avis);
+  const n = { non: 0, consult: 0, exerese: 0 };
+  for (const e of avis) {
+    const i = issueDe(e);
+    if (i === "non-indispensable") n.non++;
+    else if (i === "consultation") n.consult++;
+    else if (i === "exerese") n.exerese++;
+  }
+  const [pNon, pConsult, pExerese] = centPourCent([n.non, n.consult, n.exerese]);
+  const debut = lignes[0]?.j.date ?? "";
+  const fin = lignes[lignes.length - 1]?.j.date ?? "";
+  const delaiFiable = r.delais.mesures > SEUIL_RAPPORT && r.delais.mediane !== null;
+  return {
+    nomFichier,
+    kicker: `BILAN ${portee.uneJournee ? "DE LA JOURNÉE" : "DES JOURNÉES"} DE DÉPISTAGE`,
+    titre: portee.titre,
+    sousTitre: [portee.sousTitre, !portee.uneJournee && debut ? (debut === fin ? jourLong(debut) : `du ${jourLong(debut)} au ${jourLong(fin)}`) : ""].filter(Boolean).join(" · "),
+    edite: `Édité le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`,
+    donneesArretees: dateExport ? `Données arrêtées au ${jourLong(dateExport)}` : null,
+    chiffres: [
+      [nb(r.total), "avis dermatologiques rendus"],
+      portee.uneJournee ? [nb(r.requis.length), "dermatologue(s) mobilisé(s)"] : [nb(lignes.length), "journées réalisées"],
+      [`${pNon} %`, "des avis sans consultation nécessaire"],
+      [`${pConsult + pExerese} %`, "des avis orientant vers un dermatologue"],
+    ],
+    recos: [
+      { label: "Consultation dermatologique non indispensable", n: n.non, p: pNon, couleur: C.cyan },
+      { label: "Consultation dermatologique conseillée", n: n.consult, p: pConsult, couleur: C.marine },
+      { label: "Exérèse indispensable", n: n.exerese, p: pExerese, couleur: C.orange },
+    ],
+    texteRecos:
+      `Dans ${pNon} % des avis, le dermatologue a jugé qu'une consultation n'était pas nécessaire. Pour les ${nb(n.consult + n.exerese)} autres, une consultation dermatologique a été conseillée` +
+      (n.exerese ? `, dont ${nb(n.exerese)} avec une exérèse jugée indispensable` : "") +
+      (r.delaiRecoMedian ? `, dans un délai médian de ${r.delaiRecoMedian} jours` : "") +
+      ".",
+    delais: delaiFiable
+      ? [
+          [`${Math.round(r.delais.mediane as number)} h`, "délai médian entre la demande et l'avis"],
+          [`${pct(r.delais.sous24h, r.delais.mesures)} %`, "des avis rendus en moins de 24 h"],
+          [`${pct(r.delais.sous48h, r.delais.mesures)} %`, "des avis rendus en moins de 48 h"],
+        ]
+      : null,
+    journees: portee.uneJournee ? null : lignes.map((l) => ({ date: jourCourt(l.j.date), lieu: l.j.lieu, avis: nb(l.avis.length) })),
+    note: `Chiffres établis à partir des avis rendus par les dermatologues du réseau AvisDoc lors des journées citées. Ce bilan ne contient aucune donnée individuelle ; il n'est établi qu'au-delà de ${SEUIL_RAPPORT} avis, pour qu'aucun chiffre ne permette d'identifier une personne.`,
+    moisEdition: capitaliser(new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })),
+  };
+}
+
+const capitaliser = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Nom du fichier et titre de l'onglet : « AvisDoc - Bilan des journées - client - devis - date ». */
+function nomDuRapport(portee: Portee): string {
+  const auj = new Date().toISOString().slice(0, 10);
+  const j = portee.journees[0];
+  const morceaux = portee.uneJournee
+    ? ["AvisDoc", "Bilan de la journée", portee.titre, j?.date, j?.lieu]
+    : ["AvisDoc", "Bilan des journées", portee.titre, portee.sousTitre.replace(/^Devis /, ""), auj];
+  return morceaux
+    .filter(Boolean)
+    .join(" - ")
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 interface Portee {
