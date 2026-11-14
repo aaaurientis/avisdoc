@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import FiletErreur from "./FiletErreur";
 import { Lock, Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import { lireArrivee } from "../lib/arrivee";
@@ -83,7 +84,10 @@ export default function AppShell() {
             </div>
           </div>
         )}
-        <Outlet />
+        {/* Une erreur dans un écran n'emporte plus le menu : on peut changer d'écran. */}
+        <FiletErreur cle={pathname}>
+          <Outlet />
+        </FiletErreur>
       </main>
     </div>
   );
