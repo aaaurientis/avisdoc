@@ -18,7 +18,7 @@ import {
   type Periode,
 } from "../../lib/journees";
 import { cn } from "@/lib/utils";
-import { CadreJournees, Choix, capitale, jour, nombre, pct, selectCls } from "./commun";
+import { AxeMois, CadreJournees, Choix, capitale, jour, nombre, pct, selectCls } from "./commun";
 
 const PERIODES: { cle: Periode; label: string }[] = [
   { cle: "avenir", label: "À venir" },
@@ -157,7 +157,6 @@ function BarresMois({ journees }: { journees: JourneeDepistage[] }) {
   const serie = useMemo(() => parMois(journees), [journees]);
   const max = Math.max(1, ...serie.map((m) => m.nombre));
   const actif = survol !== null ? serie[survol] : null;
-  const pas = Math.max(1, Math.ceil(serie.length / 8));
   return (
     <div>
       <div className="relative">
@@ -174,13 +173,7 @@ function BarresMois({ journees }: { journees: JourneeDepistage[] }) {
           ))}
         </div>
       </div>
-      <div className="mt-1.5 flex gap-[2px] text-[10.5px] text-muted-foreground">
-        {serie.map((m, i) => (
-          <div key={m.cle} className="min-w-0 flex-1 truncate text-center">
-            {i % pas === 0 ? mois(m.cle) : ""}
-          </div>
-        ))}
-      </div>
+      <AxeMois etiquettes={serie.map((m) => mois(m.cle))} actif={survol} />
       <div className="mt-3 min-h-[20px] text-[12.5px] text-muted-foreground">
         {actif ? (
           <>
