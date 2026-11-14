@@ -29,9 +29,8 @@ Elles priment sur les propositions du reste de la note.
 | Praticiens hospitaliers | **Dans le périmètre dès le lot 1** |
 | `MG_DERM` | **Ajout manuel par RPPS uniquement**, pas d'import |
 | Ordre des départements | Choisi dans la plateforme par l'administrateur (conforme au brief, §3) |
-
-Reste à préciser sur Google Maps : lecture par un opérateur (règle 2 du brief maintenue) ou
-affichage automatique par l'API Places (règle 2 levée). Voir §6.
+| Lecture de la fiche Google Maps | **Par l'API Google Places**, affichage en direct. La règle 2 du brief est levée pour Google Maps, et pour lui seul |
+| DIU de dermatologie esthétique | **Affiché comme information** sur la fiche, sans effet sur le score |
 
 ---
 
@@ -249,16 +248,35 @@ disparaissent : motif « exérèse », nouveaux patients, dermoscopie, circuit r
 prévention, DU. Ce sont les plus informatifs sur la volonté ; c'est le contact du niveau 4
 qui les recueille.
 
-**Point ouvert — comment lire la fiche :**
-- **Lecture par un opérateur** (conforme à la règle 2 du brief). La fiche praticien ouvre
-  la recherche Google Maps en un clic, comme le fait déjà `mapsUrl()` dans
-  `src/admin/lib/maps.ts`. L'opérateur remplit la grille : valeur, URL, date.
-- **API Places, affichage en direct.** On associe le praticien à sa fiche et on ne stocke
-  que l'identifiant `place_id`. Les conditions de Google Maps Platform interdisent de
-  conserver le contenu des fiches. Les informations s'afficheraient à chaque ouverture, par
-  des appels facturés. Cette option lève la règle 2 du brief, et seule AvisDoc peut le
-  décider. La clé Google du projet (`GOOGLE_MAPS_KEY`, Edge Function `maps-cle`) sert
-  aujourd'hui à la carte ; l'API Places devrait y être activée.
+**Lecture par l'API Google Places** (décision du 14/11). La règle 2 du brief est levée
+pour Google Maps seulement ; Doctolib et LinkedIn restent exclus.
+
+Ce que cela implique, conditions de Google Maps Platform comprises :
+
+1. **Rattachement.** Une recherche textuelle Places (nom, spécialité, ville du lieu
+   d'exercice RPPS) propose des fiches candidates. **Un opérateur confirme la bonne**, ou
+   indique « aucune fiche ». Pas de rattachement automatique : les homonymes et les fiches
+   de cabinets de groupe sont fréquents.
+2. **Stockage.** On ne conserve que l'identifiant `place_id`, avec la date et l'auteur du
+   rattachement. Google autorise à garder cet identifiant ; il recommande de le
+   rafraîchir s'il a plus de douze mois. Aucun contenu de fiche n'est stocké : ni
+   téléphone, ni horaires, ni note, ni avis.
+3. **Affichage.** À l'ouverture de la fiche praticien, une fonction serveur appelle Place
+   Details et renvoie les champs à afficher. Rien n'est écrit en base. L'attribution
+   Google est affichée, comme l'exigent les conditions.
+4. **Signaux.** Un signal ne peut pas recopier le contenu Google ; il reste une
+   **appréciation de l'opérateur**. L'opérateur lit les informations affichées et
+   enregistre la valeur (orientation, plaintes sur les délais, fermeture), avec l'URL de la
+   fiche et la date. Le statut « fermé définitivement » peut être signalé à l'écran sans
+   saisie, mais il n'est pas conservé.
+5. **Coût.** Chaque ouverture de fiche est un appel facturé. Le téléphone, le site, les
+   horaires et les avis relèvent des niveaux de données les plus chers. Les tarifs ne sont
+   pas vérifiés ici : à consulter dans la console Google Cloud avant le lot 2. On ne
+   demande que les champs utiles (masque de champs).
+6. **Clé.** La clé du projet (`GOOGLE_MAPS_KEY`, Edge Function `maps-cle`) est une clé de
+   navigateur, à restreindre au référent `admin.avisdoc.fr`. Les appels Places se font côté
+   serveur : il faut une **seconde clé, réservée au serveur**, avec l'API Places (New)
+   activée. Secret proposé : `GOOGLE_PLACES_KEY`.
 
 ---
 
@@ -353,6 +371,6 @@ d'existence.
 Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
 restent ouvertes. S'y ajoutent :
 
-1. Google Maps : lecture par un opérateur, ou affichage par l'API Places ? (§6)
-2. Le DIU de dermatologie esthétique affiché comme information sur la fiche, sans effet
-   sur le score : validé ?
+1. Une seconde clé Google, réservée au serveur et avec l'API Places activée, est-elle
+   possible sur le compte Google Cloud d'AvisDoc ? (§6)
+2. Quel plafond mensuel de dépense Places fixer dans la console ?
