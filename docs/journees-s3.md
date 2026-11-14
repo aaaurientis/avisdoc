@@ -64,17 +64,22 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
   **toutes** les journées : **une ligne par journée**. L'écran lit la plus récente ; les autres
   restent consultables (menu « Extraction du … »).
 - Colonnes reconnues par leur nom (ordre libre, accents et majuscules indifférents) :
-  Date création, Client, Nombre de journées, Numéro devis, Dermatologue, Expert, Date événement,
+  Date création, Client, Nombre de journées, Numéro devis, Requérant, Requis (anciennement
+  Dermatologue, Expert — les deux écritures sont lues), Date événement,
   Date facture, Lieu, Numéro journée, Nom / Téléphone / Email du contact, Salle, Accès,
   Autres informations, Confirmation client / consentements / requérant (Oui/Non),
   Numéro et date d'envoi / de retour du dermatoscope. Une colonne absente est signalée à l'écran.
 - Séparateur `;` ou `,` détecté tout seul ; UTF-8 ou Windows-1252 ; l'enrobage Excel `="0612…"` est retiré.
 - Une journée est « passée » à partir du lendemain de sa date ; celle du jour est encore « à venir ».
 
-## Sans S3
+## Télécharger une extraction
 
-Tant que le bucket n'est pas branché, le bouton **Importer un CSV** lit l'extraction dans le
-navigateur (rien n'est envoyé ni enregistré) et affiche les mêmes statistiques.
+Le bouton **Télécharger le CSV** (pages Statistiques et Calendrier) enregistre l'extraction
+affichée telle qu'elle est dans le bucket (UTF-8, lisible par Excel). Le menu « Extraction du … »
+permet d'en choisir une plus ancienne avant de la télécharger. Chaque téléchargement est noté
+au journal d'audit (Admin › Auditabilité) : le fichier contient des coordonnées de contacts.
+
+L'import manuel d'un CSV a été retiré : les extractions viennent uniquement du bucket S3.
 
 ## Typologies de clients (règles de confirmation)
 
@@ -91,3 +96,18 @@ navigateur (rien n'est envoyé ni enregistré) et affiche les mêmes statistique
   (sans accents, casse ni forme juridique), alias, ou nom proche s'il n'y a qu'un candidat.
   Un nom non rattaché se rattache à la main ; il devient un alias du client.
 - Tant que la migration n'est pas jouée, les écrans Journée appliquent requérant + expert.
+
+## Noms de fichiers dans le bucket
+
+Les extractions des journées et des expertises sont déposées au même endroit, avec la même date
+(`2026-11-14-journée.csv`, `2026-11-14-expertise.csv`). Le Hub ne retient pour les journées que les
+fichiers dont le nom contient « journée » ; s'il n'en trouve aucun (anciens noms comme
+`2026-11-05.csv`), il prend tout sauf les fichiers « expertise ».
+
+## Lien avec les expertises
+
+L'extraction des expertises (une ligne = un avis) n'a pas de colonne Client. Une expertise faite
+lors d'une journée porte **Date événement + Lieu + Numéro journée** : ce triplet retrouve sa journée
+sans ambiguïté (vérifié le 14/11/2026 : 1 122 expertises de journée sur 13 608, toutes rattachées à
+une seule journée). Date + Numéro journée suffit aussi ; Date + Lieu seul est ambigu (plusieurs
+journées le même jour au même endroit).

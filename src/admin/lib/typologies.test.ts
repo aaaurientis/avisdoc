@@ -41,7 +41,7 @@ describe("typologies", () => {
   });
 
   it("règles et exigences en clair", () => {
-    expect(exigences(reglesDe(TYPOLOGIES[1]))).toEqual(["expert"]);
-    expect(exigences(reglesDe(null))).toEqual(["requérant", "expert"]);
+    expect(exigences(reglesDe(TYPOLOGIES[1]))).toEqual(["requis"]);
+    expect(exigences(reglesDe(null))).toEqual(["requérant", "requis"]);
   });
 });

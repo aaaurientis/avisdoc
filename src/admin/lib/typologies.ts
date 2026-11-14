@@ -3,7 +3,8 @@
 // Fonctions pures : testées dans typologies.test.ts.
 
 /**
- * Ce qui doit être acquis pour qu'une journée soit confirmée : requérant et/ou expert.
+ * Ce qui doit être acquis pour qu'une journée soit confirmée : requérant confirmé et/ou requis désigné.
+ * (La clé « expert » garde le nom de la colonne en base, exige_expert ; à l'écran : « Requis ».)
  * (Client, consentements et dermatoscope restent visibles dans le détail d'une journée,
  * mais ne comptent pas pour la confirmation.)
  */
@@ -12,12 +13,12 @@ export interface Regles {
   expert: boolean;
 }
 
-/** Client non affecté et pas de typologie par défaut en base : requérant + expert. */
+/** Client non affecté et pas de typologie par défaut en base : requérant + requis. */
 export const REGLES_DEFAUT: Regles = { requerant: true, expert: true };
 
 export const CRITERES: { cle: keyof Regles; label: string; court: string }[] = [
   { cle: "requerant", label: "Requérant confirmé", court: "requérant" },
-  { cle: "expert", label: "Expert désigné", court: "expert" },
+  { cle: "expert", label: "Requis désigné", court: "requis" },
 ];
 
 export interface Typologie {
@@ -46,7 +47,7 @@ export const reglesDe = (t: Typologie | null | undefined): Regles =>
     ? { requerant: t.exige_requerant, expert: t.exige_expert }
     : REGLES_DEFAUT;
 
-/** Ce qu'exige une typologie, en clair : « requérant, expert ». */
+/** Ce qu'exige une typologie, en clair : « requérant, requis ». */
 export const exigences = (r: Regles) => CRITERES.filter((c) => r[c.cle]).map((c) => c.court);
 
 const FORMES = new Set(["sas", "sa", "sarl", "sasu", "eurl", "sci", "scop"]);

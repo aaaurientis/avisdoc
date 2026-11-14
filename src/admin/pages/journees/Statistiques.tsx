@@ -26,11 +26,11 @@ const PERIODES: { cle: Periode; label: string }[] = [
   { cle: "tout", label: "Tout" },
 ];
 
-type Axe = "expert" | "dermatologue" | "lieu" | "client" | "typologie";
+type Axe = "requis" | "requerant" | "lieu" | "client" | "typologie";
 const AXES: { cle: Axe; label: string }[] = [
   { cle: "typologie", label: "Typologie" },
-  { cle: "expert", label: "Expert" },
-  { cle: "dermatologue", label: "Dermatologue" },
+  { cle: "requis", label: "Requis" },
+  { cle: "requerant", label: "Requérant" },
   { cle: "lieu", label: "Lieu" },
   { cle: "client", label: "Client" },
 ];
@@ -49,15 +49,15 @@ function Contenu() {
   const { extraction } = useJournees();
   const [periode, setPeriode] = useState<Periode>("tout");
   const [client, setClient] = useState("");
-  const [expert, setExpert] = useState("");
-  const [axe, setAxe] = useState<Axe>("expert");
+  const [requis, setRequis] = useState("");
+  const [axe, setAxe] = useState<Axe>("requis");
 
   const toutes = useMemo(() => extraction?.journees ?? [], [extraction]);
   const clients = useMemo(() => compterPar(toutes, (j) => j.client).map((c) => c.cle), [toutes]);
-  const experts = useMemo(() => compterPar(toutes, (j) => j.expert).map((c) => c.cle), [toutes]);
+  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle), [toutes]);
   const journees = useMemo(
-    () => dansLaPeriode(toutes, periode).filter((j) => (!client || j.client === client) && (!expert || j.expert === expert)),
-    [toutes, periode, client, expert],
+    () => dansLaPeriode(toutes, periode).filter((j) => (!client || j.client === client) && (!requis || j.requis === requis)),
+    [toutes, periode, client, requis],
   );
   const auj = aujourdhuiISO();
   const passees = journees.filter((j) => estPassee(j, auj));
@@ -82,7 +82,7 @@ function Contenu() {
           </button>
         ))}
         <Choix valeur={client} changer={setClient} options={clients} tous="Tous les clients" />
-        <Choix valeur={expert} changer={setExpert} options={experts} tous="Tous les experts" />
+        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" />
       </div>
 
       <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -92,7 +92,7 @@ function Contenu() {
         <Kpi
           label="Clients"
           valeur={nombre(new Set(journees.map((j) => j.client)).size)}
-          pied={`${nombre(new Set(journees.map((j) => j.expert).filter(Boolean)).size)} experts mobilisés`}
+          pied={`${nombre(new Set(journees.map((j) => j.requis).filter(Boolean)).size)} requis mobilisés`}
         />
       </div>
 

@@ -33,11 +33,10 @@ export default function EncartJournees() {
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Aucune extraction chargée.{" "}
-            <Link to="/journees/calendrier" className="font-semibold text-avisdoc-teal hover:underline">
-              Importer le CSV
-            </Link>{" "}
-            pour voir les journées du jour et de la semaine.
+            L'extraction des journées n'a pas pu être lue depuis S3.{" "}
+            <Link to="/journees" className="font-semibold text-avisdoc-teal hover:underline">
+              Voir le détail
+            </Link>
           </p>
         )
       ) : (
@@ -75,7 +74,7 @@ function Colonne({ titre, liste, vide, avecDate = false }: { titre: string; list
                   {j.numero !== null && <span className="ml-1 font-normal text-muted-foreground">· {j.numero}{j.commandees ? `/${j.commandees}` : ""}</span>}
                 </span>
                 <span className="block truncate text-[12px] text-muted-foreground">
-                  {j.lieu || "lieu non renseigné"} · {j.expert || "expert non renseigné"}
+                  {j.lieu || "lieu non renseigné"} · {j.requis || "requis non renseigné"}
                 </span>
               </span>
               <PastilleEtat j={j} court />

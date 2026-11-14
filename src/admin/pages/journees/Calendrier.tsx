@@ -48,14 +48,14 @@ function Contenu() {
   const [mois, setMois] = useState(auj.slice(0, 7));
   const [choisi, setChoisi] = useState(auj);
   const [client, setClient] = useState("");
-  const [expert, setExpert] = useState("");
+  const [requis, setRequis] = useState("");
 
   const toutes = useMemo(() => extraction?.journees ?? [], [extraction]);
   const clients = useMemo(() => compterPar(toutes, (j) => j.client).map((c) => c.cle), [toutes]);
-  const experts = useMemo(() => compterPar(toutes, (j) => j.expert).map((c) => c.cle), [toutes]);
+  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle), [toutes]);
   const journees = useMemo(
-    () => toutes.filter((j) => (!client || j.client === client) && (!expert || j.expert === expert)),
-    [toutes, client, expert],
+    () => toutes.filter((j) => (!client || j.client === client) && (!requis || j.requis === requis)),
+    [toutes, client, requis],
   );
   const parJour = useMemo(() => {
     const m = new Map<string, JourneeDepistage[]>();
@@ -92,7 +92,7 @@ function Contenu() {
           Aujourd'hui
         </button>
         <Choix valeur={client} changer={setClient} options={clients} tous="Tous les clients" />
-        <Choix valeur={expert} changer={setExpert} options={experts} tous="Tous les experts" />
+        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" />
       </div>
 
       <Card className="mb-6 overflow-hidden">
