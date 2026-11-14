@@ -103,9 +103,14 @@ export default function Rapport() {
       <style>{`
         @page { size: A4; margin: 0; }
         @media print {
-          .rapport-fond { background: none !important; padding: 0 !important; }
+          html, body { background: #fff !important; margin: 0 !important; }
+          .rapport-fond { background: none !important; padding: 0 !important; min-height: 0 !important; }
           .rapport-actions { display: none !important; }
-          .rapport-page { box-shadow: none !important; margin: 0 !important; }
+          /* Pas de hauteur imposée à l'impression : forcer exactement une A4 faisait déborder
+             le pied de page sur une 2e feuille presque blanche. Un rapport long continue
+             simplement sur la page suivante. */
+          .rapport-page { box-shadow: none !important; margin: 0 !important; min-height: 0 !important; width: auto !important; padding: 12mm 15mm 10mm !important; }
+          .rapport-page tr, .rapport-page .rapport-bloc { break-inside: avoid; }
         }
         .rapport-page, .rapport-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       `}</style>
