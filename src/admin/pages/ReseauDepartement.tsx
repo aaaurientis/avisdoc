@@ -101,7 +101,7 @@ export default function ReseauDepartement() {
     try {
       const r = await reseauRepo.importer(code);
       const c = r.compteurs ?? {};
-      toast.success(`Import terminé : ${c.praticiens ?? 0} praticiens, dont ${c.crees ?? 0} nouveaux. Recherche des fiches Google en cours.`);
+      toast.success(`Import terminé : ${c.crees ?? 0} praticien${(c.crees ?? 0) > 1 ? "s" : ""} ajouté${(c.crees ?? 0) > 1 ? "s" : ""}, rien de retiré ni d'écrasé. Recherche des fiches Google en cours.`);
       await charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e));
@@ -249,8 +249,10 @@ export default function ReseauDepartement() {
           {dernier?.statut === "echec" && <span className="font-semibold text-rose-700">Dernier import en échec : {dernier.erreur}</span>}
           {dernier?.statut === "termine" && dernier.compteurs && (
             <span>
-              Dernier import : {dernier.compteurs.crees ?? 0} créés, {dernier.compteurs.mis_a_jour ?? 0} mis à jour,{" "}
-              {dernier.compteurs.exclus_ignores ?? 0} exclus ignorés, {dernier.compteurs.relies_liste ?? 0} déjà dans la liste
+              Dernier import : {dernier.compteurs.crees ?? 0} ajoutés, {dernier.compteurs.mis_a_jour ?? 0} déjà présents (complétés sans rien écraser)
+              {dernier.compteurs.lieux_ajoutes ? `, ${dernier.compteurs.lieux_ajoutes} lieux ajoutés` : ""}
+              {dernier.compteurs.absents_extraction ? `, ${dernier.compteurs.absents_extraction} absents de l'extraction (conservés)` : ""}
+              {`, ${dernier.compteurs.exclus_ignores ?? 0} exclus ignorés, ${dernier.compteurs.relies_liste ?? 0} déjà dans la liste`}
             </span>
           )}
         </div>
