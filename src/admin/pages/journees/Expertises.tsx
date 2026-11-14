@@ -1,5 +1,5 @@
 // Statistiques › Expertises — les avis rendus, au global : volumes par mois (en journée / hors journée),
-// recommandations, délais de réponse, répartition par requis et par profession du requérant.
+// recommandations, délais de réponse, répartition par requis (taux de consultation).
 //
 // Source : l'extraction « expertise » la plus récente du bucket S3 (une ligne = un avis).
 
@@ -183,16 +183,11 @@ export default function Expertises() {
                 </Card>
               </div>
 
-              <Card className="mb-6 overflow-hidden">
+              <Card className="overflow-hidden">
                 <div className="border-b border-border px-5 py-3.5">
                   <SectionLabel>Par requis</SectionLabel>
                 </div>
                 <TableRequis liste={liste} />
-              </Card>
-
-              <Card className="p-[22px] xl:max-w-[50%]">
-                <h2 className="mb-4 font-display text-lg font-semibold text-avisdoc-ink">Profession du requérant</h2>
-                <Barres parts={r.professions} total={r.total} />
               </Card>
             </>
           )}
