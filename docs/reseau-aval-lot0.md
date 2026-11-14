@@ -34,6 +34,8 @@ Elles priment sur les propositions du reste de la note.
 | Sources | **Toute information affichée ou enregistrée porte son lien source.** Rien n'est inventé ni déduit : seule une information vérifiée et validée par un opérateur est retenue (§6) |
 | Score | **Probabilité d'adhésion au réseau**, explicable et calibrée sur les issues réelles (§8 bis) ; pondérations a priori à trancher plus tard |
 | Clé Google serveur | **Oui**, AvisDoc crée une seconde clé, réservée au serveur, avec l'API Places |
+| Plafond Places | **50 € par mois**, alertes à 50 % et 90 %, quota de 300 appels Place Details par jour |
+| Proximité dans le score | **Retirée** : l'utilisateur ouvre lui-même un département, il n'y a pas de point de référence |
 | Autres signaux du niveau 3 | **Recherche assistée par IA**, lancée une fois le praticien identifié, propositions validées par un opérateur (§6) |
 
 ---
@@ -311,7 +313,7 @@ Deux réglages pour rester bas :
 - **Un appel par ouverture** : on ne recharge pas tant que la fiche reste ouverte. Les
   conditions interdisent de stocker le contenu, pas de le garder à l'écran.
 
-**Plafond proposé : 50 € par mois**, avec des alertes de budget à 50 % et 90 % dans la
+**Plafond retenu : 50 € par mois** (décision du 14/11), avec des alertes de budget à 50 % et 90 % dans la
 console Google Cloud. On ajoute un quota de 300 appels Place Details par jour sur la clé
 serveur. Si le quota est atteint, la fiche affiche « Informations Google indisponibles
 aujourd'hui (quota atteint) » au lieu d'échouer en silence. À ajuster après le premier
@@ -472,7 +474,7 @@ d'existence.
    attente) ; seule une fonction serveur l'écrit.
 8. **Score (lot 2).** Le secteur conventionnel en sort, puisqu'il venait d'Ameli. Restent :
    délai déclaré, plateau technique (hospitalier ou établissement privé, lu dans le RPPS),
-   proximité, signaux de volonté, signal de départ.
+   signaux de volonté, signal de départ. La proximité est retirée (§8 bis).
 9. **Hospitaliers.** Ils sont importés comme les libéraux. Le lieu d'exercice et le
    standard viennent du RPPS (raison sociale, FINESS) ; le contact se fait par le service.
 10. **Rien d'Ameli, rien d'e-mail** dans le modèle ni dans l'import.
@@ -548,7 +550,6 @@ Base a priori : **taux d'adhésion attendu de 20 %** (z = −1,39). À valider p
 | Signal de départ (successeur, fermeture) | IA ou fiche Google, validé | oui | −1,5 |
 | A répondu au premier contact | interaction tracée | oui | +1,0 |
 | Délai déclaré pour un patient adressé | contact (niveau 4) | ≤ 15 j / 16–45 j / > 45 j | +1,0 / +0,3 / −0,8 |
-| Proximité | à définir (voir questions) | — | — |
 
 **Critères éliminatoires** : la probabilité affichée est 0 %, avec le motif. Ce sont
 l'opposition enregistrée, l'activité esthétique dominante et la cessation d'exercice.
@@ -559,7 +560,9 @@ tout le reste inconnu : z = −1,39 + 0,8 + 0,6 = 0,01, soit une probabilité de
 **Variables exclues volontairement** : sexe, âge, nom, origine du diplôme. Elles sont
 discriminatoires ou sans lien avec la volonté. Aucune notion de rémunération ou de
 contrepartie (règle 7). Le secteur conventionnel est absent, puisqu'Ameli n'est pas
-utilisé.
+utilisé. **La proximité est retirée** (décision du 14/11) : il n'y a pas de point de
+référence, puisque c'est l'utilisateur qui ouvre un département. L'appartenance au
+département suffit.
 
 ### Conséquences pour les lots
 
@@ -576,8 +579,5 @@ utilisé.
 Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
 restent ouvertes. S'y ajoutent :
 
-1. Plafond Places : 50 € par mois proposé (§6). À confirmer.
-2. Score : taux d'adhésion attendu de 20 % et pondérations a priori du §8 bis — **décision
+1. Score : taux d'adhésion attendu de 20 % et pondérations a priori du §8 bis — **décision
    reportée** (14/11). À trancher avant le lot 2.
-3. Score : la « proximité » se mesure par rapport à quoi ? Lieux des journées de
-   dépistage, clients d'AvisDoc, centre du département ? Sans réponse, elle est retirée.
