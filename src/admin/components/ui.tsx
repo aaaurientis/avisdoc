@@ -2,6 +2,7 @@
 // vitrine (tokens avisdoc-*, Fraunces pour les titres, Inter pour le corps).
 
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /** Avatar rond à initiales. */
@@ -124,7 +125,9 @@ export function Modal({
   children: ReactNode;
   width?: number;
 }) {
-  return (
+  // Rendue au niveau de la page (portail) : posée dans un panneau défilant ou animé (fiche
+  // praticien…), la fenêtre y restait enfermée et s'affichait coupée.
+  return createPortal(
     <div
       onClick={onClose}
       // Au-dessus d'une fiche (z-50) : un brouillon ouvert depuis une fiche doit passer
@@ -143,6 +146,7 @@ export function Modal({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
