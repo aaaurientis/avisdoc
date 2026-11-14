@@ -611,7 +611,7 @@ département suffit.
 
 Les six questions du brief (§12) sont tranchées le 14/11 : le hub est le projet admin, les
 seuils de couverture ne sont pas gérés, les `MG_DERM` sont aussi de futurs requérants, les
-hospitaliers et les centres de santé sont inclus, la forme de l'accord et la validation
+hospitaliers sont inclus (les centres de santé ne l'ont pas été explicitement), la forme de l'accord et la validation
 déontologique sont hors périmètre. Il ne reste que :
 
 1. Score : taux d'adhésion attendu de 20 % et pondérations a priori du §8 bis — **décision
