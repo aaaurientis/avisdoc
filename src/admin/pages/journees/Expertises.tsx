@@ -13,6 +13,9 @@ import {
   dansLaPeriode,
   enJournee,
   estExerese,
+  MASQUE,
+  MOTIF_MASQUE,
+  resultatsVisibles,
   parMois,
   parRequis,
   resumer,
@@ -142,7 +145,11 @@ export default function Expertises() {
               valeur={heures(r.delais.mediane)}
               pied={r.delais.mesures ? `${pct(r.delais.sous24h, r.delais.mesures)} % sous 24 h · ${nombre(r.delais.mesures)} mesurés` : "délai non mesuré sur la période"}
             />
-            <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            {resultatsVisibles(r.total) ? (
+              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            ) : (
+              <Kpi label="Exérèses indispensables" valeur={MASQUE} pied={MOTIF_MASQUE} />
+            )}
           </div>
 
           {r.total === 0 ? (
@@ -158,8 +165,12 @@ export default function Expertises() {
               <div className="mb-6 grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
                 <Card className="p-[22px]">
                   <h2 className="mb-4 font-display text-lg font-semibold text-avisdoc-ink">Recommandations</h2>
-                  <Barres parts={r.recommandations} total={r.total} />
-                  {r.delaiRecoMedian !== null && (
+                  {resultatsVisibles(r.total) ? (
+                    <Barres parts={r.recommandations} total={r.total} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{MOTIF_MASQUE}</p>
+                  )}
+                  {resultatsVisibles(r.total) && r.delaiRecoMedian !== null && (
                     <p className="mt-4 text-[12.5px] text-muted-foreground">
                       Délai recommandé médian, quand une consultation est conseillée : {r.delaiRecoMedian} jours.
                     </p>
@@ -313,7 +324,7 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-3 text-[12px] text-muted-foreground">
         <span>
-          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{tauxGlobal} %</b>.
+          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? `${tauxGlobal} %` : MASQUE}</b>. Un requis à {20} avis ou moins n'affiche pas ses résultats (règle de l'AIPD).
         </span>
         <select value={tri} onChange={(e) => setTri(e.target.value as "avis" | "taux")} className={selectCls} aria-label="Trier">
           <option value="avis">Trier par nombre d'avis</option>
@@ -337,24 +348,25 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
           <tbody>
             {lignes.map((l) => {
               const taux = pct(l.orientations, l.renseignes);
+              const visible = resultatsVisibles(l.total);
               return (
                 <tr key={l.requis} className="border-t border-border">
                   <td className="px-5 py-2.5 font-semibold text-avisdoc-ink">{l.requis}</td>
                   <td className="px-3 py-2.5 text-right text-avisdoc-ink">{nombre(l.total)}</td>
-                  <td className="px-3 py-2.5" title={`${l.orientations} orientations sur ${l.renseignes} avis renseignés`}>
+                  <td className="px-3 py-2.5" title={visible ? `${l.orientations} orientations sur ${l.renseignes} avis renseignés` : MOTIF_MASQUE}>
                     <div className="flex items-center gap-2">
                       <div className="relative h-2 flex-1 rounded-full bg-muted">
-                        <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${taux}%` }} />
+                        <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${visible ? taux : 0}%` }} />
                         <div className="absolute -top-1 h-4 w-0.5 bg-avisdoc-ink/60" style={{ left: `${tauxGlobal}%` }} />
                       </div>
-                      <span className="w-10 shrink-0 text-right font-semibold text-avisdoc-ink">{l.renseignes ? `${taux} %` : "—"}</span>
+                      <span className="w-10 shrink-0 text-right font-semibold text-avisdoc-ink">{visible && l.renseignes ? `${taux} %` : MASQUE}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{pct(l.consultations, l.renseignes)} %</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{pct(l.exereses, l.renseignes)} %</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{pct(l.nonIndispensables, l.renseignes)} %</td>
+                  <td className="px-3 py-2.5 text-right text-muted-foreground">{visible ? `${pct(l.consultations, l.renseignes)} %` : MASQUE}</td>
+                  <td className="px-3 py-2.5 text-right text-muted-foreground">{visible ? `${pct(l.exereses, l.renseignes)} %` : MASQUE}</td>
+                  <td className="px-3 py-2.5 text-right text-muted-foreground">{visible ? `${pct(l.nonIndispensables, l.renseignes)} %` : MASQUE}</td>
                   <td className="px-3 py-2.5 text-right text-muted-foreground">{heures(l.delaiMedian)}</td>
-                  <td className="px-5 py-2.5 text-right text-avisdoc-ink">{l.urgentes}</td>
+                  <td className="px-5 py-2.5 text-right text-avisdoc-ink">{visible ? l.urgentes : MASQUE}</td>
                 </tr>
               );
             })}

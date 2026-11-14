@@ -290,6 +290,15 @@ export function dansLaPeriode(liste: Expertise[], periode: PeriodeExpertises, au
   return liste.filter((e) => e.envoi.slice(0, 7) >= borne);
 }
 
-/** Seuil du rapport client : au-delà de 20 expertises seulement, pour qu'aucun chiffre ne désigne quelqu'un. */
+/**
+ * Règle de l'AIPD : aucun détail sur le résultat (recommandation, exérèse, urgence, taux de
+ * consultation) quand il porte sur 20 dossiers ou moins. Vaut pour le rapport client comme pour
+ * les statistiques du Hub ; les volumes (nombre d'avis) et les délais restent visibles.
+ */
 export const SEUIL_RAPPORT = 20;
-export const rapportPossible = (n: number) => n > SEUIL_RAPPORT;
+export const SEUIL_AIPD = SEUIL_RAPPORT;
+export const resultatsVisibles = (nbDossiers: number) => nbDossiers > SEUIL_AIPD;
+export const rapportPossible = resultatsVisibles;
+/** Ce qui s'affiche à la place d'un résultat masqué, et pourquoi. */
+export const MASQUE = "—";
+export const MOTIF_MASQUE = `Masqué : ${SEUIL_AIPD} dossiers ou moins (règle de l'AIPD).`;
