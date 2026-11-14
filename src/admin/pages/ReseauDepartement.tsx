@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Download, Loader2, MapPin, Sparkles, UserPlus } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Card, Modal, PageHeader } from "../components/ui";
 import { lectureSeuleActive } from "../lib/lectureSeule";
@@ -23,19 +23,25 @@ import {
   TEXTES,
   dateFr,
   estPerime,
+  DOCTOLIB_AIDE,
+  DOCTOLIB_BADGE,
+  DOCTOLIB_LABEL,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
+  STATUTS_DOCTOLIB,
   STATUTS_GOOGLE,
+  type StatutDoctolib,
   type StatutGoogle,
   type EtatPraticien,
   type Population,
   type Role,
 } from "../reseau/libelles";
 import { reseauRepo, type DepartementReseau, type ImportReseau, type PraticienReseau, type RechercheIa, type SignalReseau } from "../reseau/reseauRepo";
-import { calculerScore } from "../../../supabase/functions/_shared/reseau-signaux";
+import { calculerScore, releveCreneauPerime, VALEUR_LIBELLE } from "../../../supabase/functions/_shared/reseau-signaux";
 import FichePraticien from "./reseau/FichePraticien";
 import AvancementIa from "./reseau/AvancementIa";
+import ReseauCarte from "./reseau/ReseauCarte";
 import { cn } from "@/lib/utils";
 
 /** Pictogramme de la vue resserrée (fiche ouverte) : vert trouvée, orange à confirmer, gris sinon. */
@@ -48,8 +54,19 @@ const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   a_chercher: "text-slate-200",
 };
 
-const COLS_FULL = "minmax(170px,1.6fr) 130px minmax(160px,1.5fr) 90px 110px 118px 74px";
-const COLS_COMPACT = "minmax(160px,1.4fr) 110px 52px 64px";
+const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(150px,1.4fr) 84px 104px 112px 112px 70px";
+const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
+
+const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
+  confirme: "text-sky-700",
+  trouve_auto: "text-sky-500",
+  a_confirmer: "text-amber-500",
+  introuvable: "text-slate-300",
+  aucun: "text-slate-300",
+  a_chercher: "text-slate-200",
+};
+/** Coût indicatif d'une recherche IA par praticien (modèle + recherches web), à ajuster sur les factures réelles. */
+const COUT_IA_EUROS = 0.25;
 
 export default function ReseauDepartement() {
   const { code = "" } = useParams();
@@ -63,11 +80,14 @@ export default function ReseauDepartement() {
   const [signaux, setSignaux] = useState<SignalReseau[]>([]);
   const [rechercheMg, setRechercheMg] = useState<RechercheIa | null>(null);
   const [rechercheGoogle, setRechercheGoogle] = useState<RechercheIa | null>(null);
+  const [rechercheIa, setRechercheIa] = useState<RechercheIa | null>(null);
+  const [iaGroupee, setIaGroupee] = useState(false);
+  const [vue, setVue] = useState<"liste" | "carte">("liste");
   const [ajoutRpps, setAjoutRpps] = useState(false);
   /** Le journal reste affiché à la fin d'une recherche suivie à l'écran. */
   const [suiviMgOuvert, setSuiviMgOuvert] = useState(false);
-  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle }>({
-    q: "", population: "", role: "", etat: "", google: "",
+  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle; doctolib: "" | StatutDoctolib }>({
+    q: "", population: "", role: "", etat: "", google: "", doctolib: "",
   });
   const lectureSeule = lectureSeuleActive();
 
@@ -79,11 +99,13 @@ export default function ReseauDepartement() {
       setDep(ds.find((d) => d.code === code) ?? null);
       setPraticiens(ps);
       setDernier(di);
-      const [sg, rm, rg] = await Promise.all([
+      const [sg, rm, rg, ri] = await Promise.all([
         reseauRepo.signauxDe(ps.map((x) => x.id)),
         reseauRepo.derniereRecherche({ departement: code, type: "mg_derm_departement" }),
         reseauRepo.derniereRecherche({ departement: code, type: "google_departement" }),
+        reseauRepo.derniereRecherche({ departement: code, type: "ia_departement" }),
       ]);
+      setRechercheIa(ri);
       setSignaux(sg);
       setRechercheMg(rm);
       setRechercheGoogle(rg);
@@ -119,7 +141,7 @@ export default function ReseauDepartement() {
       if (sg.statut === "valide") valides.set(sg.praticienId, [...(valides.get(sg.praticienId) ?? []), sg]);
       else enAttente.set(sg.praticienId, (enAttente.get(sg.praticienId) ?? 0) + 1);
     }
-    return new Map(praticiens.map((p) => [p.id, { probabilite: calculerScore(p, valides.get(p.id) ?? []).probabilite, aValider: enAttente.get(p.id) ?? 0 }]));
+    return new Map(praticiens.map((p) => [p.id, { probabilite: calculerScore(p, (valides.get(p.id) ?? []).map((v) => ({ ...v, le: v.decideLe }))).probabilite, aValider: enAttente.get(p.id) ?? 0 }]));
   }, [praticiens, signaux]);
 
   const rows = useMemo(() => {
@@ -129,6 +151,7 @@ export default function ReseauDepartement() {
       (!filtres.role || p.roles.includes(filtres.role)) &&
       (!filtres.etat || p.etat === filtres.etat) &&
       (!filtres.google || p.googleStatut === filtres.google) &&
+      (!filtres.doctolib || p.doctolibStatut === filtres.doctolib) &&
       (!q || `${p.nom} ${p.prenom} ${p.rpps} ${p.lieux.map((l) => `${l.raisonSociale ?? ""} ${l.commune ?? ""}`).join(" ")}`.toLowerCase().includes(q)))
       .sort((a, b) => (scores.get(b.id)?.probabilite ?? 0) - (scores.get(a.id)?.probabilite ?? 0) || a.nom.localeCompare(b.nom, "fr"));
   }, [praticiens, filtres, scores]);
@@ -145,30 +168,59 @@ export default function ReseauDepartement() {
     return () => window.clearInterval(t);
   }, [rechercheMg?.statut, code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Recherche automatique des fiches Google : suivie toutes les 3 secondes, la liste se met à jour.
+  // Travaux groupés (liens, IA) : suivis toutes les 3 secondes ; la liste se met à jour au fil de l'eau.
   useEffect(() => {
-    if (rechercheGoogle?.statut !== "en_cours") return;
+    const enCours = [rechercheGoogle, rechercheIa].filter((r) => r?.statut === "en_cours") as RechercheIa[];
+    if (!enCours.length) return;
     const t = window.setInterval(async () => {
-      const r = await reseauRepo.derniereRecherche({ departement: code, type: "google_departement" }).catch(() => null);
-      if (!r) return;
-      setRechercheGoogle(r);
-      const ps = await reseauRepo.praticiens(code).catch(() => null);
+      const [rg, ri, ps, sg] = await Promise.all([
+        reseauRepo.derniereRecherche({ departement: code, type: "google_departement" }).catch(() => null),
+        reseauRepo.derniereRecherche({ departement: code, type: "ia_departement" }).catch(() => null),
+        reseauRepo.praticiens(code).catch(() => null),
+        reseauRepo.signauxDe(praticiens.map((x) => x.id)).catch(() => null),
+      ]);
+      if (rg) setRechercheGoogle(rg);
+      if (ri) setRechercheIa(ri);
       if (ps) setPraticiens(ps);
-      if (r.statut !== "en_cours") window.clearInterval(t);
+      if (sg) setSignaux(sg);
     }, 3000);
     return () => window.clearInterval(t);
-  }, [rechercheGoogle?.statut, code]);
+  }, [rechercheGoogle?.statut, rechercheIa?.statut, code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const aChercherGoogle = useMemo(() => praticiens.filter((p) => p.googleStatut === "a_chercher" && p.etat !== "exclu").length, [praticiens]);
-  const lancerGoogle = async () => {
+  const aChercherLiens = useMemo(
+    () => praticiens.filter((p) => p.etat !== "exclu" && (p.googleStatut === "a_chercher" || p.doctolibStatut === "a_chercher")).length,
+    [praticiens],
+  );
+  const lancerLiens = async () => {
     setErreur(null);
     try {
-      await reseauRepo.lancerGoogleAuto(code);
+      await reseauRepo.lancerFile(code, "liens");
       setRechercheGoogle(await reseauRepo.derniereRecherche({ departement: code, type: "google_departement" }));
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e));
     }
   };
+  const arreter = async (r: RechercheIa) => {
+    try {
+      await reseauRepo.arreterFile(r.id);
+      toast.success("Tâche arrêtée.");
+      void charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  // Synthèse Doctolib : liens et créneaux relevés (relevés de moins de 14 jours).
+  const syntheseDoctolib = useMemo(() => {
+    const actifs = praticiens.filter((p) => p.etat !== "exclu");
+    const liens = actifs.filter((p) => p.doctolibUrl).length;
+    const creneaux = new Map<string, number>();
+    for (const sg of signaux) {
+      if (sg.type !== "creneau_doctolib" || sg.statut !== "valide" || releveCreneauPerime(sg.decideLe)) continue;
+      creneaux.set(sg.valeur, (creneaux.get(sg.valeur) ?? 0) + 1);
+    }
+    return { total: actifs.length, liens, creneaux };
+  }, [praticiens, signaux]);
 
   const lancerMg = async () => {
     setErreur(null);
@@ -256,6 +308,21 @@ export default function ReseauDepartement() {
             </span>
           )}
         </div>
+        {syntheseDoctolib.total > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-semibold text-avisdoc-ink"><CalendarCheck className="size-3.5" /> Doctolib</span>
+            <span>{syntheseDoctolib.liens}/{syntheseDoctolib.total} fiches liées</span>
+            {syntheseDoctolib.creneaux.size > 0 ? (
+              <span>
+                Premier créneau (relevés de moins de 14 jours) :{" "}
+                {(["moins_7j", "7_30j", "plus_30j", "aucun_nouveau"] as const).filter((v) => syntheseDoctolib.creneaux.get(v))
+                  .map((v) => `${VALEUR_LIBELLE[v].toLowerCase()} ${syntheseDoctolib.creneaux.get(v)}`).join(" · ")}
+              </span>
+            ) : (
+              <span>aucun créneau relevé récemment</span>
+            )}
+          </div>
+        )}
         {contexte.size > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {POPULATIONS.filter((p) => contexte.has(p)).map((p) => {
@@ -285,27 +352,52 @@ export default function ReseauDepartement() {
           {rechercheMg?.statut === "en_cours" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
           Chercher les généralistes formés à la dermoscopie (IA)
         </button>
+        <button type="button" onClick={() => setIaGroupee(true)} disabled={lectureSeule || !dep || rechercheIa?.statut === "en_cours"}
+          title={lectureSeule ? TEXTES.motifLectureSeule : rechercheIa?.statut === "en_cours" ? "Une recherche groupée est en cours." : undefined}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
+          {rechercheIa?.statut === "en_cours" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          Recherche IA de toutes les fiches
+        </button>
         {rechercheMg?.statut === "termine" && (
           <span className="text-muted-foreground">
             Dernière recherche, le {dateFr(rechercheMg.fin ?? rechercheMg.debut)} : {rechercheMg.resultat?.propositions ?? 0} trouvés, {rechercheMg.resultat?.crees ?? 0} ajoutés, {rechercheMg.resultat?.deja_la ?? 0} déjà là, {rechercheMg.resultat?.ecartees?.length ?? 0} écartés.
           </span>
         )}
       </div>
-      {(rechercheGoogle?.statut === "en_cours" || rechercheGoogle?.statut === "echec" || aChercherGoogle > 0) && (
+      {(rechercheGoogle?.statut === "en_cours" || rechercheGoogle?.statut === "echec" || aChercherLiens > 0) && (
         <div className="-mt-2 mb-4 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-            <span className="font-semibold text-avisdoc-ink">Fiches Google</span>
-            {rechercheGoogle?.statut !== "en_cours" && aChercherGoogle > 0 && (
+            <span className="font-semibold text-avisdoc-ink">Carte, fiches Google et Doctolib</span>
+            {rechercheGoogle?.statut === "en_cours" ? (
+              <button type="button" onClick={() => void arreter(rechercheGoogle)} disabled={lectureSeule}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+                <Square className="size-3" /> Arrêter
+              </button>
+            ) : aChercherLiens > 0 && (
               <>
-                <span className="text-muted-foreground">{aChercherGoogle} praticien{aChercherGoogle > 1 ? "s" : ""} pas encore cherché{aChercherGoogle > 1 ? "s" : ""}{rechercheGoogle?.resultat?.quota ? " (quota du jour atteint)" : ""}.</span>
-                <button type="button" onClick={() => void lancerGoogle()} disabled={lectureSeule} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
+                <span className="text-muted-foreground">{aChercherLiens} praticien{aChercherLiens > 1 ? "s" : ""} pas encore cherché{aChercherLiens > 1 ? "s" : ""}.</span>
+                <button type="button" onClick={() => void lancerLiens()} disabled={lectureSeule} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
                   className="rounded-full border border-border bg-card px-3 py-1 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
                   Chercher maintenant
                 </button>
               </>
             )}
           </div>
-          {rechercheGoogle && rechercheGoogle.statut !== "termine" && <AvancementIa recherche={rechercheGoogle} lignesVisibles={3} />}
+          {rechercheGoogle && rechercheGoogle.statut !== "termine" && rechercheGoogle.statut !== "annule" && <AvancementIa recherche={rechercheGoogle} lignesVisibles={3} />}
+        </div>
+      )}
+      {rechercheIa && (rechercheIa.statut === "en_cours" || rechercheIa.statut === "echec") && (
+        <div className="-mt-2 mb-4 max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+            <span className="font-semibold text-avisdoc-ink">Recherche IA de toutes les fiches</span>
+            {rechercheIa.statut === "en_cours" && (
+              <button type="button" onClick={() => void arreter(rechercheIa)} disabled={lectureSeule}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+                <Square className="size-3" /> Arrêter
+              </button>
+            )}
+          </div>
+          <AvancementIa recherche={rechercheIa} lignesVisibles={4} />
         </div>
       )}
       {rechercheMg && (rechercheMg.statut !== "termine" || suiviMgOuvert) && (
@@ -328,19 +420,34 @@ export default function ReseauDepartement() {
           options={ROLES.map((r) => [r, ROLE_LABEL[r]])} />
         <Filtre label="Google" tous="tous" valeur={filtres.google} onChange={(v) => setFiltres((f) => ({ ...f, google: v as "" | StatutGoogle }))}
           options={STATUTS_GOOGLE.map((g) => [g, GOOGLE_LABEL[g]])} />
+        <Filtre label="Doctolib" tous="tous" valeur={filtres.doctolib} onChange={(v) => setFiltres((f) => ({ ...f, doctolib: v as "" | StatutDoctolib }))}
+          options={STATUTS_DOCTOLIB.map((d) => [d, DOCTOLIB_LABEL[d]])} />
         <Filtre label="État" tous="tous" valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
           options={ETATS_PRATICIEN.map((e) => [e, ETAT_PRATICIEN_LABEL[e]])} />
         <span className="ml-auto text-[12.5px] text-muted-foreground">{rows.length} affichés · triés par probabilité d'adhésion</span>
+        <div className="flex gap-1 rounded-full border border-border bg-card p-1">
+          {([{ v: "liste", label: "Liste", icon: List }, { v: "carte", label: "Carte", icon: MapIcon }] as const).map(({ v, label, icon: Icon }) => (
+            <button key={v} type="button" onClick={() => setVue(v)}
+              className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                vue === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink")}>
+              <Icon className="size-3.5" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid items-start gap-5" style={{ gridTemplateColumns: selectionne ? "minmax(0,1fr) minmax(360px,1fr)" : "1fr" }}>
+        {vue === "carte" ? (
+          <ReseauCarte praticiens={rows} departement={code} scores={scores} selection={selection} onSelect={setSelection} />
+        ) : (
         <Card className="overflow-hidden">
           <div className="grid gap-3 border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
             style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL }}>
             <div>Praticien</div>
             <div>Population</div>
             {!selectionne && <><div>Lieu d'exercice</div><div>Exercice</div><div>État</div></>}
-            <div className={cn(selectionne && "text-center")}>Google</div>
+            <div className={cn(selectionne && "text-center")} title={selectionne ? "Google" : undefined}>{selectionne ? "G" : "Google"}</div>
+            <div className={cn(selectionne && "text-center")} title={selectionne ? "Doctolib" : undefined}>{selectionne ? "D" : "Doctolib"}</div>
             <div className="text-right">Score</div>
           </div>
           {chargement && (
@@ -382,6 +489,21 @@ export default function ReseauDepartement() {
                     <Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge>
                   </div>
                 )}
+                {selectionne ? (
+                  <div className="flex justify-center" title={`${DOCTOLIB_LABEL[p.doctolibStatut]} : ${DOCTOLIB_AIDE[p.doctolibStatut]}`}>
+                    <CalendarCheck aria-label={DOCTOLIB_LABEL[p.doctolibStatut]} className={cn("size-4", DOCTOLIB_PICTO[p.doctolibStatut])} />
+                  </div>
+                ) : (
+                  <div title={DOCTOLIB_AIDE[p.doctolibStatut]} onClick={(e) => { if (p.doctolibUrl) e.stopPropagation(); }}>
+                    {p.doctolibUrl ? (
+                      <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className="inline-flex">
+                        <Badge className={cn(DOCTOLIB_BADGE[p.doctolibStatut], "underline-offset-2 hover:underline")}>{DOCTOLIB_LABEL[p.doctolibStatut]} ↗</Badge>
+                      </a>
+                    ) : (
+                      <Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge>
+                    )}
+                  </div>
+                )}
                 <div className="text-right">
                   <div className="text-[13px] font-semibold tabular-nums text-avisdoc-ink">{Math.round((scores.get(p.id)?.probabilite ?? 0) * 100)} %</div>
                   {(scores.get(p.id)?.aValider ?? 0) > 0 && <div className="text-[10.5px] font-semibold text-violet-700">{scores.get(p.id)?.aValider} à valider</div>}
@@ -395,10 +517,12 @@ export default function ReseauDepartement() {
             </div>
           )}
         </Card>
+        )}
 
         {selectionne && (
           <FichePraticien
             praticien={selectionne}
+            departement={code}
             lectureSeule={lectureSeule}
             onClose={() => setSelection(null)}
             onChange={() => void charger()}
@@ -406,10 +530,81 @@ export default function ReseauDepartement() {
         )}
       </div>
 
+      {iaGroupee && (
+        <IaGroupee departement={code} onClose={() => setIaGroupee(false)}
+          onLance={async () => { setIaGroupee(false); setRechercheIa(await reseauRepo.derniereRecherche({ departement: code, type: "ia_departement" })); }} />
+      )}
+
       {ajoutRpps && (
         <AjoutRpps onClose={() => setAjoutRpps(false)} onAjoute={(id) => { setAjoutRpps(false); void charger().then(() => setSelection(id)); }} />
       )}
     </div>
+  );
+}
+
+function IaGroupee({ departement, onClose, onLance }: { departement: string; onClose: () => void; onLance: () => void }) {
+  const [inclureRecents, setInclureRecents] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTotal(null);
+    reseauRepo.estimerFile(departement, "ia", inclureRecents).then((r) => setTotal(r.total)).catch((e) => setErreur(e instanceof Error ? e.message : String(e)));
+  }, [departement, inclureRecents]);
+
+  const motif = total === null ? "Calcul en cours…" : total === 0 ? "Aucun praticien à traiter." : envoi ? "Lancement…" : null;
+  const lancer = async () => {
+    if (motif) return;
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const r = await reseauRepo.lancerFile(departement, "ia", inclureRecents);
+      toast.success(r.deja ? "Une recherche groupée était déjà en cours : suivez-la à l'écran." : `Recherche IA lancée pour ${r.total} praticiens.`);
+      onLance();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e)); // la fenêtre reste ouverte
+    } finally {
+      setEnvoi(false);
+    }
+  };
+  const duree = total ? Math.max(1, Math.round((total * 1.5) / 3)) : 0;
+
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="font-display text-xl font-semibold text-avisdoc-ink">Recherche IA de toutes les fiches</h2>
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        La recherche IA est lancée pour chaque praticien du département, trois à la fois. Comme pour une fiche seule, chaque proposition est vérifiée sur sa source, puis reste à valider par vous.
+      </p>
+      <label className="mt-4 flex items-center gap-2 text-[13px]">
+        <input type="checkbox" checked={inclureRecents} onChange={(e) => setInclureRecents(e.target.checked)} />
+        Relancer aussi les fiches déjà recherchées ces 30 derniers jours
+      </label>
+      <div className="mt-4 rounded-xl bg-muted/50 px-3.5 py-3 text-[13px]">
+        {total === null ? (
+          <span className="inline-flex items-center gap-2 text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Calcul…</span>
+        ) : (
+          <>
+            <div><b className="text-avisdoc-ink">{total}</b> praticien{total > 1 ? "s" : ""} à rechercher</div>
+            {total > 0 && (
+              <div className="text-muted-foreground">
+                Coût estimé : environ {(total * COUT_IA_EUROS).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € · durée : environ {duree < 60 ? `${duree} min` : `${Math.round(duree / 6) / 10} h`}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <p className="mt-2 text-[11.5px] text-muted-foreground">Vous pouvez arrêter la recherche à tout moment ; ce qui est fait reste fait.</p>
+      {erreur && <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-800">{erreur}</div>}
+      <div className="mt-6 flex items-center justify-end gap-3">
+        <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
+        <button type="button" onClick={() => void lancer()} disabled={!!motif} title={motif ?? undefined}
+          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          {envoi && <Loader2 className="size-4 animate-spin" />} Lancer
+        </button>
+      </div>
+      {motif && <p className="mt-2 text-right text-[12px] text-muted-foreground">{motif}</p>}
+    </Modal>
   );
 }
 

@@ -139,3 +139,8 @@ verify_jwt = true
 
 [functions.reseau-ia]
 verify_jwt = true
+
+# Travaux groupés du réseau d'aval (file qui se relance elle-même) : l'accès est
+# vérifié dans la fonction (utilisateur « sante » ou appel interne signé).
+[functions.reseau-file]
+verify_jwt = false

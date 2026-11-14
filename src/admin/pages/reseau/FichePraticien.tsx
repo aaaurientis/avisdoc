@@ -3,7 +3,7 @@
 // Toute information affichée porte sa source ; rien n'est écrit sans validation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ExternalLink, Loader2, MapPin, Search, Sparkles, Star, X } from "lucide-react";
+import { Check, ExternalLink, Loader2, Search, Sparkles, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { confirmer } from "../../components/Confirmation";
 import { Badge, Card, Modal, SectionLabel } from "../../components/ui";
@@ -17,6 +17,10 @@ import {
   SOURCE_RPPS,
   TEXTES,
   dateFr,
+  DOCTOLIB_AIDE,
+  DOCTOLIB_BADGE,
+  DOCTOLIB_LABEL,
+  FORCE_LABEL,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
@@ -33,6 +37,7 @@ import {
 } from "../../reseau/reseauRepo";
 import {
   calculerScore,
+  releveCreneauPerime,
   SIGNAUX,
   TYPES_SIGNAL,
   VALEUR_LIBELLE,
@@ -41,6 +46,7 @@ import {
 } from "../../../../supabase/functions/_shared/reseau-signaux";
 import { cn } from "@/lib/utils";
 import AvancementIa from "./AvancementIa";
+import { lienRechercheDoctolib, urlDoctolibValide } from "../../../../supabase/functions/_shared/doctolib";
 
 const lienCls = "inline-flex items-center gap-1 font-semibold text-avisdoc-ink underline-offset-2 hover:underline";
 const btnSec = "inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50";
@@ -48,8 +54,10 @@ const hote = (u: string) => { try { return new URL(u).hostname.replace(/^www\./,
 const pourcent = (p: number) => `${Math.round(p * 100)} %`;
 const virgule = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" });
 
-export default function FichePraticien({ praticien: p, lectureSeule, onClose, onChange }: {
+export default function FichePraticien({ praticien: p, departement, lectureSeule, onClose, onChange }: {
   praticien: PraticienReseau;
+  /** Le département de l'écran : la recherche Google s'y limite. */
+  departement?: string;
   lectureSeule: boolean;
   onClose: () => void;
   /** Un changement a eu lieu (exclusion, signal, fiche Google) : la liste se recharge. */
@@ -97,7 +105,7 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
 
   const valides = useMemo(() => signaux.filter((s) => s.statut === "valide"), [signaux]);
   const propositions = useMemo(() => signaux.filter((s) => s.statut === "propose"), [signaux]);
-  const score = useMemo(() => calculerScore(p, valides), [p, valides]);
+  const score = useMemo(() => calculerScore(p, valides.map((v) => ({ ...v, le: v.decideLe }))), [p, valides]);
   const parType = useMemo(() => new Map(valides.map((s) => [s.type, s])), [valides]);
 
   const agir = async (cle: string, action: () => Promise<unknown>, succes?: string) => {
@@ -258,7 +266,8 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
         })}
       </div>
 
-      <BlocGoogle praticien={p} lectureSeule={lectureSeule} onChange={onChange} />
+      <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} />
+      <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
 
       <SectionLabel className="mt-5">Spécialités (RPPS)</SectionLabel>
       <div className="mt-1 text-[13px] text-avisdoc-ink">{p.specialites.join(", ") || "—"}</div>
@@ -339,117 +348,259 @@ function SaisieSignal({ type, occupe, onValider, onAnnuler }: {
   );
 }
 
-function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: PraticienReseau; lectureSeule: boolean; onChange: () => void }) {
+function CarteFicheGoogle({ fiche, onAvis, occupeAvis }: { fiche: FicheGoogle; onAvis: () => void; occupeAvis: boolean }) {
+  return (
+    <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
+      <div className="font-semibold text-avisdoc-ink">{fiche.nom}</div>
+      <div className="text-muted-foreground">{[fiche.categorie, fiche.statut === "CLOSED_PERMANENTLY" ? "Fermé définitivement" : null].filter(Boolean).join(" · ")}</div>
+      {fiche.adresse && <div className="mt-1">{fiche.adresse}</div>}
+      {fiche.telephone && <div>Tél. {fiche.telephone}</div>}
+      {fiche.site && <div><a href={fiche.site} target="_blank" rel="noreferrer" className={lienCls}>{hote(fiche.site)} <ExternalLink className="size-3" /></a></div>}
+      {fiche.note != null && <div className="mt-1 flex items-center gap-1"><Star className="size-3.5 fill-amber-400 text-amber-400" /> {fiche.note.toLocaleString("fr-FR")} ({fiche.nombreAvis ?? 0} avis)</div>}
+      {fiche.horaires.length > 0 && <ul className="mt-1 text-[11.5px] text-muted-foreground">{fiche.horaires.map((h) => <li key={h}>{h}</li>)}</ul>}
+      {fiche.avis && (
+        <div className="mt-2 space-y-1.5">
+          {fiche.avis.map((a, i) => (
+            <div key={i} className="rounded-lg bg-card px-2.5 py-1.5 text-[11.5px]">
+              <div className="text-muted-foreground">
+                {a.lienAuteur ? <a href={a.lienAuteur} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">{a.auteur}</a> : a.auteur}
+                {a.note != null ? ` · ${a.note}/5` : ""} · {a.quand}
+              </div>
+              <div>{a.texte}</div>
+            </div>
+          ))}
+          <p className="text-[11px] text-muted-foreground">Avis lus à l'écran, jamais enregistrés. Saisissez le signal « Plaintes sur les délais » avec le lien de la fiche.</p>
+        </div>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11.5px]">
+        {fiche.lien && <a href={fiche.lien} target="_blank" rel="noreferrer" className={lienCls}>Ouvrir dans Google Maps <ExternalLink className="size-3" /></a>}
+        {!fiche.avis && (
+          <button type="button" onClick={onAvis} disabled={occupeAvis} className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline disabled:opacity-50">
+            {occupeAvis ? "Chargement…" : "Voir les avis"}
+          </button>
+        )}
+        <span className="ml-auto text-muted-foreground">Données Google Maps, affichées sans être enregistrées</span>
+      </div>
+    </div>
+  );
+}
+
+function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
+  praticien: PraticienReseau; departement?: string; lectureSeule: boolean; onChange: () => void;
+}) {
   const [candidats, setCandidats] = useState<CandidatGoogle[] | null>(null);
-  const [fiche, setFiche] = useState<FicheGoogle | null>(null);
+  const [coches, setCoches] = useState<Set<string>>(new Set());
+  const [voirFaibles, setVoirFaibles] = useState(false);
+  const [fiches, setFiches] = useState<Record<string, FicheGoogle | "erreur">>({});
   const [occupe, setOccupe] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const cleFiches = p.googlePlaceIds.join(",");
 
-  useEffect(() => { setCandidats(null); setFiche(null); setErreur(null); }, [p.id, p.googlePlaceId]);
+  // Les fiches rattachées s'affichent d'elles-mêmes, pour valider d'un coup d'œil.
+  useEffect(() => {
+    setCandidats(null); setErreur(null); setFiches({}); setVoirFaibles(false);
+    let annule = false;
+    for (const id of p.googlePlaceIds) {
+      reseauRepo.ficheGoogle(p.id, id)
+        .then((f) => { if (!annule) setFiches((x) => ({ ...x, [id]: f })); })
+        .catch((e) => { if (!annule) { setFiches((x) => ({ ...x, [id]: "erreur" })); setErreur(e instanceof Error ? e.message : String(e)); } });
+    }
+    return () => { annule = true; };
+  }, [p.id, cleFiches]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const faire = async (cle: string, f: () => Promise<void>) => {
     setOccupe(cle);
     setErreur(null);
     try { await f(); } catch (e) { setErreur(e instanceof Error ? e.message : String(e)); } finally { setOccupe(null); }
   };
-  const chercher = () => faire("chercher", async () => setCandidats((await reseauRepo.chercherGoogle(p.id)).candidats));
-  const rattacher = (choix: { placeId: string } | { aucune: true } | { retirer: true }) =>
+  const chercher = () => faire("chercher", async () => {
+    const r = await reseauRepo.chercherGoogle(p.id, departement);
+    setCandidats(r.candidats);
+    // Pré-cocher les correspondances sûres et celles déjà rattachées.
+    setCoches(new Set(r.candidats.filter((c) => c.force === "certaine" || c.force === "forte" || p.googlePlaceIds.includes(c.place_id)).map((c) => c.place_id)));
+  });
+  const rattacher = (choix: { placeIds: string[] } | { aucune: true } | { retirer: true }) =>
     faire("rattacher", async () => { await reseauRepo.rattacherGoogle(p.id, choix); setCandidats(null); onChange(); });
-  const afficher = (avis: boolean) => faire(avis ? "avis" : "fiche", async () => setFiche(await reseauRepo.ficheGoogle(p.id, avis)));
+  const avis = (id: string) => faire(`avis-${id}`, async () => {
+    const f = await reseauRepo.ficheGoogle(p.id, id, true);
+    setFiches((x) => ({ ...x, [id]: f }));
+  });
   const bloque = lectureSeule || p.etat === "exclu";
+  const visibles = (candidats ?? []).filter((c) => c.force !== "faible");
+  const faibles = (candidats ?? []).filter((c) => c.force === "faible");
 
   return (
     <>
       <div className="mt-5 flex items-center justify-between gap-2">
-        <SectionLabel>Fiche Google Maps</SectionLabel>
+        <SectionLabel>Fiche{p.googlePlaceIds.length > 1 ? "s" : ""} Google Maps</SectionLabel>
         <span title={GOOGLE_AIDE[p.googleStatut]}><Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge></span>
       </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
-      {!p.googlePlaceId && !p.googleAucuneFiche && !candidats && (
-        <div className="mt-1.5 flex items-center gap-2">
-          <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} title={bloque ? "Action indisponible." : undefined} className={btnSec}>
-            {occupe === "chercher" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />} Trouver la fiche
-          </button>
-          <span className="text-[11.5px] text-muted-foreground">
-            {p.googleStatut === "a_confirmer" ? "Plusieurs fiches possibles : choisissez la bonne." : p.googleStatut === "introuvable" ? "La recherche automatique n'a rien trouvé : réessayez ou indiquez qu'il n'y a pas de fiche." : "Vous choisirez la bonne fiche parmi les résultats."}
-          </span>
+      {/* Fiches rattachées, affichées directement */}
+      {p.googlePlaceIds.length > 0 && !candidats && (
+        <div className="mt-1.5 space-y-2">
+          {p.googleStatut === "trouvee_auto" && (
+            <p className="text-[11.5px] text-muted-foreground">Rattachée automatiquement : même nom et même code postal qu'un lieu RPPS, mais pas la même rue. Vérifiez puis confirmez.</p>
+          )}
+          {p.googleStatut === "confirmee" && p.googlePlaceIds.length > 0 && (
+            <p className="text-[11.5px] text-muted-foreground">Validée : choisie par un opérateur, ou à l'adresse RPPS (nom, code postal et rue).</p>
+          )}
+          {p.googlePlaceIds.map((id) => {
+            const f = fiches[id];
+            if (!f) return <div key={id} className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2.5 text-[12px] text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Chargement de la fiche Google…</div>;
+            if (f === "erreur") return <div key={id} className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12px] text-muted-foreground">Fiche indisponible pour l'instant.</div>;
+            return <CarteFicheGoogle key={id} fiche={f} onAvis={() => void avis(id)} occupeAvis={occupe === `avis-${id}`} />;
+          })}
+          <div className="flex flex-wrap items-center gap-2">
+            {p.googleStatut === "trouvee_auto" && (
+              <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", async () => { await reseauRepo.confirmerGoogle(p.id); onChange(); })}
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50">
+                {occupe === "confirmer" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} C'est la bonne fiche
+              </button>
+            )}
+            <button type="button" disabled={bloque || !!occupe} onClick={() => void chercher()} className={btnSec}>
+              {occupe === "chercher" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />} Modifier ou ajouter des fiches
+            </button>
+          </div>
         </div>
       )}
 
+      {p.googlePlaceIds.length === 0 && !candidats && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {p.googleAucuneFiche ? (
+            <span className="text-[12px] text-muted-foreground">Pas de fiche Google (cela ne pénalise pas).</span>
+          ) : (
+            <span className="text-[11.5px] text-muted-foreground">
+              {p.googleStatut === "a_confirmer" ? "Des fiches portent son nom dans une autre commune du département : choisissez." : p.googleStatut === "introuvable" ? "Aucune fiche à son nom dans le département." : "Pas encore cherchée."}
+            </span>
+          )}
+          <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} className={btnSec}>
+            {occupe === "chercher" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />} Voir les fiches du département
+          </button>
+        </div>
+      )}
+
+      {/* Choix : plusieurs fiches possibles ; les correspondances faibles restent en retrait */}
       {candidats && (
         <div className="mt-1.5 space-y-1.5">
-          {candidats.length === 0 && <p className="text-[12px] text-muted-foreground">Aucune fiche trouvée.</p>}
-          {candidats.map((c) => (
-            <button key={c.place_id} type="button" disabled={!!occupe} onClick={() => void rattacher({ placeId: c.place_id })}
-              className="block w-full rounded-xl border border-border px-3 py-2 text-left text-[12.5px] hover:border-avisdoc-teal disabled:opacity-50">
-              <div className="font-semibold text-avisdoc-ink">{c.nom}{c.ferme ? " · fermé définitivement" : ""}</div>
-              <div className="text-muted-foreground">{[c.categorie, c.adresse].filter(Boolean).join(" · ")}</div>
-            </button>
+          {visibles.length === 0 && <p className="text-[12px] text-muted-foreground">Aucune fiche à son nom dans le département.</p>}
+          {[...visibles, ...(voirFaibles ? faibles : [])].map((c) => (
+            <label key={c.place_id} className={cn("flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 text-[12.5px]",
+              coches.has(c.place_id) ? "border-avisdoc-teal bg-sky-50/60" : "border-border", c.force === "faible" && "opacity-70")}>
+              <input type="checkbox" className="mt-0.5" checked={coches.has(c.place_id)}
+                onChange={() => setCoches((x) => { const n = new Set(x); if (n.has(c.place_id)) n.delete(c.place_id); else n.add(c.place_id); return n; })} />
+              <span className="min-w-0">
+                <span className="font-semibold text-avisdoc-ink">{c.nom}{c.ferme ? " · fermé définitivement" : ""}</span>
+                <span className="block text-muted-foreground">{[c.categorie, c.adresse].filter(Boolean).join(" · ")}</span>
+                <span className={cn("text-[11px] font-semibold", c.force === "certaine" || c.force === "forte" ? "text-emerald-700" : c.force === "moyenne" ? "text-amber-700" : "text-slate-500")}>
+                  {FORCE_LABEL[c.force]}
+                </span>
+              </span>
+            </label>
           ))}
-          <div className="flex gap-2">
+          {faibles.length > 0 && !voirFaibles && (
+            <button type="button" onClick={() => setVoirFaibles(true)} className="text-[11.5px] text-muted-foreground underline-offset-2 hover:underline">
+              {faibles.length} autre{faibles.length > 1 ? "s" : ""} résultat{faibles.length > 1 ? "s" : ""} sans le nom du praticien
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button type="button" disabled={!coches.size || !!occupe} onClick={() => void rattacher({ placeIds: [...coches] })}
+              title={!coches.size ? "Cochez au moins une fiche." : undefined}
+              className="inline-flex items-center gap-1 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50">
+              {occupe === "rattacher" && <Loader2 className="size-3.5 animate-spin" />} Rattacher {coches.size > 1 ? `les ${coches.size} fiches` : "la fiche"}
+            </button>
             <button type="button" disabled={!!occupe} onClick={() => void rattacher({ aucune: true })} className={btnSec}>Aucune ne correspond</button>
             <button type="button" onClick={() => setCandidats(null)} className="text-[12px] font-semibold text-muted-foreground">Annuler</button>
           </div>
         </div>
       )}
+    </>
+  );
+}
 
-      {p.googleAucuneFiche && (
-        <div className="mt-1.5 flex items-center gap-2 text-[12px] text-muted-foreground">
-          Pas de fiche Google (cela ne pénalise pas).
-          <button type="button" disabled={bloque || !!occupe} onClick={() => void rattacher({ retirer: true })} className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline disabled:opacity-50">Chercher à nouveau</button>
-        </div>
-      )}
+const CRENEAUX = ["moins_7j", "7_30j", "plus_30j", "aucun_nouveau"] as const;
 
-      {p.googlePlaceId && !fiche && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => void afficher(false)} disabled={!!occupe} className={btnSec}>
-            {occupe === "fiche" ? <Loader2 className="size-3.5 animate-spin" /> : <MapPin className="size-3.5" />} Afficher la fiche
-          </button>
-          {p.googleStatut === "trouvee_auto" && (
-            <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", async () => { await reseauRepo.confirmerGoogle(p.id); onChange(); })} className={btnSec}>
-              {occupe === "confirmer" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} C'est la bonne fiche
-            </button>
-          )}
-          <button type="button" disabled={bloque || !!occupe} onClick={() => void rattacher({ retirer: true })} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de fiche</button>
-        </div>
-      )}
-      {p.googlePlaceId && p.googleStatut === "trouvee_auto" && (
-        <p className="mt-1 text-[11px] text-muted-foreground">Rattachée automatiquement : un seul résultat au même nom et au même code postal. Affichez-la pour vérifier.</p>
-      )}
+function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
+  praticien: PraticienReseau; releve: SignalReseau | undefined; lectureSeule: boolean; onChange: () => void;
+}) {
+  const [saisie, setSaisie] = useState(false);
+  const [url, setUrl] = useState("");
+  const [occupe, setOccupe] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  useEffect(() => { setSaisie(false); setUrl(""); setErreur(null); }, [p.id]);
+  const faire = async (cle: string, f: () => Promise<unknown>) => {
+    setOccupe(cle);
+    setErreur(null);
+    try { await f(); onChange(); } catch (e) { setErreur(e instanceof Error ? e.message : String(e)); } finally { setOccupe(null); }
+  };
+  const bloque = lectureSeule || p.etat === "exclu";
+  const communes = [...new Set(p.lieux.map((l) => l.commune).filter(Boolean))] as string[];
+  const perime = releve ? releveCreneauPerime(releve.decideLe) : false;
 
-      {fiche && (
+  return (
+    <>
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <SectionLabel>Doctolib</SectionLabel>
+        <span title={DOCTOLIB_AIDE[p.doctolibStatut]}><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge></span>
+      </div>
+      {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
+
+      {p.doctolibUrl ? (
         <div className="mt-1.5 rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
-          <div className="font-semibold text-avisdoc-ink">{fiche.nom}</div>
-          <div className="text-muted-foreground">{[fiche.categorie, fiche.statut === "CLOSED_PERMANENTLY" ? "Fermé définitivement" : null].filter(Boolean).join(" · ")}</div>
-          {fiche.adresse && <div className="mt-1">{fiche.adresse}</div>}
-          {fiche.telephone && <div>Tél. {fiche.telephone}</div>}
-          {fiche.site && <div><a href={fiche.site} target="_blank" rel="noreferrer" className={lienCls}>{hote(fiche.site)} <ExternalLink className="size-3" /></a></div>}
-          {fiche.note != null && <div className="mt-1 flex items-center gap-1"><Star className="size-3.5 fill-amber-400 text-amber-400" /> {fiche.note.toLocaleString("fr-FR")} ({fiche.nombreAvis ?? 0} avis)</div>}
-          {fiche.horaires.length > 0 && <ul className="mt-1 text-[11.5px] text-muted-foreground">{fiche.horaires.map((h) => <li key={h}>{h}</li>)}</ul>}
-          {fiche.avis && (
-            <div className="mt-2 space-y-1.5">
-              {fiche.avis.map((a, i) => (
-                <div key={i} className="rounded-lg bg-card px-2.5 py-1.5 text-[11.5px]">
-                  <div className="text-muted-foreground">
-                    {a.lienAuteur ? <a href={a.lienAuteur} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">{a.auteur}</a> : a.auteur}
-                    {a.note != null ? ` · ${a.note}/5` : ""} · {a.quand}
-                  </div>
-                  <div>{a.texte}</div>
-                </div>
-              ))}
-              <p className="text-[11px] text-muted-foreground">Avis lus à l'écran, jamais enregistrés. Saisissez le signal « Plaintes sur les délais » avec le lien de la fiche.</p>
-            </div>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11.5px]">
-            {fiche.lien && <a href={fiche.lien} target="_blank" rel="noreferrer" className={lienCls}>Ouvrir dans Google Maps <ExternalLink className="size-3" /></a>}
-            {!fiche.avis && (
-              <button type="button" onClick={() => void afficher(true)} disabled={!!occupe} className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline disabled:opacity-50">
-                {occupe === "avis" ? "Chargement…" : "Voir les avis"}
+          <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className={lienCls}>{p.doctolibUrl.replace(/^https:\/\/(www\.)?/, "")} <ExternalLink className="size-3" /></a>
+          {p.doctolibStatut === "trouve_auto" && <p className="mt-1 text-[11.5px] text-muted-foreground">{DOCTOLIB_AIDE.trouve_auto}</p>}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {p.doctolibStatut === "trouve_auto" && (
+              <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", () => reseauRepo.doctolib(p.id, { confirmer: true }))}
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[12px] font-bold text-white disabled:opacity-50">
+                <Check className="size-3" /> C'est la bonne fiche
               </button>
             )}
-            <span className="ml-auto text-muted-foreground">Données Google Maps, affichées sans être enregistrées</span>
+            <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("retirer", () => reseauRepo.doctolib(p.id, { retirer: true }))} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de lien</button>
           </div>
+
+          {/* Relevé du premier créneau : lu par l'opérateur sur la fiche, enregistré avec son lien et sa date */}
+          <div className="mt-3 border-t border-border/60 pt-2">
+            <div className="text-[11.5px] font-semibold text-avisdoc-ink">Premier créneau pour un nouveau patient</div>
+            {releve && (
+              <div className={cn("text-[11.5px]", perime ? "font-semibold text-amber-700" : "text-muted-foreground")}>
+                {VALEUR_LIBELLE[releve.valeur] ?? releve.valeur} · relevé le {dateFr(releve.decideLe)} par {releve.decidePar}{perime ? " · périmé (plus de 14 jours) : relevez-le à nouveau" : ""}
+              </div>
+            )}
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {CRENEAUX.map((v) => (
+                <button key={v} type="button" disabled={bloque || !!occupe}
+                  onClick={() => void faire(`creneau-${v}`, () => reseauRepo.saisirSignal(p.id, "creneau_doctolib", v, p.doctolibUrl!))}
+                  className={cn("rounded-full border px-2.5 py-1 text-[11.5px] font-semibold disabled:opacity-50",
+                    releve?.valeur === v && !perime ? "border-avisdoc-teal bg-avisdoc-teal text-white" : "border-border bg-card")}>
+                  {occupe === `creneau-${v}` ? "…" : VALEUR_LIBELLE[v]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">Ouvrez la fiche Doctolib, regardez le premier créneau proposé, puis cliquez. Le Hub ne lit jamais Doctolib lui-même.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1.5 space-y-2 text-[12px]">
+          <p className="text-muted-foreground">{p.doctolibStatut === "aucun" ? "Pas sur Doctolib (cela ne pénalise pas)." : DOCTOLIB_AIDE[p.doctolibStatut]}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={lienRechercheDoctolib({ nom: p.nom, prenom: p.prenom, communes })} target="_blank" rel="noreferrer" className={btnSec}>
+              <Search className="size-3.5" /> Chercher sur Doctolib
+            </a>
+            <button type="button" disabled={bloque} onClick={() => setSaisie(!saisie)} className={btnSec}>Coller le lien</button>
+            {p.doctolibStatut !== "aucun" && (
+              <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("aucun", () => reseauRepo.doctolib(p.id, { aucun: true }))} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Pas sur Doctolib</button>
+            )}
+          </div>
+          {saisie && (
+            <div className="flex items-center gap-2">
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.doctolib.fr/…" className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px]" />
+              <button type="button" disabled={!urlDoctolibValide(url.trim()) || !!occupe} title={!urlDoctolibValide(url.trim()) ? "Collez l'adresse complète d'une fiche Doctolib." : undefined}
+                onClick={() => void faire("lien", () => reseauRepo.doctolib(p.id, { url: url.trim() }))}
+                className="rounded-full bg-avisdoc-teal px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-50">Enregistrer</button>
+            </div>
+          )}
         </div>
       )}
     </>

@@ -8,7 +8,8 @@
 //   • signal_saisir        { praticien_id, type, valeur, url } — saisi par un opérateur, donc validé
 //   • signal_valider       { signal_id } — proposition de l'IA acceptée
 //   • signal_rejeter       { signal_id }
-//   • google_rattacher     { praticien_id, place_id } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
+//   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
+//   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
 //   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
 //
@@ -21,7 +22,8 @@ import { estDepartement, normaliserRpps, praticienDepuisLignes } from "../_share
 import { estTypeSignal, urlValide, valeurAdmise } from "../_shared/reseau-signaux.ts";
 import { dateExtraction, lignesDuRpps } from "../_shared/tabulaire-rpps.ts";
 import { enregistrerPraticien } from "../_shared/enregistrer-praticien.ts";
-import { rechercherFichesGoogle } from "../_shared/google-places.ts";
+import { chercherLiens } from "../_shared/liens.ts";
+import { urlDoctolibValide, urlPropre } from "../_shared/doctolib.ts";
 import { enTacheDeFond } from "../_shared/suivi.ts";
 
 const ETATS_DEPARTEMENT = ["a_ouvrir", "importe", "en_qualification", "en_contact", "couvert", "en_veille"];
@@ -167,32 +169,55 @@ serve(async (req) => {
     case "google_rattacher": {
       const { data: p } = await db.from("admin_reseau_praticiens").select("id").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
       if (!p) return json({ error: "Praticien introuvable." }, 404);
+      const maintenant = new Date().toISOString();
       let maj: Record<string, unknown>;
       // « Retirer » : l'opérateur choisira lui-même parmi les fiches (pas de nouvelle recherche automatique).
-      if (corps.retirer) maj = { google_place_id: null, google_aucune_fiche: false, google_rattache_par: null, google_rattache_le: null, google_statut: "a_confirmer" };
-      else if (corps.aucune) maj = { google_place_id: null, google_aucune_fiche: true, google_rattache_par: email, google_rattache_le: new Date().toISOString(), google_statut: "aucune" };
+      if (corps.retirer) maj = { google_place_id: null, google_place_ids: [], google_aucune_fiche: false, google_rattache_par: null, google_rattache_le: null, google_statut: "a_confirmer" };
+      else if (corps.aucune) maj = { google_place_id: null, google_place_ids: [], google_aucune_fiche: true, google_rattache_par: email, google_rattache_le: maintenant, google_statut: "aucune" };
       else {
-        const placeId = String(corps.place_id ?? "").trim();
-        if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: "Identifiant de fiche Google invalide." }, 400);
-        maj = { google_place_id: placeId, google_aucune_fiche: false, google_rattache_par: email, google_rattache_le: new Date().toISOString(), google_statut: "confirmee" };
+        // Une ou plusieurs fiches (cabinet, hôpital…) : les identifiants seuls.
+        const ids = [...new Set<string>((Array.isArray(corps.place_ids) ? corps.place_ids : [corps.place_id]).map((x: unknown) => String(x ?? "").trim()))]
+          .filter((x) => /^[A-Za-z0-9_-]{10,300}$/.test(x));
+        if (!ids.length || ids.length > 10) return json({ error: "Choisissez entre une et dix fiches Google." }, 400);
+        maj = { google_place_id: ids[0], google_place_ids: ids, google_aucune_fiche: false, google_rattache_par: email, google_rattache_le: maintenant, google_statut: "confirmee" };
       }
       const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
       await db.from("admin_reseau_historique").insert({
         praticien_id: p.id, acteur: email, action: "google_rattache",
-        detail: { place_id: maj.google_place_id ?? null, aucune: maj.google_aucune_fiche ?? false },
+        detail: { place_ids: maj.google_place_ids ?? [], aucune: maj.google_aucune_fiche ?? false },
       });
       return json({ id: p.id });
     }
 
-    case "google_confirmer": {
-      const { data: p } = await db.from("admin_reseau_praticiens").select("id, google_statut, google_place_id").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+    case "doctolib": {
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, doctolib_statut, doctolib_url").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
       if (!p) return json({ error: "Praticien introuvable." }, 404);
-      if (p.google_statut !== "trouvee_auto" || !p.google_place_id) return json({ error: "Aucune fiche trouvée automatiquement à confirmer." }, 409);
+      const maintenant = new Date().toISOString();
+      let maj: Record<string, unknown>;
+      if (corps.retirer) maj = { doctolib_url: null, doctolib_statut: "a_confirmer", doctolib_par: null, doctolib_le: null };
+      else if (corps.aucun) maj = { doctolib_url: null, doctolib_statut: "aucun", doctolib_par: email, doctolib_le: maintenant };
+      else if (corps.confirmer) {
+        if (p.doctolib_statut !== "trouve_auto" || !p.doctolib_url) return json({ error: "Aucun lien trouvé automatiquement à confirmer." }, 409);
+        maj = { doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant };
+      } else {
+        if (!urlDoctolibValide(corps.url)) return json({ error: "Collez l'adresse complète d'une fiche Doctolib (https://www.doctolib.fr/…)." }, 400);
+        maj = { doctolib_url: urlPropre(corps.url), doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant };
+      }
+      const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
+      if (error) return json({ error: error.message }, 500);
+      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: maj.doctolib_url ?? p.doctolib_url ?? null, statut: maj.doctolib_statut } });
+      return json({ id: p.id });
+    }
+
+    case "google_confirmer": {
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, google_statut, google_place_id, google_place_ids").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.google_statut !== "trouvee_auto" || !(p.google_place_ids?.length || p.google_place_id)) return json({ error: "Aucune fiche trouvée automatiquement à confirmer." }, 409);
       const { error } = await db.from("admin_reseau_praticiens")
         .update({ google_statut: "confirmee", google_rattache_par: email, google_rattache_le: new Date().toISOString() }).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
-      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "google_confirme", detail: { place_id: p.google_place_id } });
+      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "google_confirme", detail: { place_ids: p.google_place_ids ?? [p.google_place_id] } });
       return json({ id: p.id });
     }
 
@@ -206,7 +231,7 @@ serve(async (req) => {
         const e = await enregistrerPraticien(db, r.praticien, { origine: "manuel", acteur: email, extraitLe });
         if (e.statut === "exclu") return json({ error: "Ce praticien est exclu du réseau : il ne peut pas y revenir." }, 409);
         // Sa fiche Google se cherche aussitôt, en tâche de fond.
-        if (e.statut === "cree") enTacheDeFond(rechercherFichesGoogle(db, { ids: [e.id] }).catch((x) => console.error(x)));
+        if (e.statut === "cree") enTacheDeFond(chercherLiens(db, e.id).catch((x) => console.error(x)));
         return json({
           ...e, nom: `${r.praticien.prenom} ${r.praticien.nom}`, population: r.praticien.population,
           departements: [...new Set(r.praticien.lieux.map((l) => l.departement))],

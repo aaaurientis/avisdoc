@@ -95,3 +95,15 @@ describe("réseau d'aval : score de probabilité d'adhésion", () => {
     expect(calculerScore(actif, []).calibre).toBe(false);
   });
 });
+
+describe("réseau d'aval : premier créneau Doctolib", () => {
+  const actif = { etat: "identifie", vuAuDernierImport: true };
+  const maintenant = new Date("2026-11-14T12:00:00Z");
+  it("compte un relevé récent, ignore un relevé de plus de 14 jours", () => {
+    const recent = calculerScore(actif, [{ type: "creneau_doctolib", valeur: "moins_7j", url: U, le: "2026-11-10T10:00:00Z" }], maintenant);
+    expect(recent.z).toBe(-0.89);
+    const vieux = calculerScore(actif, [{ type: "creneau_doctolib", valeur: "moins_7j", url: U, le: "2026-10-20T10:00:00Z" }], maintenant);
+    expect(vieux.z).toBe(-1.39);
+    expect(vieux.contributions).toHaveLength(0);
+  });
+});

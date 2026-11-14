@@ -10,7 +10,14 @@ export class Suivi {
   private etape = "";
   private progression = 0;
   private file: Promise<unknown> = Promise.resolve();
-  constructor(private db: any, private id: string) {}
+  constructor(private db: any, private id: string, reprise?: { etape?: string | null; progression?: number; journal?: any[] }) {
+    // Reprise d'un travail enchaîné sur plusieurs appels : on repart de l'état écrit.
+    if (reprise) {
+      this.etape = reprise.etape ?? "";
+      this.progression = reprise.progression ?? 0;
+      this.journal = Array.isArray(reprise.journal) ? reprise.journal : [];
+    }
+  }
 
   /** Écrit l'étape, le pourcentage et une ligne de journal. Les écritures restent dans l'ordre. */
   maj(o: { etape?: string; progression?: number; ligne?: string; niveau?: Niveau }): Promise<unknown> {

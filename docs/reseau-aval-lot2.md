@@ -107,6 +107,78 @@ Ajoutée le 14/11 à la demande d'Arthur (migration `0090_reseau_aval_google_aut
   département comme Paris (≈ 1 600 praticiens), comptez une dizaine de jours, ou
   relevez le plafond en connaissant le coût (voir l'estimation de la note du lot 0).
 
+## Liens, carte et recherches groupées (14/11, migration 0091)
+
+### Fiches Google : département, plusieurs fiches, force de la correspondance
+
+- **France et département seulement.** La recherche cible le département. Seules les
+  fiches dont l'adresse est en France, avec un code postal du département, sont gardées.
+- **Plusieurs fiches par praticien** (cabinet, hôpital…). Sur la fiche, l'opérateur coche
+  une ou plusieurs fiches puis clique sur « Rattacher ».
+- **Force de la correspondance**, affichée pour chaque résultat :
+
+  | Force | Condition | Effet |
+  |---|---|---|
+  | certaine | nom du praticien + adresse RPPS (code postal **et** rue) | validée d'office (« Fiche confirmée ») |
+  | forte | nom + code postal d'un lieu RPPS | rattachée, à vérifier (« Fiche trouvée ») |
+  | moyenne | nom, autre commune du département | proposée (« À confirmer ») |
+  | faible | le nom n'y figure pas | masquée par défaut, jamais mise en avant |
+
+  Si un praticien n'a que des correspondances faibles, il passe « Introuvable ».
+- **Affichage direct.** À l'ouverture d'une fiche praticien, ses fiches Google rattachées
+  s'affichent d'elles-mêmes, pour valider d'un coup d'œil. Chaque affichage est une
+  consultation Google, comptée dans le quota quotidien.
+
+### Doctolib
+
+Le Hub ne lit jamais une page Doctolib : pas d'API publique, collecte automatisée
+interdite par ses conditions, et règle 2 du brief.
+
+- **Lien cherché automatiquement.** Une recherche web limitée à doctolib.fr renvoie des
+  adresses, et seules ces adresses sont examinées. Une adresse n'est rattachée d'office
+  que si c'est la seule au format `doctolib.fr/<spécialité>/<ville>/<prénom-nom>` avec
+  le bon nom, le bon prénom et une commune d'exercice. Sinon le praticien passe
+  « À confirmer », ou « Introuvable » s'il n'existe aucune adresse à son nom. Une adresse
+  absente des résultats n'est jamais retenue. Quota : 200 recherches par jour
+  (`RESEAU_DOCTOLIB_PLAFOND`).
+- **Sur la fiche.** On trouve :
+  - le lien direct ;
+  - « C'est la bonne fiche » pour confirmer ;
+  - « Changer de lien » ;
+  - « Chercher sur Doctolib », qui ouvre une recherche web ;
+  - « Coller le lien » ;
+  - « Pas sur Doctolib ».
+- **Premier créneau.** L'opérateur ouvre la fiche Doctolib, puis relève le premier
+  créneau en un clic : moins de 7 jours, 7 à 30 jours, plus de 30 jours, ou aucun pour un
+  nouveau patient. Le relevé est un signal sourcé (lien, date, auteur), **périmé au bout
+  de 14 jours**. Il compte dans le score : +0,5, +0,2, −0,5 ou −0,8 (pondérations a priori
+  à valider).
+- **Dans le tableau.** Une colonne « Doctolib », cliquable quand un lien existe, avec son
+  filtre. L'écran affiche aussi une synthèse : fiches liées, et répartition des créneaux
+  relevés.
+
+### Carte
+
+Le bouton « Carte » affiche la liste filtrée du département sur une carte. Chaque lieu
+d'exercice est un point, coloré selon la population et cerclé de vert en cas d'accord ;
+un clic ouvre la fiche. Les adresses sont géocodées par l'API Adresse (BAN, gratuite) au
+cours de la recherche des liens.
+
+### Recherches groupées, en file
+
+Les travaux longs d'un département passent par une **file** (fonction `reseau-file`).
+Chaque appel traite plusieurs praticiens en parallèle pendant quelques minutes, puis se
+relance de lui-même jusqu'au bout. L'avancement s'affiche, et un bouton « Arrêter » met
+fin à la tâche ; ce qui est fait reste fait.
+
+- **Carte, fiches Google et Doctolib.** Ce travail se lance automatiquement après chaque
+  import, et par « Chercher maintenant ». Après un ajout par RPPS ou la recherche IA des
+  généralistes, il est lancé pour les nouveaux venus.
+- **Recherche IA de toutes les fiches.** Une fenêtre de confirmation affiche le nombre de
+  praticiens, le coût estimé (environ 0,25 € par praticien, à ajuster sur les factures)
+  et la durée. Par défaut, elle exclut les fiches recherchées ces 30 derniers jours.
+  Chaque praticien garde son propre suivi sur sa fiche.
+
 ## Fichiers
 
 | Fichier | Rôle |

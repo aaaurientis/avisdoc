@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseAdmin as sb } from "../data/supabaseAdmin";
 import { messageErreurFonction } from "../lib/erreurFonction";
-import type { EtatDepartement, EtatPraticien, MotifExclusion, Population, Role, StatutGoogle } from "./libelles";
+import type { EtatDepartement, EtatPraticien, MotifExclusion, Population, Role, StatutDoctolib, StatutGoogle } from "./libelles";
 import type { TypeSignal } from "../../../supabase/functions/_shared/reseau-signaux";
 
 export interface DepartementReseau {
@@ -25,6 +25,8 @@ export interface LieuReseau {
   modeExercice: string | null;
   secteur: string | null;
   finess: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface PraticienReseau {
@@ -44,6 +46,10 @@ export interface PraticienReseau {
   googlePlaceId: string | null;
   googleAucuneFiche: boolean;
   googleStatut: StatutGoogle;
+  /** Toutes les fiches Google rattachées (cabinet, hôpital…). */
+  googlePlaceIds: string[];
+  doctolibUrl: string | null;
+  doctolibStatut: StatutDoctolib;
   lieux: LieuReseau[];
 }
 
@@ -64,11 +70,11 @@ export interface SignalReseau {
 
 export interface RechercheIa {
   id: string;
-  type: "praticien" | "mg_derm_departement" | "google_departement";
-  statut: "en_cours" | "termine" | "echec";
+  type: "praticien" | "mg_derm_departement" | "google_departement" | "ia_departement";
+  statut: "en_cours" | "termine" | "echec" | "annule";
   debut: string;
   fin: string | null;
-  resultat: { propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
+  resultat: { total?: number; faits?: number; propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
   erreur: string | null;
   /** Avancement en direct : étape en cours, pourcentage, journal. */
   etape: string | null;
@@ -76,7 +82,10 @@ export interface RechercheIa {
   journal: { le: string; texte: string; niveau: "info" | "ok" | "ecarte" }[];
 }
 
-export interface CandidatGoogle { place_id: string; nom: string; adresse: string; categorie: string | null; ferme: boolean }
+export interface CandidatGoogle {
+  place_id: string; nom: string; adresse: string; categorie: string | null; ferme: boolean;
+  force: "certaine" | "forte" | "moyenne" | "faible";
+}
 
 export interface FicheGoogle {
   place_id: string;
@@ -121,6 +130,8 @@ const toLieu = (l: any): LieuReseau => ({
   modeExercice: l.mode_exercice ?? null,
   secteur: l.secteur ?? null,
   finess: l.finess ?? null,
+  lat: typeof l.lat === "number" ? l.lat : null,
+  lng: typeof l.lng === "number" ? l.lng : null,
 });
 
 const toPraticien = (r: any): PraticienReseau => ({
@@ -140,6 +151,9 @@ const toPraticien = (r: any): PraticienReseau => ({
   googlePlaceId: r.google_place_id ?? null,
   googleAucuneFiche: r.google_aucune_fiche === true,
   googleStatut: r.google_statut ?? (r.google_place_id ? "confirmee" : r.google_aucune_fiche ? "aucune" : "a_chercher"),
+  googlePlaceIds: Array.isArray(r.google_place_ids) && r.google_place_ids.length ? r.google_place_ids : r.google_place_id ? [r.google_place_id] : [],
+  doctolibUrl: r.doctolib_url ?? null,
+  doctolibStatut: r.doctolib_statut ?? "a_chercher",
   lieux: (r.admin_reseau_lieux ?? []).map(toLieu),
 });
 
@@ -266,7 +280,7 @@ export const reseauRepo = {
   },
 
   async derniereRecherche(
-    cible: { praticienId: string } | { departement: string; type: "mg_derm_departement" | "google_departement" },
+    cible: { praticienId: string } | { departement: string; type: "mg_derm_departement" | "google_departement" | "ia_departement" },
   ): Promise<RechercheIa | null> {
     let q = sb.from("admin_reseau_recherches_ia").select("*").order("debut", { ascending: false }).limit(1);
     q = "praticienId" in cible ? q.eq("praticien_id", cible.praticienId) : q.eq("departement", cible.departement).eq("type", cible.type);
@@ -280,18 +294,25 @@ export const reseauRepo = {
   validerSignal: (signalId: string) => appeler("reseau-action", { action: "signal_valider", signal_id: signalId }),
   rejeterSignal: (signalId: string) => appeler("reseau-action", { action: "signal_rejeter", signal_id: signalId }),
 
-  rattacherGoogle: (praticienId: string, choix: { placeId: string } | { aucune: true } | { retirer: true }) =>
+  rattacherGoogle: (praticienId: string, choix: { placeIds: string[] } | { aucune: true } | { retirer: true }) =>
     appeler("reseau-action", {
       action: "google_rattacher", praticien_id: praticienId,
-      ...("placeId" in choix ? { place_id: choix.placeId } : "aucune" in choix ? { aucune: true } : { retirer: true }),
+      ...("placeIds" in choix ? { place_ids: choix.placeIds } : "aucune" in choix ? { aucune: true } : { retirer: true }),
     }),
-  chercherGoogle: (praticienId: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
-    appeler("reseau-google", { action: "chercher", praticien_id: praticienId }),
+  chercherGoogle: (praticienId: string, departement?: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
+    appeler("reseau-google", { action: "chercher", praticien_id: praticienId, departement }),
+  doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true }) =>
+    appeler("reseau-action", { action: "doctolib", praticien_id: praticienId, ...choix }),
+
+  /** Travaux groupés d'un département : « liens » (carte, Google, Doctolib) ou « ia ». */
+  estimerFile: (departement: string, type: "liens" | "ia", inclureRecents = false): Promise<{ total: number }> =>
+    appeler("reseau-file", { action: "estimer", departement, type, inclure_recents: inclureRecents }),
+  lancerFile: (departement: string, type: "liens" | "ia", inclureRecents = false): Promise<{ job_id: string; total: number; deja: boolean }> =>
+    appeler("reseau-file", { action: "lancer", departement, type, inclure_recents: inclureRecents }),
+  arreterFile: (jobId: string) => appeler("reseau-file", { action: "arreter", job_id: jobId }),
   confirmerGoogle: (praticienId: string) => appeler("reseau-action", { action: "google_confirmer", praticien_id: praticienId }),
-  lancerGoogleAuto: (departement: string): Promise<{ recherche_id: string | null }> =>
-    appeler("reseau-google", { action: "auto", departement }),
-  ficheGoogle: (praticienId: string, avis = false): Promise<FicheGoogle> =>
-    appeler("reseau-google", { action: "details", praticien_id: praticienId, avis }),
+  ficheGoogle: (praticienId: string, placeId: string, avis = false): Promise<FicheGoogle> =>
+    appeler("reseau-google", { action: "details", praticien_id: praticienId, place_id: placeId, avis }),
 
   ajouterRpps: (rpps: string): Promise<{ statut: "cree" | "deja_la"; id: string; nom: string; population: Population; departements: string[] }> =>
     appeler("reseau-action", { action: "ajouter_rpps", rpps }),
