@@ -581,6 +581,7 @@ Base a priori : **taux d'adhésion attendu de 20 %** (z = −1,39). À valider p
 | Plaintes répétées sur les délais | fiche Google, lue et validée | oui | −0,6 |
 | Orientation de l'activité | fiche Google ou IA validée | mixte | −0,3 |
 | Signal de départ (successeur, fermeture) | IA ou fiche Google, validé | oui | −1,5 |
+| DU ou formation en dermoscopie (ajouté au lot 2) | IA validée ou saisie | oui | +0,3 |
 | A répondu au premier contact | interaction tracée | oui | +1,0 |
 | Délai déclaré pour un patient adressé | contact (niveau 4) | ≤ 15 j / 16–45 j / > 45 j | +1,0 / +0,3 / −0,8 |
 

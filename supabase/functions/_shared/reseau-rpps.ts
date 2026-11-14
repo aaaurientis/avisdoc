@@ -265,3 +265,53 @@ export function estPerime(extraitLe: string | null | undefined, maintenant: Date
   if (Number.isNaN(t)) return true;
   return maintenant.getTime() - t > JOURS_PEREMPTION * 86_400_000;
 }
+
+/**
+ * Un praticien à partir de TOUTES ses lignes RPPS (tous lieux, tous départements),
+ * pour l'ajout manuel par RPPS et les généralistes repérés par la recherche IA.
+ * Les spécialités importées gardent leur population ; un généraliste (SM26, SM53,
+ * SM54) devient `MG_DERM`. Renvoie le motif du refus sinon, sans rien deviner.
+ */
+export function praticienDepuisLignes(
+  lignes: LigneRpps[],
+  rpps: string,
+): { praticien: PraticienRpps } | { refus: string } {
+  const siennes = lignes.filter((l) => normaliserRpps(l["Identifiant PP"]) === rpps);
+  if (!siennes.length) return { refus: "Ce RPPS est introuvable dans l'extraction de l'Annuaire Santé." };
+  if (!siennes.some((l) => txt(l["Code profession"]) === "10")) return { refus: "Ce RPPS n'est pas celui d'un médecin." };
+  const qualif = siennes.filter((l) => txt(l["Code profession"]) === "10" && txt(l["Code type savoir-faire"]) === "S");
+  const codes = new Set(qualif.map((l) => txt(l["Code savoir-faire"])));
+  const pops = [...codes].map((c) => SPECIALITES[c]).filter(Boolean) as Population[];
+  const population: Population | null = pops.length
+    ? pops.sort((a, b) => PRIORITE.indexOf(a) - PRIORITE.indexOf(b))[0]
+    : CODES_MEDECINE_GENERALE.some((c) => codes.has(c)) ? "MG_DERM" : null;
+  if (!population) {
+    return { refus: "Ce médecin n'a ni une spécialité du réseau d'aval ni la qualification de médecine générale." };
+  }
+
+  // Lieux : un par structure, chacun rattaché à son propre département.
+  const parDep = new Map<string, LigneRpps[]>();
+  for (const l of siennes) {
+    const dep = departementDuLieu(txt(l["Code commune (coord. structure)"]), txt(l["Code postal (coord. structure)"]));
+    if (!dep) continue;
+    parDep.set(dep, [...(parDep.get(dep) ?? []), l]);
+  }
+  const p0 = siennes[0];
+  const praticien: PraticienRpps = {
+    rpps,
+    civilite: ouNull(p0["Libellé civilité d'exercice"]) ?? ouNull(p0["Libellé civilité"]),
+    nom: txt(p0["Nom d'exercice"]),
+    prenom: txt(p0["Prénom d'exercice"]),
+    population,
+    roles: [...ROLES_ATTENDUS[population]],
+    specialites: [...new Set(qualif.map((l) => txt(l["Libellé savoir-faire"])).filter(Boolean))],
+    lieux: [],
+  };
+  for (const [dep, ls] of parDep) {
+    // On réutilise le regroupement par département en neutralisant le filtre de spécialité.
+    const neutres = ls.map((l) => ({ ...l, "Code type savoir-faire": "S", "Code savoir-faire": "SM15", "Code profession": "10" }));
+    const [r] = regrouperParPraticien(neutres, dep);
+    if (r) praticien.lieux.push(...r.lieux);
+  }
+  return { praticien };
+}

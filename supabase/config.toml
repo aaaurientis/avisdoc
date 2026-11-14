@@ -132,3 +132,10 @@ verify_jwt = true
 
 [functions.reseau-action]
 verify_jwt = true
+
+# Réseau d'aval, lot 2 : fiche Google Maps (API Places) et recherche assistée par IA.
+[functions.reseau-google]
+verify_jwt = true
+
+[functions.reseau-ia]
+verify_jwt = true

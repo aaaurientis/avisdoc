@@ -5,17 +5,46 @@
 //   • departement_ajouter  { code, ordre? }
 //   • departement_modifier { code, etat?, ordre? }   — l'utilisateur décide (14/11)
 //   • exclure              { praticien_id, motif, precision? } — définitif
+//   • signal_saisir        { praticien_id, type, valeur, url } — saisi par un opérateur, donc validé
+//   • signal_valider       { signal_id } — proposition de l'IA acceptée
+//   • signal_rejeter       { signal_id }
+//   • google_rattacher     { praticien_id, place_id } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
+//   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
 //
 // Réservé au droit « sante ». Déploiement : supabase functions deploy reseau-action
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
-import { estDepartement } from "../_shared/reseau-rpps.ts";
+import { estDepartement, normaliserRpps, praticienDepuisLignes } from "../_shared/reseau-rpps.ts";
+import { estTypeSignal, urlValide, valeurAdmise } from "../_shared/reseau-signaux.ts";
+import { dateExtraction, lignesDuRpps } from "../_shared/tabulaire-rpps.ts";
+import { enregistrerPraticien } from "../_shared/enregistrer-praticien.ts";
 
 const ETATS_DEPARTEMENT = ["a_ouvrir", "importe", "en_qualification", "en_contact", "couvert", "en_veille"];
 const MOTIFS_EXCLUSION = ["opposition", "esthetique_dominante", "n_exerce_plus", "autre"];
 
 const ordreValide = (v: unknown) => v == null || v === "" || (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) < 1000);
+
+/** Le rôle « futur requérant » suit le signal de télé-expertise validé. */
+async function majRoleRequerant(db: any, praticienId: string) {
+  const [{ data: p }, { data: s }] = await Promise.all([
+    db.from("admin_reseau_praticiens").select("roles").eq("id", praticienId).single(),
+    db.from("admin_reseau_signaux").select("valeur").eq("praticien_id", praticienId).eq("type", "teleexpertise").eq("statut", "valide").maybeSingle(),
+  ]);
+  const roles: string[] = (p?.roles ?? []).filter((r: string) => r !== "requerant");
+  if (s?.valeur === "oui") roles.push("requerant");
+  await db.from("admin_reseau_praticiens").update({ roles }).eq("id", praticienId);
+}
+
+/** Le signal validé précédent du même type passe à « remplacé » (un seul validé à la fois). */
+async function remplacerAncien(db: any, praticienId: string, type: string, saufId?: string) {
+  let q = db.from("admin_reseau_signaux").update({ statut: "remplace" })
+    .eq("praticien_id", praticienId).eq("type", type).eq("statut", "valide");
+  if (saufId) q = q.neq("id", saufId);
+  const { error } = await q;
+  if (error) throw new Error(error.message);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -85,6 +114,89 @@ serve(async (req) => {
         praticien_id: p.id, acteur: email, action: "exclu", de: p.etat, vers: "exclu", detail: { motif, precision },
       });
       return json({ id: p.id });
+    }
+
+    case "signal_saisir": {
+      const { praticien_id, type, valeur, url } = corps;
+      if (!estTypeSignal(type)) return json({ error: "Type de signal inconnu." }, 400);
+      if (!valeurAdmise(type, valeur)) return json({ error: "Valeur non admise pour ce signal." }, 400);
+      if (!urlValide(url)) return json({ error: "Indiquez l'adresse complète de la page source (https://…)." }, 400);
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, etat").eq("id", String(praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.etat === "exclu") return json({ error: "Ce praticien est exclu." }, 409);
+      try { await remplacerAncien(db, p.id, type); } catch (e) { return json({ error: (e as Error).message }, 500); }
+      const maintenant = new Date().toISOString();
+      const { data: sig, error } = await db.from("admin_reseau_signaux").insert({
+        praticien_id: p.id, type, valeur, url, origine: "operateur", statut: "valide",
+        propose_par: email, decide_par: email, decide_le: maintenant,
+      }).select("id").single();
+      if (error) return json({ error: error.message }, 500);
+      if (type === "teleexpertise") await majRoleRequerant(db, p.id);
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: p.id, acteur: email, action: "signal_saisi", detail: { type, valeur, url },
+      });
+      return json({ id: sig.id });
+    }
+
+    case "signal_valider":
+    case "signal_rejeter": {
+      const { data: sig } = await db.from("admin_reseau_signaux")
+        .select("id, praticien_id, type, valeur, url, statut").eq("id", String(corps.signal_id ?? "")).maybeSingle();
+      if (!sig) return json({ error: "Proposition introuvable." }, 404);
+      if (sig.statut !== "propose") return json({ error: "Cette proposition a déjà été traitée." }, 409);
+      const valider = corps.action === "signal_valider";
+      if (valider) {
+        try { await remplacerAncien(db, sig.praticien_id, sig.type, sig.id); } catch (e) { return json({ error: (e as Error).message }, 500); }
+      }
+      // L'extrait est effacé dès la décision : aucun verbatim n'est conservé.
+      const { error } = await db.from("admin_reseau_signaux").update({
+        statut: valider ? "valide" : "rejete", extrait: null, decide_par: email, decide_le: new Date().toISOString(),
+      }).eq("id", sig.id).eq("statut", "propose");
+      if (error) return json({ error: error.message }, 500);
+      if (sig.type === "teleexpertise") await majRoleRequerant(db, sig.praticien_id);
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: sig.praticien_id, acteur: email, action: valider ? "signal_valide" : "signal_rejete",
+        detail: { type: sig.type, valeur: sig.valeur, url: sig.url },
+      });
+      return json({ id: sig.id });
+    }
+
+    case "google_rattacher": {
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      let maj: Record<string, unknown>;
+      if (corps.retirer) maj = { google_place_id: null, google_aucune_fiche: false, google_rattache_par: null, google_rattache_le: null };
+      else if (corps.aucune) maj = { google_place_id: null, google_aucune_fiche: true, google_rattache_par: email, google_rattache_le: new Date().toISOString() };
+      else {
+        const placeId = String(corps.place_id ?? "").trim();
+        if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: "Identifiant de fiche Google invalide." }, 400);
+        maj = { google_place_id: placeId, google_aucune_fiche: false, google_rattache_par: email, google_rattache_le: new Date().toISOString() };
+      }
+      const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
+      if (error) return json({ error: error.message }, 500);
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: p.id, acteur: email, action: "google_rattache",
+        detail: { place_id: maj.google_place_id ?? null, aucune: maj.google_aucune_fiche ?? false },
+      });
+      return json({ id: p.id });
+    }
+
+    case "ajouter_rpps": {
+      const rpps = normaliserRpps(corps.rpps);
+      if (!rpps) return json({ error: "Un numéro RPPS compte 11 chiffres." }, 400);
+      try {
+        const [lignes, extraitLe] = await Promise.all([lignesDuRpps(rpps), dateExtraction()]);
+        const r = praticienDepuisLignes(lignes, rpps);
+        if ("refus" in r) return json({ error: r.refus }, 422);
+        const e = await enregistrerPraticien(db, r.praticien, { origine: "manuel", acteur: email, extraitLe });
+        if (e.statut === "exclu") return json({ error: "Ce praticien est exclu du réseau : il ne peut pas y revenir." }, 409);
+        return json({
+          ...e, nom: `${r.praticien.prenom} ${r.praticien.nom}`, population: r.praticien.population,
+          departements: [...new Set(r.praticien.lieux.map((l) => l.departement))],
+        });
+      } catch (e) {
+        return json({ error: e instanceof Error ? e.message : String(e) }, 502);
+      }
     }
 
     default:
