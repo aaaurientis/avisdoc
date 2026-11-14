@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
 import { useExpertises } from "../../data/journeesStore";
-import { cleJournee, enJournee, issueDe, resumer, type Expertise } from "../../lib/expertises";
+import { cleJournee, enJournee, issueDe, MASQUE, MOTIF_MASQUE, resultatsVisibles, resumer, type Expertise } from "../../lib/expertises";
 import { aujourdhuiISO, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
@@ -14,6 +14,7 @@ const jour = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("fr
 
 /** Taux de consultation : avis qui orientent vers un dermatologue, sur les avis dont la recommandation est renseignée. */
 function tauxConsultation(liste: Expertise[]): number | null {
+  if (!resultatsVisibles(liste.length)) return null; // règle de l'AIPD
   let o = 0;
   let r = 0;
   for (const e of liste) {
@@ -114,8 +115,12 @@ export function PartieExpertises({ periode, client, requis, journees }: { period
               valeur={r.delais.mediane === null ? "—" : `${Math.round(r.delais.mediane)} h`}
               pied={r.delais.mesures ? `${pct(r.delais.sous24h, r.delais.mesures)} % sous 24 h · ${nombre(r.delais.mesures)} mesurés` : "non mesuré"}
             />
-            <Kpi label="Taux de consultation" valeur={taux === null ? "—" : `${taux} %`} pied="avis orientant vers un dermatologue" />
-            <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            <Kpi label="Taux de consultation" valeur={taux === null ? MASQUE : `${taux} %`} pied={taux === null ? MOTIF_MASQUE : "avis orientant vers un dermatologue"} />
+            {resultatsVisibles(r.total) ? (
+              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            ) : (
+              <Kpi label="Exérèses indispensables" valeur={MASQUE} pied={MOTIF_MASQUE} />
+            )}
           </div>
         </>
       )}
@@ -159,8 +164,8 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
             <Kpi label="Journées passées sans avis" valeur={nombre(sansAvis.length)} pied={`sur ${nombre(passees.length)} journées passées`} />
             <Kpi
               label="Consultation : en journée / hors"
-              valeur={`${tauxEn ?? "—"} % / ${client ? "—" : `${tauxHors ?? "—"} %`}`}
-              pied={client ? "hors journée : sans client dans l'export" : "taux de consultation comparés"}
+              valeur={`${tauxEn === null ? MASQUE : `${tauxEn} %`} / ${client || tauxHors === null ? MASQUE : `${tauxHors} %`}`}
+              pied={tauxEn === null || (!client && tauxHors === null) ? MOTIF_MASQUE : client ? "hors journée : sans client dans l'export" : "taux de consultation comparés"}
             />
           </div>
           {sansAvis.length > 0 && (

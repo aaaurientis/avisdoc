@@ -1,9 +1,11 @@
-// Ce qu'il s'est passé lors d'une journée : les avis rendus, ce qu'ils recommandent, les délais.
+// Ce qu'il s'est passé lors d'une journée : les avis rendus, les délais, et ce qu'ils recommandent
+// (en agrégé seulement, et seulement au-delà de 20 dossiers : règle de l'AIPD). La liste des dossiers
+// ne montre jamais de résultat individuel.
 // Affiché dans le détail d'une journée (Calendrier). Lien vers le rapport client au-delà de 20 avis.
 import { useMemo } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { useExpertises } from "../../data/journeesStore";
-import { cleJournee, issueDe, rapportPossible, resumer, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
+import { cleJournee, issueDe, rapportPossible, resultatsVisibles, resumer, SEUIL_AIPD, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
 import type { JourneeDepistage } from "../../lib/journees";
 
 // (Pas d'import depuis ./commun : commun affiche ce composant, on évite la boucle d'imports.)
@@ -70,10 +72,16 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px]">
           <Chiffre label="Avis rendus" valeur={nombre(r.total)} />
-          <Chiffre label="Non indispensable" valeur={`${n.non} · ${pct(n.non, renseignes)} %`} />
-          <Chiffre label="Consultation conseillée" valeur={`${n.consult} · ${pct(n.consult, renseignes)} %`} />
-          <Chiffre label="Exérèse indispensable" valeur={`${n.exerese} · ${pct(n.exerese, renseignes)} %`} />
-          <Chiffre label="Urgents" valeur={String(r.urgentes)} />
+          {resultatsVisibles(r.total) ? (
+            <>
+              <Chiffre label="Non indispensable" valeur={`${n.non} · ${pct(n.non, renseignes)} %`} />
+              <Chiffre label="Consultation conseillée" valeur={`${n.consult} · ${pct(n.consult, renseignes)} %`} />
+              <Chiffre label="Exérèse indispensable" valeur={`${n.exerese} · ${pct(n.exerese, renseignes)} %`} />
+              <Chiffre label="Urgents" valeur={String(r.urgentes)} />
+            </>
+          ) : (
+            <Chiffre label="Résultats" valeur={`masqués (${SEUIL_AIPD} dossiers ou moins, AIPD)`} />
+          )}
           {r.delais.mediane !== null && <Chiffre label="Délai médian" valeur={`${Math.round(r.delais.mediane)} h`} />}
           <Chiffre label="Requis" valeur={r.requis.map((p) => `${p.cle} (${p.nombre})`).join(", ")} />
         </div>
@@ -86,10 +94,7 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
               <th className="px-3 py-1.5 font-semibold">Dossier</th>
               <th className="px-3 py-1.5 font-semibold">Envoi</th>
               <th className="px-3 py-1.5 font-semibold">Requis</th>
-              <th className="px-3 py-1.5 font-semibold">Recommandation</th>
-              <th className="px-3 py-1.5 text-right font-semibold">Délai conseillé</th>
-              <th className="px-3 py-1.5 text-right font-semibold">Traitement</th>
-              <th className="px-3 py-1.5 font-semibold">Urgent</th>
+              <th className="px-3 py-1.5 text-right font-semibold">Délai de traitement</th>
             </tr>
           </thead>
           <tbody>
@@ -100,10 +105,7 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
                   <td className="px-3 py-1.5 text-muted-foreground">{e.id}</td>
                   <td className="px-3 py-1.5">{heure(e.envoi)}</td>
                   <td className="px-3 py-1.5">{e.requis || "—"}</td>
-                  <td className="px-3 py-1.5">{e.recommandation || "—"}</td>
-                  <td className="px-3 py-1.5 text-right">{e.delaiRecoJours ? `${e.delaiRecoJours} j` : "—"}</td>
                   <td className="px-3 py-1.5 text-right">{e.delaiH !== null ? `${e.delaiH} h` : "—"}</td>
-                  <td className="px-3 py-1.5">{e.urgent ? "Oui" : ""}</td>
                 </tr>
               ))}
           </tbody>

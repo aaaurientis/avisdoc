@@ -46,15 +46,66 @@ function centPourCent(valeurs: number[]): number[] {
 }
 const nb = (n: number) => n.toLocaleString("fr-FR");
 
+const POLICES =
+  "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&display=swap";
+
 /** Charge les polices de la charte le temps de la page. */
 function usePolicesCharte() {
   useEffect(() => {
     const l = document.createElement("link");
     l.rel = "stylesheet";
-    l.href = "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&display=swap";
+    l.href = POLICES;
     document.head.appendChild(l);
     return () => l.remove();
   }, []);
+}
+
+const echapper = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+
+/** Le document imprimé : le rapport seul, sans rien du Hub autour. */
+export function documentImprimable(pageHtml: string, titre: string): string {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${echapper(titre)}</title>
+<link rel="stylesheet" href="${POLICES}">
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+  .rapport-page { box-shadow: none !important; margin: 0 !important; min-height: 0 !important; width: 210mm !important; padding: 12mm 15mm 10mm !important; }
+  tr, .rapport-bloc { break-inside: avoid; }
+</style></head><body>${pageHtml}</body></html>`;
+}
+
+/**
+ * Imprime le rapport depuis un cadre invisible qui ne contient que lui. Imprimer la page du Hub
+ * mêlait les styles et la mise en page de l'application au rapport ; ici, le navigateur ne voit
+ * que le rapport, ses styles, son logo et ses polices. Le titre du cadre devient le nom du PDF.
+ */
+function imprimer(titre: string) {
+  const page = document.querySelector<HTMLElement>(".rapport-page");
+  if (!page) return window.print();
+  const copie = page.cloneNode(true) as HTMLElement;
+  copie.querySelectorAll("img").forEach((img) => img.setAttribute("src", (img as HTMLImageElement).src)); // adresses absolues
+  const cadre = document.createElement("iframe");
+  cadre.setAttribute("aria-hidden", "true");
+  Object.assign(cadre.style, { position: "fixed", right: "0", bottom: "0", width: "0", height: "0", border: "0" });
+  document.body.appendChild(cadre);
+  const doc = cadre.contentDocument;
+  const fen = cadre.contentWindow;
+  if (!doc || !fen) {
+    cadre.remove();
+    return window.print();
+  }
+  doc.open();
+  doc.write(documentImprimable(copie.outerHTML, titre));
+  doc.close();
+  const images = [...doc.images].map((img) => (img.complete ? Promise.resolve() : new Promise((ok) => ((img.onload = ok), (img.onerror = ok)))));
+  const polices = (doc as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
+  // Au plus 3 s d'attente : une police lente ne doit pas bloquer l'impression.
+  Promise.race([Promise.all([...images, polices]), new Promise((ok) => setTimeout(ok, 3000))]).then(() => {
+    fen.focus();
+    fen.print();
+    setTimeout(() => cadre.remove(), 60_000);
+  });
 }
 
 export default function Rapport() {
@@ -81,6 +132,27 @@ export default function Rapport() {
     [portee, index],
   );
   const avis = useMemo(() => lignes.flatMap((l) => l.avis), [lignes]);
+
+  // Le navigateur propose le titre de la page comme nom du PDF : on le rend précis.
+  // « AvisDoc - Bilan des journées - Groupama Rhône-Alpes-Auvergne - DEV 2026 051 - 2026-11-14 »
+  useEffect(() => {
+    if (!portee) return;
+    const avant = document.title;
+    const auj = new Date().toISOString().slice(0, 10);
+    const j = portee.journees[0];
+    const morceaux = portee.uneJournee
+      ? ["AvisDoc", "Bilan de la journée", portee.titre, j?.date, j?.lieu]
+      : ["AvisDoc", "Bilan des journées", portee.titre, portee.sousTitre.replace(/^Devis /, ""), auj];
+    document.title = morceaux
+      .filter(Boolean)
+      .join(" - ")
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return () => {
+      document.title = avant;
+    };
+  }, [portee]);
 
   if (statut !== "pret" || statutExp !== "pret") {
     return (
@@ -117,7 +189,7 @@ export default function Rapport() {
       <div className="rapport-actions" style={{ maxWidth: "210mm", margin: "0 auto 16px", display: "flex", justifyContent: "flex-end", gap: 8, fontFamily: SANS }}>
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={() => imprimer(document.title)}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.marine, color: "#fff", border: 0, borderRadius: 999, padding: "10px 18px", fontWeight: 600, cursor: "pointer" }}
         >
           <Printer size={16} /> Imprimer ou enregistrer en PDF
