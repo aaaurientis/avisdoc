@@ -21,7 +21,7 @@ import {
   type PeriodeExpertises,
 } from "../../lib/expertises";
 import { cn } from "@/lib/utils";
-import { Choix, boutonCls, capitale, jour, nombre, pct, selectCls } from "./commun";
+import { AxeMois, Choix, boutonCls, capitale, jour, nombre, pct, selectCls } from "./commun";
 
 const PERIODES: { cle: PeriodeExpertises; label: string }[] = [
   { cle: "12m", label: "12 mois" },
@@ -263,8 +263,6 @@ function BarresMois({ liste }: { liste: Expertise[] }) {
   const serie = useMemo(() => parMois(liste), [liste]);
   const max = Math.max(1, ...serie.map((m) => m.total));
   const actif = survol !== null ? serie[survol] : null;
-  // Un repère tous les « pas » mois, assez espacés pour que l'étiquette tienne en entier.
-  const pas = serie.length > 24 ? 6 : serie.length > 12 ? 3 : 1;
   return (
     <div>
       <div className="mb-3 flex flex-wrap gap-4 text-[12px] text-muted-foreground">
@@ -289,13 +287,7 @@ function BarresMois({ liste }: { liste: Expertise[] }) {
           ))}
         </div>
       </div>
-      <div className="mt-1.5 flex h-4 gap-[2px] text-[10.5px] text-muted-foreground">
-        {serie.map((m, i) => (
-          <div key={m.mois} className="relative min-w-0 flex-1">
-            {i % pas === 0 && <span className="absolute left-0 whitespace-nowrap">{mois(m.mois)}</span>}
-          </div>
-        ))}
-      </div>
+      <AxeMois etiquettes={serie.map((m) => mois(m.mois))} actif={survol} />
       <div className="mt-3 min-h-[20px] text-[12.5px] text-muted-foreground">
         {actif ? (
           <>

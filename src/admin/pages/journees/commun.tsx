@@ -225,3 +225,29 @@ function Info({ label, valeur }: { label: string; valeur: string }) {
     </div>
   );
 }
+
+/**
+ * Axe des mois sous un graphique en barres : une étiquette par barre, centrée dessous.
+ * Au-delà de 18 mois, les étiquettes passent en biais pour tenir sans se chevaucher.
+ * `actif` : le mois survolé, mis en avant.
+ */
+export function AxeMois({ etiquettes, actif = null }: { etiquettes: string[]; actif?: number | null }) {
+  const biais = etiquettes.length > 18;
+  return (
+    <div className={cn("mt-1.5 flex gap-[2px] text-[10.5px] text-muted-foreground", biais ? "h-10" : "h-4")}>
+      {etiquettes.map((e, i) => (
+        <div key={i} className="relative min-w-0 flex-1">
+          <span
+            className={cn(
+              "absolute top-0 whitespace-nowrap",
+              biais ? "right-1/2 origin-top-right -rotate-45" : "left-1/2 -translate-x-1/2",
+              actif === i && "font-semibold text-avisdoc-ink",
+            )}
+          >
+            {e}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
