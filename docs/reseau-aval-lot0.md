@@ -27,7 +27,8 @@ Elles priment sur les propositions du reste de la note.
 | Empreinte web (niveau 3) | **Uniquement les informations de la fiche Google Maps** du praticien |
 | Chirurgie viscérale (SM14) | **Hors périmètre.** `CHIR` = SM05 seul |
 | Praticiens hospitaliers | **Dans le périmètre dès le lot 1** |
-| `MG_DERM` | **Ajout manuel par RPPS uniquement**, pas d'import |
+| `MG_DERM` | **Repérés par une recherche IA au niveau du département**, puis ajoutés directement à la liste des candidats, comme ceux de l'import. L'IA relève aussi les signes d'un futur requérant (rôle `requerant`). L'ajout manuel par RPPS reste possible (§4). *Remplace la décision « ajout manuel uniquement » du même jour* |
+| Validation déontologique de la liste | **Hors périmètre** pour l'instant |
 | Ordre des départements | Choisi dans la plateforme par l'administrateur (conforme au brief, §3) |
 | Lecture de la fiche Google Maps | **Par l'API Google Places**, affichage en direct. La règle 2 du brief est levée pour Google Maps, et pour lui seul |
 | DIU de dermatologie esthétique | **Affiché comme information** sur la fiche, sans effet sur le score |
@@ -175,9 +176,39 @@ Ameli ne mentionne aucune orientation dermatologique non plus : le champ « acti
 particulière » ne porte que des modes d'exercice de MG (acupuncture, homéopathie,
 allergologie, angiologie, médecine du sport…).
 
-**Décision proposée sur `MG_DERM` :** pas d'import automatique. Ils entrent uniquement par
-le niveau 3, par ajout manuel du RPPS, avec contrôle d'existence et d'appartenance à la
-médecine générale (SM26, SM53, SM54). C'est la voie que le brief prévoyait en repli.
+**Décision sur `MG_DERM` (14/11) : repérage par recherche IA, ajout direct aux candidats.**
+
+Interroger l'IA pour chacun des plus de 2 000 généralistes de l'Isère coûterait trop
+cher. La recherche part donc **du département**, et non du praticien :
+
+1. **Recherche.** L'utilisateur lance « Chercher les généralistes formés à la
+   dermoscopie » depuis l'écran du département. Quelques recherches web ciblées
+   (dermoscopie, dépistage des cancers cutanés, DU, médecin généraliste, villes du
+   département) renvoient des praticiens nommés. Pour chacun, l'IA donne une URL et
+   l'extrait exact de la page.
+2. **Contrôles automatiques, tous obligatoires :**
+   - l'extrait figure mot pour mot sur la page citée (même contrôle qu'au §6) ;
+   - le praticien est retrouvé **sans ambiguïté** dans l'extraction RPPS, par nom, prénom
+     et commune d'exercice. Il doit être médecin (profession 10), qualifié en médecine
+     générale (SM26, SM53 ou SM54) et exercer dans le département. Un homonyme ou une
+     correspondance douteuse est écarté ;
+   - le praticien n'est ni déjà dans la liste, ni dans la table d'exclusion.
+3. **Ajout direct.** Les praticiens qui passent ces contrôles entrent dans la liste des
+   candidats à l'état `identifie`, population `MG_DERM`, comme ceux de l'import. Ils
+   portent la mention « repéré par l'IA » et le lien de la source.
+4. **Ce qui reste à valider.** Le signal « DU ou formation en dermoscopie » est enregistré
+   avec son URL, mais à l'état « proposé ». Il ne compte dans le score qu'une fois validé
+   par un opérateur, comme tous les signaux de l'IA. Le praticien n'entre dans le réseau
+   qu'après un accord tracé.
+
+**Rôle `requerant`.** La même recherche relève les signes d'un futur requérant, toujours
+avec sa source : pratique de la télé-expertise, téléconsultation, intérêt affiché pour le
+dépistage. La fiche peut alors porter le rôle `requerant` en plus des rôles du réseau
+d'aval. Ce rôle ne crée rien dans le parcours des requérants
+(Professionnels de Santé › Requérants) : il les signale seulement, pour un contact
+ultérieur.
+
+L'ajout manuel par RPPS reste possible, avec les mêmes contrôles RPPS.
 
 Les DIU de dermatologie esthétique (DIP48, DIP180) sont, eux, repérables par le RPPS.
 C'est une **information pour l'opérateur** (« orientation esthétique possible ») à afficher
@@ -407,7 +438,7 @@ RPPS, `personne-activite`, code postal d'exercice commençant par 38, praticiens
 | `ORL` | SM34 + SM39 | **37** | 28 | 15 |
 | `PLAST` | SM10 | **24** | 20 | 8 |
 | `CHIR` | SM05 | **42** | 28 | 17 |
-| `MG_DERM` | — | **ajout manuel** | | |
+| `MG_DERM` | — | **par recherche IA** | | |
 | *Exclus : chirurgie viscérale* | *SM14* | *40* | | |
 | *MG, pour mémoire* | *SM53 / SM26 / SM54* | *≥ 2 129 lignes (SM53 1 652, SM26 477, SM54 non obtenu)* | | |
 
@@ -578,8 +609,10 @@ département suffit.
 
 ## 9. Questions encore ouvertes
 
-Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
-restent ouvertes. S'y ajoutent :
+Les six questions du brief (§12) sont tranchées le 14/11 : le hub est le projet admin, les
+seuils de couverture ne sont pas gérés, les `MG_DERM` sont aussi de futurs requérants, les
+hospitaliers et les centres de santé sont inclus, la forme de l'accord et la validation
+déontologique sont hors périmètre. Il ne reste que :
 
 1. Score : taux d'adhésion attendu de 20 % et pondérations a priori du §8 bis — **décision
    reportée** (14/11). À trancher avant le lot 2.
