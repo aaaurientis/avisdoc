@@ -6,7 +6,7 @@
 export type TypeSignal =
   | "orientation" | "nouveaux_patients" | "motif_exerese" | "dermoscopie"
   | "chirurgie_sur_place" | "circuit_rapide" | "prevention" | "plaintes_delais"
-  | "du_dermoscopie" | "signal_depart" | "teleexpertise";
+  | "du_dermoscopie" | "signal_depart" | "teleexpertise" | "creneau_doctolib";
 
 export interface DefinitionSignal {
   libelle: string;
@@ -20,6 +20,7 @@ export interface DefinitionSignal {
 export const VALEUR_LIBELLE: Record<string, string> = {
   oui: "Oui", non: "Non", inconnu: "Inconnu", sur_courrier: "Sur courrier",
   medicale: "Médicale", mixte: "Mixte", esthetique_dominante: "Esthétique dominante", inconnue: "Inconnue",
+  moins_7j: "Moins de 7 jours", "7_30j": "7 à 30 jours", plus_30j: "Plus de 30 jours", aucun_nouveau: "Aucun pour un nouveau patient",
 };
 
 export const SIGNAUX: Record<TypeSignal, DefinitionSignal> = {
@@ -34,6 +35,8 @@ export const SIGNAUX: Record<TypeSignal, DefinitionSignal> = {
   du_dermoscopie: { libelle: "DU ou formation en dermoscopie", valeurs: ["oui", "non", "inconnu"], source: "Site du cabinet", parIa: true },
   signal_depart: { libelle: "Signal de départ (successeur, fermeture)", valeurs: ["oui", "non", "inconnu"], source: "Annonces, fiche Google", parIa: true },
   teleexpertise: { libelle: "Pratique la télé-expertise (futur requérant)", valeurs: ["oui", "non", "inconnu"], source: "Site du cabinet", parIa: true },
+  // Relevé par l'opérateur sur la fiche Doctolib : le Hub ne lit jamais Doctolib.
+  creneau_doctolib: { libelle: "Premier créneau Doctolib (nouveau patient)", valeurs: ["moins_7j", "7_30j", "plus_30j", "aucun_nouveau", "inconnu"], source: "Fiche Doctolib, relevé par l'opérateur", parIa: false },
 };
 
 export const TYPES_SIGNAL = Object.keys(SIGNAUX) as TypeSignal[];
@@ -137,6 +140,7 @@ export const SCORE_CONFIG = {
     orientation: { mixte: -0.3 },
     signal_depart: { oui: -1.5 },
     du_dermoscopie: { oui: 0.3 },
+    creneau_doctolib: { moins_7j: 0.5, "7_30j": 0.2, plus_30j: -0.5, aucun_nouveau: -0.8 },
   } as Partial<Record<TypeSignal, Record<string, number>>>,
 } as const;
 
@@ -144,6 +148,17 @@ export interface SignalPourScore {
   type: TypeSignal;
   valeur: string;
   url: string;
+  /** Date du relevé (validation) : un créneau Doctolib est périmé au bout de 14 jours. */
+  le?: string | null;
+}
+
+/** Les créneaux bougent vite : au-delà, le relevé ne compte plus (il s'affiche « périmé »). */
+export const JOURS_PEREMPTION_CRENEAU = 14;
+
+export function releveCreneauPerime(le: string | null | undefined, maintenant: Date = new Date()): boolean {
+  if (!le) return true;
+  const t = new Date(le).getTime();
+  return Number.isNaN(t) || maintenant.getTime() - t > JOURS_PEREMPTION_CRENEAU * 86_400_000;
 }
 
 export interface Contribution {
@@ -175,6 +190,7 @@ const arrondi = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 export function calculerScore(
   praticien: { etat: string; vuAuDernierImport?: boolean },
   signauxValides: SignalPourScore[],
+  maintenant: Date = new Date(),
 ): Score {
   const base = arrondi(logit(SCORE_CONFIG.tauxDeBase));
   const commun = { base, version: SCORE_CONFIG.version, calibre: SCORE_CONFIG.calibre };
@@ -189,6 +205,7 @@ export function calculerScore(
 
   const contributions: Contribution[] = [];
   for (const s of signauxValides) {
+    if (s.type === "creneau_doctolib" && releveCreneauPerime(s.le, maintenant)) continue;
     const points = SCORE_CONFIG.poids[s.type]?.[s.valeur];
     if (points === undefined || points === 0) continue;
     contributions.push({ libelle: SIGNAUX[s.type].libelle, valeur: VALEUR_LIBELLE[s.valeur] ?? s.valeur, points, url: s.url });

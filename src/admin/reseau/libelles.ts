@@ -155,3 +155,36 @@ export const GOOGLE_AIDE: Record<StatutGoogle, string> = {
   aucune: "Un opérateur a indiqué qu'aucune fiche ne correspond. Cela ne pénalise pas.",
   a_chercher: "Pas encore cherchée : la recherche automatique s'en charge.",
 };
+
+export type StatutDoctolib = "a_chercher" | "trouve_auto" | "confirme" | "a_confirmer" | "introuvable" | "aucun";
+
+export const STATUTS_DOCTOLIB: StatutDoctolib[] = ["confirme", "trouve_auto", "a_confirmer", "introuvable", "aucun", "a_chercher"];
+
+export const DOCTOLIB_LABEL: Record<StatutDoctolib, string> = {
+  confirme: "Lien confirmé",
+  trouve_auto: "Lien trouvé",
+  a_confirmer: "À confirmer",
+  introuvable: "Introuvable",
+  aucun: "Pas sur Doctolib",
+  a_chercher: "À chercher",
+};
+
+export const DOCTOLIB_BADGE: Record<StatutDoctolib, string> = {
+  confirme: "bg-sky-100 text-sky-800",
+  trouve_auto: "bg-sky-50 text-sky-700",
+  a_confirmer: "bg-amber-100 text-amber-800",
+  introuvable: "bg-slate-100 text-slate-600",
+  aucun: "bg-slate-100 text-slate-600",
+  a_chercher: "bg-slate-50 text-slate-500",
+};
+
+export const DOCTOLIB_AIDE: Record<StatutDoctolib, string> = {
+  confirme: "Lien vérifié par un opérateur.",
+  trouve_auto: "Trouvé automatiquement : la seule fiche Doctolib au nom, au prénom et dans une commune d'exercice du praticien. À vérifier.",
+  a_confirmer: "Des fiches Doctolib portent son nom, sans certitude : vérifiez.",
+  introuvable: "Aucune fiche Doctolib à son nom dans les résultats de recherche.",
+  aucun: "Un opérateur a indiqué qu'il n'est pas sur Doctolib.",
+  a_chercher: "Pas encore cherché : la recherche automatique s'en charge.",
+};
+
+export const FORCE_LABEL = { certaine: "Nom et adresse RPPS", forte: "Nom et code postal", moyenne: "Nom, autre commune", faible: "Sans le nom du praticien" } as const;
