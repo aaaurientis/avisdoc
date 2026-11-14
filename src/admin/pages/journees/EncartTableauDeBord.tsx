@@ -22,7 +22,7 @@ export default function EncartJournees() {
           <CalendarCheck className="size-5 text-avisdoc-teal" strokeWidth={2.2} /> Journées de dépistage
         </h2>
         <Link to="/journees/calendrier" className="text-[13px] font-semibold text-avisdoc-teal hover:underline">
-          Voir le calendrier
+          Voir les journées
         </Link>
       </div>
 
