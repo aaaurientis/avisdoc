@@ -1,8 +1,8 @@
 # Journée — journées de dépistage (extractions CSV, AWS S3)
 
-Le bloc **Statistiques** du Hub (ex-« Journée », droit `journee`) a trois pages — Synthèse, Journées, Expertises — et un encart sur le tableau de bord :
+Le bloc **Statistiques** du Hub (ex-« Journée », droit `journee`) a trois pages — Vue globale, Journées, Expertises — et un encart sur le tableau de bord :
 
-- **Synthèse** (`/journees`) : journées, passées, à venir, clients ; journées par mois ;
+- **Vue globale** (`/journees`), en trois parties — Journées, Expertises, Journées et expertises (avis rendus en journée, moyenne par journée, journées passées sans avis, consultation en / hors journée) : journées, passées, à venir, clients ; journées par mois ;
   préparation des journées à venir (confirmations, dermatoscope) ; avancement par contrat
   (client + devis) ; répartition par expert, dermatologue, lieu ou client.
 - **Journées** (`/journees/calendrier`, ex-Calendrier) : le mois en grille (à confirmer / confirmée / passée — confirmée = requérant confirmé et expert désigné),
@@ -74,7 +74,7 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
 
 ## Télécharger une extraction
 
-Le bouton **Télécharger le CSV** (pages Synthèse, Journées et Expertises) enregistre l'extraction
+Le bouton **Télécharger le CSV** (pages Vue globale, Journées et Expertises) enregistre l'extraction
 affichée telle qu'elle est dans le bucket (UTF-8, lisible par Excel). Le menu « Extraction du … »
 permet d'en choisir une plus ancienne avant de la télécharger. Chaque téléchargement est noté
 au journal d'audit (Admin › Auditabilité) : le fichier contient des coordonnées de contacts.
@@ -129,7 +129,7 @@ autoriser ce dossier (voir plus haut).
 
 ## Rapport client
 
-Bouton **Rapport** (contrats, page Synthèse) ou **Rapport de la journée** (page Journées) : bilan aux
+Bouton **Rapport** (contrats, Vue globale) ou **Rapport de la journée** (page Journées) : bilan aux
 couleurs AvisDoc (fond blanc, Newsreader + Hanken Grotesk, cyan / bleu marine / orange), à imprimer
 ou enregistrer en PDF. Il n'existe qu'**au-delà de 20 expertises** et ne contient que des totaux et
 des proportions (aucun chiffre par personne, aucune ventilation des recommandations par journée).

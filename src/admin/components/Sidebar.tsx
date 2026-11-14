@@ -147,7 +147,7 @@ const MENU: Entree[] = [
   ] },
   // Statistiques : journées de dépistage et expertises (extractions S3). Droit « journee ».
   { module: "journee", label: "Statistiques", icon: CalendarCheck, enfants: [
-    { to: "/journees", label: "Synthèse", icon: BarChart3, end: true },
+    { to: "/journees", label: "Vue globale", icon: BarChart3, end: true },
     { to: "/journees/calendrier", label: "Journées", icon: CalendarDays },
     { to: "/journees/expertises", label: "Expertises", icon: ClipboardList },
   ] },
