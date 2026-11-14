@@ -37,27 +37,35 @@ import {
 } from "../_shared/reseau-signaux.ts";
 import { dateExtraction, lignesDuNom, lignesDuRpps } from "../_shared/tabulaire-rpps.ts";
 import { enregistrerPraticien } from "../_shared/enregistrer-praticien.ts";
+import { enTacheDeFond, Suivi } from "../_shared/suivi.ts";
+import { rechercherFichesGoogle } from "../_shared/google-places.ts";
 
 const MODELE = Deno.env.get("RESEAU_MODEL_RECHERCHE") ?? "claude-opus-5-5";
 const RECHERCHES_WEB = { praticien: 5, mg_departement: 8 };
 const MAX_CANDIDATS_MG = 15;
 
-function enTacheDeFond(travail: Promise<unknown>): void {
-  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-  if (rt?.waitUntil) rt.waitUntil(travail.catch(() => {}));
-  else void travail.catch(() => {});
-}
+
+const hoteDe = (u: unknown) => { try { return new URL(String(u)).hostname.replace(/^www\./, ""); } catch { return String(u ?? ""); } };
 
 // ── Appel au modèle : recherche web + réponse JSON au schéma imposé ──────────
 
 interface Usage { input_tokens: number; output_tokens: number; web_searches: number; modele: string }
 
-async function demander<T>(consigne: string, schema: Record<string, unknown>, maxRecherches: number): Promise<{ resultat: T; usage: Usage }> {
+async function demander<T>(
+  consigne: string,
+  schema: Record<string, unknown>,
+  maxRecherches: number,
+  suivi: Suivi,
+  plage: [number, number],
+): Promise<{ resultat: T; usage: Usage }> {
   const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") ?? "" });
   const usage: Usage = { input_tokens: 0, output_tokens: 0, web_searches: 0, modele: MODELE };
   const messages: any[] = [{ role: "user", content: consigne }];
+  const [debut, fin] = plage;
+  let lancees = 0;
   for (let tour = 0; tour < 4; tour++) {
-    const r: any = await client.beta.messages.create({
+    // En flux : chaque recherche web lancée par l'IA s'affiche aussitôt à l'écran.
+    const flux: any = client.beta.messages.stream({
       model: MODELE,
       max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"],
@@ -69,6 +77,21 @@ async function demander<T>(consigne: string, schema: Record<string, unknown>, ma
       }],
       messages,
     } as any);
+    flux.on("contentBlock", (bloc: any) => {
+      if (bloc?.type === "server_tool_use" && bloc.name === "web_search") {
+        lancees++;
+        const requete = typeof bloc.input?.query === "string" ? bloc.input.query : "";
+        void suivi.maj({
+          etape: `Recherche sur le web (${lancees}/${maxRecherches})`,
+          progression: debut + ((fin - debut) * lancees) / (maxRecherches + 1),
+          ligne: requete ? `Recherche web : « ${requete} »` : "Recherche web lancée",
+        });
+      } else if (bloc?.type === "web_search_tool_result") {
+        const n = Array.isArray(bloc.content) ? bloc.content.length : 0;
+        void suivi.maj({ ligne: Array.isArray(bloc.content) ? `${n} page${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}` : "Recherche web sans résultat" });
+      }
+    });
+    const r: any = await flux.finalMessage();
     usage.input_tokens += r.usage?.input_tokens ?? 0;
     usage.output_tokens += r.usage?.output_tokens ?? 0;
     usage.web_searches += r.usage?.server_tool_use?.web_search_requests ?? 0;
@@ -79,6 +102,7 @@ async function demander<T>(consigne: string, schema: Record<string, unknown>, ma
     }
     if (r.stop_reason === "refusal") throw new Error("l'IA a refusé de traiter cette recherche");
     if (r.stop_reason !== "end_turn") throw new Error(`réponse de l'IA inexploitable (${r.stop_reason})`);
+    await suivi.maj({ etape: "Lecture de la réponse de l'IA", progression: fin });
     const textes = (r.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text);
     try {
       return { resultat: JSON.parse(textes.join("")) as T, usage };
@@ -171,7 +195,7 @@ const SCHEMA_SIGNAUX = {
   },
 };
 
-async function rechercherPraticien(db: any, rechercheId: string, p: any, email: string) {
+async function rechercherPraticien(db: any, rechercheId: string, p: any, email: string, suivi: Suivi) {
   const lieux = (p.admin_reseau_lieux ?? []).map((l: any) => [l.raison_sociale, l.commune].filter(Boolean).join(", ")).filter(Boolean);
   const grille = TYPES_SIGNAL.filter((t) => SIGNAUX[t].parIa)
     .map((t) => `- ${t} : ${SIGNAUX[t].libelle}. Valeurs : ${SIGNAUX[t].valeurs.filter((v) => !v.startsWith("inconnu")).join(", ")}.`)
@@ -187,20 +211,34 @@ ${consignesCommunes}
 
 Réponds avec la liste des signaux établis, éventuellement vide.`;
 
-  const { resultat, usage } = await demander<{ signaux: any[] }>(consigne, SCHEMA_SIGNAUX, RECHERCHES_WEB.praticien);
+  await suivi.maj({ etape: "L'IA cherche sur le web", progression: 3, ligne: `Recherche lancée pour Dr ${p.prenom} ${p.nom}` });
+  const { resultat, usage } = await demander<{ signaux: any[] }>(consigne, SCHEMA_SIGNAUX, RECHERCHES_WEB.praticien, suivi, [5, 60]);
   const propositions = Array.isArray(resultat?.signaux) ? resultat.signaux : [];
+  await suivi.maj({
+    etape: "Vérification des sources", progression: 62,
+    ligne: propositions.length ? `${propositions.length} information${propositions.length > 1 ? "s" : ""} proposée${propositions.length > 1 ? "s" : ""} par l'IA : vérification de chaque source` : "L'IA n'a rien trouvé d'explicite",
+  });
+  let k = 0;
   const ecartees: { motif: string; url?: string; type?: string }[] = [];
   const retenues: any[] = [];
   for (const s of propositions) {
+    k++;
+    await suivi.maj({ etape: `Vérification des sources (${k}/${propositions.length})`, progression: 62 + (33 * k) / Math.max(1, propositions.length) });
     const type: unknown = s?.type;
     if (!estTypeSignal(type) || !SIGNAUX[type].parIa) { ecartees.push({ motif: "signal hors grille", type: String(type) }); continue; }
     if (!valeurAdmise(type, s.valeur) || /^inconnu/.test(s.valeur)) { ecartees.push({ motif: "valeur hors grille", type }); continue; }
     if (retenues.some((r) => r.type === type)) { ecartees.push({ motif: "doublon", type }); continue; }
     const v = await verifierSource(s.url, s.extrait, p.nom);
-    if (!v.ok) { ecartees.push({ motif: v.motif, url: typeof s.url === "string" ? s.url : undefined, type }); continue; }
+    if (!v.ok) {
+      ecartees.push({ motif: v.motif, url: typeof s.url === "string" ? s.url : undefined, type });
+      await suivi.maj({ ligne: `Écarté : ${SIGNAUX[type].libelle} (${hoteDe(s.url)}) : ${v.motif}`, niveau: "ecarte" });
+      continue;
+    }
+    await suivi.maj({ ligne: `Source vérifiée : ${SIGNAUX[type].libelle} (${hoteDe(s.url)})`, niveau: "ok" });
     retenues.push({ type, valeur: s.valeur, url: s.url, extrait: String(s.extrait).trim().slice(0, 500) });
   }
 
+  await suivi.maj({ etape: "Enregistrement des propositions", progression: 97 });
   // Les anciennes propositions de l'IA en attente sont remplacées par les nouvelles.
   await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("origine", "ia").eq("statut", "propose");
   if (retenues.length) {
@@ -209,8 +247,10 @@ Réponds avec la liste des signaux établis, éventuellement vide.`;
     })));
     if (error) throw new Error(error.message);
   }
+  await suivi.maj({ ligne: `Terminé : ${retenues.length} à valider, ${ecartees.length} écartée${ecartees.length > 1 ? "s" : ""}`, niveau: "ok" });
+  await suivi.attendre();
   await db.from("admin_reseau_recherches_ia").update({
-    statut: "termine", fin: new Date().toISOString(), usage,
+    statut: "termine", fin: new Date().toISOString(), usage, etape: "Terminé", progression: 100,
     resultat: { propositions: propositions.length, retenues: retenues.length, ecartees },
   }).eq("id", rechercheId);
 }
@@ -263,7 +303,7 @@ async function rapprocher(nom: string, prenom: string, commune: string, dep: str
   return { rpps: rpps[0] };
 }
 
-async function rechercherMg(db: any, rechercheId: string, dep: string, email: string) {
+async function rechercherMg(db: any, rechercheId: string, dep: string, email: string, suivi: Suivi) {
   const consigne = `Tu aides AvisDoc à constituer un réseau de médecins correspondants.
 Cherche des médecins GÉNÉRALISTES exerçant dans le département ${dep} (${DEPARTEMENTS[dep]}) qui indiquent publiquement être formés à la dermoscopie : DU ou DIU de dermoscopie, formation au dépistage des cancers de la peau, orientation dermatologique.
 Pour chacun, indique aussi s'il pratique la télé-expertise, avec sa propre source (sinon laisse ces deux champs vides).
@@ -271,36 +311,53 @@ Au plus ${MAX_CANDIDATS_MG} médecins.
 
 ${consignesCommunes}`;
 
-  const { resultat, usage } = await demander<{ medecins: any[] }>(consigne, SCHEMA_MG, RECHERCHES_WEB.mg_departement);
+  await suivi.maj({ etape: "L'IA cherche sur le web", progression: 2, ligne: `Recherche lancée : généralistes formés à la dermoscopie, ${DEPARTEMENTS[dep]}` });
+  const { resultat, usage } = await demander<{ medecins: any[] }>(consigne, SCHEMA_MG, RECHERCHES_WEB.mg_departement, suivi, [4, 45]);
   const candidats = (Array.isArray(resultat?.medecins) ? resultat.medecins : []).slice(0, MAX_CANDIDATS_MG);
+  await suivi.maj({
+    etape: "Vérification des médecins trouvés", progression: 47,
+    ligne: candidats.length ? `${candidats.length} médecin${candidats.length > 1 ? "s" : ""} proposé${candidats.length > 1 ? "s" : ""} par l'IA : vérification de la source, puis rapprochement avec le RPPS` : "L'IA n'a trouvé aucun généraliste avec une source explicite",
+  });
+  let k = 0;
   const ecartees: { motif: string; url?: string; nom?: string }[] = [];
   const crees: string[] = [];
   let dejaLa = 0;
   const extraitLe = await dateExtraction();
 
   for (const c of candidats) {
+    k++;
     const nom = String(c.nom ?? "").trim();
     const qui = `${c.prenom ?? ""} ${nom}`.trim();
-    if (!nom) { ecartees.push({ motif: "nom absent" }); continue; }
+    await suivi.maj({ etape: `Vérification ${k}/${candidats.length} : ${qui}`, progression: 47 + (50 * (k - 1)) / Math.max(1, candidats.length) });
+    const ecarter = (motif: string, url?: string) => {
+      ecartees.push({ motif, url, nom: qui });
+      return suivi.maj({ ligne: `Écarté : ${qui} : ${motif}`, niveau: "ecarte" });
+    };
+    if (!nom) { await ecarter("nom absent"); continue; }
     const v = await verifierSource(c.url, c.extrait, nom);
-    if (!v.ok) { ecartees.push({ motif: v.motif, url: c.url, nom: qui }); continue; }
+    if (!v.ok) { await ecarter(v.motif, c.url); continue; }
     const r = await rapprocher(nom, String(c.prenom ?? ""), String(c.commune ?? ""), dep);
-    if ("motif" in r) { ecartees.push({ motif: r.motif, url: c.url, nom: qui }); continue; }
+    if ("motif" in r) { await ecarter(r.motif, c.url); continue; }
     const fiche = praticienDepuisLignes(await lignesDuRpps(r.rpps), r.rpps);
-    if ("refus" in fiche) { ecartees.push({ motif: fiche.refus, nom: qui }); continue; }
-    if (fiche.praticien.population !== "MG_DERM") { ecartees.push({ motif: "pas généraliste (déjà couvert par l'import)", nom: qui }); continue; }
+    if ("refus" in fiche) { await ecarter(fiche.refus); continue; }
+    if (fiche.praticien.population !== "MG_DERM") { await ecarter("pas généraliste (déjà couvert par l'import)"); continue; }
 
     const e = await enregistrerPraticien(db, fiche.praticien, { origine: "ia", acteur: email, extraitLe, detail: { recherche_id: rechercheId } });
-    if (e.statut === "exclu") { ecartees.push({ motif: "exclu du réseau", nom: qui }); continue; }
-    if (e.statut === "deja_la") dejaLa++;
-    else crees.push(e.id);
+    if (e.statut === "exclu") { await ecarter("exclu du réseau"); continue; }
+    if (e.statut === "deja_la") {
+      dejaLa++;
+      await suivi.maj({ ligne: `Déjà dans la liste : ${qui} (RPPS ${r.rpps})`, niveau: "info" });
+    } else {
+      crees.push(e.id);
+      await suivi.maj({ ligne: `Ajouté : ${qui} (RPPS ${r.rpps}), source vérifiée sur ${hoteDe(c.url)}`, niveau: "ok" });
+    }
 
     // Les signaux trouvés restent des propositions : un opérateur les valide.
     const signaux: any[] = [{ type: "du_dermoscopie", valeur: "oui", url: c.url, extrait: String(c.extrait).trim().slice(0, 500) }];
     if (c.teleexpertise_url) {
       const vt = await verifierSource(c.teleexpertise_url, c.teleexpertise_extrait, nom);
       if (vt.ok) signaux.push({ type: "teleexpertise", valeur: "oui", url: c.teleexpertise_url, extrait: String(c.teleexpertise_extrait).trim().slice(0, 500) });
-      else ecartees.push({ motif: `télé-expertise : ${vt.motif}`, url: c.teleexpertise_url, nom: qui });
+      else await ecarter(`télé-expertise : ${vt.motif}`, c.teleexpertise_url);
     }
     const { data: enAttente } = await db.from("admin_reseau_signaux").select("type").eq("praticien_id", e.id).in("statut", ["propose", "valide"]);
     const deja = new Set((enAttente ?? []).map((x: any) => x.type));
@@ -310,10 +367,24 @@ ${consignesCommunes}`;
     }
   }
 
+  if (crees.length) {
+    await suivi.maj({ etape: "Recherche des fiches Google des généralistes ajoutés", progression: 97 });
+    await rechercherFichesGoogle(db, { ids: crees }).catch((e) => suivi.maj({ ligne: `Fiches Google : ${e instanceof Error ? e.message : String(e)}`, niveau: "ecarte" }));
+  }
+  await suivi.maj({ ligne: `Terminé : ${crees.length} ajouté${crees.length > 1 ? "s" : ""}, ${dejaLa} déjà là, ${ecartees.length} écarté${ecartees.length > 1 ? "s" : ""}`, niveau: "ok" });
+  await suivi.attendre();
   await db.from("admin_reseau_recherches_ia").update({
-    statut: "termine", fin: new Date().toISOString(), usage,
+    statut: "termine", fin: new Date().toISOString(), usage, etape: "Terminé", progression: 100,
     resultat: { propositions: candidats.length, crees: crees.length, deja_la: dejaLa, ecartees },
   }).eq("id", rechercheId);
+}
+
+async function echouer(db: any, id: string, suivi: Suivi, e: unknown) {
+  console.error(e);
+  const erreur = causeLisible(e);
+  await suivi.maj({ ligne: `Échec : ${erreur}`, niveau: "ecarte" });
+  await suivi.attendre();
+  await db.from("admin_reseau_recherches_ia").update({ statut: "echec", fin: new Date().toISOString(), erreur, etape: "Échec" }).eq("id", id);
 }
 
 // ── Point d'entrée ───────────────────────────────────────────────────────────
@@ -345,10 +416,8 @@ serve(async (req) => {
     const { data: r, error } = await db.from("admin_reseau_recherches_ia")
       .insert({ type: "praticien", praticien_id: p.id, lance_par: email }).select("id").single();
     if (error) return json({ error: error.message }, 500);
-    enTacheDeFond(rechercherPraticien(db, r.id, p, email).catch(async (e) => {
-      console.error(e);
-      await db.from("admin_reseau_recherches_ia").update({ statut: "echec", fin: new Date().toISOString(), erreur: causeLisible(e) }).eq("id", r.id);
-    }));
+    const suivi = new Suivi(db, r.id);
+    enTacheDeFond(rechercherPraticien(db, r.id, p, email, suivi).catch((e) => echouer(db, r.id, suivi, e)));
     return json({ recherche_id: r.id }, 202);
   }
 
@@ -360,10 +429,8 @@ serve(async (req) => {
     const { data: r, error } = await db.from("admin_reseau_recherches_ia")
       .insert({ type: "mg_derm_departement", departement: dep, lance_par: email }).select("id").single();
     if (error) return json({ error: error.message }, 500);
-    enTacheDeFond(rechercherMg(db, r.id, dep, email).catch(async (e) => {
-      console.error(e);
-      await db.from("admin_reseau_recherches_ia").update({ statut: "echec", fin: new Date().toISOString(), erreur: causeLisible(e) }).eq("id", r.id);
-    }));
+    const suivi = new Suivi(db, r.id);
+    enTacheDeFond(rechercherMg(db, r.id, dep, email, suivi).catch((e) => echouer(db, r.id, suivi, e)));
     return json({ recherche_id: r.id }, 202);
   }
 

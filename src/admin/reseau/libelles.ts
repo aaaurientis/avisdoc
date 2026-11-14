@@ -123,3 +123,35 @@ export function dateFr(iso: string | null | undefined): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
+
+export type StatutGoogle = "a_chercher" | "trouvee_auto" | "confirmee" | "a_confirmer" | "introuvable" | "aucune";
+
+export const STATUTS_GOOGLE: StatutGoogle[] = ["confirmee", "trouvee_auto", "a_confirmer", "introuvable", "aucune", "a_chercher"];
+
+export const GOOGLE_LABEL: Record<StatutGoogle, string> = {
+  confirmee: "Fiche confirmée",
+  trouvee_auto: "Fiche trouvée",
+  a_confirmer: "À confirmer",
+  introuvable: "Introuvable",
+  aucune: "Pas de fiche",
+  a_chercher: "À chercher",
+};
+
+export const GOOGLE_BADGE: Record<StatutGoogle, string> = {
+  confirmee: "bg-emerald-100 text-emerald-800",
+  trouvee_auto: "bg-emerald-50 text-emerald-700",
+  a_confirmer: "bg-amber-100 text-amber-800",
+  introuvable: "bg-slate-100 text-slate-600",
+  aucune: "bg-slate-100 text-slate-600",
+  a_chercher: "bg-slate-50 text-slate-500",
+};
+
+/** Ce que le badge veut dire, au survol. */
+export const GOOGLE_AIDE: Record<StatutGoogle, string> = {
+  confirmee: "Fiche Google choisie ou confirmée par un opérateur.",
+  trouvee_auto: "Rattachée automatiquement : un seul résultat au même nom et au même code postal. À vérifier sur la fiche.",
+  a_confirmer: "Plusieurs fiches possibles, ou une seule incertaine : choisissez la bonne sur la fiche.",
+  introuvable: "Google n'a renvoyé aucune fiche. Cela ne pénalise pas.",
+  aucune: "Un opérateur a indiqué qu'aucune fiche ne correspond. Cela ne pénalise pas.",
+  a_chercher: "Pas encore cherchée : la recherche automatique s'en charge.",
+};

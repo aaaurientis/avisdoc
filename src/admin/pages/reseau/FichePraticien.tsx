@@ -17,6 +17,9 @@ import {
   SOURCE_RPPS,
   TEXTES,
   dateFr,
+  GOOGLE_AIDE,
+  GOOGLE_BADGE,
+  GOOGLE_LABEL,
   estPerime,
   type MotifExclusion,
 } from "../../reseau/libelles";
@@ -37,6 +40,7 @@ import {
   type TypeSignal,
 } from "../../../../supabase/functions/_shared/reseau-signaux";
 import { cn } from "@/lib/utils";
+import AvancementIa from "./AvancementIa";
 
 const lienCls = "inline-flex items-center gap-1 font-semibold text-avisdoc-ink underline-offset-2 hover:underline";
 const btnSec = "inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50";
@@ -81,7 +85,7 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
         suivi.current = null;
         if (r?.statut === "termine") onChange();
       }
-    }, 5000);
+    }, 3000);
   }, [charger, onChange]);
 
   useEffect(() => {
@@ -292,27 +296,16 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
 }
 
 function ResumeRecherche({ recherche: r }: { recherche: RechercheIa | null }) {
-  const [details, setDetails] = useState(false);
   if (!r) return <p className="mt-1 text-[12px] text-muted-foreground">Jamais lancée. L'IA cherche sur le web public les signaux absents de la fiche Google ; chaque proposition est contrôlée sur sa source, puis validée par vous.</p>;
-  if (r.statut === "en_cours") return <p className="mt-1 text-[12px] text-muted-foreground">Lancée le {dateFr(r.debut)}. Les propositions s'affichent dès qu'elle se termine.</p>;
-  if (r.statut === "echec") return <p className="mt-1 text-[12px] font-semibold text-rose-700">Dernière recherche en échec : {r.erreur}</p>;
-  const ec = r.resultat?.ecartees ?? [];
+  if (r.statut !== "termine") return <AvancementIa recherche={r} />;
+  const nbEcartees = r.resultat?.ecartees?.length ?? 0;
   return (
-    <div className="mt-1 text-[12px] text-muted-foreground">
-      Le {dateFr(r.fin ?? r.debut)} : {r.resultat?.propositions ?? 0} trouvées, {r.resultat?.retenues ?? 0} retenues après contrôle de la source
-      {ec.length > 0 && (
-        <>
-          , {ec.length} écartées.{" "}
-          <button type="button" onClick={() => setDetails(!details)} className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline">{details ? "Masquer" : "Pourquoi ?"}</button>
-          {details && (
-            <ul className="mt-1 list-disc pl-4">
-              {ec.map((e, i) => <li key={i}>{e.type ? `${SIGNAUX[e.type as TypeSignal]?.libelle ?? e.type} : ` : ""}{e.motif}{e.url ? ` (${hote(e.url)})` : ""}</li>)}
-            </ul>
-          )}
-        </>
-      )}
-      {ec.length === 0 && "."}
-    </div>
+    <>
+      <p className="mt-1 text-[12px] text-muted-foreground">
+        Le {dateFr(r.fin ?? r.debut)} : {r.resultat?.propositions ?? 0} trouvées, {r.resultat?.retenues ?? 0} retenues après contrôle de la source, {nbEcartees} écartée{nbEcartees > 1 ? "s" : ""}.
+      </p>
+      <AvancementIa recherche={r} ouvertParDefaut={false} />
+    </>
   );
 }
 
@@ -367,7 +360,10 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
 
   return (
     <>
-      <SectionLabel className="mt-5">Fiche Google Maps</SectionLabel>
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <SectionLabel>Fiche Google Maps</SectionLabel>
+        <span title={GOOGLE_AIDE[p.googleStatut]}><Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge></span>
+      </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
       {!p.googlePlaceId && !p.googleAucuneFiche && !candidats && (
@@ -375,7 +371,9 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
           <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} title={bloque ? "Action indisponible." : undefined} className={btnSec}>
             {occupe === "chercher" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />} Trouver la fiche
           </button>
-          <span className="text-[11.5px] text-muted-foreground">Vous choisirez la bonne fiche parmi les résultats.</span>
+          <span className="text-[11.5px] text-muted-foreground">
+            {p.googleStatut === "a_confirmer" ? "Plusieurs fiches possibles : choisissez la bonne." : p.googleStatut === "introuvable" ? "La recherche automatique n'a rien trouvé : réessayez ou indiquez qu'il n'y a pas de fiche." : "Vous choisirez la bonne fiche parmi les résultats."}
+          </span>
         </div>
       )}
 
@@ -408,8 +406,16 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
           <button type="button" onClick={() => void afficher(false)} disabled={!!occupe} className={btnSec}>
             {occupe === "fiche" ? <Loader2 className="size-3.5 animate-spin" /> : <MapPin className="size-3.5" />} Afficher la fiche
           </button>
+          {p.googleStatut === "trouvee_auto" && (
+            <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", async () => { await reseauRepo.confirmerGoogle(p.id); onChange(); })} className={btnSec}>
+              {occupe === "confirmer" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} C'est la bonne fiche
+            </button>
+          )}
           <button type="button" disabled={bloque || !!occupe} onClick={() => void rattacher({ retirer: true })} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de fiche</button>
         </div>
+      )}
+      {p.googlePlaceId && p.googleStatut === "trouvee_auto" && (
+        <p className="mt-1 text-[11px] text-muted-foreground">Rattachée automatiquement : un seul résultat au même nom et au même code postal. Affichez-la pour vérifier.</p>
       )}
 
       {fiche && (

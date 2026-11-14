@@ -67,6 +67,46 @@ Dans **Trouver des médecins › un département › une fiche praticien** :
    « DU ou formation en dermoscopie » (et « télé-expertise » s'il est trouvé) reste à
    valider.
 
+## Suivre l'avancement d'une recherche IA
+
+Ajouté le 14/11 à la demande d'Arthur, migration `0089_reseau_aval_avancement_ia.sql`.
+Pendant une recherche, sur la fiche praticien comme sur l'écran du département, l'écran
+se rafraîchit toutes les 3 secondes et affiche :
+
+- l'étape en cours, par exemple « Recherche sur le web (2/5) » ou « Vérification des
+  sources (3/4) » ;
+- une barre de progression et la durée écoulée ;
+- le journal : chaque recherche web lancée par l'IA (avec ses mots-clés, annoncée dès son
+  lancement grâce au mode flux), le nombre de pages trouvées, chaque source vérifiée ou
+  écartée avec son motif, chaque généraliste ajouté ou écarté.
+
+Une fois la recherche terminée, le journal reste consultable (« Voir le journal »). Il
+contient des adresses de pages et des motifs, jamais d'extrait de page.
+
+## Recherche automatique de la fiche Google
+
+Ajoutée le 14/11 à la demande d'Arthur (migration `0090_reseau_aval_google_auto.sql`).
+
+- **Quand.** Dès qu'un praticien entre dans le tableau : à la fin de chaque import RPPS,
+  après un ajout par RPPS, et après la recherche IA des généralistes. Le bouton « Chercher
+  maintenant » relance la recherche pour ceux qui restent.
+- **Comment.** Une recherche Google Places par praticien (« Dr Prénom Nom, spécialité,
+  commune »). La fiche est **rattachée d'office seulement si un seul résultat porte le nom
+  du praticien ET le code postal d'un de ses lieux d'exercice RPPS**, et n'est pas fermée.
+  Sinon le praticien passe « À confirmer » (plusieurs fiches possibles) ou « Introuvable ».
+  Un choix fait par un opérateur n'est jamais écrasé.
+- **Dans le tableau.** La colonne « Google » indique le statut : fiche confirmée, fiche
+  trouvée, à confirmer, introuvable, pas de fiche, ou à chercher. Elle a son filtre, et
+  devient un pictogramme coloré quand une fiche est ouverte. Sur la fiche, « C'est la bonne
+  fiche » confirme une fiche trouvée automatiquement.
+- **Suivi.** La recherche des fiches d'un département s'affiche comme une recherche IA :
+  étape, pourcentage, journal.
+- **Budget.** Une recherche par praticien. Le plafond quotidien passe à 200 recherches
+  (`RESEAU_GOOGLE_PLAFOND_RECHERCHE`). Au-delà, la suite reprend le lendemain ou au clic
+  sur « Chercher maintenant ». Un lot traite au plus 150 praticiens. Pour un gros
+  département comme Paris (≈ 1 600 praticiens), comptez une dizaine de jours, ou
+  relevez le plafond en connaissant le coût (voir l'estimation de la note du lot 0).
+
 ## Fichiers
 
 | Fichier | Rôle |

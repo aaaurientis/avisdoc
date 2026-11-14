@@ -21,6 +21,7 @@ import {
   SPECIALITES,
 } from "../_shared/reseau-rpps.ts";
 import { dateExtraction, lignesSpecialiteDepartement } from "../_shared/tabulaire-rpps.ts";
+import { demarrerRechercheGoogle } from "../_shared/google-places.ts";
 
 function versLigne(p: PraticienRpps, extraitLe: string | null) {
   return {
@@ -203,7 +204,10 @@ serve(async (req) => {
       });
     }
 
-    return json({ import_id: imp.id, compteurs, rpps_extrait_le: extraitLe });
+    // Les fiches Google des nouveaux venus se cherchent aussitôt, en tâche de fond.
+    const rechercheGoogle = await demarrerRechercheGoogle(db, dep, email).catch((e) => { console.error(e); return null; });
+
+    return json({ import_id: imp.id, compteurs, rpps_extrait_le: extraitLe, recherche_google_id: rechercheGoogle });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error(e);
