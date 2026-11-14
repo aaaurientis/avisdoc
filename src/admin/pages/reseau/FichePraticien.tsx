@@ -30,6 +30,7 @@ import {
 import {
   reseauRepo,
   type CandidatGoogle,
+  type InfosDoctolib,
   type FicheGoogle,
   type PraticienReseau,
   type RechercheIa,
@@ -565,6 +566,8 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
             <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("retirer", () => reseauRepo.doctolib(p.id, { retirer: true }))} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de lien</button>
           </div>
 
+          {p.doctolibInfos && <InfosDoctolibBloc infos={p.doctolibInfos} le={p.doctolibReleveLe} par={p.doctolibRelevePar} />}
+
           {/* Relevé du premier créneau : lu par l'opérateur sur la fiche, enregistré avec son lien et sa date */}
           <div className="mt-3 border-t border-border/60 pt-2">
             <div className="text-[11.5px] font-semibold text-avisdoc-ink">Premier créneau pour un nouveau patient</div>
@@ -609,6 +612,33 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
         </div>
       )}
     </>
+  );
+}
+
+function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: string | null; par: string | null }) {
+  const lignes: [string, string | null][] = [
+    ["Spécialité", infos.specialite],
+    ["Conventionnement", infos.conventionnement],
+    ["Carte Vitale", infos.carteVitale === null ? null : infos.carteVitale ? "Acceptée" : "Non acceptée"],
+    ["Téléconsultation", infos.teleconsultation ? "Proposée" : null],
+    ["Langues", infos.langues.join(", ") || null],
+    ["Tarifs", infos.tarifs.join(" · ") || null],
+  ];
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2 text-[12px]">
+      <div className="font-semibold text-avisdoc-ink">Relevé de la fiche Doctolib</div>
+      <div className="text-muted-foreground">Le {dateFr(le)}{par ? ` par ${par}` : ""}</div>
+      {lignes.filter(([, v]) => v).map(([t, v]) => (
+        <div key={t} className="mt-1 grid grid-cols-[110px_1fr] gap-2"><span className="text-muted-foreground">{t}</span><span className="text-avisdoc-ink">{v}</span></div>
+      ))}
+      {infos.expertises.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">{infos.expertises.map((x) => <Badge key={x} className="bg-card text-avisdoc-ink">{x}</Badge>)}</div>
+      )}
+      {infos.presentation && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Présentation</summary><p className="mt-1 text-muted-foreground">{infos.presentation}</p></details>
+      )}
+      <p className="mt-1 text-[11px] text-muted-foreground">Pour mettre à jour : ouvrez la fiche Doctolib et cliquez sur le favori « Relever sur Doctolib ».</p>
+    </div>
   );
 }
 

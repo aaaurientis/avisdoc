@@ -3,7 +3,7 @@
 // résumée du praticien, exclusion définitive.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarCheck, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Card, Modal, PageHeader } from "../components/ui";
@@ -76,7 +76,9 @@ export default function ReseauDepartement() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [importEnCours, setImportEnCours] = useState(false);
-  const [selection, setSelection] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  // ?praticien=… : ouvrir directement sa fiche (retour d'un relevé Doctolib, par exemple).
+  const [selection, setSelection] = useState<string | null>(params.get("praticien"));
   const [signaux, setSignaux] = useState<SignalReseau[]>([]);
   const [rechercheMg, setRechercheMg] = useState<RechercheIa | null>(null);
   const [rechercheGoogle, setRechercheGoogle] = useState<RechercheIa | null>(null);

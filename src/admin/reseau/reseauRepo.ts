@@ -50,7 +50,24 @@ export interface PraticienReseau {
   googlePlaceIds: string[];
   doctolibUrl: string | null;
   doctolibStatut: StatutDoctolib;
+  /** Rubriques relevées sur la fiche Doctolib par un opérateur. */
+  doctolibInfos: InfosDoctolib | null;
+  doctolibReleveLe: string | null;
+  doctolibRelevePar: string | null;
   lieux: LieuReseau[];
+}
+
+export interface InfosDoctolib {
+  specialite: string | null;
+  expertises: string[];
+  conventionnement: string | null;
+  carteVitale: boolean | null;
+  teleconsultation: boolean | null;
+  tarifs: string[];
+  langues: string[];
+  presentation: string | null;
+  adresses: string[];
+  premierCreneau: { date: string | null; jours: number | null; valeur: string | null } | null;
 }
 
 export interface SignalReseau {
@@ -168,6 +185,9 @@ const toPraticien = (r: any): PraticienReseau => ({
   googlePlaceIds: Array.isArray(r.google_place_ids) && r.google_place_ids.length ? r.google_place_ids : r.google_place_id ? [r.google_place_id] : [],
   doctolibUrl: r.doctolib_url ?? null,
   doctolibStatut: r.doctolib_statut ?? "a_chercher",
+  doctolibInfos: r.doctolib_infos ?? null,
+  doctolibReleveLe: r.doctolib_releve_le ?? null,
+  doctolibRelevePar: r.doctolib_releve_par ?? null,
   lieux: (r.admin_reseau_lieux ?? []).map(toLieu),
 });
 
@@ -344,6 +364,18 @@ export const reseauRepo = {
     }),
   chercherGoogle: (praticienId: string, departement?: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
     appeler("reseau-google", { action: "chercher", praticien_id: praticienId, departement }),
+  /** Praticiens candidats pour un relevé Doctolib : même lien, ou même nom de famille. */
+  async praticiensPourDoctolib(url: string, nomFamille: string): Promise<PraticienReseau[]> {
+    const parLien = url ? await sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").eq("doctolib_url", url).limit(5) : { data: [], error: null };
+    if (parLien.error) throw new Error(parLien.error.message);
+    if (parLien.data?.length) return parLien.data.map(toPraticien);
+    if (!nomFamille) return [];
+    const { data, error } = await sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").ilike("nom", nomFamille).limit(20);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(toPraticien);
+  },
+  enregistrerFicheDoctolib: (praticienId: string, url: string, infos: InfosDoctolib, signaux: { type: TypeSignal; valeur: string }[]) =>
+    appeler("reseau-action", { action: "doctolib_fiche", praticien_id: praticienId, url, infos, signaux }),
   doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true }) =>
     appeler("reseau-action", { action: "doctolib", praticien_id: praticienId, ...choix }),
 

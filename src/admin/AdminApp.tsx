@@ -6,6 +6,7 @@ import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
 import ReseauDepartements from "./pages/ReseauDepartements";
 import ReseauDepartement from "./pages/ReseauDepartement";
+import ReleveDoctolib from "./pages/reseau/ReleveDoctolib";
 import Dashboard from "./pages/Dashboard";
 import Crm from "./pages/Crm";
 import CrmSynthese from "./pages/CrmSynthese";
@@ -167,6 +168,7 @@ function Gate() {
           <Route path="/contacts/requis" element={<Garde module="sante"><Contacts fixedType="Requis" /></Garde>} />
           <Route path="/contacts/reseau" element={<Garde module="sante"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
           <Route path="/reseau-aval" element={<Garde module="sante"><ReseauDepartements /></Garde>} />
+          <Route path="/reseau-aval/doctolib" element={<Garde module="sante"><ReleveDoctolib /></Garde>} />
           <Route path="/reseau-aval/:code" element={<Garde module="sante"><ReseauDepartement /></Garde>} />
           <Route path="/journees" element={<Garde module="journee"><JourneesStatistiques /></Garde>} />
           <Route path="/journees/calendrier" element={<Garde module="journee"><JourneesCalendrier /></Garde>} />
