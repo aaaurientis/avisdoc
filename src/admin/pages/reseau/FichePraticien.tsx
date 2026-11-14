@@ -17,6 +17,9 @@ import {
   SOURCE_RPPS,
   TEXTES,
   dateFr,
+  GOOGLE_AIDE,
+  GOOGLE_BADGE,
+  GOOGLE_LABEL,
   estPerime,
   type MotifExclusion,
 } from "../../reseau/libelles";
@@ -357,7 +360,10 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
 
   return (
     <>
-      <SectionLabel className="mt-5">Fiche Google Maps</SectionLabel>
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <SectionLabel>Fiche Google Maps</SectionLabel>
+        <span title={GOOGLE_AIDE[p.googleStatut]}><Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge></span>
+      </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
       {!p.googlePlaceId && !p.googleAucuneFiche && !candidats && (
@@ -365,7 +371,9 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
           <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} title={bloque ? "Action indisponible." : undefined} className={btnSec}>
             {occupe === "chercher" ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />} Trouver la fiche
           </button>
-          <span className="text-[11.5px] text-muted-foreground">Vous choisirez la bonne fiche parmi les résultats.</span>
+          <span className="text-[11.5px] text-muted-foreground">
+            {p.googleStatut === "a_confirmer" ? "Plusieurs fiches possibles : choisissez la bonne." : p.googleStatut === "introuvable" ? "La recherche automatique n'a rien trouvé : réessayez ou indiquez qu'il n'y a pas de fiche." : "Vous choisirez la bonne fiche parmi les résultats."}
+          </span>
         </div>
       )}
 
@@ -398,8 +406,16 @@ function BlocGoogle({ praticien: p, lectureSeule, onChange }: { praticien: Prati
           <button type="button" onClick={() => void afficher(false)} disabled={!!occupe} className={btnSec}>
             {occupe === "fiche" ? <Loader2 className="size-3.5 animate-spin" /> : <MapPin className="size-3.5" />} Afficher la fiche
           </button>
+          {p.googleStatut === "trouvee_auto" && (
+            <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", async () => { await reseauRepo.confirmerGoogle(p.id); onChange(); })} className={btnSec}>
+              {occupe === "confirmer" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} C'est la bonne fiche
+            </button>
+          )}
           <button type="button" disabled={bloque || !!occupe} onClick={() => void rattacher({ retirer: true })} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de fiche</button>
         </div>
+      )}
+      {p.googlePlaceId && p.googleStatut === "trouvee_auto" && (
+        <p className="mt-1 text-[11px] text-muted-foreground">Rattachée automatiquement : un seul résultat au même nom et au même code postal. Affichez-la pour vérifier.</p>
       )}
 
       {fiche && (

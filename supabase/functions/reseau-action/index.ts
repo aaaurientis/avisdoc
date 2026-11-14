@@ -9,6 +9,7 @@
 //   • signal_valider       { signal_id } — proposition de l'IA acceptée
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_id } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
+//   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
 //   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
 //
 // Réservé au droit « sante ». Déploiement : supabase functions deploy reseau-action
@@ -20,6 +21,8 @@ import { estDepartement, normaliserRpps, praticienDepuisLignes } from "../_share
 import { estTypeSignal, urlValide, valeurAdmise } from "../_shared/reseau-signaux.ts";
 import { dateExtraction, lignesDuRpps } from "../_shared/tabulaire-rpps.ts";
 import { enregistrerPraticien } from "../_shared/enregistrer-praticien.ts";
+import { rechercherFichesGoogle } from "../_shared/google-places.ts";
+import { enTacheDeFond } from "../_shared/suivi.ts";
 
 const ETATS_DEPARTEMENT = ["a_ouvrir", "importe", "en_qualification", "en_contact", "couvert", "en_veille"];
 const MOTIFS_EXCLUSION = ["opposition", "esthetique_dominante", "n_exerce_plus", "autre"];
@@ -165,12 +168,13 @@ serve(async (req) => {
       const { data: p } = await db.from("admin_reseau_praticiens").select("id").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
       if (!p) return json({ error: "Praticien introuvable." }, 404);
       let maj: Record<string, unknown>;
-      if (corps.retirer) maj = { google_place_id: null, google_aucune_fiche: false, google_rattache_par: null, google_rattache_le: null };
-      else if (corps.aucune) maj = { google_place_id: null, google_aucune_fiche: true, google_rattache_par: email, google_rattache_le: new Date().toISOString() };
+      // « Retirer » : l'opérateur choisira lui-même parmi les fiches (pas de nouvelle recherche automatique).
+      if (corps.retirer) maj = { google_place_id: null, google_aucune_fiche: false, google_rattache_par: null, google_rattache_le: null, google_statut: "a_confirmer" };
+      else if (corps.aucune) maj = { google_place_id: null, google_aucune_fiche: true, google_rattache_par: email, google_rattache_le: new Date().toISOString(), google_statut: "aucune" };
       else {
         const placeId = String(corps.place_id ?? "").trim();
         if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return json({ error: "Identifiant de fiche Google invalide." }, 400);
-        maj = { google_place_id: placeId, google_aucune_fiche: false, google_rattache_par: email, google_rattache_le: new Date().toISOString() };
+        maj = { google_place_id: placeId, google_aucune_fiche: false, google_rattache_par: email, google_rattache_le: new Date().toISOString(), google_statut: "confirmee" };
       }
       const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
@@ -178,6 +182,17 @@ serve(async (req) => {
         praticien_id: p.id, acteur: email, action: "google_rattache",
         detail: { place_id: maj.google_place_id ?? null, aucune: maj.google_aucune_fiche ?? false },
       });
+      return json({ id: p.id });
+    }
+
+    case "google_confirmer": {
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, google_statut, google_place_id").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.google_statut !== "trouvee_auto" || !p.google_place_id) return json({ error: "Aucune fiche trouvée automatiquement à confirmer." }, 409);
+      const { error } = await db.from("admin_reseau_praticiens")
+        .update({ google_statut: "confirmee", google_rattache_par: email, google_rattache_le: new Date().toISOString() }).eq("id", p.id);
+      if (error) return json({ error: error.message }, 500);
+      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "google_confirme", detail: { place_id: p.google_place_id } });
       return json({ id: p.id });
     }
 
@@ -190,6 +205,8 @@ serve(async (req) => {
         if ("refus" in r) return json({ error: r.refus }, 422);
         const e = await enregistrerPraticien(db, r.praticien, { origine: "manuel", acteur: email, extraitLe });
         if (e.statut === "exclu") return json({ error: "Ce praticien est exclu du réseau : il ne peut pas y revenir." }, 409);
+        // Sa fiche Google se cherche aussitôt, en tâche de fond.
+        if (e.statut === "cree") enTacheDeFond(rechercherFichesGoogle(db, { ids: [e.id] }).catch((x) => console.error(x)));
         return json({
           ...e, nom: `${r.praticien.prenom} ${r.praticien.nom}`, population: r.praticien.population,
           departements: [...new Set(r.praticien.lieux.map((l) => l.departement))],

@@ -37,47 +37,13 @@ import {
 } from "../_shared/reseau-signaux.ts";
 import { dateExtraction, lignesDuNom, lignesDuRpps } from "../_shared/tabulaire-rpps.ts";
 import { enregistrerPraticien } from "../_shared/enregistrer-praticien.ts";
+import { enTacheDeFond, Suivi } from "../_shared/suivi.ts";
+import { rechercherFichesGoogle } from "../_shared/google-places.ts";
 
 const MODELE = Deno.env.get("RESEAU_MODEL_RECHERCHE") ?? "claude-opus-5-5";
 const RECHERCHES_WEB = { praticien: 5, mg_departement: 8 };
 const MAX_CANDIDATS_MG = 15;
 
-function enTacheDeFond(travail: Promise<unknown>): void {
-  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-  if (rt?.waitUntil) rt.waitUntil(travail.catch(() => {}));
-  else void travail.catch(() => {});
-}
-
-// ── Suivi de l'avancement (relu par l'écran toutes les 3 secondes) ───────────
-
-type Niveau = "info" | "ok" | "ecarte";
-
-class Suivi {
-  private journal: { le: string; texte: string; niveau: Niveau }[] = [];
-  private etape = "";
-  private progression = 0;
-  private file: Promise<unknown> = Promise.resolve();
-  constructor(private db: any, private id: string) {}
-
-  /** Écrit l'étape, le pourcentage et une ligne de journal. Les écritures restent dans l'ordre. */
-  maj(o: { etape?: string; progression?: number; ligne?: string; niveau?: Niveau }): Promise<unknown> {
-    if (o.etape) this.etape = o.etape;
-    if (o.progression !== undefined) this.progression = Math.max(this.progression, Math.min(99, Math.round(o.progression)));
-    if (o.ligne) this.journal = [...this.journal, { le: new Date().toISOString(), texte: o.ligne.slice(0, 300), niveau: o.niveau ?? "info" }].slice(-40);
-    const ligne = { etape: this.etape, progression: this.progression, journal: this.journal };
-    this.file = this.file.then(() => this.db.from("admin_reseau_recherches_ia").update(ligne).eq("id", this.id)).catch(() => {});
-    return this.file;
-  }
-
-  /** La dernière écriture avant de clore la recherche. */
-  attendre(): Promise<unknown> {
-    return this.file;
-  }
-
-  get lignes() {
-    return this.journal;
-  }
-}
 
 const hoteDe = (u: unknown) => { try { return new URL(String(u)).hostname.replace(/^www\./, ""); } catch { return String(u ?? ""); } };
 
@@ -401,6 +367,10 @@ ${consignesCommunes}`;
     }
   }
 
+  if (crees.length) {
+    await suivi.maj({ etape: "Recherche des fiches Google des généralistes ajoutés", progression: 97 });
+    await rechercherFichesGoogle(db, { ids: crees }).catch((e) => suivi.maj({ ligne: `Fiches Google : ${e instanceof Error ? e.message : String(e)}`, niveau: "ecarte" }));
+  }
   await suivi.maj({ ligne: `Terminé : ${crees.length} ajouté${crees.length > 1 ? "s" : ""}, ${dejaLa} déjà là, ${ecartees.length} écarté${ecartees.length > 1 ? "s" : ""}`, niveau: "ok" });
   await suivi.attendre();
   await db.from("admin_reseau_recherches_ia").update({

@@ -16,12 +16,12 @@ function duree(debut: string, fin: string | null): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
 }
 
-export default function AvancementIa({ recherche: r, ouvertParDefaut = true }: { recherche: RechercheIa; ouvertParDefaut?: boolean }) {
+export default function AvancementIa({ recherche: r, ouvertParDefaut = true, lignesVisibles = 8 }: { recherche: RechercheIa; ouvertParDefaut?: boolean; lignesVisibles?: number }) {
   const [tout, setTout] = useState(false);
   const [ouvert, setOuvert] = useState(ouvertParDefaut);
   const enCours = r.statut === "en_cours";
   const pct = r.statut === "termine" ? 100 : r.progression;
-  const lignes = tout ? r.journal : r.journal.slice(-8);
+  const lignes = tout ? r.journal : r.journal.slice(-lignesVisibles);
 
   return (
     <div className="mt-1.5 rounded-xl border border-border/70 bg-card px-3 py-2.5 text-[12px]">

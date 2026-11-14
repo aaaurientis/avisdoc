@@ -7,6 +7,8 @@
 // Actions :
 //   • chercher { praticien_id }            — fiches candidates, l'opérateur choisit
 //   • details  { praticien_id, avis? }     — la fiche rattachée, en direct
+//   • auto     { departement }             — recherche automatique des fiches
+//                                            encore « à chercher » (tâche de fond)
 //
 // Coût maîtrisé : masque de champs minimal, avis chargés seulement à la demande,
 // quota quotidien compté en base (plafond réglable par variables d'environnement).
@@ -17,40 +19,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
-import { POPULATION_LIBELLE } from "../_shared/reseau-rpps.ts";
+import { appelGoogle, chercherFiches, cleGoogle, compterAppel, demarrerRechercheGoogle, QUOTA_ATTEINT, requeteFiche } from "../_shared/google-places.ts";
+import { estDepartement } from "../_shared/reseau-rpps.ts";
 
-const RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 const DETAILS = "https://places.googleapis.com/v1/places/";
-// La clé du projet est restreinte aux appels venant du Hub (référent HTTP), comme pour Merx.
-const REFERENT_HUB = "https://admin.avisdoc.fr/";
-const PLAFONDS = {
-  recherche: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_RECHERCHE") ?? 100),
-  details: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_DETAILS") ?? 300),
-  details_avis: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_AVIS") ?? 100),
-};
-
-const CHAMPS_RECHERCHE = "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.businessStatus";
 const CHAMPS_DETAILS = [
   "id", "displayName", "formattedAddress", "nationalPhoneNumber", "websiteUri", "googleMapsUri",
   "regularOpeningHours.weekdayDescriptions", "rating", "userRatingCount", "businessStatus", "primaryTypeDisplayName",
 ].join(",");
-
-const quotaAtteint = "Quota Google du jour atteint : les informations Google reviennent demain.";
-
-async function appelGoogle(url: string, init: RequestInit, cle: string, masque: string): Promise<any> {
-  const r = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(10_000),
-    headers: { ...(init.headers ?? {}), "X-Goog-Api-Key": cle, "X-Goog-FieldMask": masque, Referer: REFERENT_HUB },
-  });
-  if (!r.ok) {
-    const corps = (await r.text().catch(() => "")).slice(0, 200);
-    console.error("Google Places", r.status, corps);
-    if (r.status === 403) throw new Error("Google refuse la clé : vérifiez que l'API Places (New) est activée pour la clé serveur.");
-    throw new Error(`Google Maps a répondu ${r.status}. Réessayez.`);
-  }
-  return r.json();
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -58,11 +34,22 @@ serve(async (req) => {
   const acces = await verifierAccesSante(req);
   if ("refus" in acces) return acces.refus;
 
-  const cle = (Deno.env.get("GOOGLE_PLACES_KEY") ?? Deno.env.get("GOOGLE_MAPS_KEY") ?? "").trim();
+  const cle = cleGoogle();
   if (!cle) return json({ error: "Aucune clé Google n'est configurée sur le projet (GOOGLE_PLACES_KEY)." }, 500);
 
   const corps = await req.json().catch(() => ({}));
   const db = clientService();
+
+  if (corps.action === "auto") {
+    const dep = String(corps.departement ?? "").toUpperCase();
+    if (!estDepartement(dep)) return json({ error: "Département inconnu." }, 400);
+    try {
+      return json({ recherche_id: await demarrerRechercheGoogle(db, dep, acces.email) }, 202);
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    }
+  }
+
   const { data: p } = await db
     .from("admin_reseau_praticiens")
     .select("id, nom, prenom, population, google_place_id, admin_reseau_lieux(commune, code_postal, raison_sociale)")
@@ -70,37 +57,20 @@ serve(async (req) => {
     .maybeSingle();
   if (!p) return json({ error: "Praticien introuvable." }, 404);
 
-  const compter = async (type: keyof typeof PLAFONDS) => {
-    const { data, error } = await db.rpc("admin_reseau_compter_appel_google", { t: type, plafond: PLAFONDS[type] });
-    if (error) throw new Error(error.message);
-    return data === true;
-  };
+  const compter = (type: "recherche" | "details" | "details_avis") => compterAppel(db, type);
 
   try {
     if (corps.action === "chercher") {
-      if (!(await compter("recherche"))) return json({ error: quotaAtteint }, 429);
-      const communes = [...new Set((p.admin_reseau_lieux ?? []).map((l: any) => l.commune).filter(Boolean))];
-      const requete = [`Dr ${p.prenom} ${p.nom}`, POPULATION_LIBELLE[p.population as keyof typeof POPULATION_LIBELLE], communes[0]]
-        .filter(Boolean).join(" ");
-      const d = await appelGoogle(RECHERCHE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ textQuery: requete, languageCode: "fr", regionCode: "FR", maxResultCount: 5 }),
-      }, cle, CHAMPS_RECHERCHE);
-      const candidats = (d?.places ?? []).map((x: any) => ({
-        place_id: x.id,
-        nom: x.displayName?.text ?? "",
-        adresse: x.formattedAddress ?? "",
-        categorie: x.primaryTypeDisplayName?.text ?? null,
-        ferme: x.businessStatus === "CLOSED_PERMANENTLY",
-      }));
+      if (!(await compter("recherche"))) return json({ error: QUOTA_ATTEINT }, 429);
+      const candidats = await chercherFiches(p, cle);
+      const requete = requeteFiche(p);
       return json({ requete, candidats });
     }
 
     if (corps.action === "details") {
       if (!p.google_place_id) return json({ error: "Aucune fiche Google n'est rattachée à ce praticien." }, 400);
       const avecAvis = corps.avis === true;
-      if (!(await compter(avecAvis ? "details_avis" : "details"))) return json({ error: quotaAtteint }, 429);
+      if (!(await compter(avecAvis ? "details_avis" : "details"))) return json({ error: QUOTA_ATTEINT }, 429);
       const masque = avecAvis ? `${CHAMPS_DETAILS},reviews` : CHAMPS_DETAILS;
       const x = await appelGoogle(`${DETAILS}${encodeURIComponent(p.google_place_id)}?languageCode=fr&regionCode=FR`, { method: "GET" }, cle, masque);
       // Renvoyé pour affichage seulement : rien de ce contenu n'est enregistré.

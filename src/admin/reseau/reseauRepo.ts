@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseAdmin as sb } from "../data/supabaseAdmin";
 import { messageErreurFonction } from "../lib/erreurFonction";
-import type { EtatDepartement, EtatPraticien, MotifExclusion, Population, Role } from "./libelles";
+import type { EtatDepartement, EtatPraticien, MotifExclusion, Population, Role, StatutGoogle } from "./libelles";
 import type { TypeSignal } from "../../../supabase/functions/_shared/reseau-signaux";
 
 export interface DepartementReseau {
@@ -43,6 +43,7 @@ export interface PraticienReseau {
   vuAuDernierImport: boolean;
   googlePlaceId: string | null;
   googleAucuneFiche: boolean;
+  googleStatut: StatutGoogle;
   lieux: LieuReseau[];
 }
 
@@ -63,11 +64,11 @@ export interface SignalReseau {
 
 export interface RechercheIa {
   id: string;
-  type: "praticien" | "mg_derm_departement";
+  type: "praticien" | "mg_derm_departement" | "google_departement";
   statut: "en_cours" | "termine" | "echec";
   debut: string;
   fin: string | null;
-  resultat: { propositions?: number; retenues?: number; crees?: number; deja_la?: number; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
+  resultat: { propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
   erreur: string | null;
   /** Avancement en direct : étape en cours, pourcentage, journal. */
   etape: string | null;
@@ -138,6 +139,7 @@ const toPraticien = (r: any): PraticienReseau => ({
   vuAuDernierImport: r.vu_au_dernier_import !== false,
   googlePlaceId: r.google_place_id ?? null,
   googleAucuneFiche: r.google_aucune_fiche === true,
+  googleStatut: r.google_statut ?? (r.google_place_id ? "confirmee" : r.google_aucune_fiche ? "aucune" : "a_chercher"),
   lieux: (r.admin_reseau_lieux ?? []).map(toLieu),
 });
 
@@ -263,9 +265,11 @@ export const reseauRepo = {
     return out;
   },
 
-  async derniereRecherche(cible: { praticienId: string } | { departement: string }): Promise<RechercheIa | null> {
+  async derniereRecherche(
+    cible: { praticienId: string } | { departement: string; type: "mg_derm_departement" | "google_departement" },
+  ): Promise<RechercheIa | null> {
     let q = sb.from("admin_reseau_recherches_ia").select("*").order("debut", { ascending: false }).limit(1);
-    q = "praticienId" in cible ? q.eq("praticien_id", cible.praticienId) : q.eq("departement", cible.departement);
+    q = "praticienId" in cible ? q.eq("praticien_id", cible.praticienId) : q.eq("departement", cible.departement).eq("type", cible.type);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return data?.[0] ? toRecherche(data[0]) : null;
@@ -283,6 +287,9 @@ export const reseauRepo = {
     }),
   chercherGoogle: (praticienId: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
     appeler("reseau-google", { action: "chercher", praticien_id: praticienId }),
+  confirmerGoogle: (praticienId: string) => appeler("reseau-action", { action: "google_confirmer", praticien_id: praticienId }),
+  lancerGoogleAuto: (departement: string): Promise<{ recherche_id: string | null }> =>
+    appeler("reseau-google", { action: "auto", departement }),
   ficheGoogle: (praticienId: string, avis = false): Promise<FicheGoogle> =>
     appeler("reseau-google", { action: "details", praticien_id: praticienId, avis }),
 
