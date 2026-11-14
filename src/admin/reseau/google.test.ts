@@ -77,3 +77,17 @@ describe("réseau d'aval : validation automatique à l'adresse RPPS", () => {
     ], "ARNOUX", lieux, ["38"])).toEqual({ statut: "trouvee_auto", placeIds: ["A", "B"] });
   });
 });
+
+describe("réseau d'aval : cas réel du 14/11 (Dr Boudet, Clermont-Ferrand)", () => {
+  it("valide d'office une fiche au nom et à l'adresse RPPS", async () => {
+    const { forceFiche } = await import("../../../supabase/functions/_shared/google-correspondance");
+    const lieux = [
+      { codePostal: "63100", adresse: "1 RUE SIMMER" },
+      { codePostal: "63100", adresse: "123 Boulevard ETIENNE CLEMENTEL" },
+    ];
+    expect(forceFiche(
+      { place_id: "x", nom: "Cabinet ORL 56 république Dr Boudet Stéphane", adresse: "1 Rue Simmer, 63100 Clermont-Ferrand, France", ferme: false },
+      "BOUDET", lieux,
+    )).toBe("certaine");
+  });
+});

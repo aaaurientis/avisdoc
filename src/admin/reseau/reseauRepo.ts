@@ -88,6 +88,8 @@ export interface CandidatGoogle {
 }
 
 export interface FicheGoogle {
+  /** La fiche vient d'être validée d'office (nom et adresse RPPS). */
+  valideeAuto?: boolean;
   place_id: string;
   nom: string;
   adresse: string | null;
