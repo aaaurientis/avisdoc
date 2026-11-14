@@ -3,7 +3,9 @@
 
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useJournees, useRegles } from "../../data/journeesStore";
+import { useExpertises, useJournees, useRegles } from "../../data/journeesStore";
+import { cleJournee } from "../../lib/expertises";
+import { BoutonRapport, ouvrirRapport } from "./ExpertisesJournee";
 import {
   aujourdhuiISO,
   compterPar,
@@ -228,9 +230,13 @@ function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
 function Contrats({ journees }: { journees: JourneeDepistage[] }) {
   const liste = useMemo(() => contrats(journees), [journees]);
   const { typologieDe } = useRegles();
+  const { index, statut } = useExpertises();
+  /** Avis rendus par contrat : la somme des avis de ses journées. */
+  const avisDe = (client: string, devis: string) =>
+    journees.filter((j) => j.client === client && j.devis === devis).reduce((s, j) => s + (index.get(cleJournee(j))?.length ?? 0), 0);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-left text-[13px]">
+      <table className="w-full min-w-[820px] text-left text-[13px]">
         <thead>
           <tr className="text-[11.5px] text-muted-foreground">
             <th className="min-w-[200px] px-5 py-2.5 font-semibold">Client · devis</th>
@@ -238,7 +244,9 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
             <th className="px-3 py-2.5 text-right font-semibold">Planifiées</th>
             <th className="px-3 py-2.5 text-right font-semibold">Passées</th>
             <th className="w-32 px-3 py-2.5 font-semibold">Avancement</th>
-            <th className="px-5 py-2.5 font-semibold">Prochaine</th>
+            <th className="px-3 py-2.5 font-semibold">Prochaine</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Avis</th>
+            <th className="px-5 py-2.5 font-semibold">Rapport</th>
           </tr>
         </thead>
         <tbody>
@@ -260,7 +268,11 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
                     <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${Math.min(100, pct(c.passees, base))}%` }} />
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-5 py-2.5 text-muted-foreground">{c.prochaine ? jour(c.prochaine, { day: "numeric", month: "short" }) : "—"}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{c.prochaine ? jour(c.prochaine, { day: "numeric", month: "short" }) : "—"}</td>
+                <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut === "pret" ? nombre(avisDe(c.client, c.devis)) : "…"}</td>
+                <td className="px-5 py-2.5">
+                  <BoutonRapport nbAvis={avisDe(c.client, c.devis)} onClick={() => ouvrirRapport({ client: c.client, devis: c.devis })} libelle="Rapport" />
+                </td>
               </tr>
             );
           })}
