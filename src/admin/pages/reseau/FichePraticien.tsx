@@ -47,7 +47,7 @@ import {
 } from "../../../../supabase/functions/_shared/reseau-signaux";
 import { cn } from "@/lib/utils";
 import AvancementIa from "./AvancementIa";
-import { lienRechercheDoctolib, urlDoctolibValide } from "../../../../supabase/functions/_shared/doctolib";
+import { lienRechercheDoctolib, specialiteDuLienDoctolib, specialiteHorsCible, urlDoctolibValide } from "../../../../supabase/functions/_shared/doctolib";
 
 const lienCls = "inline-flex items-center gap-1 font-semibold text-avisdoc-ink underline-offset-2 hover:underline";
 const btnSec = "inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50";
@@ -142,6 +142,8 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
   };
 
   const perime = estPerime(p.rppsExtraitLe);
+  // Spécialité hors du réseau repérée sur Doctolib (adresse de la fiche ou relevé) : simple alerte.
+  const horsCible = specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite);
   const motifExclure = lectureSeule ? TEXTES.motifLectureSeule : p.etat === "exclu" ? "Ce praticien est déjà exclu." : null;
 
   return (
@@ -164,6 +166,16 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
       </div>
 
       {erreur && <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-800">{erreur}</div>}
+
+      {horsCible && p.etat !== "exclu" && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12.5px] text-amber-900">
+          <span><b>Hors cible ?</b> Doctolib le présente comme {horsCible}. S'il n'a pas sa place dans le réseau d'aval, excluez-le.</span>
+          <button type="button" onClick={() => setExclusion(true)} disabled={!!motifExclure}
+            className="ml-auto rounded-full border border-amber-400 bg-white px-3 py-1 text-[12px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">
+            Exclure : non concerné
+          </button>
+        </div>
+      )}
 
       {/* Score expliqué */}
       <SectionLabel className="mt-5">Probabilité d'adhésion au réseau</SectionLabel>
@@ -300,7 +312,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         {motifExclure && <span className="ml-2 text-[11.5px] text-muted-foreground">{motifExclure}</span>}
       </div>
 
-      {exclusion && <ExclusionModal praticien={p} onClose={() => setExclusion(false)} onFait={() => { setExclusion(false); onChange(); }} />}
+      {exclusion && <ExclusionModal praticien={p} motifInitial={horsCible ? "hors_cible" : ""} onClose={() => setExclusion(false)} onFait={() => { setExclusion(false); onChange(); }} />}
     </Card>
   );
 }
@@ -354,6 +366,9 @@ function CarteFicheGoogle({ fiche, onAvis, occupeAvis }: { fiche: FicheGoogle; o
     <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
       <div className="font-semibold text-avisdoc-ink">{fiche.nom}</div>
       <div className="text-muted-foreground">{[fiche.categorie, fiche.statut === "CLOSED_PERMANENTLY" ? "Fermé définitivement" : null].filter(Boolean).join(" · ")}</div>
+      {specialiteHorsCible(fiche.categorie) && (
+        <div className="mt-1 text-[11.5px] font-semibold text-amber-800">Hors cible ? Google le classe comme {specialiteHorsCible(fiche.categorie)}.</div>
+      )}
       {fiche.adresse && <div className="mt-1">{fiche.adresse}</div>}
       {fiche.telephone && <div>Tél. {fiche.telephone}</div>}
       {fiche.site && <div><a href={fiche.site} target="_blank" rel="noreferrer" className={lienCls}>{hote(fiche.site)} <ExternalLink className="size-3" /></a></div>}
@@ -642,8 +657,10 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
   );
 }
 
-function ExclusionModal({ praticien: p, onClose, onFait }: { praticien: PraticienReseau; onClose: () => void; onFait: () => void }) {
-  const [motif, setMotif] = useState<"" | MotifExclusion>("");
+function ExclusionModal({ praticien: p, motifInitial = "", onClose, onFait }: {
+  praticien: PraticienReseau; motifInitial?: "" | MotifExclusion; onClose: () => void; onFait: () => void;
+}) {
+  const [motif, setMotif] = useState<"" | MotifExclusion>(motifInitial);
   const [precision, setPrecision] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -653,7 +670,9 @@ function ExclusionModal({ praticien: p, onClose, onFait }: { praticien: Praticie
     if (raison || !motif) return;
     const ok = await confirmer({
       titre: `Exclure ${p.prenom} ${p.nom} ?`,
-      message: "L'exclusion est définitive : ce praticien ne reviendra jamais dans le réseau, même après un nouvel import.",
+      message: motif === "hors_cible"
+        ? "Il sort de la liste et ne sera jamais réimporté (contrôle sur son RPPS)."
+        : "L'exclusion est définitive : ce praticien ne reviendra jamais dans le réseau, même après un nouvel import.",
       action: "Exclure définitivement",
       definitif: true,
     });

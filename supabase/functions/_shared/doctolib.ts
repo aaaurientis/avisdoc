@@ -63,3 +63,40 @@ export function lienRechercheDoctolib(p: { nom: string; prenom: string; communes
   const q = `site:doctolib.fr "${p.prenom} ${p.nom}" ${p.communes[0] ?? ""}`.trim();
   return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 }
+
+/**
+ * Spécialités hors du réseau d'aval, reconnues dans l'adresse ou le relevé d'une fiche
+ * Doctolib (ou la catégorie d'une fiche Google). Ce n'est qu'une alerte : l'opérateur
+ * décide d'exclure (motif « non concerné »).
+ */
+const HORS_CIBLE: [RegExp, string][] = [
+  [/urolog/, "urologue"],
+  [/vascul|phlebolog|angiolog/, "chirurgien vasculaire"],
+  [/orthoped|traumatolog/, "orthopédiste"],
+  [/digestif|viscer|proctolog|gastro/, "chirurgien digestif"],
+  [/cardi|thoraci/, "cardiologue ou chirurgien thoracique"],
+  [/gyneco|obstetri|senolog/, "gynécologue"],
+  [/ophtalm/, "ophtalmologue"],
+  [/neurochir|neurolog/, "neurochirurgien"],
+  [/pediatr/, "pédiatre"],
+  [/bariatr|obesite/, "chirurgien de l'obésité"],
+  [/dentiste|stomatolog|maxillo|orthodont/, "chirurgien-dentiste ou maxillo-facial"],
+];
+
+export function specialiteHorsCible(...textes: (string | null | undefined)[]): string | null {
+  const t = textes.filter(Boolean).join(" ").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (!t) return null;
+  // Les spécialités du réseau ne déclenchent jamais l'alerte (« dermatologue », « ORL »…).
+  for (const [rx, libelle] of HORS_CIBLE) if (rx.test(t)) return libelle;
+  return null;
+}
+
+/** La spécialité écrite dans l'adresse Doctolib : doctolib.fr/<spécialité>/<ville>/<nom>. */
+export function specialiteDuLienDoctolib(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean)[0]?.replace(/-/g, " ") ?? null;
+  } catch {
+    return null;
+  }
+}

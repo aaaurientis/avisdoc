@@ -42,6 +42,7 @@ import { calculerScore, releveCreneauPerime, VALEUR_LIBELLE } from "../../../sup
 import FichePraticien from "./reseau/FichePraticien";
 import AvancementIa from "./reseau/AvancementIa";
 import ReseauCarte from "./reseau/ReseauCarte";
+import { specialiteDuLienDoctolib, specialiteHorsCible } from "../../../supabase/functions/_shared/doctolib";
 import { cn } from "@/lib/utils";
 
 /** Pictogramme de la vue resserrée (fiche ouverte) : vert trouvée, orange à confirmer, gris sinon. */
@@ -469,6 +470,9 @@ export default function ReseauDepartement() {
                   <div className="flex flex-wrap gap-1 pt-0.5">
                     {p.contactId && <Badge className="bg-emerald-50 text-emerald-800">{TEXTES.dejaDansLaListe}</Badge>}
                     {!p.vuAuDernierImport && <Badge className="bg-amber-50 text-amber-800">{TEXTES.absentExtraction}</Badge>}
+                    {p.etat !== "exclu" && specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite) && (
+                      <Badge className="bg-amber-100 text-amber-900">Hors cible ?</Badge>
+                    )}
                   </div>
                 </div>
                 <div className="text-[12.5px] text-muted-foreground">{POPULATION_LIBELLE[p.population]}</div>
