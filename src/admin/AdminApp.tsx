@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AdminDataProvider } from "./data/AdminDataContext";
 import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
+import ReseauDepartements from "./pages/ReseauDepartements";
+import ReseauDepartement from "./pages/ReseauDepartement";
 import Dashboard from "./pages/Dashboard";
 import Crm from "./pages/Crm";
 import CrmSynthese from "./pages/CrmSynthese";
@@ -164,6 +166,8 @@ function Gate() {
           <Route path="/contacts" element={<Garde module="sante"><ContactsDashboard /></Garde>} />
           <Route path="/contacts/requis" element={<Garde module="sante"><Contacts fixedType="Requis" /></Garde>} />
           <Route path="/contacts/reseau" element={<Garde module="sante"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
+          <Route path="/reseau-aval" element={<Garde module="sante"><ReseauDepartements /></Garde>} />
+          <Route path="/reseau-aval/:code" element={<Garde module="sante"><ReseauDepartement /></Garde>} />
           <Route path="/journees" element={<Garde module="journee"><JourneesStatistiques /></Garde>} />
           <Route path="/journees/calendrier" element={<Garde module="journee"><JourneesCalendrier /></Garde>} />
           <Route path="/journees/expertises" element={<Garde module="journee"><JourneesExpertises /></Garde>} />

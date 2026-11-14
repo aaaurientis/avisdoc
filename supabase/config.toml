@@ -124,3 +124,11 @@ verify_jwt = false
 # Compte @avisdoc.fr + droit « journee » vérifiés dans la fonction ; clés AWS côté serveur.
 [functions.journees-s3]
 verify_jwt = true
+
+# Réseau d'aval : import RPPS d'un département et transitions d'état. Droit
+# « sante » revérifié dans la fonction.
+[functions.reseau-import]
+verify_jwt = true
+
+[functions.reseau-action]
+verify_jwt = true

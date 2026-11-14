@@ -46,6 +46,7 @@ import {
   Tags,
   ClipboardList,
   HeartPulse,
+  UserSearch,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
 import { cn } from "@/lib/utils";
@@ -144,6 +145,7 @@ const MENU: Entree[] = [
     { to: "/infirmieres", label: "Requérants", icon: Stethoscope },
     { to: "/contacts/requis", label: "Requis", icon: Users },
     { to: "/contacts/reseau", label: "Réseau Aval", icon: Building2 },
+    { to: "/reseau-aval", label: "Trouver des médecins", icon: UserSearch },
   ] },
   // Statistiques : journées de dépistage et expertises (extractions S3). Droit « journee ».
   { module: "journee", label: "Statistiques", icon: CalendarCheck, enfants: [
