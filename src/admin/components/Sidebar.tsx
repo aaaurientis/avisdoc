@@ -44,6 +44,7 @@ import {
   CalendarCheck,
   BarChart3,
   Tags,
+  ClipboardList,
   HeartPulse,
 } from "lucide-react";
 import AvisdocLogo from "@/components/AvisdocLogo";
@@ -148,6 +149,7 @@ const MENU: Entree[] = [
   { module: "journee", label: "Journée", icon: CalendarCheck, enfants: [
     { to: "/journees", label: "Statistiques", icon: BarChart3, end: true },
     { to: "/journees/calendrier", label: "Calendrier", icon: CalendarDays },
+    { to: "/journees/expertises", label: "Expertises", icon: ClipboardList },
   ] },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [
     { to: "/clients", label: "Facturation", icon: Receipt },

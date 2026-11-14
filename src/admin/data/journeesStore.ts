@@ -9,7 +9,8 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { lireExtraction, type Extraction, type FichierS3, type JourneeDepistage } from "../lib/journees";
 import { reglesDe, typologieDuClient, type Affectation, type Regles, type Typologie } from "../lib/typologies";
-import { ErreurJournees, listerExtractions, lireExtractionS3, type Source } from "./journeesRepo";
+import { ErreurJournees, listerExpertises, listerExtractions, lireExtractionS3, type Source } from "./journeesRepo";
+import { lireExpertises, parJournee, type Expertise } from "../lib/expertises";
 import { listerAffectations, listerTypologies } from "./typologiesRepo";
 
 export interface EtatJournees {
@@ -118,4 +119,73 @@ export function useRegles() {
       reglesDe: (j: JourneeDepistage): Regles => reglesDe(typologieDe(j.client)),
     };
   }, [typologies, affectations]);
+}
+
+// ── Expertises ───────────────────────────────────────────────────────────────
+// Chargées à la demande (le fichier pèse plusieurs Mo) : seuls les écrans qui en ont besoin
+// (Expertises, Calendrier, Statistiques, rapport) les lisent ; le tableau de bord, non.
+
+export interface EtatExpertises {
+  statut: "initial" | "chargement" | "pret";
+  source: Source | null;
+  expertises: Expertise[];
+  colonnesManquantes: string[];
+  /** Les expertises de chaque journée (clé Date + Lieu + Numéro journée). */
+  index: Map<string, Expertise[]>;
+  fichiers: FichierS3[];
+  /** Pourquoi rien n'a été lu (pas de fichier « expertise », erreur S3…). */
+  info: string | null;
+}
+
+let etatExp: EtatExpertises = { statut: "initial", source: null, expertises: [], colonnesManquantes: [], index: new Map(), fichiers: [], info: null };
+const abonnesExp = new Set<() => void>();
+
+function changerExp(p: Partial<EtatExpertises>) {
+  etatExp = { ...etatExp, ...p };
+  abonnesExp.forEach((f) => f());
+}
+
+function appliquer(source: Source) {
+  const { expertises, colonnesManquantes } = lireExpertises(source.texte);
+  changerExp({ source, expertises, colonnesManquantes, index: parJournee(expertises), info: null });
+}
+
+export async function chargerExpertises(): Promise<void> {
+  changerExp({ statut: "chargement" });
+  try {
+    const liste = await listerExpertises();
+    changerExp({ fichiers: liste.fichiers });
+    if (!liste.fichiers.length) {
+      changerExp({ info: `Aucune extraction « expertise » dans ${liste.bucket}/${liste.prefixe}.`, source: null, expertises: [], index: new Map() });
+    } else {
+      appliquer(await lireExtractionS3(liste.fichiers[0], liste.bucket, liste.prefixe));
+    }
+  } catch (e) {
+    changerExp({ info: e instanceof Error ? e.message : String(e), source: null, expertises: [], index: new Map() });
+  } finally {
+    changerExp({ statut: "pret" });
+  }
+}
+
+/** Une autre extraction des expertises (menu « Extraction du … »). */
+export async function choisirExpertises(f: FichierS3): Promise<void> {
+  changerExp({ statut: "chargement" });
+  try {
+    const liste = await listerExpertises();
+    appliquer(await lireExtractionS3(f, liste.bucket, liste.prefixe));
+  } catch (e) {
+    changerExp({ info: e instanceof Error ? e.message : String(e) });
+  } finally {
+    changerExp({ statut: "pret" });
+  }
+}
+
+function abonnerExp(f: () => void) {
+  abonnesExp.add(f);
+  if (etatExp.statut === "initial") void chargerExpertises();
+  return () => abonnesExp.delete(f);
+}
+
+export function useExpertises(): EtatExpertises {
+  return useSyncExternalStore(abonnerExp, () => etatExp);
 }

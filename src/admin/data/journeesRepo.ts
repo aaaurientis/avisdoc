@@ -6,7 +6,7 @@
 // - Mode démo (sans base) : une extraction fictive au même format que l'export réel.
 import { supabaseAdmin } from "./supabaseAdmin";
 import { ADMIN_BACKEND } from "../lib/config";
-import { dateDansLeNom, extractionsJournees, type FichierS3 } from "../lib/journees";
+import { dateDansLeNom, extractionsJournees, lireExtraction, type FichierS3 } from "../lib/journees";
 import { logAudit } from "../lib/audit";
 
 export class ErreurJournees extends Error {
@@ -57,9 +57,20 @@ export async function listerExtractions(): Promise<{ bucket: string; prefixe: st
   return r;
 }
 
+/** Les extractions des expertises (fichiers « expertise »), la plus récente d'abord. */
+export async function listerExpertises(): Promise<{ bucket: string; prefixe: string; fichiers: FichierS3[] }> {
+  if (ADMIN_BACKEND !== "supabase") {
+    return { bucket: "démo", prefixe: "", fichiers: [{ key: `demo-${aujourdhui()}-expertise.csv`, taille: 0, modifie: new Date().toISOString() }] };
+  }
+  const r = await appeler<{ bucket: string; prefixe: string; fichiers: FichierS3[] }>({ action: "lister", type: "expertises" });
+  r.fichiers = r.fichiers.filter((f) => /expertise/i.test(f.key.split("/").pop() ?? ""));
+  r.fichiers.sort((a, b) => dateDuFichier(b).localeCompare(dateDuFichier(a)) || b.modifie.localeCompare(a.modifie));
+  return r;
+}
+
 export async function lireExtractionS3(f: FichierS3, bucket: string, prefixe: string): Promise<Source> {
   const nom = f.key.split("/").pop() ?? f.key;
-  if (ADMIN_BACKEND !== "supabase") return { origine: "Démo", nom, date: dateDuFichier(f), texte: demo() };
+  if (ADMIN_BACKEND !== "supabase") return { origine: "Démo", nom, date: dateDuFichier(f), texte: /expertise/.test(nom) ? demoExpertises() : demo() };
   const r = await appeler<{ fichiers: { key: string; contenu?: string; erreur?: string }[] }>({ action: "lire", keys: [f.key] });
   const lu = r.fichiers[0];
   if (!lu || lu.contenu === undefined) throw new ErreurJournees(lu?.erreur ?? "Fichier illisible.");
@@ -125,6 +136,45 @@ function demo(): string {
         ].join(","),
       );
     }
+  }
+  return lignes.join("\n");
+}
+
+/**
+ * Expertises fictives au format de l'export réel : 22 à 34 avis par journée passée de la démo
+ * (même date, lieu et numéro), et des téléexpertises hors journée sur deux ans.
+ */
+function demoExpertises(): string {
+  const entete =
+    '"Identifiant dossier","Date d\'envoi","Date d\'affectation","Date de réponse","Délai de traitement (h)","Requérant","Profession requérant","Requis","Recommandation","Délai recommandé (jours)","Urgence","Statut","Date événement","Lieu","Numéro journée"';
+  const requis = ["Dr Alice Martin", "Dr Bruno Petit", "Dr Chloé Durand", "Dr David Leroy"];
+  const recos = ["Consultation dermatologique non indispensable", "Consultation dermatologique non indispensable", "Consultation dermatologique non indispensable", "Consultation dermatologique", "Exérèse indispensable"];
+  const lignes = [entete];
+  let id = 50000;
+  let graine = 7;
+  const hasard = () => ((graine = (graine * 16807) % 2147483647) / 2147483647);
+  const ligne = (envoi: string, journee: { date: string; lieu: string; numero: number | null } | null) => {
+    const reco = recos[Math.floor(hasard() * recos.length)];
+    const delai = Math.round(2 + hasard() * 40);
+    lignes.push(
+      [
+        `"${id++}"`, `"${envoi}"`, `"${envoi}"`, `"${envoi}"`, `"${delai}"`, `"Infirmière ${1 + Math.floor(hasard() * 6)}"`, `"Infirmier(e)"`,
+        `"${requis[Math.floor(hasard() * 4)]}"`, `"${reco}"`, `"${reco.startsWith("Consultation dermatologique non") ? "" : [30, 60, 90][Math.floor(hasard() * 3)]}"`,
+        `"${hasard() < 0.01 ? "Oui" : "Non"}"`, `"Avis rendu"`,
+        `"${journee ? `${journee.date}T00:00:00.000Z` : ""}"`, `"${journee?.lieu ?? ""}"`, `"${journee?.numero ?? ""}"`,
+      ].join(","),
+    );
+  };
+  const auj = aujourdhui();
+  for (const j of lireExtraction(demo()).journees) {
+    if (!j.date || j.date >= auj) continue;
+    const n = 22 + Math.floor(hasard() * 13);
+    for (let i = 0; i < n; i++) ligne(`${j.date} ${String(9 + (i % 8)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`, j);
+  }
+  for (let k = 0; k < 900; k++) {
+    const d = new Date();
+    d.setDate(d.getDate() - Math.floor(hasard() * 730));
+    ligne(`${d.toISOString().slice(0, 10)} 14:00`, null);
   }
   return lignes.join("\n");
 }

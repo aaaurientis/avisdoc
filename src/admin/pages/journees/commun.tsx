@@ -7,6 +7,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { dateDuFichier, telechargerExtraction } from "../../data/journeesRepo";
 import { etatDe, manques, type JourneeDepistage } from "../../lib/journees";
 import { exigences } from "../../lib/typologies";
+import ExpertisesJournee, { useAvisDeLaJournee } from "./ExpertisesJournee";
 import { cn } from "@/lib/utils";
 
 export const jour = (iso: string, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }) =>
@@ -157,6 +158,7 @@ export function LigneJournee({
   const regles = reglesDe(j);
   const etat = etatDe(j, undefined, regles);
   const typologie = typologieDe(j.client);
+  const { avis } = useAvisDeLaJournee(j);
   return (
     <div className="border-b border-border last:border-b-0">
       <button type="button" onClick={basculer} className="flex w-full items-center gap-3 px-5 py-3 text-left text-[13px] transition-colors hover:bg-accent">
@@ -176,6 +178,11 @@ export function LigneJournee({
             {j.lieu || "lieu non renseigné"} · {j.requis || "requis non renseigné"}
           </span>
         </span>
+        {avis.length > 0 && (
+          <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-semibold text-avisdoc-ink md:inline">
+            {avis.length} avis
+          </span>
+        )}
         <span className="hidden sm:inline">
           <PastilleEtat j={j} />
         </span>
@@ -198,6 +205,10 @@ export function LigneJournee({
           <Info label="Dermatoscope — retour" valeur={j.retourDermatoscope ? `n° ${j.retourDermatoscope} · ${jour(j.dateRetourDermatoscope)}` : ""} />
           <Info label="Date de facture" valeur={j.dateFacture ? jour(j.dateFacture) : ""} />
           <Info label="Autres informations" valeur={j.autres} />
+          <div className="col-span-full mt-2 border-t border-border pt-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Expertises de la journée</div>
+            <ExpertisesJournee j={j} />
+          </div>
         </div>
       )}
     </div>

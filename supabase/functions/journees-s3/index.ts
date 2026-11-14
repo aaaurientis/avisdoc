@@ -6,7 +6,8 @@
 // Garde-fous : compte @avisdoc.fr, et droit « journee » (ou super-admin).
 //
 // Actions :
-//   "lister"            → les fichiers .csv du bucket (sous le préfixe configuré)
+//   "lister"            → les fichiers .csv du bucket (sous le préfixe configuré) ;
+//                         { type: "expertises" } → ceux du dossier des expertises
 //   "lire" { keys[] }   → le contenu texte de ces fichiers (50 au plus par appel)
 //
 // Secrets (Supabase → Edge Functions → Secrets) :
@@ -14,6 +15,7 @@
 //   AWS_REGION           facultatif — défaut eu-west-3 ; une mauvaise région est corrigée seule
 //   JOURNEES_S3_BUCKET   facultatif — défaut avisdoc-exports
 //   JOURNEES_S3_PREFIX   facultatif — défaut journees-depistage/
+//   EXPERTISES_S3_PREFIX facultatif — dossier des expertises ; défaut : celui des journées
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.99.3";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
@@ -32,6 +34,7 @@ const MAX_FICHIERS_PAR_LECTURE = 50;
 const env = (k: string) => (Deno.env.get(k) ?? "").trim();
 const BUCKET = env("JOURNEES_S3_BUCKET") || "avisdoc-exports";
 const PREFIXE = (env("JOURNEES_S3_PREFIX") || "journees-depistage/").replace(/^\/+/, "");
+const PREFIXE_EXPERTISES = (env("EXPERTISES_S3_PREFIX") || PREFIXE).replace(/^\/+/, "");
 /** Corrigée au premier appel si le bucket vit ailleurs (S3 donne sa vraie région). */
 let region = env("AWS_REGION") || "eu-west-3";
 
@@ -84,12 +87,12 @@ interface Fichier {
 }
 
 /** ListObjectsV2, page par page (1 000 objets par page). */
-async function lister(): Promise<Fichier[]> {
+async function lister(prefixe: string): Promise<Fichier[]> {
   const fichiers: Fichier[] = [];
   let jeton = "";
   for (let page = 0; page < 50; page++) {
     const p = new URLSearchParams({ "list-type": "2", "max-keys": "1000" });
-    if (PREFIXE) p.set("prefix", PREFIXE);
+    if (prefixe) p.set("prefix", prefixe);
     if (jeton) p.set("continuation-token", jeton);
     const res = await s3(`/?${p}`);
     const xml = await res.text();
@@ -119,7 +122,7 @@ function decoder(octets: Uint8Array): string {
 
 const cleSure = (key: unknown): key is string =>
   typeof key === "string" &&
-  key.startsWith(PREFIXE) &&
+  (key.startsWith(PREFIXE) || key.startsWith(PREFIXE_EXPERTISES)) &&
   /\.csv$/i.test(key) &&
   !key.split("/").includes("..");
 
@@ -150,7 +153,8 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
 
     if (body.action === "lister") {
-      return json({ bucket: BUCKET, prefixe: PREFIXE, fichiers: await lister() });
+      const prefixe = body.type === "expertises" ? PREFIXE_EXPERTISES : PREFIXE;
+      return json({ bucket: BUCKET, prefixe, fichiers: await lister(prefixe) });
     }
 
     if (body.action === "lire") {

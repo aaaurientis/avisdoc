@@ -111,3 +111,23 @@ lors d'une journée porte **Date événement + Lieu + Numéro journée** : ce tr
 sans ambiguïté (vérifié le 14/11/2026 : 1 122 expertises de journée sur 13 608, toutes rattachées à
 une seule journée). Date + Numéro journée suffit aussi ; Date + Lieu seul est ambigu (plusieurs
 journées le même jour au même endroit).
+
+## Expertises
+
+**Journée › Expertises** (`/journees/expertises`) lit l'extraction « expertise » la plus récente
+(même dossier que les journées ; un autre dossier se règle avec le secret `EXPERTISES_S3_PREFIX`).
+
+- Avis par mois (en journée / hors journée), recommandations, délai de traitement (mesuré depuis
+  fin août 2026 seulement), profession du requérant.
+- **Par requis** : nombre d'avis et **taux de consultation** = avis qui orientent vers un
+  dermatologue (consultation conseillée ou exérèse) sur les avis dont la recommandation est
+  renseignée ; détail consultation / exérèse / non indispensable, délai médian, urgences.
+- Dans le **Calendrier**, le détail d'une journée montre ses expertises (rattachées par
+  date + lieu + n° journée) ; la colonne « Avis » des contrats en fait la somme.
+
+## Rapport client
+
+Bouton **Rapport** (contrats, page Statistiques) ou **Rapport de la journée** (Calendrier) : bilan aux
+couleurs AvisDoc (fond blanc, Newsreader + Hanken Grotesk, cyan / bleu marine / orange), à imprimer
+ou enregistrer en PDF. Il n'existe qu'**au-delà de 20 expertises** et ne contient que des totaux et
+des proportions (aucun chiffre par personne, aucune ventilation des recommandations par journée).

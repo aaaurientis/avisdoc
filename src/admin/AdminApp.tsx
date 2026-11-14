@@ -24,6 +24,8 @@ import Documents from "./pages/Documents";
 import Infirmieres from "./pages/Infirmieres";
 import JourneesStatistiques from "./pages/journees/Statistiques";
 import JourneesCalendrier from "./pages/journees/Calendrier";
+import JourneesExpertises from "./pages/journees/Expertises";
+import JourneesRapport from "./pages/journees/Rapport";
 import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
 import TypologiesClients from "./pages/TypologiesClients";
@@ -120,6 +122,8 @@ function Gate() {
         {/* Hors de la coquille : un dictaphone se tient à l'écran entier, sans menu.
             Le bouton Retour, en haut à droite, ramène au Débrief. */}
         <Route path="/dictee" element={<Garde module="commercial"><Dictee /></Garde>} />
+        {/* Rapport client : page à imprimer, sans le menu. */}
+        <Route path="/journees/rapport" element={<Garde module="journee"><JourneesRapport /></Garde>} />
 
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
@@ -162,6 +166,7 @@ function Gate() {
           <Route path="/contacts/reseau" element={<Garde module="sante"><Contacts fixedType="Réseau d'Aval" /></Garde>} />
           <Route path="/journees" element={<Garde module="journee"><JourneesStatistiques /></Garde>} />
           <Route path="/journees/calendrier" element={<Garde module="journee"><JourneesCalendrier /></Garde>} />
+          <Route path="/journees/expertises" element={<Garde module="journee"><JourneesExpertises /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
           <Route path="/infirmieres" element={<Garde module="sante"><Infirmieres /></Garde>} />
           <Route path="/infirmieres/:id" element={<Garde module="sante"><InfirmiereFiche /></Garde>} />
