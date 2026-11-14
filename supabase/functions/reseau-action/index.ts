@@ -9,6 +9,7 @@
 //   • signal_valider       { signal_id } — proposition de l'IA acceptée
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
+//   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
 //   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
@@ -188,6 +189,50 @@ serve(async (req) => {
         detail: { place_ids: maj.google_place_ids ?? [], aucune: maj.google_aucune_fiche ?? false },
       });
       return json({ id: p.id });
+    }
+
+    case "doctolib_fiche": {
+      // Relevé d'une fiche Doctolib ouverte par l'opérateur, vérifié dans le Hub avant envoi.
+      const url = corps.url;
+      if (!urlDoctolibValide(url)) return json({ error: "Adresse de fiche Doctolib invalide." }, 400);
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, etat").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.etat === "exclu") return json({ error: "Ce praticien est exclu." }, 409);
+      const i = corps.infos ?? {};
+      const txt = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : null);
+      const lst = (v: unknown, n: number, m: number) => (Array.isArray(v) ? v.filter((x) => typeof x === "string").map((x: string) => x.slice(0, m)).slice(0, n) : []);
+      const infos = {
+        specialite: txt(i.specialite, 120), expertises: lst(i.expertises, 40, 120), conventionnement: txt(i.conventionnement, 160),
+        carteVitale: typeof i.carteVitale === "boolean" ? i.carteVitale : null, teleconsultation: typeof i.teleconsultation === "boolean" ? i.teleconsultation : null,
+        tarifs: lst(i.tarifs, 20, 160), langues: lst(i.langues, 15, 40), presentation: txt(i.presentation, 1500), adresses: lst(i.adresses, 5, 160),
+        premierCreneau: i.premierCreneau && typeof i.premierCreneau === "object"
+          ? { date: txt(i.premierCreneau.date, 10), jours: Number.isFinite(i.premierCreneau.jours) ? i.premierCreneau.jours : null, valeur: txt(i.premierCreneau.valeur, 20) }
+          : null,
+      };
+      const lien = urlPropre(url);
+      const maintenant = new Date().toISOString();
+      const { error } = await db.from("admin_reseau_praticiens").update({
+        doctolib_url: lien, doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant,
+        doctolib_infos: infos, doctolib_releve_le: maintenant, doctolib_releve_par: email,
+      }).eq("id", p.id);
+      if (error) return json({ error: error.message }, 500);
+
+      // Signaux cochés par l'opérateur : validés, avec la fiche Doctolib comme source.
+      const enregistres: string[] = [];
+      for (const sg of Array.isArray(corps.signaux) ? corps.signaux.slice(0, 12) : []) {
+        if (!estTypeSignal(sg?.type) || !valeurAdmise(sg.type, sg.valeur)) continue;
+        await remplacerAncien(db, p.id, sg.type);
+        const { error: eS } = await db.from("admin_reseau_signaux").insert({
+          praticien_id: p.id, type: sg.type, valeur: sg.valeur, url: lien, origine: "operateur", statut: "valide",
+          propose_par: email, decide_par: email, decide_le: maintenant,
+        });
+        if (!eS) enregistres.push(sg.type);
+        if (sg.type === "teleexpertise") await majRoleRequerant(db, p.id);
+      }
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: p.id, acteur: email, action: "doctolib_releve", detail: { url: lien, signaux: enregistres },
+      });
+      return json({ id: p.id, signaux: enregistres });
     }
 
     case "doctolib": {

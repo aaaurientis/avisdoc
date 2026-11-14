@@ -22,6 +22,8 @@ import {
   type Role,
 } from "../reseau/libelles";
 import { reseauRepo, type DepartementReseau, type ResumeDepartement } from "../reseau/reseauRepo";
+import { codeFavori } from "../reseau/favori";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const COLS = "56px minmax(150px,1.4fr) 150px 80px minmax(180px,1.6fr) minmax(150px,1.2fr) 120px";
@@ -165,6 +167,8 @@ export default function ReseauDepartements() {
         </div>
       </Card>
 
+      <FavoriDoctolib />
+
       {ajout && (
         <AjoutDepartement
           dejaLa={new Set(deps.map((d) => d.code))}
@@ -248,5 +252,30 @@ function AjoutDepartement({ dejaLa, onClose, onAjoute }: {
       </div>
       {motif && <p className="mt-2 text-right text-[12px] text-muted-foreground">{motif}</p>}
     </Modal>
+  );
+}
+
+/**
+ * Le favori « Relever sur Doctolib », à glisser une fois dans la barre de favoris.
+ * Sur une fiche Doctolib ouverte par l'opérateur, il envoie le texte de la page au Hub,
+ * qui l'analyse et le fait vérifier avant tout enregistrement. Aucun parcours automatique.
+ */
+function FavoriDoctolib() {
+  const lien = codeFavori(window.location.origin, window.location.pathname);
+  // Lien « javascript: » posé en HTML : React refuse ces adresses dans le JSX.
+  const html = `<a href="${lien.replace(/"/g, "&quot;")}" class="inline-flex items-center gap-1.5 rounded-full bg-sky-700 px-4 py-2 text-[13px] font-bold text-white no-underline" onclick="alert('Glissez ce bouton dans votre barre de favoris, puis cliquez dessus depuis une fiche Doctolib.');return false;">Relever sur Doctolib</a>`;
+  return (
+    <Card className="mt-6 p-5 text-[13px]">
+      <div className="font-display text-base font-semibold text-avisdoc-ink">Relever une fiche Doctolib en un clic</div>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+        <li>Glissez ce bouton dans la barre de favoris de votre navigateur (une seule fois) : <span dangerouslySetInnerHTML={{ __html: html }} /></li>
+        <li>Ouvrez la fiche d'un praticien sur Doctolib, puis cliquez sur le favori.</li>
+        <li>Le Hub s'ouvre avec l'analyse de la fiche (créneau, nouveaux patients, expertises, conventionnement…) : vérifiez, cochez, enregistrez.</li>
+      </ol>
+      <p className="mt-2 text-[11.5px] text-muted-foreground">
+        Une page à la fois, ouverte par vous : le Hub ne parcourt jamais Doctolib. Le favori ne marche pas ?{" "}
+        <Link to="/reseau-aval/doctolib" className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline">Collez la fiche à la main</Link>.
+      </p>
+    </Card>
   );
 }

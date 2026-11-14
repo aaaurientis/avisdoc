@@ -157,6 +157,43 @@ interdite par ses conditions, et règle 2 du brief.
   filtre. L'écran affiche aussi une synthèse : fiches liées, et répartition des créneaux
   relevés.
 
+### Relever une fiche Doctolib en un clic (favori, 14/11, migration 0092)
+
+> **À faire valider par le DPO avant usage courant** (décision d'Arthur du 14/11 : option
+> « favori », avec réserve). La règle 2 du brief (Doctolib en lecture humaine) est
+> respectée dans l'esprit : une page à la fois, ouverte par l'opérateur, au rythme humain,
+> sans parcours automatique. Mais le texte de la page est lu par le navigateur, puis
+> analysé par le Hub.
+
+- **Installation.** Sur l'écran « Trouver des médecins », on glisse une fois le bouton
+  « Relever sur Doctolib » dans la barre de favoris.
+- **Usage.** On ouvre la fiche d'un praticien sur Doctolib, puis on clique sur le favori.
+  Le Hub s'ouvre (écran « Relevé d'une fiche Doctolib ») avec le texte de cette page
+  seulement. Le message n'est accepté que s'il vient de doctolib.fr.
+- **Analyse** (`_shared/doctolib-fiche.ts`, logique pure testée) :
+  - premier créneau, réparti en moins de 7 jours, 7 à 30 jours, plus de 30 jours, ou
+    aucun ;
+  - nouveaux patients, et fiches réservées aux patients déjà suivis ;
+  - spécialité ;
+  - expertises, actes et symptômes ;
+  - conventionnement, carte Vitale, tarifs, langues ;
+  - téléconsultation, adresses, présentation.
+
+  Une rubrique introuvable reste vide, « non reconnue », et n'est jamais déduite.
+- **Vérification.** L'opérateur choisit le praticien, retrouvé par son lien Doctolib ou
+  par son nom. Il relit l'analyse et coche les signaux proposés, chacun avec le passage de
+  la page qui le justifie : créneau, nouveaux patients, dermoscopie, exérèse, chirurgie sur
+  place. L'enregistrement fait alors trois choses :
+  - les informations relevées vont dans `doctolib_infos`, avec la date et l'auteur ;
+  - le lien Doctolib passe « confirmé » ;
+  - les signaux cochés sont validés au nom de l'opérateur, avec la fiche comme source.
+- **Secours.** Si le favori est bloqué, la même page accepte un copier-coller du texte de
+  la fiche et de son adresse.
+- **Limite.** L'analyse repose sur les intitulés de Doctolib (« Expertises, actes et
+  symptômes », « Tarifs », « Langues parlées »…). Elle est écrite sans accès à Doctolib
+  et sera à ajuster après les premiers relevés réels si Doctolib emploie d'autres
+  intitulés.
+
 ### Carte
 
 Le bouton « Carte » affiche la liste filtrée du département sur une carte. Chaque lieu
