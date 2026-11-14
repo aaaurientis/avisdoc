@@ -1,11 +1,14 @@
-// Statistiques › Synthèse — combien de journées et quand, où en est chaque contrat,
-// les journées à venir sont-elles confirmées (requérant + expert). Le détail jour par jour est dans le Calendrier.
+// Statistiques › Vue globale — en trois parties, sous les mêmes filtres (période, client, requis) :
+// 1. Journées : combien et quand, confirmation des journées à venir, avancement des contrats ;
+// 2. Expertises : l'essentiel des avis (détail sur la page Expertises) ;
+// 3. Journées et expertises : avis rendus en journée, journées sans avis, consultation en / hors journée.
 
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "../../components/ui";
 import { useExpertises, useJournees, useRegles } from "../../data/journeesStore";
 import { cleJournee } from "../../lib/expertises";
 import { BoutonRapport, ouvrirRapport } from "./ExpertisesJournee";
+import { PartieExpertises, PartieLien, Titre } from "./VueGlobaleParties";
 import {
   aujourdhuiISO,
   compterPar,
@@ -41,7 +44,7 @@ const mois = (cle: string) => capitale(new Date(`${cle}-15T12:00:00`).toLocaleDa
 
 export default function Statistiques() {
   return (
-    <CadreJournees titre="Synthèse des journées">
+    <CadreJournees titre="Vue globale">
       <Contenu />
     </CadreJournees>
   );
@@ -87,6 +90,7 @@ function Contenu() {
         <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" />
       </div>
 
+      <Titre numero="01" titre="Journées" />
       <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Journées" valeur={nombre(journees.length)} pied={`sur ${nombre(toutes.length)} dans l'extraction`} />
         <Kpi label="Passées" valeur={nombre(passees.length)} pied={journees.length ? `${pct(passees.length, journees.length)} % des journées` : "—"} />
@@ -114,13 +118,13 @@ function Contenu() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_380px]">
-            <Card className="overflow-hidden">
-              <div className="border-b border-border px-5 py-3.5">
-                <SectionLabel>Avancement des contrats</SectionLabel>
-              </div>
-              <Contrats journees={journees} />
-            </Card>
+          <Card className="mb-6 overflow-hidden">
+            <div className="border-b border-border px-5 py-3.5">
+              <SectionLabel>Avancement des contrats</SectionLabel>
+            </div>
+            <Contrats journees={journees} />
+          </Card>
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
             <Card className="p-[22px]">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="font-display text-lg font-semibold text-avisdoc-ink">Répartition</h2>
@@ -137,6 +141,9 @@ function Contenu() {
           </div>
         </>
       )}
+
+      <PartieExpertises periode={periode} client={client} requis={requis} journees={journees} />
+      <PartieLien periode={periode} client={client} requis={requis} journees={journees} />
     </>
   );
 }
