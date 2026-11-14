@@ -1,9 +1,10 @@
 // Éléments partagés par les pages Journée (Statistiques, Calendrier) et l'encart du tableau de bord.
-import { useRef, type ReactNode } from "react";
-import { Check, ChevronRight, Loader2, RefreshCw, Upload } from "lucide-react";
+import { type ReactNode } from "react";
+import { Check, ChevronRight, Download, Loader2, RefreshCw } from "lucide-react";
 import { Card, PageHeader } from "../../components/ui";
-import { chargerJournees, choisirExtraction, importerJournees, useJournees, useRegles } from "../../data/journeesStore";
-import { dateDuFichier } from "../../data/journeesRepo";
+import { chargerJournees, choisirExtraction, useJournees, useRegles } from "../../data/journeesStore";
+import { useAuth } from "../../auth/AuthContext";
+import { dateDuFichier, telechargerExtraction } from "../../data/journeesRepo";
 import { etatDe, manques, type JourneeDepistage } from "../../lib/journees";
 import { exigences } from "../../lib/typologies";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ export function Choix({ valeur, changer, options, tous }: { valeur: string; chan
  */
 export function CadreJournees({ titre, children }: { titre: string; children: ReactNode }) {
   const { statut, source, extraction, s3, s3Info, erreur } = useJournees();
-  const fichierRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const chargement = statut !== "pret";
 
   return (
@@ -51,20 +52,16 @@ export function CadreJournees({ titre, children }: { titre: string; children: Re
         }
         action={
           <div className="flex flex-wrap gap-2">
-            <input
-              ref={fichierRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void importerJournees(f);
-                e.target.value = "";
-              }}
-            />
-            <button type="button" onClick={() => fichierRef.current?.click()} className={boutonCls}>
-              <Upload className="size-4" /> Importer un CSV
-            </button>
+            {source && (
+              <button
+                type="button"
+                onClick={() => telechargerExtraction(source, user?.email ?? "")}
+                className={boutonCls}
+                title={`Télécharger ${source.nom}`}
+              >
+                <Download className="size-4" /> Télécharger le CSV
+              </button>
+            )}
             {s3 && (
               <button type="button" onClick={() => void chargerJournees()} disabled={chargement} className={boutonCls}>
                 {chargement ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Actualiser
@@ -91,17 +88,18 @@ export function CadreJournees({ titre, children }: { titre: string; children: Re
         }
       />
 
-      {/* S3 pas encore branché : on le dit sans alarmer, et l'import manuel prend le relais. */}
+      {/* S3 injoignable, pas configuré ou vide : on dit pourquoi. */}
       {s3Info && !source && (
         <Card className="mb-6 p-5 text-sm">
           <div className="font-semibold text-avisdoc-ink">
             {s3Info.nonConfigure ? "Le bucket S3 n'est pas encore branché." : "Les extractions S3 n'ont pas pu être lues."}
           </div>
           <div className="mt-1 text-muted-foreground">{s3Info.message}</div>
-          <div className="mt-3 text-muted-foreground">
-            En attendant, importez l'extraction avec « Importer un CSV » : elle est lue dans votre navigateur, rien n'est envoyé, et elle
-            reste disponible jusqu'à la fermeture de l'onglet.
-          </div>
+          {s3Info.nonConfigure && (
+            <div className="mt-3 text-muted-foreground">
+              À renseigner dans Supabase → Edge Functions → Secrets : AWS_ACCESS_KEY_ID et AWS_SECRET_ACCESS_KEY.
+            </div>
+          )}
         </Card>
       )}
 
@@ -175,7 +173,7 @@ export function LigneJournee({
             )}
           </span>
           <span className="block truncate text-[12px] text-muted-foreground">
-            {j.lieu || "lieu non renseigné"} · {j.expert || "expert non renseigné"}
+            {j.lieu || "lieu non renseigné"} · {j.requis || "requis non renseigné"}
           </span>
         </span>
         <span className="hidden sm:inline">
@@ -190,8 +188,8 @@ export function LigneJournee({
             valeur={`${typologie?.nom ?? "Règle par défaut"} — exige : ${exigences(regles).join(", ") || "rien"}`}
           />
           <Info label="Devis" valeur={j.devis} />
-          <Info label="Dermatologue" valeur={j.dermatologue} />
-          <Info label="Expert" valeur={j.expert} />
+          <Info label="Requérant" valeur={j.requerant} />
+          <Info label="Requis" valeur={j.requis} />
           <Info label="Contact" valeur={[j.contactNom, j.contactTel, j.contactEmail].filter(Boolean).join(" · ")} />
           <Info label="Salle" valeur={j.salle} />
           <Info label="Accès" valeur={j.acces} />

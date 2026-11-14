@@ -2,11 +2,12 @@
 //
 // - S3 : la fonction journees-s3 liste le dossier ; on lit le fichier le plus récent
 //   (date dans le nom, sinon date de dépôt). Les plus anciens restent consultables.
-// - Import manuel : un CSV choisi sur l'ordinateur, lu dans le navigateur. Rien n'est envoyé.
+// - Téléchargement : l'extraction affichée, en CSV, telle qu'elle est dans le bucket.
 // - Mode démo (sans base) : une extraction fictive au même format que l'export réel.
 import { supabaseAdmin } from "./supabaseAdmin";
 import { ADMIN_BACKEND } from "../lib/config";
-import { dateDansLeNom, type FichierS3 } from "../lib/journees";
+import { dateDansLeNom, extractionsJournees, type FichierS3 } from "../lib/journees";
+import { logAudit } from "../lib/audit";
 
 export class ErreurJournees extends Error {
   constructor(message: string, readonly nonConfigure = false) {
@@ -37,7 +38,7 @@ async function appeler<T>(body: Record<string, unknown>): Promise<T> {
 export const dateDuFichier = (f: FichierS3) => dateDansLeNom(f.key) ?? f.modifie.slice(0, 10);
 
 export interface Source {
-  /** Libellé affiché : « S3 · avisdoc-exports/journees-depistage/ », « Fichier importé », « Démo ». */
+  /** Libellé affiché : « S3 · avisdoc-exports/journees-depistage/ » ou « Démo ». */
   origine: string;
   nom: string;
   date: string;
@@ -50,6 +51,8 @@ export async function listerExtractions(): Promise<{ bucket: string; prefixe: st
     return { bucket: "démo", prefixe: "", fichiers: [{ key: `demo-${aujourdhui()}.csv`, taille: 0, modifie: new Date().toISOString() }] };
   }
   const r = await appeler<{ bucket: string; prefixe: string; fichiers: FichierS3[] }>({ action: "lister" });
+  // Les expertises sont rangées au même endroit : on ne garde que les extractions des journées.
+  r.fichiers = extractionsJournees(r.fichiers);
   r.fichiers.sort((a, b) => dateDuFichier(b).localeCompare(dateDuFichier(a)) || b.modifie.localeCompare(a.modifie));
   return r;
 }
@@ -63,17 +66,30 @@ export async function lireExtractionS3(f: FichierS3, bucket: string, prefixe: st
   return { origine: `S3 · ${bucket}/${prefixe}`, nom, date: dateDuFichier(f), texte: lu.contenu };
 }
 
-/** Un CSV choisi sur l'ordinateur. UTF-8 d'abord ; à défaut Windows-1252 (export Excel). */
-export async function lireFichierLocal(fichier: File): Promise<Source> {
-  const octets = new Uint8Array(await fichier.arrayBuffer());
-  let texte: string;
-  try {
-    texte = new TextDecoder("utf-8", { fatal: true }).decode(octets);
-  } catch {
-    texte = new TextDecoder("windows-1252").decode(octets);
-  }
-  const date = dateDansLeNom(fichier.name) ?? new Date(fichier.lastModified).toISOString().slice(0, 10);
-  return { origine: "Fichier importé", nom: fichier.name, date, texte };
+/**
+ * Télécharge l'extraction affichée, telle qu'elle est dans le bucket, en CSV.
+ * Écrite en UTF-8 avec la marque d'ordre des octets : Excel lit ainsi les accents correctement.
+ * Le téléchargement est noté au journal d'audit (le fichier contient des coordonnées de contacts).
+ */
+export function telechargerExtraction(source: Source, par: string): void {
+  const bom = String.fromCharCode(0xfeff);
+  const url = URL.createObjectURL(new Blob([bom + source.texte], { type: "text/csv;charset=utf-8" }));
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = /\.csv$/i.test(source.nom) ? source.nom : `${source.nom}.csv`;
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  void logAudit({
+    actorEmail: par,
+    category: "data",
+    action: "telechargement_extraction",
+    entity: "journees_s3",
+    entityId: source.nom,
+    success: true,
+    detail: { origine: source.origine, date: source.date },
+  });
 }
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
@@ -81,7 +97,7 @@ const aujourdhui = () => new Date().toISOString().slice(0, 10);
 /** Extraction fictive au format de l'export réel : 3 clients, 26 journées autour d'aujourd'hui. */
 function demo(): string {
   const entete =
-    '"Date création","Client","Nombre de journées","Numéro devis","Dermatologue","Expert","Date événement","Date facture","Lieu","Numéro journée","Nom du contact","Téléphone du contact","Email du contact","Salle","Accès","Autres informations","Confirmation client","Date confirmation client","Confirmation consentements","Date confirmation consentements","Confirmation requérant","Date confirmation requérant","Numéro envoi dermatoscope","Date envoi dermatoscope","Numéro retour dermatoscope","Date retour dermatoscope"';
+    '"Date création","Client","Nombre de journées","Numéro devis","Requérant","Requis","Date événement","Date facture","Lieu","Numéro journée","Nom du contact","Téléphone du contact","Email du contact","Salle","Accès","Autres informations","Confirmation client","Date confirmation client","Confirmation consentements","Date confirmation consentements","Confirmation requérant","Date confirmation requérant","Numéro envoi dermatoscope","Date envoi dermatoscope","Numéro retour dermatoscope","Date retour dermatoscope"';
   const clients = [
     { nom: "Société Exemple", devis: "DEV 2026 001", nb: 12, lieux: ["Lyon", "Villeurbanne"] },
     { nom: "Mutuelle Démo", devis: "DEV 2026 002", nb: 10, lieux: ["Nantes", "Rennes", "Brest"] },

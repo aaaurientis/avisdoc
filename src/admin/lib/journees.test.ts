@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compterPar,
   etatDe,
+  extractionsJournees,
   grilleDuMois,
   journeesEntre,
   lundiDe,
@@ -72,7 +73,7 @@ describe("extraction", () => {
       client: "ACME",
       commandees: 3,
       devis: "DEV 1",
-      expert: "Dr B",
+      requis: "Dr B",
       date: "2026-11-20",
       numero: 2,
       contactTel: "0600000000",
@@ -80,6 +81,13 @@ describe("extraction", () => {
       confConsentements: false,
       envoiDermatoscope: "42",
     });
+  });
+
+  it("lit les nouveaux noms de colonnes (Requérant / Requis) comme les anciens (Dermatologue / Expert)", () => {
+    const nouveau = lireExtraction(CSV.replace('"Dermatologue","Expert"', '"Requérant","Requis"'));
+    expect(nouveau.colonnesManquantes).toEqual([]);
+    expect(nouveau.journees[1]).toMatchObject({ requerant: "Infirmière Test", requis: "Dr B" });
+    expect(journees[1]).toMatchObject({ requerant: "Infirmière Test", requis: "Dr B" });
   });
 
   it("signale les colonnes absentes", () => {
@@ -99,7 +107,7 @@ describe("extraction", () => {
   });
 
   it("comptes, mois sans trou, préparation", () => {
-    expect(compterPar(journees, (j) => j.expert)).toEqual([
+    expect(compterPar(journees, (j) => j.requis)).toEqual([
       { cle: "Dr A", nombre: 2 },
       { cle: "Dr B", nombre: 1 },
     ]);
@@ -113,7 +121,7 @@ describe("extraction", () => {
       confirmees: 1,
       criteres: [
         { cle: "requerant", label: "Requérant confirmé", exigees: 3, acquises: 1 },
-        { cle: "expert", label: "Expert désigné", exigees: 3, acquises: 3 },
+        { cle: "expert", label: "Requis désigné", exigees: 3, acquises: 3 },
       ],
     });
     // Typologie sans requérant (partenaire sans CPS) : l'expert suffit.
@@ -123,7 +131,7 @@ describe("extraction", () => {
     // Requérant confirmé + expert désigné : confirmée, même sans consentements.
     expect(manques(journees[1])).toEqual([]);
     expect(manques(journees[0])).toEqual(["requérant"]);
-    expect(manques({ ...journees[1], expert: "" })).toEqual(["expert"]);
+    expect(manques({ ...journees[1], requis: "" })).toEqual(["requis"]);
   });
 });
 
@@ -152,5 +160,17 @@ describe("calendrier", () => {
     expect(etatDe(journees[0], "2026-11-05")).toBe("passee");
     expect(etatDe(journees[1], "2026-11-05")).toBe("prete");
     expect(etatDe(journees[2], "2026-11-05")).toBe("a-confirmer");
+  });
+});
+
+describe("fichiers du bucket", () => {
+  const f = (key: string) => ({ key });
+  it("garde les journées, écarte les expertises du même jour", () => {
+    expect(
+      extractionsJournees([f("journees-depistage/2026-11-14-journée.csv"), f("journees-depistage/2026-11-14-expertise.csv"), f("journees-depistage/2026-11-05.csv")]).map((x) => x.key),
+    ).toEqual(["journees-depistage/2026-11-14-journée.csv"]);
+  });
+  it("anciens noms sans « journée » : tout sauf les expertises", () => {
+    expect(extractionsJournees([f("2026-11-05.csv"), f("2026-11-05-expertise.csv")]).map((x) => x.key)).toEqual(["2026-11-05.csv"]);
   });
 });

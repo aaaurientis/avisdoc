@@ -9,7 +9,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { lireExtraction, type Extraction, type FichierS3, type JourneeDepistage } from "../lib/journees";
 import { reglesDe, typologieDuClient, type Affectation, type Regles, type Typologie } from "../lib/typologies";
-import { ErreurJournees, listerExtractions, lireExtractionS3, lireFichierLocal, type Source } from "./journeesRepo";
+import { ErreurJournees, listerExtractions, lireExtractionS3, type Source } from "./journeesRepo";
 import { listerAffectations, listerTypologies } from "./typologiesRepo";
 
 export interface EtatJournees {
@@ -25,7 +25,13 @@ export interface EtatJournees {
   affectations: Affectation[];
 }
 
-const CLE_IMPORT = "avisdoc.journees.import";
+// L'ancien import manuel gardait l'extraction dans l'onglet : on efface ce qui pourrait en rester
+// (coordonnées de contacts). Les extractions viennent désormais uniquement du bucket S3.
+try {
+  sessionStorage.removeItem("avisdoc.journees.import");
+} catch {
+  /* stockage indisponible : rien à effacer */
+}
 
 let etat: EtatJournees = { statut: "initial", source: null, extraction: null, s3: null, s3Info: null, erreur: null, typologies: [], affectations: [] };
 const abonnes = new Set<() => void>();
@@ -34,15 +40,6 @@ function changer(p: Partial<EtatJournees>) {
   etat = { ...etat, ...p };
   if (p.source !== undefined) etat.extraction = p.source ? lireExtraction(p.source.texte) : null;
   abonnes.forEach((f) => f());
-}
-
-function importGarde(): Source | null {
-  try {
-    const brut = sessionStorage.getItem(CLE_IMPORT);
-    return brut ? (JSON.parse(brut) as Source) : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -65,17 +62,15 @@ export async function chargerJournees(): Promise<void> {
   try {
     const s3 = await listerExtractions();
     if (s3.fichiers.length) {
-      const lue = await lireExtractionS3(s3.fichiers[0], s3.bucket, s3.prefixe);
-      // La démo n'est qu'un exemple : un vrai fichier importé passe devant.
-      changer({ s3, s3Info: null, source: lue.origine === "Démo" ? (importGarde() ?? lue) : lue });
+      changer({ s3, s3Info: null, source: await lireExtractionS3(s3.fichiers[0], s3.bucket, s3.prefixe) });
     } else {
-      changer({ s3, s3Info: { message: `Aucun fichier CSV dans ${s3.bucket}/${s3.prefixe}.`, nonConfigure: false }, source: importGarde() });
+      changer({ s3, s3Info: { message: `Aucun fichier CSV dans ${s3.bucket}/${s3.prefixe}.`, nonConfigure: false }, source: null });
     }
   } catch (e) {
     changer({
       s3: null,
       s3Info: { message: e instanceof Error ? e.message : String(e), nonConfigure: e instanceof ErreurJournees && e.nonConfigure },
-      source: importGarde(),
+      source: null,
     });
   } finally {
     changer({ statut: "pret" });
@@ -92,21 +87,6 @@ export async function choisirExtraction(f: FichierS3): Promise<void> {
     changer({ erreur: e instanceof Error ? e.message : String(e) });
   } finally {
     changer({ statut: "pret" });
-  }
-}
-
-/** Un CSV choisi sur l'ordinateur : lu dans le navigateur, gardé le temps de l'onglet. */
-export async function importerJournees(fichier: File): Promise<void> {
-  try {
-    const source = await lireFichierLocal(fichier);
-    try {
-      sessionStorage.setItem(CLE_IMPORT, JSON.stringify(source));
-    } catch {
-      /* trop gros ou stockage bloqué : l'import vaut pour cet écran seulement */
-    }
-    changer({ source, erreur: null });
-  } catch (e) {
-    changer({ erreur: e instanceof Error ? e.message : String(e) });
   }
 }
 

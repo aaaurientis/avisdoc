@@ -115,8 +115,10 @@ export interface JourneeDepistage {
   /** Nombre de journées commandées sur le devis. */
   commandees: number | null;
   devis: string;
-  dermatologue: string;
-  expert: string;
+  /** Professionnel de santé présent sur place (colonne « Requérant », ex-« Dermatologue »). */
+  requerant: string;
+  /** Expert qui rend les avis (colonne « Requis », ex-« Expert »). */
+  requis: string;
   /** Date de la journée (AAAA-MM-JJ). */
   date: string;
   dateFacture: string;
@@ -152,8 +154,12 @@ const COLONNES: Record<string, keyof JourneeDepistage> = {
   client: "client",
   "nombre de journees": "commandees",
   "numero devis": "devis",
-  dermatologue: "dermatologue",
-  expert: "expert",
+  // Noms actuels de l'export (depuis novembre 2026)…
+  requerant: "requerant",
+  requis: "requis",
+  // …et anciens noms, pour relire les extractions antérieures.
+  dermatologue: "requerant",
+  expert: "requis",
   "date evenement": "date",
   "date facture": "dateFacture",
   lieu: "lieu",
@@ -196,7 +202,7 @@ export function lireExtraction(texte: string): Extraction {
   });
   const journees = corps.map((cellules, rang) => {
     const j = { id: rang + 1 } as Record<string, unknown>;
-    for (const champ of Object.values(COLONNES)) {
+    for (const champ of new Set(Object.values(COLONNES))) {
       const i = index.get(champ);
       const brut = i === undefined ? "" : nettoyer(cellules[i]);
       if (CHAMPS_DATE.has(champ)) j[champ] = jourDe(brut);
@@ -206,8 +212,9 @@ export function lireExtraction(texte: string): Extraction {
     }
     return j as unknown as JourneeDepistage;
   });
+  const vus = new Set<string>();
   const colonnesManquantes = Object.entries(COLONNES)
-    .filter(([, champ]) => !index.has(champ))
+    .filter(([, champ]) => !index.has(champ) && !vus.has(champ) && (vus.add(champ), true))
     .map(([nom]) => nom);
   return { journees, colonnesManquantes };
 }
@@ -314,14 +321,14 @@ export function acquis(j: JourneeDepistage, cle: keyof Regles): boolean {
     case "requerant":
       return j.confRequerant;
     case "expert":
-      return !!j.expert;
+      return !!j.requis;
   }
 }
 
 /**
  * Ce qui manque pour qu'une journée soit confirmée, selon ce qu'exige la typologie de son client.
- * Par défaut : requérant confirmé et expert désigné (l'export n'a pas de colonne « confirmation
- * expert » : l'expert compte dès que la colonne Expert est remplie).
+ * Par défaut : requérant confirmé et requis désigné (l'export n'a pas de colonne « confirmation
+ * requis » : le requis compte dès que la colonne Requis est remplie).
  */
 export function manques(j: JourneeDepistage, regles: Regles = REGLES_DEFAUT): string[] {
   return CRITERES.filter((c) => regles[c.cle] && !acquis(j, c.cle)).map((c) => c.court);
@@ -376,3 +383,23 @@ export function moisDecale(mois: string, n: number): string {
 export type EtatJournee = "passee" | "prete" | "a-confirmer";
 export const etatDe = (j: JourneeDepistage, aujourdhui = aujourdhuiISO(), regles: Regles = REGLES_DEFAUT): EtatJournee =>
   estPassee(j, aujourdhui) ? "passee" : manques(j, regles).length ? "a-confirmer" : "prete";
+
+// ── Fichiers du bucket ───────────────────────────────────────────────────────
+
+/** Nom de fichier comparable : sans dossier, accents ni casse (« 2026-11-14-journée.csv » → « 2026-11-14-journee.csv »). */
+const nomDeFichier = (key: string) =>
+  (key.split("/").pop() ?? key)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+/**
+ * Les extractions des journées parmi les fichiers du bucket.
+ * Les expertises sont déposées au même endroit, avec la même date dans le nom : on ne garde que
+ * les fichiers « journée » ; à défaut d'en trouver (anciens noms, ex. 2026-11-05.csv), tout ce qui
+ * n'est pas une expertise.
+ */
+export function extractionsJournees<T extends { key: string }>(fichiers: T[]): T[] {
+  const journees = fichiers.filter((f) => /journ/.test(nomDeFichier(f.key)));
+  return journees.length ? journees : fichiers.filter((f) => !/expertise/.test(nomDeFichier(f.key)));
+}
