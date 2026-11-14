@@ -37,6 +37,7 @@ import {
   type TypeSignal,
 } from "../../../../supabase/functions/_shared/reseau-signaux";
 import { cn } from "@/lib/utils";
+import AvancementIa from "./AvancementIa";
 
 const lienCls = "inline-flex items-center gap-1 font-semibold text-avisdoc-ink underline-offset-2 hover:underline";
 const btnSec = "inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50";
@@ -81,7 +82,7 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
         suivi.current = null;
         if (r?.statut === "termine") onChange();
       }
-    }, 5000);
+    }, 3000);
   }, [charger, onChange]);
 
   useEffect(() => {
@@ -292,27 +293,16 @@ export default function FichePraticien({ praticien: p, lectureSeule, onClose, on
 }
 
 function ResumeRecherche({ recherche: r }: { recherche: RechercheIa | null }) {
-  const [details, setDetails] = useState(false);
   if (!r) return <p className="mt-1 text-[12px] text-muted-foreground">Jamais lancée. L'IA cherche sur le web public les signaux absents de la fiche Google ; chaque proposition est contrôlée sur sa source, puis validée par vous.</p>;
-  if (r.statut === "en_cours") return <p className="mt-1 text-[12px] text-muted-foreground">Lancée le {dateFr(r.debut)}. Les propositions s'affichent dès qu'elle se termine.</p>;
-  if (r.statut === "echec") return <p className="mt-1 text-[12px] font-semibold text-rose-700">Dernière recherche en échec : {r.erreur}</p>;
-  const ec = r.resultat?.ecartees ?? [];
+  if (r.statut !== "termine") return <AvancementIa recherche={r} />;
+  const nbEcartees = r.resultat?.ecartees?.length ?? 0;
   return (
-    <div className="mt-1 text-[12px] text-muted-foreground">
-      Le {dateFr(r.fin ?? r.debut)} : {r.resultat?.propositions ?? 0} trouvées, {r.resultat?.retenues ?? 0} retenues après contrôle de la source
-      {ec.length > 0 && (
-        <>
-          , {ec.length} écartées.{" "}
-          <button type="button" onClick={() => setDetails(!details)} className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline">{details ? "Masquer" : "Pourquoi ?"}</button>
-          {details && (
-            <ul className="mt-1 list-disc pl-4">
-              {ec.map((e, i) => <li key={i}>{e.type ? `${SIGNAUX[e.type as TypeSignal]?.libelle ?? e.type} : ` : ""}{e.motif}{e.url ? ` (${hote(e.url)})` : ""}</li>)}
-            </ul>
-          )}
-        </>
-      )}
-      {ec.length === 0 && "."}
-    </div>
+    <>
+      <p className="mt-1 text-[12px] text-muted-foreground">
+        Le {dateFr(r.fin ?? r.debut)} : {r.resultat?.propositions ?? 0} trouvées, {r.resultat?.retenues ?? 0} retenues après contrôle de la source, {nbEcartees} écartée{nbEcartees > 1 ? "s" : ""}.
+      </p>
+      <AvancementIa recherche={r} ouvertParDefaut={false} />
+    </>
   );
 }
 

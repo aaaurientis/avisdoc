@@ -30,6 +30,7 @@ import {
 import { reseauRepo, type DepartementReseau, type ImportReseau, type PraticienReseau, type RechercheIa, type SignalReseau } from "../reseau/reseauRepo";
 import { calculerScore } from "../../../supabase/functions/_shared/reseau-signaux";
 import FichePraticien from "./reseau/FichePraticien";
+import AvancementIa from "./reseau/AvancementIa";
 import { cn } from "@/lib/utils";
 
 const COLS_FULL = "minmax(170px,1.6fr) 140px minmax(170px,1.6fr) 90px 110px 74px";
@@ -47,6 +48,8 @@ export default function ReseauDepartement() {
   const [signaux, setSignaux] = useState<SignalReseau[]>([]);
   const [rechercheMg, setRechercheMg] = useState<RechercheIa | null>(null);
   const [ajoutRpps, setAjoutRpps] = useState(false);
+  /** Le journal reste affiché à la fin d'une recherche suivie à l'écran. */
+  const [suiviMgOuvert, setSuiviMgOuvert] = useState(false);
   const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien }>({
     q: "", population: "", role: "", etat: "",
   });
@@ -113,8 +116,10 @@ export default function ReseauDepartement() {
     if (rechercheMg?.statut !== "en_cours") return;
     const t = window.setInterval(async () => {
       const r = await reseauRepo.derniereRecherche({ departement: code }).catch(() => null);
-      if (r && r.statut !== "en_cours") { window.clearInterval(t); setRechercheMg(r); void charger(); }
-    }, 5000);
+      if (!r) return;
+      setRechercheMg(r);
+      if (r.statut !== "en_cours") { window.clearInterval(t); setSuiviMgOuvert(true); void charger(); }
+    }, 3000);
     return () => window.clearInterval(t);
   }, [rechercheMg?.statut, code]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -231,12 +236,17 @@ export default function ReseauDepartement() {
           {rechercheMg?.statut === "en_cours" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
           Chercher les généralistes formés à la dermoscopie (IA)
         </button>
-        <span className="text-muted-foreground">
-          {rechercheMg?.statut === "en_cours" && `Recherche lancée le ${dateFr(rechercheMg.debut)}…`}
-          {rechercheMg?.statut === "echec" && <span className="font-semibold text-rose-700">Dernière recherche en échec : {rechercheMg.erreur}</span>}
-          {rechercheMg?.statut === "termine" && `Dernière recherche : ${rechercheMg.resultat?.propositions ?? 0} trouvés, ${rechercheMg.resultat?.crees ?? 0} ajoutés, ${rechercheMg.resultat?.deja_la ?? 0} déjà là, ${rechercheMg.resultat?.ecartees?.length ?? 0} écartés (source non vérifiée ou RPPS introuvable).`}
-        </span>
+        {rechercheMg?.statut === "termine" && (
+          <span className="text-muted-foreground">
+            Dernière recherche, le {dateFr(rechercheMg.fin ?? rechercheMg.debut)} : {rechercheMg.resultat?.propositions ?? 0} trouvés, {rechercheMg.resultat?.crees ?? 0} ajoutés, {rechercheMg.resultat?.deja_la ?? 0} déjà là, {rechercheMg.resultat?.ecartees?.length ?? 0} écartés.
+          </span>
+        )}
       </div>
+      {rechercheMg && (rechercheMg.statut !== "termine" || suiviMgOuvert) && (
+        <div className="-mt-2 mb-4 max-w-3xl">
+          <AvancementIa recherche={rechercheMg} ouvertParDefaut />
+        </div>
+      )}
 
       {/* Filtres */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

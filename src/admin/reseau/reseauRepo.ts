@@ -69,6 +69,10 @@ export interface RechercheIa {
   fin: string | null;
   resultat: { propositions?: number; retenues?: number; crees?: number; deja_la?: number; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
   erreur: string | null;
+  /** Avancement en direct : étape en cours, pourcentage, journal. */
+  etape: string | null;
+  progression: number;
+  journal: { le: string; texte: string; niveau: "info" | "ok" | "ecarte" }[];
 }
 
 export interface CandidatGoogle { place_id: string; nom: string; adresse: string; categorie: string | null; ferme: boolean }
@@ -162,6 +166,7 @@ const toSignal = (r: any): SignalReseau => ({
 
 const toRecherche = (r: any): RechercheIa => ({
   id: r.id, type: r.type, statut: r.statut, debut: r.debut, fin: r.fin ?? null, resultat: r.resultat ?? null, erreur: r.erreur ?? null,
+  etape: r.etape ?? null, progression: typeof r.progression === "number" ? r.progression : 0, journal: Array.isArray(r.journal) ? r.journal : [],
 });
 
 export const reseauRepo = {
