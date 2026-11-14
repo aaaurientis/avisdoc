@@ -36,6 +36,7 @@ Elles priment sur les propositions du reste de la note.
 | Clé Google serveur | **Oui**, AvisDoc crée une seconde clé, réservée au serveur, avec l'API Places |
 | Plafond Places | **50 € par mois**, alertes à 50 % et 90 %, quota de 300 appels Place Details par jour |
 | Seuils de couverture | **Aucun seuil géré par le module.** L'utilisateur décide lui-même qu'un département est couvert. L'écran affiche seulement le nombre d'accords par rôle. La règle N/M du brief (§3) et sa recette n° 9 sont abandonnées |
+| Forme de l'accord | **Hors périmètre pour l'instant.** L'accord reste la trace minimale du brief (date, canal, auteur, rôles, départements). Pas de charte, pas de Yousign. Le modèle garde la place d'un lien vers un document signé plus tard |
 | Proximité dans le score | **Retirée** : l'utilisateur ouvre lui-même un département, il n'y a pas de point de référence |
 | Autres signaux du niveau 3 | **Recherche assistée par IA**, lancée une fois le praticien identifié, propositions validées par un opérateur (§6) |
 
