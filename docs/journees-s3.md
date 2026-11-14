@@ -120,7 +120,7 @@ un autre dossier se règle avec le secret `EXPERTISES_S3_PREFIX`). La règle IAM
 autoriser ce dossier (voir plus haut).
 
 - Avis par mois (en journée / hors journée), recommandations, délai de traitement (mesuré depuis
-  fin août 2026 seulement), profession du requérant.
+  fin août 2026 seulement).
 - **Par requis** : nombre d'avis et **taux de consultation** = avis qui orientent vers un
   dermatologue (consultation conseillée ou exérèse) sur les avis dont la recommandation est
   renseignée ; détail consultation / exérèse / non indispensable, délai médian, urgences.
