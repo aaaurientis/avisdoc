@@ -85,12 +85,22 @@ for cible in "${cibles[@]}"; do
   fi
   echo
   echo "▶︎ $cible → ${OVH_USER}@${OVH_HOST}:${remote_dir}/  (port ${OVH_PORT})"
+  # Ordre : 1) les nouveaux fichiers versionnés (assets/), SANS supprimer les anciens ;
+  # 2) le reste (pages HTML, .htaccess…), avec suppression des fichiers obsolètes HORS
+  # assets/. Une page ouverte pendant le déploiement garde ainsi tous ses fichiers, et la
+  # nouvelle page HTML n'arrive qu'une fois tous ses fichiers en place — jamais de mélange
+  # de versions (page blanche « Importing binding name … is not found », 14/11/2026).
+  # Les anciens assets s'accumulent (quelques Mo par déploiement) : les supprimer à la
+  # main de temps en temps (fichiers de plus d'un mois dans assets/, via le FTP OVH).
   lftp -u "${OVH_USER},${OVH_PASSWORD}" "sftp://${OVH_HOST}:${OVH_PORT}" -e "
     set sftp:auto-confirm yes;
     set net:timeout 15;
     set net:max-retries 2;
-    mirror -R --delete --verbose --parallel=4 \
+    mirror -R --verbose --parallel=4 \
       --exclude-glob .DS_Store \
+      ${local_dir}/assets/ ${remote_dir}/assets/;
+    mirror -R --delete --verbose --parallel=4 \
+      --exclude-glob .DS_Store --exclude ^assets/ \
       ${local_dir}/ ${remote_dir}/;
     quit
   "
