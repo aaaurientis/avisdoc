@@ -303,7 +303,7 @@ Hypothèses par département (Isère : 167 praticiens) :
 |---|---|
 | 1 département par mois | **~0 $** (sous les quotas gratuits) |
 | 3 départements par mois | **~20 à 40 $** |
-| Sans aucun quota gratuit, par département | ~30 $ au plus |
+| Sans aucun quota gratuit, par département | ~35 $ au plus |
 
 Deux réglages pour rester bas :
 - **Les avis à la demande** : la fiche charge les informations sans les avis (20 $), et un
