@@ -63,7 +63,9 @@ export async function listerExpertises(): Promise<{ bucket: string; prefixe: str
     return { bucket: "démo", prefixe: "", fichiers: [{ key: `demo-${aujourdhui()}-expertise.csv`, taille: 0, modifie: new Date().toISOString() }] };
   }
   const r = await appeler<{ bucket: string; prefixe: string; fichiers: FichierS3[] }>({ action: "lister", type: "expertises" });
-  r.fichiers = r.fichiers.filter((f) => /expertise/i.test(f.key.split("/").pop() ?? ""));
+  // Dossier « expertises/ » (fichiers nommés par leur date) ou, à défaut, fichiers « …expertise… »
+  // rangés avec les journées : le mot peut être dans le dossier comme dans le nom.
+  r.fichiers = r.fichiers.filter((f) => /expertise/i.test(f.key));
   r.fichiers.sort((a, b) => dateDuFichier(b).localeCompare(dateDuFichier(a)) || b.modifie.localeCompare(a.modifie));
   return r;
 }
