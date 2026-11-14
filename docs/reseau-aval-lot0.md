@@ -32,6 +32,7 @@ Elles priment sur les propositions du reste de la note.
 | Lecture de la fiche Google Maps | **Par l'API Google Places**, affichage en direct. La règle 2 du brief est levée pour Google Maps, et pour lui seul |
 | DIU de dermatologie esthétique | **Affiché comme information** sur la fiche, sans effet sur le score |
 | Sources | **Toute information affichée ou enregistrée porte son lien source.** Rien n'est inventé ni déduit : seule une information vérifiée et validée par un opérateur est retenue (§6) |
+| Score | **Probabilité d'adhésion au réseau**, explicable et calibrée sur les issues réelles (§8 bis) |
 | Autres signaux du niveau 3 | **Recherche assistée par IA**, lancée une fois le praticien identifié, propositions validées par un opérateur (§6) |
 
 ---
@@ -438,6 +439,98 @@ d'existence.
 
 ---
 
+## 8 bis. Score : probabilité qu'un praticien adhère au réseau
+
+Demande d'Arthur (14/11) : à la fin, un score qui donne la **probabilité qu'un praticien
+adhère au réseau d'aval**, c'est-à-dire qu'il passe à l'état `accord`. Le cadrage est
+posé ici ; les pondérations sont à valider au lot 2, comme le prévoit le brief (§5).
+
+### Ce que le score est, et ce qu'il n'est pas
+
+- Il **estime une probabilité** (0 à 100 %) et **classe la file de contact**.
+- Il **ne décide jamais** d'une entrée dans le réseau : seul un accord tracé y fait entrer
+  (règle 6 du brief).
+- Il n'utilise **que des informations sourcées et validées** (§6). Un signal en attente
+  de validation ou `inconnu` ne compte pas : il ne pénalise pas, il ne favorise pas.
+
+### Le calcul : une régression logistique, lisible à la main
+
+Le score est une **somme de contributions**, transformée en probabilité :
+
+```
+z = base + Σ contributions des informations connues
+probabilité = 1 / (1 + e^(−z))
+```
+
+Une contribution positive augmente la probabilité, une contribution négative la diminue,
+une information inconnue vaut 0. La fiche affiche la base, chaque contribution avec sa
+source, la somme `z` et la probabilité : le calcul se refait à la main (recette n° 5 du
+brief). Les pondérations sont dans un fichier de configuration versionné, et la fiche
+indique la version utilisée.
+
+Ce modèle a été choisi parce qu'il donne une vraie probabilité **et** reste explicable
+terme à terme. Un modèle plus complexe (forêt, réseau de neurones) violerait la règle
+« un score sans explication visible est un défaut ».
+
+### Deux temps : estimation a priori, puis probabilité calibrée
+
+**Au départ, aucune donnée réelle n'existe** : personne n'a encore accepté ni refusé. Le
+pourcentage affiché est donc une **estimation a priori**, fondée sur des pondérations
+proposées par AvisDoc. La fiche le dit en clair : « Estimation a priori, non calibrée ».
+
+**Dès que les issues s'accumulent**, les pondérations sont réapprises sur les décisions
+réelles :
+- l'issue observée est `accord` (1) contre `refus` (0), après un contact effectif. Les
+  `injoignable` sont comptés à part : ils mesurent la joignabilité, pas la volonté ;
+- seuil proposé : **au moins 40 issues**, dont au moins 10 accords et 10 refus, tous
+  départements confondus ;
+- le réapprentissage est un script lancé à la main, pas un calcul automatique en
+  production. Il produit une nouvelle version du fichier de pondérations, avec ses
+  indicateurs de qualité : score de Brier, et courbe de calibration (sur 100 praticiens
+  annoncés à 30 %, environ 30 adhèrent-ils vraiment ?) ;
+- la nouvelle version n'entre en service qu'après validation par AvisDoc. La fiche
+  affiche alors « Probabilité calibrée sur N issues, version X ».
+
+### Variables proposées et pondérations a priori (à valider)
+
+Base a priori : **taux d'adhésion attendu de 20 %** (z = −1,39). À valider par AvisDoc.
+
+| Information | Source | Valeur | Contribution a priori |
+|---|---|---|---|
+| Nouveaux patients | IA validée ou contact | oui / sur courrier / non | +0,8 / +0,4 / −1,0 |
+| Motif « lésion suspecte » ou « exérèse » proposé | IA validée | oui | +0,6 |
+| Dermoscopie ou cartographie des nævus | IA validée | oui | +0,4 |
+| Chirurgie cutanée sur place (rôle `exerese`) | IA validée | oui | +0,4 |
+| Circuit rapide ou contact réservé aux médecins | IA validée | oui | +0,8 |
+| Participation à des actions de prévention | IA validée | oui | +0,5 |
+| Plaintes répétées sur les délais | fiche Google, lue et validée | oui | −0,6 |
+| Orientation de l'activité | fiche Google ou IA validée | mixte | −0,3 |
+| Signal de départ (successeur, fermeture) | IA ou fiche Google, validé | oui | −1,5 |
+| A répondu au premier contact | interaction tracée | oui | +1,0 |
+| Délai déclaré pour un patient adressé | contact (niveau 4) | ≤ 15 j / 16–45 j / > 45 j | +1,0 / +0,3 / −0,8 |
+| Proximité | à définir (voir questions) | — | — |
+
+**Critères éliminatoires** : la probabilité affichée est 0 %, avec le motif. Ce sont
+l'opposition enregistrée, l'activité esthétique dominante et la cessation d'exercice.
+
+**Exemple de lecture.** Dermatologue, nouveaux patients « oui », motif exérèse « oui »,
+tout le reste inconnu : z = −1,39 + 0,8 + 0,6 = 0,01, soit une probabilité de **50 %**.
+
+**Variables exclues volontairement** : sexe, âge, nom, origine du diplôme. Elles sont
+discriminatoires ou sans lien avec la volonté. Aucune notion de rémunération ou de
+contrepartie (règle 7). Le secteur conventionnel est absent, puisqu'Ameli n'est pas
+utilisé.
+
+### Conséquences pour les lots
+
+- **Lot 2** : fonction pure de calcul, fichier de pondérations versionné, affichage du
+  détail sur la fiche, tests qui recalculent des exemples à la main.
+- **Lot 3** : enregistrement de l'issue (`accord`, `refus`, `injoignable`) avec la version
+  du score au moment du contact. Sans cela, la calibration est impossible.
+- **Après 40 issues** : premier réapprentissage, et note de calibration soumise à AvisDoc.
+
+---
+
 ## 9. Questions encore ouvertes
 
 Celles du brief (§12), hors la n° 4 tranchée le 14/11 (hospitaliers dans le périmètre),
@@ -446,3 +539,7 @@ restent ouvertes. S'y ajoutent :
 1. Une seconde clé Google, réservée au serveur et avec l'API Places activée, est-elle
    possible sur le compte Google Cloud d'AvisDoc ? (§6)
 2. Quel plafond mensuel de dépense Places fixer dans la console ?
+3. Score : le taux d'adhésion attendu de 20 % et les pondérations a priori du §8 bis
+   conviennent-ils ?
+4. Score : la « proximité » se mesure par rapport à quoi ? Lieux des journées de
+   dépistage, clients d'AvisDoc, centre du département ? Sans réponse, elle est retirée.
