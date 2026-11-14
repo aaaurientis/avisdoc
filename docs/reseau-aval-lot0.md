@@ -254,6 +254,27 @@ opérateur.
 
 ---
 
+## 7 bis. L'API FHIR de l'Annuaire Santé ne remplace pas les fichiers
+
+Testée le 14/11 avec la clé ANS (`gateway.api.esante.gouv.fr/fhir/v2`) :
+
+- La fiche d'un praticien porte bien les codes du §3. Exemple : RPPS 10003097440 → `SM15`,
+  `DSM14`, profession `10`.
+- `Practitioner?qualification-code=SM15` renvoie **5 800 praticiens** en France. C'est
+  cohérent avec les 5 795 lignes SM15 du fichier `savoirfaire`.
+- En revanche, **aucune recherche par lieu n'est possible sur le praticien**. Seule
+  `Organization` accepte un code postal. `PractitionerRole` ne se filtre que par structure
+  ou par praticien, pas par spécialité.
+- Pour monter la liste d'un département, il faudrait enchaîner trois requêtes : les
+  structures par code postal (1 971 pour le seul 38000), puis leurs exercices, puis les
+  praticiens. Cela fait des milliers d'appels par département.
+
+**Conséquence :** l'import d'un département se fait par les fichiers d'extraction. L'API
+sert à l'unité : ajout manuel par RPPS, rafraîchissement d'une fiche, contrôle
+d'existence.
+
+---
+
 ## 8. Conséquences pour le lot 1
 
 1. **Import.** Lecture en flux du fichier `personne-activite`. Filtre : profession 10,
