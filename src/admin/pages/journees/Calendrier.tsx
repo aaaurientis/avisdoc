@@ -1,4 +1,4 @@
-// Journée › Calendrier — les journées de dépistage mois par mois, et le détail de chacune.
+// Statistiques › Journées (ex-Calendrier) — les journées de dépistage mois par mois, et le détail de chacune.
 //
 // Un clic sur un jour affiche ses journées. En dessous, la liste complète : à venir d'abord
 // (la plus proche en tête), puis les passées (la plus récente en tête).
@@ -6,7 +6,8 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useJournees, useRegles } from "../../data/journeesStore";
+import { useExpertises, useJournees, useRegles } from "../../data/journeesStore";
+import { cleJournee } from "../../lib/expertises";
 import {
   aujourdhuiISO,
   compterPar,
@@ -35,7 +36,7 @@ const LEGENDE: { etat: EtatJournee; label: string }[] = [
 
 export default function Calendrier() {
   return (
-    <CadreJournees titre="Calendrier des journées">
+    <CadreJournees titre="Journées">
       <Contenu />
     </CadreJournees>
   );
@@ -44,6 +45,9 @@ export default function Calendrier() {
 function Contenu() {
   const { extraction } = useJournees();
   const { reglesDe } = useRegles();
+  // Journée terminée : on affiche le nombre d'expertises rendues.
+  const { index } = useExpertises();
+  const avisDe = (j: JourneeDepistage) => (estPassee(j, auj) ? (index.get(cleJournee(j))?.length ?? 0) : 0);
   const auj = aujourdhuiISO();
   const [mois, setMois] = useState(auj.slice(0, 7));
   const [choisi, setChoisi] = useState(auj);
@@ -145,8 +149,13 @@ function Contenu() {
                 {/* Grand écran : le client de chaque journée. Téléphone : le nombre seulement. */}
                 <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
                   {liste.slice(0, 3).map((j) => (
-                    <span key={j.id} className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))])} title={`${j.client} · ${j.lieu}`}>
-                      {j.client}
+                    <span
+                      key={j.id}
+                      className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))])}
+                      title={`${j.client} · ${j.lieu}${avisDe(j) ? ` · ${avisDe(j)} avis` : ""}`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{j.client}</span>
+                      {avisDe(j) > 0 && <span className="shrink-0 font-bold text-avisdoc-ink">{avisDe(j)}</span>}
                     </span>
                   ))}
                   {liste.length > 3 && <span className="px-1.5 text-[11px] text-muted-foreground">+{liste.length - 3}</span>}

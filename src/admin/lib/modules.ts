@@ -15,7 +15,7 @@ export type Module =
   | "veille" // Veille Marché (avis AvisDoc, évènements, concurrence, publications)
   | "crm_synthese" // CRM Synthèse : les CRM ensemble, en consultation seule
   | "sante" // Bloc Professionnels de Santé (ex-Contacts Médicaux : Requérants, Requis, Aval)
-  | "journee" // Bloc Journée : extractions des journées de dépistage (bucket S3)
+  | "journee" // Bloc Statistiques (ex-« Journée ») : journées de dépistage et expertises (bucket S3)
   | "finance"
   | "documents"
   | "admin";
@@ -28,7 +28,7 @@ export const MODULES: { key: Module; label: string }[] = [
   { key: "veille", label: "Veille Marché" },
   { key: "crm_synthese", label: "CRM Synthèse" },
   { key: "sante", label: "Professionnels de Santé" },
-  { key: "journee", label: "Journée" },
+  { key: "journee", label: "Statistiques" },
   { key: "finance", label: "Finance" },
   { key: "documents", label: "Documents" },
   { key: "admin", label: "Admin" },

@@ -145,10 +145,10 @@ const MENU: Entree[] = [
     { to: "/contacts/requis", label: "Requis", icon: Users },
     { to: "/contacts/reseau", label: "Réseau Aval", icon: Building2 },
   ] },
-  // Journée : suivi et statistiques des journées de dépistage (extractions S3).
-  { module: "journee", label: "Journée", icon: CalendarCheck, enfants: [
-    { to: "/journees", label: "Statistiques", icon: BarChart3, end: true },
-    { to: "/journees/calendrier", label: "Calendrier", icon: CalendarDays },
+  // Statistiques : journées de dépistage et expertises (extractions S3). Droit « journee ».
+  { module: "journee", label: "Statistiques", icon: CalendarCheck, enfants: [
+    { to: "/journees", label: "Synthèse", icon: BarChart3, end: true },
+    { to: "/journees/calendrier", label: "Journées", icon: CalendarDays },
     { to: "/journees/expertises", label: "Expertises", icon: ClipboardList },
   ] },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [

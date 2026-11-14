@@ -1,11 +1,11 @@
 # Journée — journées de dépistage (extractions CSV, AWS S3)
 
-Le bloc **Journée** du Hub a deux pages, et un encart sur le tableau de bord :
+Le bloc **Statistiques** du Hub (ex-« Journée », droit `journee`) a trois pages — Synthèse, Journées, Expertises — et un encart sur le tableau de bord :
 
-- **Statistiques** (`/journees`) : journées, passées, à venir, clients ; journées par mois ;
+- **Synthèse** (`/journees`) : journées, passées, à venir, clients ; journées par mois ;
   préparation des journées à venir (confirmations, dermatoscope) ; avancement par contrat
   (client + devis) ; répartition par expert, dermatologue, lieu ou client.
-- **Calendrier** (`/journees/calendrier`) : le mois en grille (à confirmer / confirmée / passée — confirmée = requérant confirmé et expert désigné),
+- **Journées** (`/journees/calendrier`, ex-Calendrier) : le mois en grille (à confirmer / confirmée / passée — confirmée = requérant confirmé et expert désigné),
   le détail du jour choisi, puis la liste complète (à venir, puis passées).
 - **Tableau de bord** : les journées d'aujourd'hui et de la semaine (lundi → dimanche),
   pour les personnes qui ont le droit « Journée ».
@@ -74,7 +74,7 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
 
 ## Télécharger une extraction
 
-Le bouton **Télécharger le CSV** (pages Statistiques et Calendrier) enregistre l'extraction
+Le bouton **Télécharger le CSV** (pages Synthèse, Journées et Expertises) enregistre l'extraction
 affichée telle qu'elle est dans le bucket (UTF-8, lisible par Excel). Le menu « Extraction du … »
 permet d'en choisir une plus ancienne avant de la télécharger. Chaque téléchargement est noté
 au journal d'audit (Admin › Auditabilité) : le fichier contient des coordonnées de contacts.
@@ -114,7 +114,7 @@ journées le même jour au même endroit).
 
 ## Expertises
 
-**Journée › Expertises** (`/journees/expertises`) lit l'extraction « expertise » la plus récente
+**Statistiques › Expertises** (`/journees/expertises`) lit l'extraction « expertise » la plus récente
 dans le dossier **`expertises/`** du bucket (fichiers nommés par leur date, ex. `2026-11-13.csv` ;
 un autre dossier se règle avec le secret `EXPERTISES_S3_PREFIX`). La règle IAM de l'utilisateur doit
 autoriser ce dossier (voir plus haut).
@@ -124,12 +124,12 @@ autoriser ce dossier (voir plus haut).
 - **Par requis** : nombre d'avis et **taux de consultation** = avis qui orientent vers un
   dermatologue (consultation conseillée ou exérèse) sur les avis dont la recommandation est
   renseignée ; détail consultation / exérèse / non indispensable, délai médian, urgences.
-- Dans le **Calendrier**, le détail d'une journée montre ses expertises (rattachées par
+- Dans **Journées**, le détail d'une journée montre ses expertises (rattachées par
   date + lieu + n° journée) ; la colonne « Avis » des contrats en fait la somme.
 
 ## Rapport client
 
-Bouton **Rapport** (contrats, page Statistiques) ou **Rapport de la journée** (Calendrier) : bilan aux
+Bouton **Rapport** (contrats, page Synthèse) ou **Rapport de la journée** (page Journées) : bilan aux
 couleurs AvisDoc (fond blanc, Newsreader + Hanken Grotesk, cyan / bleu marine / orange), à imprimer
 ou enregistrer en PDF. Il n'existe qu'**au-delà de 20 expertises** et ne contient que des totaux et
 des proportions (aucun chiffre par personne, aucune ventilation des recommandations par journée).

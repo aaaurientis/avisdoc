@@ -1,4 +1,4 @@
-// Journée › Expertises — les avis rendus, au global : volumes par mois (en journée / hors journée),
+// Statistiques › Expertises — les avis rendus, au global : volumes par mois (en journée / hors journée),
 // recommandations, délais de réponse, répartition par requis et par profession du requérant.
 //
 // Source : l'extraction « expertise » la plus récente du bucket S3 (une ligne = un avis).

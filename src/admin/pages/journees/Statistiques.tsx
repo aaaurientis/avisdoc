@@ -1,4 +1,4 @@
-// Journée › Statistiques — combien de journées et quand, où en est chaque contrat,
+// Statistiques › Synthèse — combien de journées et quand, où en est chaque contrat,
 // les journées à venir sont-elles confirmées (requérant + expert). Le détail jour par jour est dans le Calendrier.
 
 import { useMemo, useState } from "react";
@@ -41,7 +41,7 @@ const mois = (cle: string) => capitale(new Date(`${cle}-15T12:00:00`).toLocaleDa
 
 export default function Statistiques() {
   return (
-    <CadreJournees titre="Statistiques des journées">
+    <CadreJournees titre="Synthèse des journées">
       <Contenu />
     </CadreJournees>
   );
