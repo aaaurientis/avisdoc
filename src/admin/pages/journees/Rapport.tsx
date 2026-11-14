@@ -5,9 +5,9 @@
 // Seulement au-delà de 20 expertises, et sans aucun chiffre par personne : le client reçoit des
 // totaux et des proportions, jamais de quoi reconnaître quelqu'un.
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Printer } from "lucide-react";
+import { Download, Loader2, Printer } from "lucide-react";
 import logo from "@/assets/avisdoc-logo.png";
 import { useExpertises, useJournees } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resumer, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
@@ -61,6 +61,95 @@ function usePolicesCharte() {
 }
 
 const echapper = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+
+/**
+ * Fabrique le PDF dans le navigateur et le télécharge, sans passer par l'impression : sous Safari,
+ * « Enregistrer au format PDF » depuis la boîte d'impression produisait un fichier vide.
+ * La page est photographiée en haute définition (×2) puis posée sur des feuilles A4 ; quand le
+ * rapport fait plusieurs pages, la coupure tombe entre deux lignes du tableau, jamais au milieu.
+ * Les deux bibliothèques ne sont chargées qu'au clic.
+ */
+async function fabriquerPdf(nom: string): Promise<Blob | null> {
+  const page = document.querySelector<HTMLElement>(".rapport-page");
+  if (!page) return null;
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+  // Les polices de la charte doivent être là avant la photo, sinon le PDF sort en police de secours.
+  const polices = (document as Document & { fonts?: FontFaceSet }).fonts;
+  if (polices) {
+    await Promise.race([
+      Promise.all(["600 30px 'Newsreader'", "400 12px 'Hanken Grotesk'", "700 12px 'Hanken Grotesk'"].map((f) => polices.load(f))).then(() => polices.ready),
+      new Promise((ok) => setTimeout(ok, 4000)),
+    ]);
+  }
+
+  // Points de coupure possibles (bas de chaque ligne et de chaque bloc), en pixels CSS depuis le haut de la page.
+  // Mesurés sur la copie elle-même (marges réduites), dans onclone ci-dessous.
+  let coupures: number[] = [];
+
+  const echelle = 2;
+  const canvas = await html2canvas(page, {
+    scale: echelle,
+    backgroundColor: "#ffffff",
+    useCORS: true,
+    logging: false,
+    // Sur la copie photographiée : pas d'ombre, pas de hauteur imposée.
+    onclone: (doc) => {
+      const p = doc.querySelector<HTMLElement>(".rapport-page");
+      if (!p) return;
+      Object.assign(p.style, { boxShadow: "none", minHeight: "0", padding: "12mm 15mm 10mm" });
+      const haut = p.getBoundingClientRect().top;
+      coupures = [...p.querySelectorAll<HTMLElement>("tr, .rapport-bloc")].map((el) => el.getBoundingClientRect().bottom - haut);
+    },
+  });
+
+  const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
+  const pxParMm = canvas.width / 210;
+  const hauteurFeuille = Math.floor(297 * pxParMm);
+  const limites = coupures.map((c) => Math.round(c * echelle)).sort((a, b) => a - b);
+  let y = 0;
+  let premiere = true;
+  while (y < canvas.height - 2 * pxParMm) {
+    let fin = Math.min(y + hauteurFeuille, canvas.height);
+    if (fin < canvas.height) {
+      const propre = limites.filter((l) => l > y + hauteurFeuille * 0.5 && l <= fin).pop();
+      if (propre) fin = propre;
+    }
+    const morceau = document.createElement("canvas");
+    morceau.width = canvas.width;
+    morceau.height = fin - y;
+    const ctx = morceau.getContext("2d");
+    if (!ctx) break;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, morceau.width, morceau.height);
+    ctx.drawImage(canvas, 0, y, canvas.width, fin - y, 0, 0, canvas.width, fin - y);
+    if (!premiere) pdf.addPage();
+    pdf.addImage(morceau.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, (fin - y) / pxParMm);
+    premiere = false;
+    y = fin;
+  }
+  pdf.setProperties({ title: nom, creator: "AvisDoc" });
+  return pdf.output("blob");
+}
+
+/**
+ * Téléchargement par un lien nommé, dans le geste même du clic : un téléchargement lancé plusieurs
+ * secondes après (le temps de fabriquer le PDF) perd son nom, ou est bloqué par Safari.
+ */
+function enregistrer(blob: Blob, nom: string) {
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = url;
+  // Nom de fichier sans accents : certains navigateurs refusent un nom accentué et retombent sur « download ».
+  const fichier = nom
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7e]/g, "");
+  lien.download = `${fichier}.pdf`;
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 
 /** Le document imprimé : le rapport seul, sans rien du Hub autour. */
 export function documentImprimable(pageHtml: string, titre: string): string {
@@ -186,16 +275,44 @@ export default function Rapport() {
         }
         .rapport-page, .rapport-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       `}</style>
-      <div className="rapport-actions" style={{ maxWidth: "210mm", margin: "0 auto 16px", display: "flex", justifyContent: "flex-end", gap: 8, fontFamily: SANS }}>
-        <button
-          type="button"
-          onClick={() => imprimer(document.title)}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.marine, color: "#fff", border: 0, borderRadius: 999, padding: "10px 18px", fontWeight: 600, cursor: "pointer" }}
-        >
-          <Printer size={16} /> Imprimer ou enregistrer en PDF
-        </button>
-      </div>
+      <Actions />
       <Page portee={portee} lignes={lignes} avis={avis} dateExport={sourceExp?.date ?? ""} />
+    </div>
+  );
+}
+
+/** Le PDF est préparé dès que le rapport est affiché (polices chargées) ; le clic l'enregistre aussitôt. */
+function Actions() {
+  const [pdf, setPdf] = useState<{ blob: Blob; nom: string } | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  useEffect(() => {
+    let vivant = true;
+    const t = window.setTimeout(async () => {
+      try {
+        const nom = document.title || "AvisDoc - Bilan";
+        const blob = await fabriquerPdf(nom);
+        if (vivant && blob) setPdf({ blob, nom });
+      } catch (e) {
+        if (vivant) setErreur(e instanceof Error ? e.message : String(e));
+      }
+    }, 1000);
+    return () => {
+      vivant = false;
+      window.clearTimeout(t);
+    };
+  }, []);
+  const enCours = !pdf && !erreur;
+  const telecharger = () => pdf && enregistrer(pdf.blob, pdf.nom);
+  const bouton = { display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 999, padding: "10px 18px", fontWeight: 600, cursor: "pointer" } as const;
+  return (
+    <div className="rapport-actions" style={{ maxWidth: "210mm", margin: "0 auto 16px", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, fontFamily: SANS }}>
+      {erreur && <span style={{ color: C.orange, fontSize: 13, marginRight: "auto" }}>Le PDF n'a pas pu être fabriqué : {erreur}</span>}
+      <button type="button" onClick={() => imprimer(document.title)} style={{ ...bouton, background: "#fff", color: C.marine, border: `1px solid ${C.filet}` }}>
+        <Printer size={16} /> Imprimer
+      </button>
+      <button type="button" onClick={telecharger} disabled={!pdf} style={{ ...bouton, background: C.marine, color: "#fff", border: 0, opacity: pdf ? 1 : 0.7, cursor: pdf ? "pointer" : "wait" }}>
+        {enCours ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {enCours ? "Préparation du PDF…" : "Télécharger le PDF"}
+      </button>
     </div>
   );
 }
@@ -278,7 +395,7 @@ function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { 
       </div>
 
       {/* Chiffres clés */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: "9mm" }}>
+      <div className="rapport-bloc" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: "9mm" }}>
         {(
           [
             [nb(r.total), "avis dermatologiques rendus"],
@@ -311,7 +428,7 @@ function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { 
           </div>
         ))}
       </div>
-      <p style={{ marginTop: 10, fontSize: 11.5, color: C.ardoise, lineHeight: 1.45 }}>
+      <p className="rapport-bloc" style={{ marginTop: 10, fontSize: 11.5, color: C.ardoise, lineHeight: 1.45 }}>
         Dans {pNon} % des avis, le dermatologue a jugé qu'une consultation n'était pas nécessaire. Pour les {nb(n.consult + n.exerese)} autres, une consultation
         dermatologique a été conseillée{n.exerese ? `, dont ${nb(n.exerese)} avec une exérèse jugée indispensable` : ""}
         {r.delaiRecoMedian ? `, dans un délai médian de ${r.delaiRecoMedian} jours` : ""}.
@@ -321,7 +438,7 @@ function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { 
       {delaiFiable && (
         <>
           <Section numero="02" titre="La rapidité des avis" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          <div className="rapport-bloc" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
             {(
               [
                 [`${Math.round(r.delais.mediane as number)} h`, "délai médian entre la demande et l'avis"],

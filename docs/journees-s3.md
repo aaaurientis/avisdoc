@@ -142,5 +142,7 @@ les délais restent visibles. La règle vaut partout : rapport client (qui n'exi
 expertises), détail d'une journée, tableau par requis, filtres de la page Expertises, Vue globale.
 La liste des dossiers d'une journée ne montre jamais de résultat individuel.
 
-Le PDF du rapport s'imprime depuis un document qui ne contient que le rapport ; son nom proposé est
-« AvisDoc - Bilan des journées - <client> - <devis> - <date> » (ou « Bilan de la journée … »).
+**Télécharger le PDF** fabrique le fichier dans le navigateur (préparé dès l'ouverture du rapport) :
+« Enregistrer au format PDF » depuis la boîte d'impression de Safari donnait un fichier vide. Nom du
+fichier : « AvisDoc - Bilan des journees - <client> - <devis> - <date>.pdf » (sans accents, pour tous
+les navigateurs). Le bouton **Imprimer** reste disponible pour une impression papier.
