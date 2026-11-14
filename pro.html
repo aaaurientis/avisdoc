@@ -15,6 +15,26 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <!-- Fichiers de deux versions mélangés (page ouverte pendant un déploiement) : la page
+         ne s'affichait pas (« Importing binding name … is not found »). On recharge une fois. -->
+    <script>
+      (function () {
+        var cle = "avisdoc.recharge-version";
+        function recharger() {
+          try { if (sessionStorage.getItem(cle)) return; sessionStorage.setItem(cle, "1"); } catch (x) { return; }
+          setTimeout(function () { location.reload(); }, 1200);
+        }
+        window.addEventListener("error", function (e) {
+          var t = e && e.target;
+          if (t && t.tagName === "SCRIPT" && t.type === "module") return recharger(); // fichier introuvable
+          var m = String((e && e.message) || "");
+          if (/Importing binding name|does not provide an export named|Importing a module script failed|dynamically imported module/i.test(m)) recharger();
+        }, true);
+        window.addEventListener("load", function () {
+          setTimeout(function () { try { sessionStorage.removeItem(cle); } catch (x) {} }, 15000);
+        });
+      })();
+    </script>
   </head>
 
   <body>

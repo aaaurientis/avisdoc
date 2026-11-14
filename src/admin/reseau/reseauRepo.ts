@@ -88,6 +88,8 @@ export interface CandidatGoogle {
 }
 
 export interface FicheGoogle {
+  /** La fiche vient d'être validée d'office (nom et adresse RPPS). */
+  valideeAuto?: boolean;
   place_id: string;
   nom: string;
   adresse: string | null;
@@ -113,7 +115,19 @@ export interface ImportReseau {
   erreur: string | null;
 }
 
-/** Une résumé par département, pour l'écran Départements. */
+export interface StatistiquesReseau {
+  candidats: number;
+  exclus: number;
+  parPopulation: Partial<Record<Population, number>>;
+  parEtat: Partial<Record<EtatPraticien, number>>;
+  google: Partial<Record<StatutGoogle, number>>;
+  doctolib: Partial<Record<StatutDoctolib, number>>;
+  departements: { code: string; etat: EtatDepartement }[];
+  propositionsAValider: number;
+  recherchesEnCours: number;
+}
+
+/** Un résumé par département, pour l'écran Départements. */
 export interface ResumeDepartement {
   total: number;
   parEtat: Partial<Record<EtatPraticien, number>>;
@@ -232,6 +246,35 @@ export const reseauRepo = {
       out.push(...(data ?? []).map(toPraticien));
     }
     return out.sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
+  },
+
+  /** Chiffres clés du réseau d'aval, pour le tableau de bord du Hub. */
+  async statistiques(): Promise<StatistiquesReseau> {
+    const [praticiens, departements, propositions, enCours] = await Promise.all([
+      toutLire((de, a) => sb.from("admin_reseau_praticiens")
+        .select("id, population, etat, google_statut, doctolib_statut").order("id").range(de, a)),
+      sb.from("admin_reseau_departements").select("code, etat"),
+      sb.from("admin_reseau_signaux").select("id", { count: "exact", head: true }).eq("statut", "propose"),
+      sb.from("admin_reseau_recherches_ia").select("id", { count: "exact", head: true }).eq("statut", "en_cours"),
+    ]);
+    if (departements.error) throw new Error(departements.error.message);
+    const actifs = praticiens.filter((p) => p.etat !== "exclu");
+    const compter = <K extends string>(liste: any[], cle: string) => {
+      const m: Partial<Record<K, number>> = {};
+      for (const x of liste) m[x[cle] as K] = (m[x[cle] as K] ?? 0) + 1;
+      return m;
+    };
+    return {
+      candidats: actifs.length,
+      exclus: praticiens.length - actifs.length,
+      parPopulation: compter<Population>(actifs, "population"),
+      parEtat: compter<EtatPraticien>(praticiens, "etat"),
+      google: compter<StatutGoogle>(actifs, "google_statut"),
+      doctolib: compter<StatutDoctolib>(actifs, "doctolib_statut"),
+      departements: (departements.data ?? []).map((d: any) => ({ code: d.code, etat: d.etat })),
+      propositionsAValider: propositions.count ?? 0,
+      recherchesEnCours: enCours.count ?? 0,
+    };
   },
 
   async dernierImport(code: string): Promise<ImportReseau | null> {

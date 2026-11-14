@@ -402,7 +402,12 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
     let annule = false;
     for (const id of p.googlePlaceIds) {
       reseauRepo.ficheGoogle(p.id, id)
-        .then((f) => { if (!annule) setFiches((x) => ({ ...x, [id]: f })); })
+        .then((f) => {
+          if (annule) return;
+          setFiches((x) => ({ ...x, [id]: f }));
+          // Au nom et à l'adresse RPPS : validée d'office par le serveur, on rafraîchit le statut.
+          if (f.valideeAuto) { toast.success("Fiche Google validée : même nom et même adresse que le RPPS."); onChange(); }
+        })
         .catch((e) => { if (!annule) { setFiches((x) => ({ ...x, [id]: "erreur" })); setErreur(e instanceof Error ? e.message : String(e)); } });
     }
     return () => { annule = true; };
@@ -441,7 +446,7 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
       {p.googlePlaceIds.length > 0 && !candidats && (
         <div className="mt-1.5 space-y-2">
           {p.googleStatut === "trouvee_auto" && (
-            <p className="text-[11.5px] text-muted-foreground">Rattachée automatiquement : même nom et même code postal qu'un lieu RPPS, mais pas la même rue. Vérifiez puis confirmez.</p>
+            <p className="text-[11.5px] text-muted-foreground">Rattachée automatiquement : même nom et même code postal qu'un lieu RPPS. Vérifiez puis confirmez.</p>
           )}
           {p.googleStatut === "confirmee" && p.googlePlaceIds.length > 0 && (
             <p className="text-[11.5px] text-muted-foreground">Validée : choisie par un opérateur, ou à l'adresse RPPS (nom, code postal et rue).</p>

@@ -21,6 +21,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
 import { appelGoogle, chercherFiches, cleGoogle, compterAppel, QUOTA_ATTEINT, requeteFiche } from "../_shared/google-places.ts";
 import { estDepartement } from "../_shared/reseau-rpps.ts";
+import { forceFiche } from "../_shared/google-correspondance.ts";
 
 const DETAILS = "https://places.googleapis.com/v1/places/";
 const CHAMPS_DETAILS = [
@@ -41,7 +42,7 @@ serve(async (req) => {
   const db = clientService();
   const { data: p } = await db
     .from("admin_reseau_praticiens")
-    .select("id, nom, prenom, population, google_place_id, google_place_ids, admin_reseau_lieux(commune, code_postal, adresse, departement)")
+    .select("id, nom, prenom, population, google_statut, google_place_id, google_place_ids, admin_reseau_lieux(commune, code_postal, adresse, departement)")
     .eq("id", String(corps.praticien_id ?? ""))
     .maybeSingle();
   if (!p) return json({ error: "Praticien introuvable." }, 404);
@@ -68,8 +69,33 @@ serve(async (req) => {
       if (!(await compterAppel(db, avecAvis ? "details_avis" : "details"))) return json({ error: QUOTA_ATTEINT }, 429);
       const masque = avecAvis ? `${CHAMPS_DETAILS},reviews` : CHAMPS_DETAILS;
       const x = await appelGoogle(`${DETAILS}${encodeURIComponent(placeId)}?languageCode=fr&regionCode=FR`, { method: "GET" }, cle, masque);
+      // Une fiche rattachée automatiquement « à vérifier » (première version de la recherche,
+      // qui ne comparait pas la rue) est validée d'office si elle est au nom ET à l'adresse
+      // RPPS du praticien (code postal + voie) — décision du 14/11. Aucun appel en plus :
+      // on se sert de l'affichage. Le contenu, lui, n'est toujours pas enregistré.
+      let valideeAuto = false;
+      if (p.google_statut === "trouvee_auto" && rattachees.length === 1) {
+        const lieux = (p.admin_reseau_lieux ?? []).map((l: any) => ({ codePostal: l.code_postal, adresse: l.adresse }));
+        const force = forceFiche(
+          { place_id: x.id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "", ferme: x.businessStatus === "CLOSED_PERMANENTLY" },
+          p.nom, lieux,
+        );
+        if (force === "certaine") {
+          const { error } = await db.from("admin_reseau_praticiens")
+            .update({ google_statut: "confirmee", google_rattache_par: "automatique (adresse RPPS)", google_rattache_le: new Date().toISOString() })
+            .eq("id", p.id).eq("google_statut", "trouvee_auto");
+          if (!error) {
+            valideeAuto = true;
+            await db.from("admin_reseau_historique").insert({
+              praticien_id: p.id, acteur: acces.email, action: "google_valide_adresse_rpps", detail: { place_id: x.id },
+            });
+          }
+        }
+      }
+
       // Renvoyé pour affichage seulement : rien de ce contenu n'est enregistré.
       return json({
+        valideeAuto,
         place_id: x.id,
         nom: x.displayName?.text ?? "",
         adresse: x.formattedAddress ?? null,
