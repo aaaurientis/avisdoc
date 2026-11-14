@@ -15,7 +15,7 @@
 //   AWS_REGION           facultatif — défaut eu-west-3 ; une mauvaise région est corrigée seule
 //   JOURNEES_S3_BUCKET   facultatif — défaut avisdoc-exports
 //   JOURNEES_S3_PREFIX   facultatif — défaut journees-depistage/
-//   EXPERTISES_S3_PREFIX facultatif — dossier des expertises ; défaut : celui des journées
+//   EXPERTISES_S3_PREFIX facultatif — dossier des expertises ; défaut expertises/
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.99.3";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
@@ -34,7 +34,7 @@ const MAX_FICHIERS_PAR_LECTURE = 50;
 const env = (k: string) => (Deno.env.get(k) ?? "").trim();
 const BUCKET = env("JOURNEES_S3_BUCKET") || "avisdoc-exports";
 const PREFIXE = (env("JOURNEES_S3_PREFIX") || "journees-depistage/").replace(/^\/+/, "");
-const PREFIXE_EXPERTISES = (env("EXPERTISES_S3_PREFIX") || PREFIXE).replace(/^\/+/, "");
+const PREFIXE_EXPERTISES = (env("EXPERTISES_S3_PREFIX") || "expertises/").replace(/^\/+/, "");
 /** Corrigée au premier appel si le bucket vit ailleurs (S3 donne sa vraie région). */
 let region = env("AWS_REGION") || "eu-west-3";
 

@@ -35,12 +35,12 @@ Bucket : **`avisdoc-exports`**, dossier **`journees-depistage/`** (valeurs par d
          "Effect": "Allow",
          "Action": "s3:ListBucket",
          "Resource": "arn:aws:s3:::avisdoc-exports",
-         "Condition": { "StringLike": { "s3:prefix": "journees-depistage/*" } }
+         "Condition": { "StringLike": { "s3:prefix": ["journees-depistage/*", "expertises/*"] } }
        },
        {
          "Effect": "Allow",
          "Action": "s3:GetObject",
-         "Resource": "arn:aws:s3:::avisdoc-exports/journees-depistage/*"
+         "Resource": ["arn:aws:s3:::avisdoc-exports/journees-depistage/*", "arn:aws:s3:::avisdoc-exports/expertises/*"]
        }
      ]
    }
@@ -115,7 +115,9 @@ journées le même jour au même endroit).
 ## Expertises
 
 **Journée › Expertises** (`/journees/expertises`) lit l'extraction « expertise » la plus récente
-(même dossier que les journées ; un autre dossier se règle avec le secret `EXPERTISES_S3_PREFIX`).
+dans le dossier **`expertises/`** du bucket (fichiers nommés par leur date, ex. `2026-11-13.csv` ;
+un autre dossier se règle avec le secret `EXPERTISES_S3_PREFIX`). La règle IAM de l'utilisateur doit
+autoriser ce dossier (voir plus haut).
 
 - Avis par mois (en journée / hors journée), recommandations, délai de traitement (mesuré depuis
   fin août 2026 seulement), profession du requérant.
