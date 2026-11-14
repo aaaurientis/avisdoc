@@ -31,6 +31,8 @@ Elles priment sur les propositions du reste de la note.
 | Ordre des départements | Choisi dans la plateforme par l'administrateur (conforme au brief, §3) |
 | Lecture de la fiche Google Maps | **Par l'API Google Places**, affichage en direct. La règle 2 du brief est levée pour Google Maps, et pour lui seul |
 | DIU de dermatologie esthétique | **Affiché comme information** sur la fiche, sans effet sur le score |
+| Sources | **Toute information affichée ou enregistrée porte son lien source.** Rien n'est inventé ni déduit : seule une information vérifiée et validée par un opérateur est retenue (§6) |
+| Autres signaux du niveau 3 | **Recherche assistée par IA**, lancée une fois le praticien identifié, propositions validées par un opérateur (§6) |
 
 ---
 
@@ -243,10 +245,10 @@ La grille du brief se réduit aux signaux lisibles sur une fiche Google Maps :
 | Plaintes répétées sur les délais | avis : valeur oui, non ou inconnu, **jamais de verbatim** (règle 3) |
 | Établissement fermé définitivement | mention de la fiche → signal de départ |
 
-Les signaux propres à Doctolib, au site du cabinet, à la presse ou à LinkedIn
-disparaissent : motif « exérèse », nouveaux patients, dermoscopie, circuit rapide,
-prévention, DU. Ce sont les plus informatifs sur la volonté ; c'est le contact du niveau 4
-qui les recueille.
+Les autres signaux du brief (motif « exérèse », nouveaux patients, dermoscopie, circuit
+rapide, prévention, DU, recherche de successeur) ne sont pas sur la fiche Google Maps. Ce
+sont pourtant les plus informatifs sur la volonté. Ils passent par une **recherche
+assistée par IA**, voir plus bas, et sont confirmés au contact du niveau 4.
 
 **Lecture par l'API Google Places** (décision du 14/11). La règle 2 du brief est levée
 pour Google Maps seulement ; Doctolib et LinkedIn restent exclus.
@@ -277,6 +279,76 @@ Ce que cela implique, conditions de Google Maps Platform comprises :
    navigateur, à restreindre au référent `admin.avisdoc.fr`. Les appels Places se font côté
    serveur : il faut une **seconde clé, réservée au serveur**, avec l'API Places (New)
    activée. Secret proposé : `GOOGLE_PLACES_KEY`.
+
+### Recherche assistée par IA, une fois le praticien identifié
+
+Proposition d'Arthur (14/11) : plutôt que d'extraire des pages web, lancer une recherche
+par IA, **une fois le praticien bien identifié**, pour les signaux que Google Maps ne donne
+pas.
+
+**Déclenchement.** Le praticien doit avoir un RPPS (identité certaine) et une fiche Google
+Maps confirmée, ou « aucune fiche » confirmé. L'opérateur lance la recherche par un bouton
+sur la fiche praticien. Elle n'est jamais lancée en masse ni à l'import, ce qui borne le
+coût et le volume de données traitées.
+
+**Ce qu'on envoie à l'IA.** Uniquement des données professionnelles publiques : nom et
+prénom d'exercice, RPPS, spécialité, lieu d'exercice (raison sociale, adresse), site web de
+la fiche Google s'il existe. Aucune donnée de patient, aucune donnée d'AvisDoc.
+
+**Ce que l'IA renvoie.** Une Edge Function appelle l'API Claude avec son outil de
+recherche web. Pour chaque signal de la grille, la réponse suit un format fixe :
+
+| Champ | Contenu |
+|---|---|
+| `type` | un des signaux du brief : motif exérèse, nouveaux patients, dermoscopie, chirurgie sur place, circuit rapide, prévention, DU/DIU, recherche de successeur, orientation de l'activité |
+| `valeur` | oui, non ou inconnu (les valeurs du brief) |
+| `url` | la page qui justifie la valeur ; obligatoire |
+| `extrait` | la phrase exacte de cette page qui justifie la valeur ; obligatoire |
+
+**Rien n'est inventé : trois contrôles successifs.**
+1. **Contrôle automatique de la source.** La fonction serveur charge la page citée et
+   vérifie que l'extrait y figure mot pour mot (après normalisation des espaces et de la
+   casse). Lien absent, page inaccessible ou extrait introuvable : la proposition est
+   **écartée d'office** et le signal reste `inconnu`. Une IA peut se tromper ou inventer ;
+   ce contrôle élimine toute valeur qui ne s'appuie pas sur une page réelle.
+2. **Pas de déduction.** La consigne donnée à l'IA : ne répondre « oui » ou « non » que si
+   la page le dit explicitement. Une absence d'information donne `inconnu`, jamais « non ».
+   Un silence n'est pas une preuve.
+3. **Validation humaine obligatoire.** Les signaux proposés s'affichent sur
+   la fiche avec leur lien et leur extrait. L'opérateur ouvre le lien, accepte ou rejette
+   chacun d'eux. S'il corrige une valeur, il doit fournir sa propre URL. Un signal accepté est enregistré comme « proposé par l'IA, validé par [opérateur] »,
+   avec la date. La traçabilité de l'IA est ainsi conservée sans qu'elle écrive elle-même.
+4. **Domaines exclus de la recherche** : `doctolib.fr`, `linkedin.com` et les sites d'avis.
+   L'outil de recherche permet une liste de domaines bloqués. La règle 2 du brief reste
+   donc vraie pour eux ; Google passe par l'API Places.
+5. **Ce qui est stocké** : `type`, `valeur`, `url`, date, auteur de la validation, et la
+   mention « proposé par l'IA ». L'extrait sert au contrôle et à l'opérateur ; il n'est
+   pas conservé, conformément à la règle 3 du brief. La réponse brute de l'IA n'est pas
+   conservée non plus.
+6. **`inconnu` reste la valeur par défaut** et ne pénalise pas. Un signal sans URL est
+   refusé par la base (contrainte `not null`, recette n° 4 du brief).
+7. **Le score n'utilise que les signaux validés.** Une proposition en attente n'a aucun
+   effet, ni sur le score, ni sur l'export.
+
+### Une source pour chaque information
+
+La règle vaut pour toute la fiche praticien, pas seulement pour l'IA :
+
+| Information | Source affichée |
+|---|---|
+| Identité, spécialité, lieu d'exercice, téléphone RPPS | Fiche Annuaire Santé du RPPS, avec la date d'extraction |
+| Informations Google Maps | Lien de la fiche Google Maps, rendu par l'API, et attribution Google |
+| Signal du niveau 3 | URL de la page source, vérifiée puis validée |
+| Échange du niveau 4 (délai, accord…) | Interaction tracée : date, canal, auteur |
+
+Une information sans source ne s'affiche pas et ne s'enregistre pas.
+
+**RGPD.** Anthropic devient sous-traitant pour ce traitement. Il faut l'inscrire dans la
+fiche de registre (lot 1), avec les destinataires, et le mentionner dans l'information du
+praticien au premier contact.
+
+**Coût.** Un appel par recherche, plus les recherches web qu'il déclenche. Le coût est à
+mesurer sur l'Isère au lot 2 (167 praticiens au plus).
 
 ---
 
