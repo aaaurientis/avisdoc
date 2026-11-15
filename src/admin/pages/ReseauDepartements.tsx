@@ -269,9 +269,13 @@ function FavoriDoctolib() {
       <div className="font-display text-base font-semibold text-avisdoc-ink">Relever une fiche Doctolib en un clic</div>
       <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
         <li>Glissez ce bouton dans la barre de favoris de votre navigateur (une seule fois) : <span dangerouslySetInnerHTML={{ __html: html }} /></li>
-        <li>Ouvrez la fiche d'un praticien sur Doctolib, puis cliquez sur le favori.</li>
-        <li>Le Hub s'ouvre avec l'analyse de la fiche (créneau, nouveaux patients, expertises, conventionnement…) : vérifiez, cochez, enregistrez.</li>
+        <li>Ouvrez la fiche d'un praticien sur Doctolib, puis cliquez sur le favori : il ouvre lui-même les « Voir plus » de la page avant de la lire.</li>
+        <li>Le Hub s'ouvre avec l'analyse de la fiche (nouveaux patients, expertises, présentation, tarifs, conventionnement…) : vérifiez, cochez, enregistrez.</li>
+        <li>Pour les créneaux : sur Doctolib, cliquez « Prendre rendez-vous », choisissez le motif (nouveau patient), puis cliquez à nouveau sur le favori. Le Hub compte les horaires affichés, jour par jour.</li>
       </ol>
+      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+        <b>Nouvelle version du favori (15/11)</b> : si vous l'aviez déjà installé, supprimez l'ancien et glissez à nouveau ce bouton.
+      </p>
       <p className="mt-2 text-[11.5px] text-muted-foreground">
         Une page à la fois, ouverte par vous : le Hub ne parcourt jamais Doctolib. Le favori ne marche pas ?{" "}
         <Link to="/reseau-aval/doctolib" className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline">Collez la fiche à la main</Link>.

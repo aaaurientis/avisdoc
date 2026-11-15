@@ -10,6 +10,7 @@
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
 //   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
+//   • doctolib_creneaux    { praticien_id, url, disponibilites, creneau? } — créneaux relevés sur la page de rendez-vous
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //                          | { praticien_id, non_reservable: boolean } (page « n'est pas sur Doctolib »)
 //   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
@@ -196,7 +197,7 @@ serve(async (req) => {
       // Relevé d'une fiche Doctolib ouverte par l'opérateur, vérifié dans le Hub avant envoi.
       const url = corps.url;
       if (!urlDoctolibValide(url)) return json({ error: "Adresse de fiche Doctolib invalide." }, 400);
-      const { data: p } = await db.from("admin_reseau_praticiens").select("id, etat").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, etat, doctolib_infos").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
       if (!p) return json({ error: "Praticien introuvable." }, 404);
       if (p.etat === "exclu") return json({ error: "Ce praticien est exclu." }, 409);
       const i = corps.infos ?? {};
@@ -215,7 +216,7 @@ serve(async (req) => {
       const maintenant = new Date().toISOString();
       const { error } = await db.from("admin_reseau_praticiens").update({
         doctolib_url: lien, doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant,
-        doctolib_infos: infos, doctolib_releve_le: maintenant, doctolib_releve_par: email,
+        doctolib_infos: { ...infos, disponibilites: p.doctolib_infos?.disponibilites ?? null }, doctolib_releve_le: maintenant, doctolib_releve_par: email,
       }).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
 
@@ -235,6 +236,45 @@ serve(async (req) => {
         praticien_id: p.id, acteur: email, action: "doctolib_releve", detail: { url: lien, signaux: enregistres },
       });
       return json({ id: p.id, signaux: enregistres });
+    }
+
+    case "doctolib_creneaux": {
+      // Créneaux relevés par l'opérateur sur la page de prise de rendez-vous, vérifiés dans le Hub.
+      const url = corps.url;
+      if (!urlDoctolibValide(url)) return json({ error: "Adresse de fiche Doctolib invalide." }, 400);
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, etat, doctolib_infos").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.etat === "exclu") return json({ error: "Ce praticien est exclu." }, 409);
+      const d = corps.disponibilites ?? {};
+      const entier = (v: unknown) => (Number.isFinite(v) && (v as number) >= 0 ? Math.min(Math.round(v as number), 10000) : 0);
+      const jourIso = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+      const maintenant = new Date().toISOString();
+      const disponibilites = {
+        creneaux: entier(d.creneaux), sous7Jours: entier(d.sous7Jours),
+        parJour: (Array.isArray(d.parJour) ? d.parJour : []).slice(0, 31).map((j: any) => ({ date: jourIso(j?.date), n: entier(j?.n) })).filter((j: any) => j.date),
+        premier: d.premier && jourIso(d.premier.date) ? { date: jourIso(d.premier.date), jours: entier(d.premier.jours) } : null,
+        motif: typeof d.motif === "string" ? d.motif.slice(0, 120) : null,
+        releve_le: maintenant, releve_par: email,
+      };
+      const lien = urlPropre(url);
+      const { error } = await db.from("admin_reseau_praticiens").update({
+        doctolib_url: lien, doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant,
+        doctolib_infos: { ...(p.doctolib_infos ?? {}), reservable: true, disponibilites },
+      }).eq("id", p.id);
+      if (error) return json({ error: error.message }, 500);
+      let signal = false;
+      if (typeof corps.creneau === "string" && valeurAdmise("creneau_doctolib", corps.creneau)) {
+        await remplacerAncien(db, p.id, "creneau_doctolib");
+        const { error: eS } = await db.from("admin_reseau_signaux").insert({
+          praticien_id: p.id, type: "creneau_doctolib", valeur: corps.creneau, url: lien, origine: "operateur", statut: "valide",
+          propose_par: email, decide_par: email, decide_le: maintenant,
+        });
+        signal = !eS;
+      }
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: p.id, acteur: email, action: "doctolib_creneaux", detail: { url: lien, creneaux: disponibilites.creneaux, sous7Jours: disponibilites.sous7Jours, signal },
+      });
+      return json({ id: p.id, signal });
     }
 
     case "doctolib": {
