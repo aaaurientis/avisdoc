@@ -57,11 +57,15 @@ function cleRubrique(ligne: string): string | null {
   return null;
 }
 
+/** Séparateur entre les états successifs de la page envoyés par le favori (avant / après chaque « Voir plus »). */
+export const SEPARATEUR_RELEVE = "§§avisdoc§§";
+
 /** Découpe le texte en rubriques : clé → lignes jusqu'à la rubrique suivante. */
 function rubriques(lignes: string[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   let courante: string | null = null;
   for (const l of lignes) {
+    if (l === SEPARATEUR_RELEVE) { courante = null; continue; }
     const c = cleRubrique(l);
     if (c) { courante = c; if (!out.has(c)) out.set(c, []); continue; }
     if (courante) out.get(courante)!.push(l);
@@ -94,7 +98,7 @@ function compartiment(jours: number): "moins_7j" | "7_30j" | "plus_30j" {
 /** Liste propre : lignes courtes, sans doublon, sans les boutons de l'interface. */
 function liste(lignes: string[] | undefined, max = 40): string[] {
   const bruit = /^(voir plus|voir moins|afficher plus|afficher moins|prendre rendez-vous|en savoir plus|lire la suite|\+ ?\d+)$/;
-  return [...new Set((lignes ?? []).map((l) => l.trim()).filter((l) => l && l.length <= 120 && !bruit.test(norm(l))))].slice(0, max);
+  return [...new Set((lignes ?? []).map((l) => l.replace(/\s+\+\s?\d+$/, "").trim()).filter((l) => l && l.length <= 120 && !bruit.test(norm(l))))].slice(0, max);
 }
 
 const MOTS_SIGNAUX: { type: TypeSignal; valeur: string; rx: RegExp }[] = [
@@ -106,6 +110,8 @@ const MOTS_SIGNAUX: { type: TypeSignal; valeur: string; rx: RegExp }[] = [
 export function analyserFicheDoctolib(texte: string, aujourdhui: Date = new Date()): FicheDoctolib {
   const lignes = texte.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const r = rubriques(lignes);
+  // Le reste de l'analyse ignore les séparateurs.
+  lignes.splice(0, lignes.length, ...lignes.filter((l) => l !== SEPARATEUR_RELEVE));
   const tout = norm(texte);
   const fiche: FicheDoctolib = {
     nom: lignes.find((l) => /^(dr|docteur|pr|professeur)\.? /i.test(l) && l.length < 80) ?? null,
@@ -132,7 +138,13 @@ export function analyserFicheDoctolib(texte: string, aujourdhui: Date = new Date
     const suivante = lignes[i + 1];
     if (suivante && suivante.length < 60 && !/\d/.test(suivante)) fiche.specialite = suivante;
   }
-  const presentation = (r.get("presentation") ?? []).join(" ").trim();
+  // Les « Voir plus » ouverts par le favori répètent des passages : sans doublon.
+  const lignesPres = [...new Set(r.get("presentation") ?? [])].filter((l) => !/^(voir plus|voir moins|lire la suite|afficher plus)$/.test(norm(l)));
+  // Un passage tronqué (« Le docteur… ») est remplacé par sa version dépliée.
+  const presentation = lignesPres.filter((l) => {
+    const debut = l.replace(/(…|\.\.\.)\s*$/, "");
+    return debut === l || !lignesPres.some((x) => x !== l && x.startsWith(debut));
+  }).join(" ").trim();
   if (presentation) fiche.presentation = presentation.slice(0, 1500);
 
   // Conventionnement et carte Vitale (n'importe où sur la page).
@@ -167,4 +179,83 @@ export function analyserFicheDoctolib(texte: string, aujourdhui: Date = new Date
   }
   // La téléconsultation reste une information : elle ne vaut pas télé-expertise.
   return fiche;
+}
+
+// ── Page de prise de rendez-vous : créneaux affichés ─────────────────────────
+// L'opérateur ouvre lui-même « Prendre rendez-vous », choisit le motif, puis clique sur
+// le favori. On compte les horaires affichés (« 09:30 ») sous chaque jour (« lun. 17 nov. »).
+// L'attribution horaire → jour suit l'ordre du texte : l'écran de vérification montre le
+// détail par jour pour que l'opérateur le compare à ce qu'il voit.
+
+export interface Disponibilites {
+  /** Horaires affichés au total. */
+  creneaux: number;
+  /** Détail par jour affiché (date ISO), dans l'ordre de la page. */
+  parJour: { date: string; n: number }[];
+  /** Premier jour avec au moins un horaire, et son délai en jours. */
+  premier: { date: string; jours: number } | null;
+  /** Horaires dans les 7 prochains jours. */
+  sous7Jours: number;
+  valeur: "moins_7j" | "7_30j" | "plus_30j" | "aucun_nouveau" | null;
+  extrait: string;
+}
+
+/** La page reçue est-elle celle de la prise de rendez-vous (et non la fiche) ? */
+export function estPageRendezVous(url: string, texte: string): boolean {
+  if (/\/booking(\/|$)/.test(url)) return true;
+  const horaires = texte.split(/\r?\n/).filter((l) => /^\s*\d{1,2}[:h]\d{2}\s*$/.test(l)).length;
+  return horaires >= 3 && /choisissez|disponibilit|motif|rendez-vous/i.test(texte);
+}
+
+/** Lien de la fiche à partir de l'adresse de la page de rendez-vous (…/nom/booking/… → …/nom). */
+export function urlFicheDepuisRendezVous(url: string): string {
+  const x = new URL(url);
+  const chemin = x.pathname.split("/booking")[0].replace(/\/+$/, "");
+  return `${x.origin}${chemin}`;
+}
+
+const JOUR_ENTETE = /^(lun|mar|mer|jeu|ven|sam|dim)[a-z]*\.?\s*(\d{1,2})?\s*([a-zéû]+\.?)?$/i;
+
+export function analyserCreneaux(texte: string, aujourdhui: Date = new Date()): Disponibilites {
+  const lignes = texte.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const parJour: { date: string; n: number }[] = [];
+  let courant: { date: string; n: number } | null = null;
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    const m = norm(l).match(JOUR_ENTETE);
+    if (m) {
+      // « lun. » puis « 17 nov. » sur la ligne suivante, ou tout sur une ligne.
+      const avecDate = m[2] ? l : `${l} ${lignes[i + 1] ?? ""}`;
+      const date = dateProchainRdv(avecDate, aujourdhui);
+      if (date) {
+        // Un jour déjà vu (le favori envoie la page avant et après « Voir plus ») : on recompte.
+        courant = parJour.find((j) => j.date === date) ?? { date, n: 0 };
+        if (parJour.includes(courant)) courant.n = 0;
+        else parJour.push(courant);
+        if (!m[2]) i++;
+        continue;
+      }
+    }
+    if (courant && /^\d{1,2}[:h]\d{2}$/.test(l)) courant.n++;
+  }
+  const auj = Date.UTC(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate());
+  const delai = (d: string) => Math.round((Date.parse(d) - auj) / 86_400_000);
+  const avec = parJour.filter((j) => j.n > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const creneaux = parJour.reduce((t, j) => t + j.n, 0);
+  const premier = avec.length ? { date: avec[0].date, jours: Math.max(0, delai(avec[0].date)) } : null;
+  // Sans horaire affiché : « Prochain RDV le … » ou « aucune disponibilité » (voir la fiche).
+  let valeur: Disponibilites["valeur"] = premier ? compartiment(premier.jours) : null;
+  let extrait = premier ? `${creneaux} horaire${creneaux > 1 ? "s" : ""} affiché${creneaux > 1 ? "s" : ""}, le premier le ${premier.date}` : "";
+  if (!premier) {
+    const prochain = lignes.find((l) => /prochain (rdv|rendez-vous)/i.test(norm(l)));
+    const aucun = lignes.find((l) => /aucune disponibilite|pas de disponibilite|aucun (rendez-vous|creneau) disponible/i.test(norm(l)));
+    const d = prochain ? dateProchainRdv(prochain, aujourdhui) : null;
+    if (d && delai(d) >= 0) { valeur = compartiment(delai(d)); extrait = prochain!; }
+    else if (aucun) { valeur = "aucun_nouveau"; extrait = aucun; }
+  }
+  return {
+    creneaux, parJour, premier,
+    sous7Jours: parJour.filter((j) => delai(j.date) >= 0 && delai(j.date) < 7).reduce((t, j) => t + j.n, 0),
+    valeur, extrait,
+  };
 }

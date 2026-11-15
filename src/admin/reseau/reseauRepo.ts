@@ -72,6 +72,11 @@ export interface InfosDoctolib {
   adresses: string[];
   /** false : « n'est pas sur Doctolib », pas de rendez-vous en ligne. */
   reservable?: boolean | null;
+  /** Créneaux relevés sur la page de prise de rendez-vous. */
+  disponibilites?: {
+    creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[];
+    premier: { date: string; jours: number } | null; motif: string | null; releve_le: string; releve_par: string;
+  } | null;
   premierCreneau: { date: string | null; jours: number | null; valeur: string | null } | null;
 }
 
@@ -394,6 +399,8 @@ export const reseauRepo = {
   },
   enregistrerFicheDoctolib: (praticienId: string, url: string, infos: InfosDoctolib, signaux: { type: TypeSignal; valeur: string }[]) =>
     appeler("reseau-action", { action: "doctolib_fiche", praticien_id: praticienId, url, infos, signaux }),
+  enregistrerCreneauxDoctolib: (praticienId: string, url: string, disponibilites: { creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[]; premier: { date: string; jours: number } | null; motif: string | null }, creneau: string | null) =>
+    appeler("reseau-action", { action: "doctolib_creneaux", praticien_id: praticienId, url, disponibilites, creneau }),
   doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean }) =>
     appeler("reseau-action", { action: "doctolib", praticien_id: praticienId, ...choix }),
 
