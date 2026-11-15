@@ -39,3 +39,16 @@ describe("réseau d'aval : lien Doctolib", () => {
     expect(choisirDoctolib(["https://www.doctolib.fr/dermatologue/grenoble/paul-martin"], P)).toEqual({ statut: "introuvable" });
   });
 });
+
+describe("réseau d'aval : alerte « hors cible »", () => {
+  it("reconnaît une spécialité hors du réseau dans le lien ou le relevé Doctolib", async () => {
+    const { specialiteHorsCible, specialiteDuLienDoctolib } = await import("../../../supabase/functions/_shared/doctolib");
+    expect(specialiteDuLienDoctolib("https://www.doctolib.fr/urologue/le-puy-en-velay/pierre-test")).toBe("urologue");
+    expect(specialiteHorsCible("urologue")).toBe("urologue");
+    expect(specialiteHorsCible("Chirurgien urologue")).toBe("urologue");
+    expect(specialiteHorsCible(null, "Chirurgien vasculaire")).toBe("chirurgien vasculaire");
+    expect(specialiteHorsCible("dermatologue", "Dermatologue et vénérologue")).toBeNull();
+    expect(specialiteHorsCible("chirurgien")).toBeNull(); // trop vague : pas d'alerte
+    expect(specialiteHorsCible("orl")).toBeNull();
+  });
+});

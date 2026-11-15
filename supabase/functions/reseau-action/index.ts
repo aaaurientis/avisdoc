@@ -28,7 +28,7 @@ import { urlDoctolibValide, urlPropre } from "../_shared/doctolib.ts";
 import { enTacheDeFond } from "../_shared/suivi.ts";
 
 const ETATS_DEPARTEMENT = ["a_ouvrir", "importe", "en_qualification", "en_contact", "couvert", "en_veille"];
-const MOTIFS_EXCLUSION = ["opposition", "esthetique_dominante", "n_exerce_plus", "autre"];
+const MOTIFS_EXCLUSION = ["hors_cible", "opposition", "esthetique_dominante", "n_exerce_plus", "autre"];
 
 const ordreValide = (v: unknown) => v == null || v === "" || (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) < 1000);
 

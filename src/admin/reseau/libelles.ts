@@ -14,7 +14,7 @@ export type EtatDepartement = "a_ouvrir" | "importe" | "en_qualification" | "en_
 export type EtatPraticien =
   | "identifie" | "qualifie" | "a_contacter" | "contacte" | "en_discussion"
   | "accord" | "refus" | "injoignable" | "exclu" | "sorti";
-export type MotifExclusion = "opposition" | "esthetique_dominante" | "n_exerce_plus" | "autre";
+export type MotifExclusion = "hors_cible" | "opposition" | "esthetique_dominante" | "n_exerce_plus" | "autre";
 
 export const ETATS_DEPARTEMENT: EtatDepartement[] = ["a_ouvrir", "importe", "en_qualification", "en_contact", "couvert", "en_veille"];
 
@@ -88,6 +88,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 export const MOTIF_EXCLUSION_LABEL: Record<MotifExclusion, string> = {
+  hors_cible: "Non concerné (autre spécialité, hors cible)",
   opposition: "Opposition du praticien",
   esthetique_dominante: "Activité esthétique dominante",
   n_exerce_plus: "N'exerce plus",

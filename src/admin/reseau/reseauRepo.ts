@@ -362,7 +362,7 @@ export const reseauRepo = {
       action: "google_rattacher", praticien_id: praticienId,
       ...("placeIds" in choix ? { place_ids: choix.placeIds } : "aucune" in choix ? { aucune: true } : { retirer: true }),
     }),
-  chercherGoogle: (praticienId: string, departement?: string): Promise<{ requete: string; candidats: CandidatGoogle[] }> =>
+  chercherGoogle: (praticienId: string, departement?: string): Promise<{ requete: string; candidats: CandidatGoogle[]; valideesAuto?: string[] }> =>
     appeler("reseau-google", { action: "chercher", praticien_id: praticienId, departement }),
   /** Praticiens candidats pour un relevé Doctolib : même lien, ou même nom de famille. */
   async praticiensPourDoctolib(url: string, nomFamille: string): Promise<PraticienReseau[]> {

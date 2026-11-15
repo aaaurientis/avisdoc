@@ -276,3 +276,8 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 | L2-9 | « Chercher les généralistes formés à la dermoscopie (IA) » | Quelques minutes après : trouvés, ajoutés, déjà là, écartés. Les ajoutés portent « Repéré par l'IA » et un signal « DU » à valider |
 | L2-10 | Valider une télé-expertise « oui » | Le rôle « Futur requérant » apparaît sur la fiche |
 | L2-11 | Couper l'API (clé retirée) et relancer une recherche IA | Message clair (« la clé de l'IA… » ou « l'IA refuse l'accès… »), rien d'enregistré |
+
+## Fiche praticien : sections repliables et validation Google (15/11)
+
+- La fiche est découpée en sections repliables : probabilité d'adhésion, recherche IA (ouverte d'office s'il y a des propositions ou une recherche en cours), signaux validés (repliée par défaut), **adresses et fiches en ligne** (lieux d'exercice RPPS, fiches Google Maps et Doctolib regroupés). L'état ouvert ou replié est retenu d'une fiche à l'autre (navigateur de l'opérateur). Les spécialités RPPS passent sous le nom.
+- Une fiche « À confirmer » affiche d'elle-même les fiches Google possibles. Si l'une est au nom ET à l'adresse RPPS (code postal + voie), elle est validée d'office lors de cette recherche (décision du 14/11), comme pour la recherche automatique. Cas corrigé : fiches restées « À confirmer » alors que l'adresse Google était celle du RPPS.
