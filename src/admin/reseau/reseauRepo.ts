@@ -104,11 +104,15 @@ export interface RechercheIa {
 export interface CandidatGoogle {
   place_id: string; nom: string; adresse: string; categorie: string | null; ferme: boolean;
   force: "certaine" | "forte" | "moyenne" | "faible";
+  /** Adresse reconnue par la vérification IA (raison donnée par l'IA). */
+  verifieIa?: string;
 }
 
 export interface FicheGoogle {
   /** La fiche vient d'être validée d'office (nom et adresse RPPS). */
   valideeAuto?: boolean;
+  /** Raison de l'IA quand c'est elle qui a reconnu l'adresse RPPS. */
+  verificationIa?: string | null;
   place_id: string;
   nom: string;
   adresse: string | null;

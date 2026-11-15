@@ -6,6 +6,7 @@
 import { POPULATION_LIBELLE } from "./reseau-rpps.ts";
 import { type CandidatFiche, type Force, qualifierFiches } from "./google-correspondance.ts";
 import { DEPARTEMENTS } from "./reseau-rpps.ts";
+import { verifierFichesIa } from "./google-ia.ts";
 
 const RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 // La clé du projet est restreinte aux appels venant du Hub (référent HTTP), comme pour Merx.
@@ -50,7 +51,7 @@ export interface PraticienPourGoogle {
   nom: string;
   prenom: string;
   population: string;
-  admin_reseau_lieux?: { commune: string | null; code_postal: string | null; adresse?: string | null; departement?: string | null }[];
+  admin_reseau_lieux?: { commune: string | null; code_postal: string | null; adresse?: string | null; departement?: string | null; raison_sociale?: string | null }[];
 }
 
 /** La requête : nom, spécialité, commune d'exercice dans le département, nom du département. */
@@ -67,7 +68,7 @@ export function requeteFiche(p: PraticienPourGoogle, departements: string[]): st
  */
 export async function chercherFiches(
   p: PraticienPourGoogle, departements: string[], cle: string,
-): Promise<(CandidatFiche & { categorie: string | null; force: Force })[]> {
+): Promise<(CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string })[]> {
   const d = await appelGoogle(RECHERCHE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -81,5 +82,19 @@ export async function chercherFiches(
     ferme: x.businessStatus === "CLOSED_PERMANENTLY",
   }));
   const lieux = (p.admin_reseau_lieux ?? []).map((l) => ({ codePostal: l.code_postal, adresse: l.adresse ?? null }));
-  return qualifierFiches(bruts, p.nom, lieux, departements);
+  const q: (CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string })[] = qualifierFiches(bruts, p.nom, lieux, departements);
+  // Au nom du praticien mais adresse non reconnue mot à mot : l'IA compare les adresses.
+  // Elle ne peut que confirmer (→ certaine), jamais rétrograder ni retenir une fiche sans le nom.
+  const douteuses = q.filter((c) => (c.force === "forte" || c.force === "moyenne") && !c.ferme);
+  if (douteuses.length) {
+    const verdicts = await verifierFichesIa({ nom: p.nom, prenom: p.prenom, population: p.population, lieux: p.admin_reseau_lieux ?? [] }, douteuses);
+    for (const c of douteuses) {
+      const v = verdicts.get(c.place_id);
+      if (v?.memePraticien && v.memeAdresse) { c.force = "certaine"; c.verifieIa = v.raison; }
+    }
+    q.sort((a, b) => RANG_FORCE[a.force] - RANG_FORCE[b.force]);
+  }
+  return q;
 }
+
+const RANG_FORCE: Record<Force, number> = { certaine: 0, forte: 1, moyenne: 2, faible: 3 };

@@ -91,3 +91,10 @@ describe("réseau d'aval : cas réel du 14/11 (Dr Boudet, Clermont-Ferrand)", ()
     )).toBe("certaine");
   });
 });
+
+describe("adresse RPPS avec complément après une virgule", () => {
+  it("« 21 RUE DE SARLIEVE, LE TRIANGLE » : seule la voie compte", () => {
+    expect(motsDeLaVoie("21 RUE DE SARLIEVE, LE TRIANGLE")).toEqual(["sarlieve"]);
+    expect(memeAdresse("21 Rue de Sarliève, 63800 Cournon-d'Auvergne, France", { codePostal: "63800", adresse: "21 RUE DE SARLIEVE, LE TRIANGLE" })).toBe(true);
+  });
+});

@@ -57,7 +57,8 @@ const MOTS_VIDES = new Set(["de", "du", "des", "la", "le", "les", "l", "d", "et"
 
 /** Les mots qui nomment la voie d'une adresse RPPS (« 12 Rue DES ALPES, BP 56 » → alpes). */
 export function motsDeLaVoie(adresse: string): string[] {
-  for (const partie of norm(adresse).split(/\s{2,}|,/).map((x) => x.trim())) {
+  // Découper AVANT de normaliser : la normalisation efface les virgules (« 21 RUE DE SARLIEVE, LE TRIANGLE »).
+  for (const partie of adresse.split(/,|\s{2,}/).map((x) => norm(x))) {
     const m = partie.match(TYPES_VOIE);
     if (!m || m.index === undefined) continue;
     const apres = partie.slice(m.index + m[0].length).split(" ").filter((w) => w && !/^\d+$/.test(w) && !MOTS_VIDES.has(w));
