@@ -277,7 +277,7 @@ function BlocReseauAval() {
       {s && (s.candidats > 0 || s.departements.length > 0) && (() => {
         const google = (s.google.confirmee ?? 0) + (s.google.trouvee_auto ?? 0);
         const doctolib = (s.doctolib.confirme ?? 0) + (s.doctolib.trouve_auto ?? 0);
-        const aConfirmer = (s.google.a_confirmer ?? 0) + (s.google.trouvee_auto ?? 0) + (s.doctolib.a_confirmer ?? 0) + (s.doctolib.trouve_auto ?? 0);
+        const aConfirmer = (s.google.trouvee_auto ?? 0) + (s.doctolib.a_confirmer ?? 0) + (s.doctolib.trouve_auto ?? 0);
         const enDiscussion = (s.parEtat.contacte ?? 0) + (s.parEtat.en_discussion ?? 0);
         return (
           <>
