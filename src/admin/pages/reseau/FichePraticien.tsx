@@ -542,7 +542,7 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
             <span className="text-[12px] text-muted-foreground">Pas de fiche Google (cela ne pénalise pas).</span>
           ) : (
             <span className="text-[11.5px] text-muted-foreground">
-              {p.googleStatut === "a_confirmer" ? "Des fiches portent son nom dans une autre commune du département : choisissez." : p.googleStatut === "introuvable" ? "Aucune fiche à son nom dans le département." : "Pas encore cherchée."}
+              {p.googleStatut === "a_confirmer" ? "Aucune fiche à une adresse RPPS. Des fiches portent son nom dans une autre commune du département : choisissez-en une si elle correspond." : p.googleStatut === "introuvable" ? "Aucune fiche à son nom dans le département." : "Pas encore cherchée."}
             </span>
           )}
           <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} className={btnSec}>

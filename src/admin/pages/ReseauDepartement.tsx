@@ -47,11 +47,11 @@ import ReseauCarte from "./reseau/ReseauCarte";
 import { specialiteDuLienDoctolib, specialiteHorsCible } from "../../../supabase/functions/_shared/doctolib";
 import { cn } from "@/lib/utils";
 
-/** Pictogramme de la vue resserrée (fiche ouverte) : vert trouvée, orange à confirmer, gris sinon. */
+/** Pictogramme de la vue resserrée (fiche ouverte) : vert trouvée, gris sans correspondance RPPS. */
 const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   confirmee: "fill-emerald-600 text-emerald-700",
   trouvee_auto: "text-emerald-600",
-  a_confirmer: "text-amber-500",
+  a_confirmer: "text-slate-300",
   introuvable: "text-slate-300",
   aucune: "text-slate-300",
   a_chercher: "text-slate-200",
@@ -240,7 +240,7 @@ export default function ReseauDepartement() {
         trouvees: n((p) => p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto"),
         confirmees: n((p) => p.googleStatut === "confirmee"),
         aConfirmer: n((p) => p.googleStatut === "a_confirmer"),
-        aVerifier: n((p) => p.googleStatut === "trouvee_auto" || p.googleStatut === "a_confirmer"),
+        aVerifier: n((p) => p.googleStatut === "trouvee_auto"),
         aRapprocher: n((p) => p.googleStatut === "trouvee_auto" || p.googleStatut === "a_confirmer" || p.googleStatut === "introuvable"),
         sans: n((p) => p.googleStatut === "introuvable" || p.googleStatut === "aucune"),
       },
@@ -432,7 +432,7 @@ export default function ReseauDepartement() {
           icone={<MapPin className="size-4" />} titre="Fiches Google Maps"
           etat={liensEnCours("google") ? "en_cours" : comptes.google.aChercher ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
           lignes={[
-            `${comptes.google.trouvees} trouvée${comptes.google.trouvees > 1 ? "s" : ""} · ${comptes.google.aConfirmer} à confirmer · ${comptes.google.sans} sans fiche`,
+            `${comptes.google.trouvees} trouvée${comptes.google.trouvees > 1 ? "s" : ""} · ${comptes.google.aConfirmer + comptes.google.sans} sans correspondance`,
             comptes.google.aChercher ? `${comptes.google.aChercher} pas encore cherché${comptes.google.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
           ]}
           bouton={liensEnCours("google") ? "Arrêter" : comptes.google.aChercher ? `Chercher (${comptes.google.aChercher})` : null}
@@ -443,7 +443,7 @@ export default function ReseauDepartement() {
           etat={liensEnCours("rapprochement") ? "en_cours" : comptes.google.aVerifier ? "a_faire" : comptes.google.trouvees ? "a_jour" : "vide"}
           lignes={[
             `${comptes.google.confirmees} validée${comptes.google.confirmees > 1 ? "s" : ""} (adresse RPPS ou opérateur)`,
-            comptes.google.aVerifier ? `${comptes.google.aVerifier} à vérifier (trouvées ou à confirmer)` : "Aucune fiche à vérifier",
+            comptes.google.aVerifier ? `${comptes.google.aVerifier} trouvée${comptes.google.aVerifier > 1 ? "s" : ""} à vérifier (même nom et code postal)` : "Aucune fiche à vérifier",
           ]}
           aide="Revérifie les fiches non tranchées : au nom et à l'adresse RPPS, elles sont validées d'office. Une recherche Google par praticien."
           bouton={liensEnCours("rapprochement") ? "Arrêter" : comptes.google.aRapprocher ? `Revérifier (${comptes.google.aRapprocher})` : null}
