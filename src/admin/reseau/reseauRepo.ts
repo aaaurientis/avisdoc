@@ -45,6 +45,9 @@ export interface PraticienReseau {
   vuAuDernierImport: boolean;
   googlePlaceId: string | null;
   googleAucuneFiche: boolean;
+  /** Qui a rattaché ou validé la fiche Google : « automatique… » ou l'e-mail de l'opérateur. */
+  googleRattachePar: string | null;
+  googleRattacheLe: string | null;
   googleStatut: StatutGoogle;
   /** Toutes les fiches Google rattachées (cabinet, hôpital…). */
   googlePlaceIds: string[];
@@ -187,6 +190,8 @@ const toPraticien = (r: any): PraticienReseau => ({
   vuAuDernierImport: r.vu_au_dernier_import !== false,
   googlePlaceId: r.google_place_id ?? null,
   googleAucuneFiche: r.google_aucune_fiche === true,
+  googleRattachePar: r.google_rattache_par ?? null,
+  googleRattacheLe: r.google_rattache_le ?? null,
   googleStatut: r.google_statut ?? (r.google_place_id ? "confirmee" : r.google_aucune_fiche ? "aucune" : "a_chercher"),
   googlePlaceIds: Array.isArray(r.google_place_ids) && r.google_place_ids.length ? r.google_place_ids : r.google_place_id ? [r.google_place_id] : [],
   doctolibUrl: r.doctolib_url ?? null,

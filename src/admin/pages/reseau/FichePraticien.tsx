@@ -48,6 +48,7 @@ import {
   type TypeSignal,
 } from "../../../../supabase/functions/_shared/reseau-signaux";
 import { cn } from "@/lib/utils";
+import { memeAdresse, porteLeNom } from "../../../../supabase/functions/_shared/google-correspondance";
 import AvancementIa from "./AvancementIa";
 import { lienRechercheDoctolib, specialiteDuLienDoctolib, specialiteHorsCible, urlDoctolibValide } from "../../../../supabase/functions/_shared/doctolib";
 
@@ -399,9 +400,24 @@ function SaisieSignal({ type, occupe, onValider, onAnnuler }: {
   );
 }
 
-function CarteFicheGoogle({ fiche, onAvis, occupeAvis }: { fiche: FicheGoogle; onAvis: () => void; occupeAvis: boolean }) {
+/** Le lieu RPPS à la même adresse que la fiche Google (nom du praticien + code postal + voie), s'il y en a un. */
+function lieuCorrespondant(f: FicheGoogle, p: PraticienReseau): string | null {
+  if (!f.adresse || !porteLeNom(f.nom, p.nom)) return null;
+  const l = p.lieux.find((x) => memeAdresse(f.adresse!, { codePostal: x.codePostal, adresse: x.adresse }));
+  return l ? (l.raisonSociale ?? [l.adresse, l.codePostal, l.commune].filter(Boolean).join(" ")) : null;
+}
+
+function CarteFicheGoogle({ fiche, lieuRpps, onAvis, occupeAvis }: { fiche: FicheGoogle; lieuRpps: string | null; onAvis: () => void; occupeAvis: boolean }) {
   return (
     <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
+      {lieuRpps && (
+        <div className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+          <Check className="size-3" /> Même adresse que le lieu RPPS « {lieuRpps} »
+        </div>
+      )}
+      {!lieuRpps && fiche.verificationIa && (
+        <div className="mb-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800"><b>Vérifiée par IA :</b> {fiche.verificationIa}</div>
+      )}
       <div className="font-semibold text-avisdoc-ink">{fiche.nom}</div>
       <div className="text-muted-foreground">{[fiche.categorie, fiche.statut === "CLOSED_PERMANENTLY" ? "Fermé définitivement" : null].filter(Boolean).join(" · ")}</div>
       {specialiteHorsCible(fiche.categorie) && (
@@ -514,13 +530,18 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
             <p className="text-[11.5px] text-muted-foreground">Rattachée automatiquement : même nom et même code postal qu'un lieu RPPS. Vérifiez puis confirmez.</p>
           )}
           {p.googleStatut === "confirmee" && p.googlePlaceIds.length > 0 && (
-            <p className="text-[11.5px] text-muted-foreground">Validée : choisie par un opérateur, ou à l'adresse RPPS (nom, code postal et rue).</p>
+            <p className="text-[11.5px] text-muted-foreground">
+              {p.googleRattachePar?.startsWith("automatique")
+                ? "Validée automatiquement : même nom et même adresse qu'un lieu RPPS."
+                : p.googleRattachePar ? `Choisie par ${p.googleRattachePar}.` : "Validée."}
+              {p.googleRattacheLe ? ` Le ${dateFr(p.googleRattacheLe)}.` : ""}
+            </p>
           )}
           {p.googlePlaceIds.map((id) => {
             const f = fiches[id];
             if (!f) return <div key={id} className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2.5 text-[12px] text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Chargement de la fiche Google…</div>;
             if (f === "erreur") return <div key={id} className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12px] text-muted-foreground">Fiche indisponible pour l'instant.</div>;
-            return <CarteFicheGoogle key={id} fiche={f} onAvis={() => void avis(id)} occupeAvis={occupe === `avis-${id}`} />;
+            return <CarteFicheGoogle key={id} fiche={f} lieuRpps={lieuCorrespondant(f, p)} onAvis={() => void avis(id)} occupeAvis={occupe === `avis-${id}`} />;
           })}
           <div className="flex flex-wrap items-center gap-2">
             {p.googleStatut === "trouvee_auto" && (
