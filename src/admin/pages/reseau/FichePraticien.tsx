@@ -3,7 +3,7 @@
 // Toute information affichée porte sa source ; rien n'est écrit sans validation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ExternalLink, Loader2, Search, Sparkles, Star, X } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Loader2, Search, Sparkles, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { confirmer } from "../../components/Confirmation";
 import { Badge, Card, Modal, SectionLabel } from "../../components/ui";
@@ -152,6 +152,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         <div className="min-w-0">
           <div className="font-display text-lg font-semibold text-avisdoc-ink">{p.civilite ? `${p.civilite} ` : ""}{p.prenom} {p.nom}</div>
           <div className="text-[12.5px] text-muted-foreground">{POPULATION_LIBELLE[p.population]} · RPPS {p.rpps}</div>
+          {p.specialites.length > 0 && <div className="text-[12px] text-muted-foreground">Spécialités RPPS : {p.specialites.join(", ")}</div>}
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer la fiche" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted">
           <X className="size-4" />
@@ -177,132 +178,133 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         </div>
       )}
 
-      {/* Score expliqué */}
-      <SectionLabel className="mt-5">Probabilité d'adhésion au réseau</SectionLabel>
-      <div className="mt-1.5 rounded-xl bg-muted/50 px-3.5 py-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="font-display text-3xl font-semibold text-avisdoc-ink">{pourcent(score.probabilite)}</span>
-          <span className="text-right text-[11.5px] text-muted-foreground">{score.calibre ? "Probabilité calibrée" : "Estimation a priori, non calibrée"}<br />{score.version}</span>
+      <Section id="score" titre="Probabilité d'adhésion au réseau" resume={score.elimine ? "Éliminé" : pourcent(score.probabilite)}>
+        <div className="rounded-xl bg-muted/50 px-3.5 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-display text-3xl font-semibold text-avisdoc-ink">{pourcent(score.probabilite)}</span>
+            <span className="text-right text-[11.5px] text-muted-foreground">{score.calibre ? "Probabilité calibrée" : "Estimation a priori, non calibrée"}<br />{score.version}</span>
+          </div>
+          {score.elimine ? (
+            <p className="mt-2 text-[12.5px] font-semibold text-rose-700">Critère éliminatoire : {score.elimine}</p>
+          ) : (
+            <table className="mt-2 w-full text-[12px]">
+              <tbody>
+                <tr className="text-muted-foreground"><td className="py-0.5">Base (taux d'adhésion attendu 20 %)</td><td className="text-right tabular-nums">{virgule(score.base)}</td></tr>
+                {score.contributions.map((c) => (
+                  <tr key={c.libelle}>
+                    <td className="py-0.5">
+                      {c.libelle} : {c.valeur}{" "}
+                      <a href={c.url} target="_blank" rel="noreferrer" className="text-muted-foreground underline-offset-2 hover:underline">({hote(c.url)})</a>
+                    </td>
+                    <td className={cn("text-right tabular-nums font-semibold", c.points > 0 ? "text-emerald-700" : "text-rose-700")}>{virgule(c.points)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-border/60 font-semibold"><td className="pt-1">Somme z</td><td className="pt-1 text-right tabular-nums">{virgule(score.z)}</td></tr>
+              </tbody>
+            </table>
+          )}
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Probabilité = 1 / (1 + e<sup>−z</sup>). Seuls les signaux validés comptent ; « inconnu » vaut 0. Le score classe la file de contact, il ne décide jamais d'une entrée dans le réseau.
+          </p>
         </div>
-        {score.elimine ? (
-          <p className="mt-2 text-[12.5px] font-semibold text-rose-700">Critère éliminatoire : {score.elimine}</p>
-        ) : (
-          <table className="mt-2 w-full text-[12px]">
-            <tbody>
-              <tr className="text-muted-foreground"><td className="py-0.5">Base (taux d'adhésion attendu 20 %)</td><td className="text-right tabular-nums">{virgule(score.base)}</td></tr>
-              {score.contributions.map((c) => (
-                <tr key={c.libelle}>
-                  <td className="py-0.5">
-                    {c.libelle} : {c.valeur}{" "}
-                    <a href={c.url} target="_blank" rel="noreferrer" className="text-muted-foreground underline-offset-2 hover:underline">({hote(c.url)})</a>
-                  </td>
-                  <td className={cn("text-right tabular-nums font-semibold", c.points > 0 ? "text-emerald-700" : "text-rose-700")}>{virgule(c.points)}</td>
-                </tr>
+      </Section>
+
+      <Section id="ia" titre="Recherche assistée par IA" resume={propositions.length ? `${propositions.length} à valider` : enCours ? "En cours…" : undefined} forcerOuvert={propositions.length > 0 || enCours}>
+        {/* Recherche IA */}
+        <div className="flex items-center justify-end gap-3">
+          <button type="button" onClick={() => void lancerIa()} disabled={!!motifIa} title={motifIa ?? undefined} className={btnSec}>
+            {enCours || occupe === "ia" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+            {enCours ? "Recherche en cours…" : "Lancer la recherche"}
+          </button>
+        </div>
+        <ResumeRecherche recherche={recherche} />
+
+        {propositions.length > 0 && (
+          <>
+            <SousTitre className="mt-4">À valider ({propositions.length})</SousTitre>
+            <div className="mt-1.5 space-y-2">
+              {propositions.map((s) => (
+                <div key={s.id} className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-[12.5px]">
+                  <div className="font-semibold text-avisdoc-ink">{SIGNAUX[s.type].libelle} : {VALEUR_LIBELLE[s.valeur] ?? s.valeur}</div>
+                  {s.extrait && <blockquote className="mt-1 border-l-2 border-violet-300 pl-2 italic text-muted-foreground">« {s.extrait} »</blockquote>}
+                  <a href={s.url} target="_blank" rel="noreferrer" className={cn(lienCls, "mt-1 text-[12px]")}>{hote(s.url)} <ExternalLink className="size-3" /></a>
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" disabled={lectureSeule || !!occupe} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
+                      onClick={() => void agir(s.id, () => reseauRepo.validerSignal(s.id), "Signal validé.")}
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[12px] font-bold text-white disabled:opacity-50">
+                      {occupe === s.id ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Valider
+                    </button>
+                    <button type="button" disabled={lectureSeule || !!occupe}
+                      onClick={() => void agir(s.id, () => reseauRepo.rejeterSignal(s.id))}
+                      className="rounded-full border border-border px-3 py-1 text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Rejeter</button>
+                  </div>
+                </div>
               ))}
-              <tr className="border-t border-border/60 font-semibold"><td className="pt-1">Somme z</td><td className="pt-1 text-right tabular-nums">{virgule(score.z)}</td></tr>
-            </tbody>
-          </table>
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Ouvrez la source avant de valider. L'extrait est effacé dès la décision.</p>
+          </>
         )}
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          Probabilité = 1 / (1 + e<sup>−z</sup>). Seuls les signaux validés comptent ; « inconnu » vaut 0. Le score classe la file de contact, il ne décide jamais d'une entrée dans le réseau.
-        </p>
-      </div>
+      </Section>
 
-      {/* Recherche IA */}
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <SectionLabel>Recherche assistée par IA</SectionLabel>
-        <button type="button" onClick={() => void lancerIa()} disabled={!!motifIa} title={motifIa ?? undefined} className={btnSec}>
-          {enCours || occupe === "ia" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-          {enCours ? "Recherche en cours…" : "Lancer la recherche"}
-        </button>
-      </div>
-      <ResumeRecherche recherche={recherche} />
-
-      {propositions.length > 0 && (
-        <>
-          <SectionLabel className="mt-4">À valider ({propositions.length})</SectionLabel>
-          <div className="mt-1.5 space-y-2">
-            {propositions.map((s) => (
-              <div key={s.id} className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-[12.5px]">
-                <div className="font-semibold text-avisdoc-ink">{SIGNAUX[s.type].libelle} : {VALEUR_LIBELLE[s.valeur] ?? s.valeur}</div>
-                {s.extrait && <blockquote className="mt-1 border-l-2 border-violet-300 pl-2 italic text-muted-foreground">« {s.extrait} »</blockquote>}
-                <a href={s.url} target="_blank" rel="noreferrer" className={cn(lienCls, "mt-1 text-[12px]")}>{hote(s.url)} <ExternalLink className="size-3" /></a>
-                <div className="mt-2 flex gap-2">
-                  <button type="button" disabled={lectureSeule || !!occupe} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-                    onClick={() => void agir(s.id, () => reseauRepo.validerSignal(s.id), "Signal validé.")}
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[12px] font-bold text-white disabled:opacity-50">
-                    {occupe === s.id ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Valider
+      <Section id="signaux" titre="Signaux validés" resume={`${valides.length} / ${TYPES_SIGNAL.length}`} ouvertParDefaut={false}>
+        {/* Grille des signaux */}
+        <div className="divide-y divide-border/60 rounded-xl border border-border/60">
+          {TYPES_SIGNAL.map((t) => {
+            const s = parType.get(t);
+            return (
+              <div key={t} className="px-3 py-2 text-[12.5px]">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-avisdoc-ink">{SIGNAUX[t].libelle}</div>
+                    {s ? (
+                      <div className="text-[11.5px] text-muted-foreground">
+                        <b className="text-avisdoc-ink">{VALEUR_LIBELLE[s.valeur] ?? s.valeur}</b>{" · "}
+                        <a href={s.url} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">{hote(s.url)}</a>
+                        {" · "}{dateFr(s.decideLe)}{" · "}{s.origine === "ia" ? `IA, validé par ${s.decidePar}` : s.decidePar}
+                      </div>
+                    ) : (
+                      <div className="text-[11.5px] text-muted-foreground">Inconnu · d'habitude : {SIGNAUX[t].source}</div>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => setSaisie(saisie === t ? null : t)} disabled={lectureSeule || p.etat === "exclu"}
+                    title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
+                    className="shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-avisdoc-teal hover:bg-muted disabled:opacity-40">
+                    {s ? "Modifier" : "Saisir"}
                   </button>
-                  <button type="button" disabled={lectureSeule || !!occupe}
-                    onClick={() => void agir(s.id, () => reseauRepo.rejeterSignal(s.id))}
-                    className="rounded-full border border-border px-3 py-1 text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Rejeter</button>
                 </div>
+                {saisie === t && (
+                  <SaisieSignal type={t} onAnnuler={() => setSaisie(null)} occupe={occupe === `saisie-${t}`}
+                    onValider={(valeur, url) => void agir(`saisie-${t}`, async () => { await reseauRepo.saisirSignal(p.id, t, valeur, url); setSaisie(null); }, "Signal enregistré.")} />
+                )}
               </div>
-            ))}
-          </div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Ouvrez la source avant de valider. L'extrait est effacé dès la décision.</p>
-        </>
-      )}
+            );
+          })}
+        </div>
+      </Section>
 
-      {/* Grille des signaux */}
-      <SectionLabel className="mt-5">Signaux validés</SectionLabel>
-      <div className="mt-1.5 divide-y divide-border/60 rounded-xl border border-border/60">
-        {TYPES_SIGNAL.map((t) => {
-          const s = parType.get(t);
-          return (
-            <div key={t} className="px-3 py-2 text-[12.5px]">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-avisdoc-ink">{SIGNAUX[t].libelle}</div>
-                  {s ? (
-                    <div className="text-[11.5px] text-muted-foreground">
-                      <b className="text-avisdoc-ink">{VALEUR_LIBELLE[s.valeur] ?? s.valeur}</b>{" · "}
-                      <a href={s.url} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">{hote(s.url)}</a>
-                      {" · "}{dateFr(s.decideLe)}{" · "}{s.origine === "ia" ? `IA, validé par ${s.decidePar}` : s.decidePar}
-                    </div>
-                  ) : (
-                    <div className="text-[11.5px] text-muted-foreground">Inconnu · d'habitude : {SIGNAUX[t].source}</div>
-                  )}
-                </div>
-                <button type="button" onClick={() => setSaisie(saisie === t ? null : t)} disabled={lectureSeule || p.etat === "exclu"}
-                  title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-                  className="shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-avisdoc-teal hover:bg-muted disabled:opacity-40">
-                  {s ? "Modifier" : "Saisir"}
-                </button>
+      <Section id="adresses" titre="Adresses et fiches en ligne"
+        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>Doctolib</Badge></span>}>
+        <SousTitre>Lieux d'exercice (RPPS)</SousTitre>
+        <div className="mt-1.5 space-y-2">
+          {p.lieux.map((l, i) => (
+            <div key={i} className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
+              <div className="font-semibold text-avisdoc-ink">{l.raisonSociale ?? "Structure non renseignée"}</div>
+              <div className="text-muted-foreground">{[l.adresse, [l.codePostal, l.commune].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</div>
+              <div className="text-muted-foreground">
+                {[l.modeExercice, l.secteur, l.telephone ? `Tél. ${l.telephone}` : null, DEPARTEMENTS[l.departement]].filter(Boolean).join(" · ")}
               </div>
-              {saisie === t && (
-                <SaisieSignal type={t} onAnnuler={() => setSaisie(null)} occupe={occupe === `saisie-${t}`}
-                  onValider={(valeur, url) => void agir(`saisie-${t}`, async () => { await reseauRepo.saisirSignal(p.id, t, valeur, url); setSaisie(null); }, "Signal enregistré.")} />
-              )}
             </div>
-          );
-        })}
-      </div>
-
-      <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} />
-      <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
-
-      <SectionLabel className="mt-5">Spécialités (RPPS)</SectionLabel>
-      <div className="mt-1 text-[13px] text-avisdoc-ink">{p.specialites.join(", ") || "—"}</div>
-
-      <SectionLabel className="mt-5">Lieux d'exercice</SectionLabel>
-      <div className="mt-1.5 space-y-2.5">
-        {p.lieux.map((l, i) => (
-          <div key={i} className="rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
-            <div className="font-semibold text-avisdoc-ink">{l.raisonSociale ?? "Structure non renseignée"}</div>
-            <div className="text-muted-foreground">{[l.adresse, [l.codePostal, l.commune].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</div>
-            <div className="text-muted-foreground">
-              {[l.modeExercice, l.secteur, l.telephone ? `Tél. ${l.telephone}` : null, DEPARTEMENTS[l.departement]].filter(Boolean).join(" · ")}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className={cn("mt-3 text-[12px]", perime ? "font-semibold text-amber-700" : "text-muted-foreground")}>
-        <a href={SOURCE_RPPS.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:underline">
-          {SOURCE_RPPS.libelle} <ExternalLink className="size-3" />
-        </a>
-        {" · "}{p.rppsExtraitLe ? `extraction du ${dateFr(p.rppsExtraitLe)}` : "date d'extraction inconnue"}{perime ? ` · ${TEXTES.perime}` : ""}
-      </div>
+          ))}
+        </div>
+        <div className={cn("mt-3 text-[12px]", perime ? "font-semibold text-amber-700" : "text-muted-foreground")}>
+          <a href={SOURCE_RPPS.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+            {SOURCE_RPPS.libelle} <ExternalLink className="size-3" />
+          </a>
+          {" · "}{p.rppsExtraitLe ? `extraction du ${dateFr(p.rppsExtraitLe)}` : "date d'extraction inconnue"}{perime ? ` · ${TEXTES.perime}` : ""}
+        </div>
+        <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} />
+        <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
+      </Section>
 
       <div className="mt-5 border-t border-border/60 pt-4">
         <button type="button" onClick={() => setExclusion(true)} disabled={!!motifExclure} title={motifExclure ?? undefined}
@@ -315,6 +317,40 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
       {exclusion && <ExclusionModal praticien={p} motifInitial={horsCible ? "hors_cible" : ""} onClose={() => setExclusion(false)} onFait={() => { setExclusion(false); onChange(); }} />}
     </Card>
   );
+}
+
+const CLE_SECTIONS = "avisdoc.reseau.fiche.sections";
+function lireSections(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(CLE_SECTIONS) ?? "{}") ?? {}; } catch { return {}; }
+}
+
+/** Section repliable de la fiche ; le choix ouvert / replié est retenu d'une fiche à l'autre. */
+function Section({ id, titre, resume, ouvertParDefaut = true, forcerOuvert = false, children }: {
+  id: string; titre: string; resume?: React.ReactNode; ouvertParDefaut?: boolean; forcerOuvert?: boolean; children: React.ReactNode;
+}) {
+  const [ouvert, setOuvert] = useState(() => lireSections()[id] ?? ouvertParDefaut);
+  // Quelque chose demande l'attention (propositions, recherche en cours) : on ouvre.
+  useEffect(() => { if (forcerOuvert) setOuvert(true); }, [forcerOuvert]);
+  const basculer = () => {
+    const n = !ouvert;
+    setOuvert(n);
+    try { localStorage.setItem(CLE_SECTIONS, JSON.stringify({ ...lireSections(), [id]: n })); } catch { /* sans mémoire */ }
+  };
+  return (
+    <section className="mt-4 rounded-2xl border border-border/70">
+      <button type="button" onClick={basculer} aria-expanded={ouvert}
+        className="flex w-full items-center gap-2 rounded-2xl px-3.5 py-2.5 text-left hover:bg-muted/40">
+        <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouvert && "rotate-90")} />
+        <span className="text-[12px] font-bold uppercase tracking-wide text-avisdoc-ink">{titre}</span>
+        {resume != null && <span className="ml-auto text-[12px] font-semibold text-muted-foreground">{resume}</span>}
+      </button>
+      {ouvert && <div className="px-3.5 pb-3.5">{children}</div>}
+    </section>
+  );
+}
+
+function SousTitre({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn("text-[11.5px] font-bold uppercase tracking-wide text-muted-foreground", className)}>{children}</div>;
 }
 
 function ResumeRecherche({ recherche: r }: { recherche: RechercheIa | null }) {
@@ -436,6 +472,13 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
   };
   const chercher = () => faire("chercher", async () => {
     const r = await reseauRepo.chercherGoogle(p.id, departement);
+    // Au nom et à l'adresse RPPS : le serveur a validé d'office, on recharge le statut.
+    if (r.valideesAuto?.length) {
+      toast.success(`Fiche${r.valideesAuto.length > 1 ? "s" : ""} Google validée${r.valideesAuto.length > 1 ? "s" : ""} : même nom et même adresse que le RPPS.`);
+      setCandidats(null);
+      onChange();
+      return;
+    }
     setCandidats(r.candidats);
     // Pré-cocher les correspondances sûres et celles déjà rattachées.
     setCoches(new Set(r.candidats.filter((c) => c.force === "certaine" || c.force === "forte" || p.googlePlaceIds.includes(c.place_id)).map((c) => c.place_id)));
@@ -447,13 +490,17 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
     setFiches((x) => ({ ...x, [id]: f }));
   });
   const bloque = lectureSeule || p.etat === "exclu";
+  // « À confirmer » : les fiches possibles s'affichent d'elles-mêmes pour choisir sans clic de plus.
+  useEffect(() => {
+    if (p.googleStatut === "a_confirmer" && p.googlePlaceIds.length === 0 && !bloque) void chercher();
+  }, [p.id, p.googleStatut]); // eslint-disable-line react-hooks/exhaustive-deps
   const visibles = (candidats ?? []).filter((c) => c.force !== "faible");
   const faibles = (candidats ?? []).filter((c) => c.force === "faible");
 
   return (
     <>
-      <div className="mt-5 flex items-center justify-between gap-2">
-        <SectionLabel>Fiche{p.googlePlaceIds.length > 1 ? "s" : ""} Google Maps</SectionLabel>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <SousTitre>Fiche{p.googlePlaceIds.length > 1 ? "s" : ""} Google Maps</SousTitre>
         <span title={GOOGLE_AIDE[p.googleStatut]}><Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge></span>
       </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
@@ -561,8 +608,8 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
 
   return (
     <>
-      <div className="mt-5 flex items-center justify-between gap-2">
-        <SectionLabel>Doctolib</SectionLabel>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <SousTitre>Doctolib</SousTitre>
         <span title={DOCTOLIB_AIDE[p.doctolibStatut]}><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge></span>
       </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}

@@ -57,7 +57,25 @@ serve(async (req) => {
       if (!departements.length) return json({ error: "Aucun département connu pour ce praticien." }, 400);
       if (!(await compterAppel(db, "recherche"))) return json({ error: QUOTA_ATTEINT }, 429);
       const candidats = await chercherFiches(p, departements, cle);
-      return json({ requete: requeteFiche(p, departements), candidats });
+      // Personne n'a encore tranché (à chercher, à confirmer, introuvable) et des fiches sont
+      // au nom ET à l'adresse RPPS : validées d'office (décision du 14/11), sans attendre de clic.
+      let valideesAuto: string[] = [];
+      if (["a_chercher", "a_confirmer", "introuvable"].includes(p.google_statut)) {
+        const certaines = [...new Set(candidats.filter((c) => c.force === "certaine").map((c) => c.place_id))];
+        if (certaines.length) {
+          const { error } = await db.from("admin_reseau_praticiens").update({
+            google_statut: "confirmee", google_place_ids: certaines, google_place_id: certaines[0], google_aucune_fiche: false,
+            google_rattache_par: "automatique (adresse RPPS)", google_rattache_le: new Date().toISOString(),
+          }).eq("id", p.id).eq("google_statut", p.google_statut);
+          if (!error) {
+            valideesAuto = certaines;
+            await db.from("admin_reseau_historique").insert({
+              praticien_id: p.id, acteur: acces.email, action: "google_valide_adresse_rpps", detail: { place_ids: certaines },
+            });
+          }
+        }
+      }
+      return json({ requete: requeteFiche(p, departements), candidats, valideesAuto });
     }
 
     if (corps.action === "details") {
