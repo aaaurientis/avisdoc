@@ -11,6 +11,7 @@
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
 //   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
+//                          | { praticien_id, non_reservable: boolean } (page « n'est pas sur Doctolib »)
 //   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
 //   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
 //
@@ -205,6 +206,7 @@ serve(async (req) => {
         specialite: txt(i.specialite, 120), expertises: lst(i.expertises, 40, 120), conventionnement: txt(i.conventionnement, 160),
         carteVitale: typeof i.carteVitale === "boolean" ? i.carteVitale : null, teleconsultation: typeof i.teleconsultation === "boolean" ? i.teleconsultation : null,
         tarifs: lst(i.tarifs, 20, 160), langues: lst(i.langues, 15, 40), presentation: txt(i.presentation, 1500), adresses: lst(i.adresses, 5, 160),
+        reservable: typeof i.reservable === "boolean" ? i.reservable : null,
         premierCreneau: i.premierCreneau && typeof i.premierCreneau === "object"
           ? { date: txt(i.premierCreneau.date, 10), jours: Number.isFinite(i.premierCreneau.jours) ? i.premierCreneau.jours : null, valeur: txt(i.premierCreneau.valeur, 20) }
           : null,
@@ -236,12 +238,16 @@ serve(async (req) => {
     }
 
     case "doctolib": {
-      const { data: p } = await db.from("admin_reseau_praticiens").select("id, doctolib_statut, doctolib_url").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      const { data: p } = await db.from("admin_reseau_praticiens").select("id, doctolib_statut, doctolib_url, doctolib_infos").eq("id", String(corps.praticien_id ?? "")).maybeSingle();
       if (!p) return json({ error: "Praticien introuvable." }, 404);
       const maintenant = new Date().toISOString();
       let maj: Record<string, unknown>;
       if (corps.retirer) maj = { doctolib_url: null, doctolib_statut: "a_confirmer", doctolib_par: null, doctolib_le: null };
-      else if (corps.aucun) maj = { doctolib_url: null, doctolib_statut: "aucun", doctolib_par: email, doctolib_le: maintenant };
+      else if (typeof corps.non_reservable === "boolean") {
+        // Constaté par l'opérateur sur la fiche : « … n'est pas sur Doctolib, pas réservable en ligne ».
+        if (!p.doctolib_url) return json({ error: "Aucune fiche Doctolib rattachée." }, 409);
+        maj = { doctolib_infos: { ...(p.doctolib_infos ?? {}), reservable: !corps.non_reservable }, doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant };
+      } else if (corps.aucun) maj = { doctolib_url: null, doctolib_statut: "aucun", doctolib_par: email, doctolib_le: maintenant };
       else if (corps.confirmer) {
         if (p.doctolib_statut !== "trouve_auto" || !p.doctolib_url) return json({ error: "Aucun lien trouvé automatiquement à confirmer." }, 409);
         maj = { doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant };
@@ -251,7 +257,7 @@ serve(async (req) => {
       }
       const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
-      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: maj.doctolib_url ?? p.doctolib_url ?? null, statut: maj.doctolib_statut } });
+      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: maj.doctolib_url ?? p.doctolib_url ?? null, statut: maj.doctolib_statut, ...(typeof corps.non_reservable === "boolean" ? { non_reservable: corps.non_reservable } : {}) } });
       return json({ id: p.id });
     }
 

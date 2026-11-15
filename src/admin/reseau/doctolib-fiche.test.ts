@@ -72,3 +72,22 @@ describe("réseau d'aval : analyse d'une fiche Doctolib relevée par l'opérateu
     expect(dateProchainRdv("Prochain RDV bientôt", auj)).toBeNull();
   });
 });
+
+describe("fiche Doctolib non réservable", () => {
+  it("repère « n'est pas sur Doctolib » et nettoie le nom", () => {
+    const f = analyserFicheDoctolib([
+      "Dr. Remi Achin n'est pas sur Doctolib",
+      "Dermatologue et vénérologue",
+      "10 Avenue de la Liberté, 63530 Volvic",
+      "Ce soignant n'est pas réservable en ligne sur Doctolib.",
+      "Accéder à la recherche",
+    ].join("\n"), new Date("2026-11-15"));
+    expect(f.reservable).toBe(false);
+    expect(f.nom).toBe("Dr. Remi Achin");
+    expect(f.specialite).toBe("Dermatologue et vénérologue");
+    expect(f.adresses).toEqual(["10 Avenue de la Liberté, 63530 Volvic"]);
+  });
+  it("une fiche avec prise de rendez-vous est réservable", () => {
+    expect(analyserFicheDoctolib("Dr Claire Arnoux\nDermatologue\nPrendre rendez-vous", new Date("2026-11-15")).reservable).toBe(true);
+  });
+});

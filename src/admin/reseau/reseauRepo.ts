@@ -67,6 +67,8 @@ export interface InfosDoctolib {
   langues: string[];
   presentation: string | null;
   adresses: string[];
+  /** false : « n'est pas sur Doctolib », pas de rendez-vous en ligne. */
+  reservable?: boolean | null;
   premierCreneau: { date: string | null; jours: number | null; valeur: string | null } | null;
 }
 
@@ -91,7 +93,7 @@ export interface RechercheIa {
   statut: "en_cours" | "termine" | "echec" | "annule";
   debut: string;
   fin: string | null;
-  resultat: { total?: number; faits?: number; propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
+  resultat: { total?: number; faits?: number; propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; volet?: "tout" | "google" | "doctolib" | "rapprochement"; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
   erreur: string | null;
   /** Avancement en direct : étape en cours, pourcentage, journal. */
   etape: string | null;
@@ -376,14 +378,14 @@ export const reseauRepo = {
   },
   enregistrerFicheDoctolib: (praticienId: string, url: string, infos: InfosDoctolib, signaux: { type: TypeSignal; valeur: string }[]) =>
     appeler("reseau-action", { action: "doctolib_fiche", praticien_id: praticienId, url, infos, signaux }),
-  doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true }) =>
+  doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean }) =>
     appeler("reseau-action", { action: "doctolib", praticien_id: praticienId, ...choix }),
 
   /** Travaux groupés d'un département : « liens » (carte, Google, Doctolib) ou « ia ». */
   estimerFile: (departement: string, type: "liens" | "ia", inclureRecents = false): Promise<{ total: number }> =>
     appeler("reseau-file", { action: "estimer", departement, type, inclure_recents: inclureRecents }),
-  lancerFile: (departement: string, type: "liens" | "ia", inclureRecents = false): Promise<{ job_id: string; total: number; deja: boolean }> =>
-    appeler("reseau-file", { action: "lancer", departement, type, inclure_recents: inclureRecents }),
+  lancerFile: (departement: string, type: "liens" | "ia", inclureRecents = false, volet?: "tout" | "google" | "doctolib" | "rapprochement"): Promise<{ job_id: string; total: number; deja: boolean }> =>
+    appeler("reseau-file", { action: "lancer", departement, type, inclure_recents: inclureRecents, volet }),
   arreterFile: (jobId: string) => appeler("reseau-file", { action: "arreter", job_id: jobId }),
   confirmerGoogle: (praticienId: string) => appeler("reseau-action", { action: "google_confirmer", praticien_id: praticienId }),
   ficheGoogle: (praticienId: string, placeId: string, avis = false): Promise<FicheGoogle> =>

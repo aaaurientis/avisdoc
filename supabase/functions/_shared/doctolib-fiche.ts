@@ -27,6 +27,8 @@ export interface FicheDoctolib {
   carteVitale: boolean | null;
   teleconsultation: boolean | null;
   presentation: string | null;
+  /** false : fiche « … n'est pas sur Doctolib » / « pas réservable en ligne ». */
+  reservable: boolean | null;
   /** Adresses relevées sur la fiche. */
   adresses: string[];
   nouveauxPatients: { valeur: "oui" | "non"; extrait: string } | null;
@@ -115,13 +117,18 @@ export function analyserFicheDoctolib(texte: string, aujourdhui: Date = new Date
     carteVitale: null,
     teleconsultation: null,
     presentation: null,
+    reservable: null,
     adresses: [...new Set(lignes.filter((l) => /\b\d{5}\b/.test(l) && l.length < 120 && /(rue|avenue|bd|boulevard|place|chemin|allee|route|quai|cours|impasse)\b/i.test(norm(l))))].slice(0, 5),
     nouveauxPatients: null,
     premierCreneau: null,
     signaux: [],
   };
+  // Fiche « fantôme » : le praticien a une page, mais ne prend pas de rendez-vous en ligne.
+  if (/n'est pas sur doctolib|n'est pas reservable en ligne|pas reservable en ligne sur doctolib/.test(tout)) fiche.reservable = false;
+  else if (/prendre rendez-vous|prochain (rdv|rendez-vous)|choisissez (votre|un) motif/.test(tout)) fiche.reservable = true;
   if (fiche.nom) {
     const i = lignes.indexOf(fiche.nom);
+    fiche.nom = fiche.nom.replace(/\s+n'est pas sur Doctolib\s*$/i, "").trim();
     const suivante = lignes[i + 1];
     if (suivante && suivante.length < 60 && !/\d/.test(suivante)) fiche.specialite = suivante;
   }

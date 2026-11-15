@@ -122,7 +122,7 @@ function Verification({ recu, lectureSeule, onFini, onAutre }: {
     try {
       const infos: InfosDoctolib = {
         specialite: fiche.specialite, expertises: fiche.expertises, conventionnement: fiche.conventionnement, carteVitale: fiche.carteVitale,
-        teleconsultation: fiche.teleconsultation, tarifs: fiche.tarifs, langues: fiche.langues, presentation: fiche.presentation, adresses: fiche.adresses,
+        teleconsultation: fiche.teleconsultation, tarifs: fiche.tarifs, langues: fiche.langues, presentation: fiche.presentation, adresses: fiche.adresses, reservable: fiche.reservable,
         premierCreneau: fiche.premierCreneau ? { date: fiche.premierCreneau.date, jours: fiche.premierCreneau.jours, valeur: fiche.premierCreneau.valeur } : null,
       };
       const signaux = fiche.signaux.filter((_, i) => coches.has(i)).map((s) => ({ type: s.type, valeur: s.valeur }));
