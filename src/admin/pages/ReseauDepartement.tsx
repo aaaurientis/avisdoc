@@ -28,6 +28,7 @@ import {
   DOCTOLIB_LABEL,
   NON_RESERVABLE,
   nonReservableDoctolib,
+  PLAFONDS_JOUR,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
@@ -254,6 +255,13 @@ export default function ReseauDepartement() {
     };
   }, [praticiens]);
 
+  // Compteur du plafond Google / Doctolib du jour, rafraîchi quand une recherche change d'état.
+  const [appels, setAppels] = useState<Record<string, number>>({});
+  useEffect(() => {
+    reseauRepo.appelsDuJour().then(setAppels).catch(() => setAppels({}));
+  }, [code, rechercheGoogle?.statut, rechercheGoogle?.progression]); // eslint-disable-line react-hooks/exhaustive-deps
+  const plafondGoogle = `Aujourd'hui : ${appels.recherche ?? 0} / ${PLAFONDS_JOUR.recherche} recherches Google`;
+
   // Fiches sans recherche IA récente : recalculé quand une passe groupée change d'état.
   const [iaRestants, setIaRestants] = useState<number | null>(null);
   useEffect(() => {
@@ -434,6 +442,7 @@ export default function ReseauDepartement() {
           lignes={[
             `${comptes.google.trouvees} trouvée${comptes.google.trouvees > 1 ? "s" : ""} · ${comptes.google.aConfirmer + comptes.google.sans} sans correspondance`,
             comptes.google.aChercher ? `${comptes.google.aChercher} pas encore cherché${comptes.google.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
+            plafondGoogle,
           ]}
           bouton={liensEnCours("google") ? "Arrêter" : comptes.google.aChercher ? `Chercher (${comptes.google.aChercher})` : null}
           onClick={() => liensEnCours("google") ? void arreter(rechercheGoogle!) : void lancerLiens("google")}
@@ -444,6 +453,7 @@ export default function ReseauDepartement() {
           lignes={[
             `${comptes.google.confirmees} validée${comptes.google.confirmees > 1 ? "s" : ""} (adresse RPPS ou opérateur)`,
             comptes.google.aVerifier ? `${comptes.google.aVerifier} trouvée${comptes.google.aVerifier > 1 ? "s" : ""} à vérifier (même nom et code postal)` : "Aucune fiche à vérifier",
+            plafondGoogle,
           ]}
           aide="Revérifie les fiches non tranchées : au nom et à l'adresse RPPS, elles sont validées d'office. Une recherche Google par praticien."
           bouton={liensEnCours("rapprochement") ? "Arrêter" : comptes.google.aRapprocher ? `Revérifier (${comptes.google.aRapprocher})` : null}
@@ -455,6 +465,7 @@ export default function ReseauDepartement() {
           lignes={[
             `${comptes.doctolib.liens} lien${comptes.doctolib.liens > 1 ? "s" : ""}${comptes.doctolib.nonReservables ? ` dont ${comptes.doctolib.nonReservables} non réservable${comptes.doctolib.nonReservables > 1 ? "s" : ""}` : ""} · ${comptes.doctolib.aConfirmer} à confirmer · ${comptes.doctolib.sans} absent${comptes.doctolib.sans > 1 ? "s" : ""}`,
             comptes.doctolib.aChercher ? `${comptes.doctolib.aChercher} pas encore cherché${comptes.doctolib.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
+            `Aujourd'hui : ${appels.doctolib ?? 0} / ${PLAFONDS_JOUR.doctolib} recherches Doctolib`,
           ]}
           bouton={liensEnCours("doctolib") ? "Arrêter" : comptes.doctolib.aChercher ? `Chercher (${comptes.doctolib.aChercher})` : null}
           onClick={() => liensEnCours("doctolib") ? void arreter(rechercheGoogle!) : void lancerLiens("doctolib")}

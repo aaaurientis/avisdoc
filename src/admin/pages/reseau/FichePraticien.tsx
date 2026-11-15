@@ -508,10 +508,6 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
     setFiches((x) => ({ ...x, [id]: f }));
   });
   const bloque = lectureSeule || p.etat === "exclu";
-  // « À confirmer » : les fiches possibles s'affichent d'elles-mêmes pour choisir sans clic de plus.
-  useEffect(() => {
-    if (p.googleStatut === "a_confirmer" && p.googlePlaceIds.length === 0 && !bloque) void chercher();
-  }, [p.id, p.googleStatut]); // eslint-disable-line react-hooks/exhaustive-deps
   const visibles = (candidats ?? []).filter((c) => c.force !== "faible");
   const faibles = (candidats ?? []).filter((c) => c.force === "faible");
 
