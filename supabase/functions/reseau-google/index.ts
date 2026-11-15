@@ -19,6 +19,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
+import { verifierFichesIa } from "../_shared/google-ia.ts";
 import { appelGoogle, chercherFiches, cleGoogle, compterAppel, QUOTA_ATTEINT, requeteFiche } from "../_shared/google-places.ts";
 import { estDepartement } from "../_shared/reseau-rpps.ts";
 import { forceFiche } from "../_shared/google-correspondance.ts";
@@ -42,7 +43,7 @@ serve(async (req) => {
   const db = clientService();
   const { data: p } = await db
     .from("admin_reseau_praticiens")
-    .select("id, nom, prenom, population, google_statut, google_place_id, google_place_ids, admin_reseau_lieux(commune, code_postal, adresse, departement)")
+    .select("id, nom, prenom, population, google_statut, google_place_id, google_place_ids, admin_reseau_lieux(commune, code_postal, adresse, departement, raison_sociale)")
     .eq("id", String(corps.praticien_id ?? ""))
     .maybeSingle();
   if (!p) return json({ error: "Praticien introuvable." }, 404);
@@ -87,25 +88,44 @@ serve(async (req) => {
       if (!(await compterAppel(db, avecAvis ? "details_avis" : "details"))) return json({ error: QUOTA_ATTEINT }, 429);
       const masque = avecAvis ? `${CHAMPS_DETAILS},reviews` : CHAMPS_DETAILS;
       const x = await appelGoogle(`${DETAILS}${encodeURIComponent(placeId)}?languageCode=fr&regionCode=FR`, { method: "GET" }, cle, masque);
-      // Une fiche rattachée automatiquement « à vérifier » (première version de la recherche,
-      // qui ne comparait pas la rue) est validée d'office si elle est au nom ET à l'adresse
-      // RPPS du praticien (code postal + voie) — décision du 14/11. Aucun appel en plus :
-      // on se sert de l'affichage. Le contenu, lui, n'est toujours pas enregistré.
+      // Fiche rattachée « à vérifier » : on profite de l'affichage pour la vérifier. Au nom
+      // ET à l'adresse RPPS (comparaison mot à mot, sinon vérification par IA des deux
+      // adresses), elle est notée vérifiée. Quand TOUTES les fiches rattachées le sont,
+      // le statut passe à « confirmée » (décision du 14/11). Le contenu n'est pas enregistré.
       let valideeAuto = false;
-      if (p.google_statut === "trouvee_auto" && rattachees.length === 1) {
-        const lieux = (p.admin_reseau_lieux ?? []).map((l: any) => ({ codePostal: l.code_postal, adresse: l.adresse }));
-        const force = forceFiche(
-          { place_id: x.id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "", ferme: x.businessStatus === "CLOSED_PERMANENTLY" },
-          p.nom, lieux,
-        );
-        if (force === "certaine") {
+      let verificationIa: string | null = null;
+      if (p.google_statut === "trouvee_auto") {
+        const { data: deja } = await db.from("admin_reseau_historique").select("detail")
+          .eq("praticien_id", p.id).eq("action", "google_fiche_verifiee");
+        const verifiees = new Set<string>((deja ?? []).map((h: any) => h.detail?.place_id).filter(Boolean));
+        if (!verifiees.has(x.id)) {
+          const fiche = { place_id: x.id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "", ferme: x.businessStatus === "CLOSED_PERMANENTLY" };
+          const lieux = (p.admin_reseau_lieux ?? []).map((l: any) => ({ codePostal: l.code_postal, adresse: l.adresse }));
+          const force = forceFiche(fiche, p.nom, lieux);
+          let ok = force === "certaine";
+          if (!ok && (force === "forte" || force === "moyenne") && !fiche.ferme) {
+            const v = (await verifierFichesIa(
+              { nom: p.nom, prenom: p.prenom, population: p.population, lieux: p.admin_reseau_lieux ?? [] },
+              [{ ...fiche, categorie: x.primaryTypeDisplayName?.text ?? null }],
+            )).get(x.id);
+            if (v?.memePraticien && v.memeAdresse) { ok = true; verificationIa = v.raison; }
+          }
+          if (ok) {
+            verifiees.add(x.id);
+            await db.from("admin_reseau_historique").insert({
+              praticien_id: p.id, acteur: acces.email, action: "google_fiche_verifiee",
+              detail: { place_id: x.id, par: verificationIa ? "ia" : "adresse", raison: verificationIa },
+            });
+          }
+        }
+        if (rattachees.every((id) => verifiees.has(id))) {
           const { error } = await db.from("admin_reseau_praticiens")
             .update({ google_statut: "confirmee", google_rattache_par: "automatique (adresse RPPS)", google_rattache_le: new Date().toISOString() })
             .eq("id", p.id).eq("google_statut", "trouvee_auto");
           if (!error) {
             valideeAuto = true;
             await db.from("admin_reseau_historique").insert({
-              praticien_id: p.id, acteur: acces.email, action: "google_valide_adresse_rpps", detail: { place_id: x.id },
+              praticien_id: p.id, acteur: acces.email, action: "google_valide_adresse_rpps", detail: { place_ids: rattachees },
             });
           }
         }
@@ -114,6 +134,7 @@ serve(async (req) => {
       // Renvoyé pour affichage seulement : rien de ce contenu n'est enregistré.
       return json({
         valideeAuto,
+        verificationIa,
         place_id: x.id,
         nom: x.displayName?.text ?? "",
         adresse: x.formattedAddress ?? null,

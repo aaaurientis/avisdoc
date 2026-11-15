@@ -9,7 +9,7 @@ import { urlsDoctolib } from "./doctolib-recherche.ts";
 import type { Niveau } from "./suivi.ts";
 
 const SELECT = "id, nom, prenom, population, etat, google_statut, google_place_ids, doctolib_statut, " +
-  "admin_reseau_lieux(id, departement, adresse, code_postal, commune, lat, lng, geo_tente)";
+  "admin_reseau_lieux(id, departement, raison_sociale, adresse, code_postal, commune, lat, lng, geo_tente)";
 
 /** Géocodage par l'API Adresse (BAN, data.gouv.fr) : gratuit, sans clé, adresses françaises. */
 async function geocoder(l: any): Promise<{ lat: number; lng: number } | null> {

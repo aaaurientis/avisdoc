@@ -460,7 +460,7 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
           if (annule) return;
           setFiches((x) => ({ ...x, [id]: f }));
           // Au nom et à l'adresse RPPS : validée d'office par le serveur, on rafraîchit le statut.
-          if (f.valideeAuto) { toast.success("Fiche Google validée : même nom et même adresse que le RPPS."); onChange(); }
+          if (f.valideeAuto) { toast.success(f.verificationIa ? `Fiche Google validée par l'IA : ${f.verificationIa}` : "Fiche Google validée : même nom et même adresse que le RPPS."); onChange(); }
         })
         .catch((e) => { if (!annule) { setFiches((x) => ({ ...x, [id]: "erreur" })); setErreur(e instanceof Error ? e.message : String(e)); } });
     }
@@ -564,8 +564,9 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
                 <span className="font-semibold text-avisdoc-ink">{c.nom}{c.ferme ? " · fermé définitivement" : ""}</span>
                 <span className="block text-muted-foreground">{[c.categorie, c.adresse].filter(Boolean).join(" · ")}</span>
                 <span className={cn("text-[11px] font-semibold", c.force === "certaine" || c.force === "forte" ? "text-emerald-700" : c.force === "moyenne" ? "text-amber-700" : "text-slate-500")}>
-                  {FORCE_LABEL[c.force]}
+                  {FORCE_LABEL[c.force]}{c.verifieIa ? " (vérifié par IA)" : ""}
                 </span>
+                {c.verifieIa && <span className="block text-[11px] text-muted-foreground">{c.verifieIa}</span>}
               </span>
             </label>
           ))}
