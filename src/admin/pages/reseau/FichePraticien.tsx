@@ -207,7 +207,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
             </table>
           )}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Probabilité = 1 / (1 + e<sup>−z</sup>). Seuls les signaux validés comptent ; « inconnu » vaut 0. Le score classe la file de contact, il ne décide jamais d'une entrée dans le réseau.
+            Probabilité = 1 / (1 + e<sup>−z</sup>). Seuls comptent les signaux validés et la présence en ligne (fiche Google, prise de rendez-vous Doctolib) ; « inconnu » vaut 0. Le score classe la file de contact, il ne décide jamais d'une entrée dans le réseau.
           </p>
         </div>
       </Section>
