@@ -198,4 +198,7 @@ export const NON_RESERVABLE = {
   picto: "text-rose-600",
 } as const;
 
+/** Plafonds quotidiens par défaut (variables RESEAU_GOOGLE_PLAFOND_* / RESEAU_DOCTOLIB_PLAFOND côté serveur). */
+export const PLAFONDS_JOUR = { recherche: 200, details: 300, details_avis: 100, doctolib: 200 } as const;
+
 export const FORCE_LABEL = { certaine: "Nom et adresse RPPS", forte: "Nom et code postal", moyenne: "Nom, autre commune", faible: "Sans le nom du praticien" } as const;

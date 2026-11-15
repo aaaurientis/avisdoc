@@ -3,7 +3,7 @@
 // Rien n'est deviné : voir google-correspondance.ts et doctolib.ts.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { chercherFiches, cleGoogle, compterAppel, type PraticienPourGoogle } from "./google-places.ts";
+import { chercherFiches, cleGoogle, compterAppel, PLAFONDS, type PraticienPourGoogle } from "./google-places.ts";
 import { choisirDoctolib } from "./doctolib.ts";
 import { urlsDoctolib } from "./doctolib-recherche.ts";
 import type { Niveau } from "./suivi.ts";
@@ -65,7 +65,7 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
   }
   if ((volet === "tout" || volet === "google") && p.google_statut === "a_chercher" && cleGoogle()) {
     if (!(await compterAppel(db, "recherche"))) {
-      lignes.push({ texte: `Quota Google du jour atteint : ${qui} sera cherché demain`, niveau: "ecarte" });
+      lignes.push({ texte: `Plafond Google du jour atteint (${PLAFONDS.recherche} recherches) : ${qui} sera cherché demain`, niveau: "ecarte" });
     } else {
       const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle());
       const retenues = candidats.filter((c) => c.force === "certaine" || c.force === "forte");
@@ -98,7 +98,7 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
   // 3. Lien Doctolib (adresses des résultats de recherche seulement, jamais les pages).
   if ((volet === "tout" || volet === "doctolib") && p.doctolib_statut === "a_chercher" && Deno.env.get("ANTHROPIC_API_KEY")) {
     if (!(await compterAppel(db, "doctolib"))) {
-      lignes.push({ texte: `Quota Doctolib du jour atteint : ${qui} sera cherché demain`, niveau: "ecarte" });
+      lignes.push({ texte: `Plafond Doctolib du jour atteint (${PLAFONDS.doctolib} recherches) : ${qui} sera cherché demain`, niveau: "ecarte" });
     } else {
       const communes = [...new Set(lieux.map((l) => l.commune).filter(Boolean))] as string[];
       const c = choisirDoctolib(await urlsDoctolib({ nom: p.nom, prenom: p.prenom, population: p.population, communes }), { nom: p.nom, prenom: p.prenom, communes });
@@ -124,7 +124,7 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
  */
 async function rapprocher(db: any, p: any, deps: string[]): Promise<LigneJournal[]> {
   const qui = `${p.prenom} ${p.nom}`;
-  if (!(await compterAppel(db, "recherche"))) return [{ texte: `Quota Google du jour atteint : ${qui} sera revérifié demain`, niveau: "ecarte" }];
+  if (!(await compterAppel(db, "recherche"))) return [{ texte: `Plafond Google du jour atteint (${PLAFONDS.recherche} recherches) : ${qui} sera revérifié demain`, niveau: "ecarte" }];
   const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle());
   const force = new Map(candidats.map((c) => [c.place_id, c.force]));
   const retenues = candidats.filter((c) => c.force === "certaine" || c.force === "forte").map((c) => c.place_id);

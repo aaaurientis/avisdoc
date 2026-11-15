@@ -20,7 +20,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
 import { verifierFichesIa } from "../_shared/google-ia.ts";
-import { appelGoogle, chercherFiches, cleGoogle, compterAppel, QUOTA_ATTEINT, requeteFiche } from "../_shared/google-places.ts";
+import { appelGoogle, chercherFiches, cleGoogle, compterAppel, quotaAtteint, requeteFiche } from "../_shared/google-places.ts";
 import { estDepartement } from "../_shared/reseau-rpps.ts";
 import { forceFiche } from "../_shared/google-correspondance.ts";
 
@@ -56,7 +56,7 @@ serve(async (req) => {
         ? [dep]
         : [...new Set((p.admin_reseau_lieux ?? []).map((l: any) => l.departement).filter(Boolean))] as string[];
       if (!departements.length) return json({ error: "Aucun département connu pour ce praticien." }, 400);
-      if (!(await compterAppel(db, "recherche"))) return json({ error: QUOTA_ATTEINT }, 429);
+      if (!(await compterAppel(db, "recherche"))) return json({ error: quotaAtteint("recherche") }, 429);
       const candidats = await chercherFiches(p, departements, cle);
       // Personne n'a encore tranché (à chercher, à confirmer, introuvable) et des fiches sont
       // au nom ET à l'adresse RPPS : validées d'office (décision du 14/11), sans attendre de clic.
@@ -85,7 +85,7 @@ serve(async (req) => {
       // Seules les fiches rattachées à ce praticien s'affichent par ici.
       if (!placeId || !rattachees.includes(placeId)) return json({ error: "Cette fiche Google n'est pas rattachée à ce praticien." }, 400);
       const avecAvis = corps.avis === true;
-      if (!(await compterAppel(db, avecAvis ? "details_avis" : "details"))) return json({ error: QUOTA_ATTEINT }, 429);
+      if (!(await compterAppel(db, avecAvis ? "details_avis" : "details"))) return json({ error: quotaAtteint(avecAvis ? "details_avis" : "details") }, 429);
       const masque = avecAvis ? `${CHAMPS_DETAILS},reviews` : CHAMPS_DETAILS;
       const x = await appelGoogle(`${DETAILS}${encodeURIComponent(placeId)}?languageCode=fr&regionCode=FR`, { method: "GET" }, cle, masque);
       // Fiche rattachée « à vérifier » : on profite de l'affichage pour la vérifier. Au nom

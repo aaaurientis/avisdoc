@@ -373,6 +373,13 @@ export const reseauRepo = {
       action: "google_rattacher", praticien_id: praticienId,
       ...("placeIds" in choix ? { place_ids: choix.placeIds } : "aucune" in choix ? { aucune: true } : { retirer: true }),
     }),
+  /** Appels Google / Doctolib du jour (compteur du plafond quotidien, remis à zéro à minuit UTC). */
+  async appelsDuJour(): Promise<Record<string, number>> {
+    const jour = new Date().toISOString().slice(0, 10);
+    const { data, error } = await sb.from("admin_reseau_appels_google").select("type, nombre").eq("jour", jour);
+    if (error) throw new Error(error.message);
+    return Object.fromEntries((data ?? []).map((r: { type: string; nombre: number }) => [r.type, r.nombre]));
+  },
   chercherGoogle: (praticienId: string, departement?: string): Promise<{ requete: string; candidats: CandidatGoogle[]; valideesAuto?: string[] }> =>
     appeler("reseau-google", { action: "chercher", praticien_id: praticienId, departement }),
   /** Praticiens candidats pour un relevé Doctolib : même lien, ou même nom de famille. */

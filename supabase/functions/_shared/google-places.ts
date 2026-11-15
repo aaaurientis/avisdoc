@@ -19,7 +19,19 @@ export const PLAFONDS = {
 };
 const CHAMPS_RECHERCHE = "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.businessStatus";
 
-export const QUOTA_ATTEINT = "Quota du jour atteint : la suite reprend demain.";
+const QUOTA_LIBELLE: Record<keyof typeof PLAFONDS, string> = {
+  recherche: "recherches de fiches Google Maps",
+  details: "affichages de fiches Google Maps",
+  details_avis: "affichages d'avis Google",
+  doctolib: "recherches de liens Doctolib",
+};
+/** Message clair : quel plafond, combien, quand il revient. Plafonds fixés pour tenir le budget (50 €/mois). */
+export function quotaAtteint(type: keyof typeof PLAFONDS): string {
+  return `Plafond du jour atteint : ${PLAFONDS[type]} ${QUOTA_LIBELLE[type]} par jour, fixé pour tenir le budget Google. ` +
+    "Le compteur repart à zéro à 1 h du matin (heure de Paris).";
+}
+/** Compatibilité : message générique. */
+export const QUOTA_ATTEINT = quotaAtteint("recherche");
 
 export function cleGoogle(): string {
   return (Deno.env.get("GOOGLE_PLACES_KEY") ?? Deno.env.get("GOOGLE_MAPS_KEY") ?? "").trim();
