@@ -294,3 +294,10 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - **Vérification par IA** (modèle léger, `RESEAU_MODEL_VERIF`, défaut `claude-haiku-5-5`, sans recherche web) : quand une fiche porte le nom du praticien mais que l'adresse n'est pas reconnue mot à mot (abréviations, complément, bis/ter…), l'IA compare la fiche aux lieux RPPS et rend un verdict motivé. Elle ne peut que **confirmer** (nom ET même adresse postale) ; jamais rétrograder, jamais retenir une fiche sans le nom. Appliquée à la recherche automatique, au rapprochement, à « Voir les fiches du département » et à l'affichage des fiches « trouvées ». La raison donnée par l'IA est affichée et tracée dans l'historique (`google_fiche_verifiee`).
 - Plusieurs fiches rattachées : chacune est vérifiée à l'affichage ; le statut passe à « confirmée » quand toutes le sont.
 - Données envoyées à l'IA : nom, prénom, spécialité et lieux RPPS (publics), nom et adresse des fiches Google affichées. Rien n'est conservé côté IA par le Hub.
+
+## Tri, filtre « non réservable » et présence en ligne dans le score (15/11)
+
+- **Tri** : chaque en-tête du tableau est cliquable (praticien, population, commune, exercice, état, Google, Doctolib, score) ; deuxième clic = sens inverse. Par défaut : score décroissant.
+- **Filtre Doctolib** : nouvelle valeur « Non réservable ».
+- **Score v0.1 (présence en ligne, a priori, à valider avec les autres poids)** : fiche Google confirmée +0,3 (trouvée, à vérifier +0,2) ; lien Doctolib avec prise de rendez-vous en ligne confirmé +0,3 (trouvé, à vérifier +0,2) ; page Doctolib « non réservable » : 0. Chaque point s'affiche dans le détail du score avec son lien.
+- **Plafonds quotidiens** (budget Google) : 200 recherches de fiches, 300 affichages de fiches, 100 affichages d'avis, 200 recherches Doctolib ; remise à zéro à minuit UTC (1 h à Paris). Compteur du jour affiché sur les tuiles. Modifiables par les variables `RESEAU_GOOGLE_PLAFOND_RECHERCHE`, `RESEAU_GOOGLE_PLAFOND_DETAILS`, `RESEAU_GOOGLE_PLAFOND_AVIS`, `RESEAU_DOCTOLIB_PLAFOND` (et `PLAFONDS_JOUR` côté écran).

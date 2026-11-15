@@ -58,7 +58,7 @@ const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   a_chercher: "text-slate-200",
 };
 
-const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(150px,1.4fr) 84px 104px 112px 112px 70px";
+const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(150px,1.4fr) 84px 104px 140px 120px 70px";
 const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
 
 const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
@@ -129,10 +129,13 @@ export default function ReseauDepartement() {
   const [ajoutRpps, setAjoutRpps] = useState(false);
   /** Le journal reste affiché à la fin d'une recherche suivie à l'écran. */
   const [suiviMgOuvert, setSuiviMgOuvert] = useState(false);
-  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle; doctolib: "" | StatutDoctolib }>({
+  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle; doctolib: "" | StatutDoctolib | "non_reservable" }>({
     q: "", population: "", role: "", etat: "", google: "", doctolib: "",
   });
   const lectureSeule = lectureSeuleActive();
+  // Tri du tableau : clic sur un en-tête ; deuxième clic = sens inverse. Par défaut, le score.
+  const [tri, setTri] = useState<{ cle: CleTri; sens: 1 | -1 }>({ cle: "score", sens: -1 });
+  const trier = (cle: CleTri) => setTri((t) => (t.cle === cle ? { cle, sens: t.sens === 1 ? -1 : 1 } : { cle, sens: cle === "score" ? -1 : 1 }));
 
   const charger = async () => {
     setChargement(true);
@@ -194,10 +197,26 @@ export default function ReseauDepartement() {
       (!filtres.role || p.roles.includes(filtres.role)) &&
       (!filtres.etat || p.etat === filtres.etat) &&
       (!filtres.google || p.googleStatut === filtres.google) &&
-      (!filtres.doctolib || p.doctolibStatut === filtres.doctolib) &&
+      (!filtres.doctolib || (filtres.doctolib === "non_reservable" ? nonReservableDoctolib(p) : p.doctolibStatut === filtres.doctolib && !nonReservableDoctolib(p))) &&
       (!q || `${p.nom} ${p.prenom} ${p.rpps} ${p.lieux.map((l) => `${l.raisonSociale ?? ""} ${l.commune ?? ""}`).join(" ")}`.toLowerCase().includes(q)))
-      .sort((a, b) => (scores.get(b.id)?.probabilite ?? 0) - (scores.get(a.id)?.probabilite ?? 0) || a.nom.localeCompare(b.nom, "fr"));
-  }, [praticiens, filtres, scores]);
+      .sort((a, b) => {
+        const v = (p: PraticienReseau): number | string => {
+          switch (tri.cle) {
+            case "score": return scores.get(p.id)?.probabilite ?? 0;
+            case "nom": return `${p.nom} ${p.prenom}`;
+            case "population": return POPULATION_LIBELLE[p.population];
+            case "lieu": return p.lieux.find((l) => l.departement === code)?.commune ?? "~";
+            case "exercice": return p.lieux.find((l) => l.departement === code)?.modeExercice ?? "~";
+            case "etat": return ETATS_PRATICIEN.indexOf(p.etat);
+            case "google": return STATUTS_GOOGLE.indexOf(p.googleStatut);
+            case "doctolib": return nonReservableDoctolib(p) ? 1.5 : STATUTS_DOCTOLIB.indexOf(p.doctolibStatut);
+          }
+        };
+        const va = v(a), vb = v(b);
+        const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "fr");
+        return c * tri.sens || (scores.get(b.id)?.probabilite ?? 0) - (scores.get(a.id)?.probabilite ?? 0) || a.nom.localeCompare(b.nom, "fr");
+      });
+  }, [praticiens, filtres, scores, tri, code]);
 
   // Recherche IA des généralistes formés à la dermoscopie : suivie toutes les 5 secondes.
   useEffect(() => {
@@ -259,7 +278,7 @@ export default function ReseauDepartement() {
   const [appels, setAppels] = useState<Record<string, number>>({});
   useEffect(() => {
     reseauRepo.appelsDuJour().then(setAppels).catch(() => setAppels({}));
-  }, [code, rechercheGoogle?.statut, rechercheGoogle?.progression]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [code, rechercheGoogle?.statut, rechercheGoogle?.progression]);
   const plafondGoogle = `Aujourd'hui : ${appels.recherche ?? 0} / ${PLAFONDS_JOUR.recherche} recherches Google`;
 
   // Fiches sans recherche IA récente : recalculé quand une passe groupée change d'état.
@@ -530,11 +549,11 @@ export default function ReseauDepartement() {
           options={ROLES.map((r) => [r, ROLE_LABEL[r]])} />
         <Filtre label="Google" tous="tous" valeur={filtres.google} onChange={(v) => setFiltres((f) => ({ ...f, google: v as "" | StatutGoogle }))}
           options={STATUTS_GOOGLE.map((g) => [g, GOOGLE_LABEL[g]])} />
-        <Filtre label="Doctolib" tous="tous" valeur={filtres.doctolib} onChange={(v) => setFiltres((f) => ({ ...f, doctolib: v as "" | StatutDoctolib }))}
-          options={STATUTS_DOCTOLIB.map((d) => [d, DOCTOLIB_LABEL[d]])} />
+        <Filtre label="Doctolib" tous="tous" valeur={filtres.doctolib} onChange={(v) => setFiltres((f) => ({ ...f, doctolib: v as "" | StatutDoctolib | "non_reservable" }))}
+          options={[...STATUTS_DOCTOLIB.map((d) => [d, DOCTOLIB_LABEL[d]] as [string, string]), ["non_reservable", NON_RESERVABLE.label]]} />
         <Filtre label="État" tous="tous" valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
           options={ETATS_PRATICIEN.map((e) => [e, ETAT_PRATICIEN_LABEL[e]])} />
-        <span className="ml-auto text-[12.5px] text-muted-foreground">{rows.length} affichés · triés par probabilité d'adhésion</span>
+        <span className="ml-auto text-[12.5px] text-muted-foreground">{rows.length} affichés · triés par {LIBELLE_TRI[tri.cle]}{tri.sens === 1 ? " (croissant)" : " (décroissant)"}</span>
         <div className="flex gap-1 rounded-full border border-border bg-card p-1">
           {([{ v: "liste", label: "Liste", icon: List }, { v: "carte", label: "Carte", icon: MapIcon }] as const).map(({ v, label, icon: Icon }) => (
             <button key={v} type="button" onClick={() => setVue(v)}
@@ -553,12 +572,16 @@ export default function ReseauDepartement() {
         <Card className="overflow-hidden">
           <div className="grid gap-3 border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
             style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL }}>
-            <div>Praticien</div>
-            <div>Population</div>
-            {!selectionne && <><div>Lieu d'exercice</div><div>Exercice</div><div>État</div></>}
-            <div className={cn(selectionne && "text-center")} title={selectionne ? "Google" : undefined}>{selectionne ? "G" : "Google"}</div>
-            <div className={cn(selectionne && "text-center")} title={selectionne ? "Doctolib" : undefined}>{selectionne ? "D" : "Doctolib"}</div>
-            <div className="text-right">Score</div>
+            <EnTete cle="nom" tri={tri} onTri={trier}>Praticien</EnTete>
+            <EnTete cle="population" tri={tri} onTri={trier}>Population</EnTete>
+            {!selectionne && <>
+              <EnTete cle="lieu" tri={tri} onTri={trier}>Lieu d'exercice</EnTete>
+              <EnTete cle="exercice" tri={tri} onTri={trier}>Exercice</EnTete>
+              <EnTete cle="etat" tri={tri} onTri={trier}>État</EnTete>
+            </>}
+            <EnTete cle="google" tri={tri} onTri={trier} centre={!!selectionne} titre="Google">{selectionne ? "G" : "Google"}</EnTete>
+            <EnTete cle="doctolib" tri={tri} onTri={trier} centre={!!selectionne} titre="Doctolib">{selectionne ? "D" : "Doctolib"}</EnTete>
+            <EnTete cle="score" tri={tri} onTri={trier} droite>Score</EnTete>
           </div>
           {chargement && (
             <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-muted-foreground">
@@ -764,6 +787,28 @@ function AjoutRpps({ onClose, onAjoute }: { onClose: () => void; onAjoute: (id: 
       </div>
       {motif && <p className="mt-2 text-right text-[12px] text-muted-foreground">{motif}</p>}
     </Modal>
+  );
+}
+
+type CleTri = "score" | "nom" | "population" | "lieu" | "exercice" | "etat" | "google" | "doctolib";
+const LIBELLE_TRI: Record<CleTri, string> = {
+  score: "probabilité d'adhésion", nom: "nom", population: "population", lieu: "commune", exercice: "mode d'exercice",
+  etat: "état", google: "statut Google", doctolib: "statut Doctolib",
+};
+
+/** En-tête de colonne cliquable pour trier ; la flèche montre le tri en cours. */
+function EnTete({ cle, tri, onTri, children, centre, droite, titre }: {
+  cle: CleTri; tri: { cle: CleTri; sens: 1 | -1 }; onTri: (c: CleTri) => void; children: React.ReactNode;
+  centre?: boolean; droite?: boolean; titre?: string;
+}) {
+  const actif = tri.cle === cle;
+  return (
+    <button type="button" onClick={() => onTri(cle)} title={`Trier par ${LIBELLE_TRI[cle]}${titre ? ` (${titre})` : ""}`}
+      className={cn("inline-flex items-center gap-1 uppercase tracking-[0.05em] hover:text-avisdoc-ink", actif && "text-avisdoc-ink",
+        centre && "justify-center", droite && "justify-end")}>
+      {children}
+      <span className={cn("text-[10px]", !actif && "opacity-0")}>{tri.sens === 1 ? "▲" : "▼"}</span>
+    </button>
   );
 }
 

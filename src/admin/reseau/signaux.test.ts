@@ -107,3 +107,18 @@ describe("réseau d'aval : premier créneau Doctolib", () => {
     expect(vieux.contributions).toHaveLength(0);
   });
 });
+
+describe("score : présence en ligne", () => {
+  const base = { etat: "identifie" };
+  it("ajoute des points pour une fiche Google confirmée et un lien Doctolib réservable", () => {
+    const sans = calculerScore(base, []);
+    const avec = calculerScore({ ...base, googleStatut: "confirmee", googlePlaceIds: ["ChIJx"], doctolibStatut: "confirme", doctolibUrl: "https://www.doctolib.fr/dermatologue/x/y" }, []);
+    expect(avec.contributions.map((c) => c.libelle)).toEqual(["Fiche Google Maps", "Prise de rendez-vous Doctolib"]);
+    expect(avec.z).toBeCloseTo(sans.z + 0.6, 5);
+    expect(avec.contributions[0].url).toContain("place_id:ChIJx");
+  });
+  it("rien pour une page Doctolib non réservable ni une fiche Google sans correspondance", () => {
+    const s = calculerScore({ ...base, googleStatut: "a_confirmer", googlePlaceIds: [], doctolibStatut: "confirme", doctolibUrl: "https://www.doctolib.fr/x/y/z", doctolibInfos: { reservable: false } }, []);
+    expect(s.contributions).toEqual([]);
+  });
+});

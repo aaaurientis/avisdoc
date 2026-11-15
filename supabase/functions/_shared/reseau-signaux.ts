@@ -125,7 +125,7 @@ export function extraitPresent(extrait: string, textePage: string): boolean {
 // AvisDoc (14/11) : à valider, puis à réapprendre sur les issues réelles.
 
 export const SCORE_CONFIG = {
-  version: "v0, pondérations proposées le 14/11/2026",
+  version: "v0.1, pondérations proposées le 15/11/2026",
   calibre: false,
   tauxDeBase: 0.2,
   /** Contribution par signal validé et par valeur. Une valeur absente vaut 0 (« inconnu » ne pénalise pas). */
@@ -142,7 +142,46 @@ export const SCORE_CONFIG = {
     du_dermoscopie: { oui: 0.3 },
     creneau_doctolib: { moins_7j: 0.5, "7_30j": 0.2, plus_30j: -0.5, aucun_nouveau: -0.8 },
   } as Partial<Record<TypeSignal, Record<string, number>>>,
+  /**
+   * Présence en ligne (demande du 15/11) : un praticien joignable et visible adhère plus
+   * facilement. Fiche Google confirmée (ou trouvée, à vérifier) ; lien Doctolib avec prise
+   * de rendez-vous en ligne. Une page Doctolib « non réservable » ne rapporte rien.
+   */
+  presence: {
+    google: { confirmee: 0.3, trouvee_auto: 0.2 } as Record<string, number>,
+    doctolib: { reservable: 0.3, a_verifier: 0.2 },
+  },
 } as const;
+
+/** Ce que le score lit du praticien pour la présence en ligne (facultatif). */
+export interface PresencePourScore {
+  googleStatut?: string;
+  googlePlaceIds?: string[];
+  doctolibStatut?: string;
+  doctolibUrl?: string | null;
+  doctolibInfos?: { reservable?: boolean | null } | null;
+}
+
+/** Points de présence en ligne, chacun avec son lien (fiche Google, page Doctolib). */
+export function contributionsPresence(p: PresencePourScore): Contribution[] {
+  const out: Contribution[] = [];
+  const g = p.googleStatut ? SCORE_CONFIG.presence.google[p.googleStatut] : undefined;
+  const placeId = p.googlePlaceIds?.[0];
+  if (g && placeId) {
+    out.push({
+      libelle: "Fiche Google Maps", valeur: p.googleStatut === "confirmee" ? "confirmée" : "trouvée, à vérifier",
+      points: g, url: `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(placeId)}`,
+    });
+  }
+  if (p.doctolibUrl && p.doctolibInfos?.reservable !== false && (p.doctolibStatut === "confirme" || p.doctolibStatut === "trouve_auto")) {
+    const confirme = p.doctolibStatut === "confirme";
+    out.push({
+      libelle: "Prise de rendez-vous Doctolib", valeur: confirme ? "lien confirmé" : "lien trouvé, à vérifier",
+      points: confirme ? SCORE_CONFIG.presence.doctolib.reservable : SCORE_CONFIG.presence.doctolib.a_verifier, url: p.doctolibUrl,
+    });
+  }
+  return out;
+}
 
 export interface SignalPourScore {
   type: TypeSignal;
@@ -188,7 +227,7 @@ const arrondi = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
  * le détail renvoyé permet de refaire le calcul à la main (recette 5 du brief).
  */
 export function calculerScore(
-  praticien: { etat: string; vuAuDernierImport?: boolean },
+  praticien: { etat: string; vuAuDernierImport?: boolean } & PresencePourScore,
   signauxValides: SignalPourScore[],
   maintenant: Date = new Date(),
 ): Score {
@@ -210,6 +249,7 @@ export function calculerScore(
     if (points === undefined || points === 0) continue;
     contributions.push({ libelle: SIGNAUX[s.type].libelle, valeur: VALEUR_LIBELLE[s.valeur] ?? s.valeur, points, url: s.url });
   }
+  contributions.push(...contributionsPresence(praticien));
   contributions.sort((a, b) => b.points - a.points);
   const z = arrondi(base + contributions.reduce((t, c) => t + c.points, 0));
   return { ...commun, probabilite: 1 / (1 + Math.exp(-z)), z, contributions, elimine: null };
