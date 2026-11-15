@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CalendarCheck, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Check, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Card, Modal, PageHeader } from "../components/ui";
 import { lectureSeuleActive } from "../lib/lectureSeule";
@@ -26,6 +26,8 @@ import {
   DOCTOLIB_AIDE,
   DOCTOLIB_BADGE,
   DOCTOLIB_LABEL,
+  NON_RESERVABLE,
+  nonReservableDoctolib,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
@@ -68,6 +70,43 @@ const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
 };
 /** Coût indicatif d'une recherche IA par praticien (modèle + recherches web), à ajuster sur les factures réelles. */
 const COUT_IA_EUROS = 0.25;
+
+/** Une recherche du département : son statut en clair, un point vert quand elle est à jour. */
+function TuileRecherche({ icone, titre, etat, lignes, aide, bouton, onClick, motif }: {
+  icone: React.ReactNode; titre: string;
+  etat: "a_jour" | "a_faire" | "en_cours" | "echec" | "vide";
+  lignes: string[]; aide?: string; bouton: string | null; onClick: () => void; motif: string | null;
+}) {
+  const pastille = {
+    a_jour: { cls: "bg-emerald-500", txt: "À jour", txtCls: "text-emerald-700" },
+    a_faire: { cls: "bg-amber-400", txt: "À faire", txtCls: "text-amber-700" },
+    en_cours: { cls: "bg-sky-500 animate-pulse", txt: "En cours", txtCls: "text-sky-700" },
+    echec: { cls: "bg-rose-500", txt: "Échec", txtCls: "text-rose-700" },
+    vide: { cls: "bg-slate-300", txt: "—", txtCls: "text-muted-foreground" },
+  }[etat];
+  const arret = bouton === "Arrêter";
+  return (
+    <div className="flex flex-col rounded-2xl border border-border bg-card px-3.5 py-3" title={aide}>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground">{icone}</span>
+        <span className="min-w-0 flex-1 text-[13px] font-semibold leading-tight text-avisdoc-ink">{titre}</span>
+        <span className={cn("inline-flex items-center gap-1.5 text-[11.5px] font-semibold", pastille.txtCls)}>
+          <span className={cn("size-2.5 rounded-full", pastille.cls)} aria-hidden /> {pastille.txt}
+        </span>
+      </div>
+      <div className="mt-1.5 flex-1 space-y-0.5 text-[11.5px] leading-snug text-muted-foreground">
+        {lignes.filter(Boolean).map((l) => <div key={l}>{l}</div>)}
+      </div>
+      {bouton && (
+        <button type="button" onClick={onClick} disabled={!!motif && !arret} title={motif ?? aide}
+          className={cn("mt-2 inline-flex items-center justify-center gap-1.5 self-start rounded-full border px-3 py-1 text-[12px] font-semibold disabled:opacity-50",
+            arret ? "border-border text-muted-foreground hover:bg-muted" : "border-avisdoc-teal text-avisdoc-teal hover:bg-sky-50")}>
+          {etat === "en_cours" && (arret ? <Square className="size-3" /> : <Loader2 className="size-3 animate-spin" />)} {bouton}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ReseauDepartement() {
   const { code = "" } = useParams();
@@ -190,14 +229,51 @@ export default function ReseauDepartement() {
     return () => window.clearInterval(t);
   }, [rechercheGoogle?.statut, rechercheIa?.statut, code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const aChercherLiens = useMemo(
-    () => praticiens.filter((p) => p.etat !== "exclu" && (p.googleStatut === "a_chercher" || p.doctolibStatut === "a_chercher")).length,
-    [praticiens],
-  );
-  const lancerLiens = async () => {
+  // Compteurs des tuiles de recherche (praticiens non exclus).
+  const comptes = useMemo(() => {
+    const a = praticiens.filter((p) => p.etat !== "exclu");
+    const n = (f: (p: PraticienReseau) => boolean) => a.filter(f).length;
+    return {
+      actifs: a.length,
+      google: {
+        aChercher: n((p) => p.googleStatut === "a_chercher"),
+        trouvees: n((p) => p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto"),
+        confirmees: n((p) => p.googleStatut === "confirmee"),
+        aConfirmer: n((p) => p.googleStatut === "a_confirmer"),
+        aVerifier: n((p) => p.googleStatut === "trouvee_auto" || p.googleStatut === "a_confirmer"),
+        aRapprocher: n((p) => p.googleStatut === "trouvee_auto" || p.googleStatut === "a_confirmer" || p.googleStatut === "introuvable"),
+        sans: n((p) => p.googleStatut === "introuvable" || p.googleStatut === "aucune"),
+      },
+      doctolib: {
+        aChercher: n((p) => p.doctolibStatut === "a_chercher"),
+        liens: n((p) => !!p.doctolibUrl),
+        nonReservables: n((p) => nonReservableDoctolib(p)),
+        aConfirmer: n((p) => p.doctolibStatut === "a_confirmer"),
+        sans: n((p) => p.doctolibStatut === "introuvable" || p.doctolibStatut === "aucun"),
+      },
+    };
+  }, [praticiens]);
+
+  // Fiches sans recherche IA récente : recalculé quand une passe groupée change d'état.
+  const [iaRestants, setIaRestants] = useState<number | null>(null);
+  useEffect(() => {
+    if (!dep) return;
+    reseauRepo.estimerFile(code, "ia").then((r) => setIaRestants(r.total)).catch(() => setIaRestants(null));
+  }, [code, dep?.code, rechercheIa?.statut]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  type VoletLiens = "google" | "doctolib" | "rapprochement";
+  // La recherche « tout » (lancée à l'import) couvre Google et Doctolib.
+  const liensEnCours = (v: VoletLiens) => {
+    if (rechercheGoogle?.statut !== "en_cours") return false;
+    const enCours = rechercheGoogle.resultat?.volet ?? "tout";
+    return enCours === v || (enCours === "tout" && v !== "rapprochement");
+  };
+  const motifLiens = (v: VoletLiens) => lectureSeule ? TEXTES.motifLectureSeule : !dep ? "Département absent de la liste."
+    : rechercheGoogle?.statut === "en_cours" && !liensEnCours(v) ? "Une autre recherche Google / Doctolib est en cours : patientez ou arrêtez-la." : null;
+  const lancerLiens = async (volet: VoletLiens) => {
     setErreur(null);
     try {
-      await reseauRepo.lancerFile(code, "liens");
+      await reseauRepo.lancerFile(code, "liens", false, volet);
       setRechercheGoogle(await reseauRepo.derniereRecherche({ departement: code, type: "google_departement" }));
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e));
@@ -343,50 +419,70 @@ export default function ReseauDepartement() {
         )}
       </Card>
 
-      {/* Actions secondaires : ajouter un praticien hors import */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-[12.5px]">
+      {/* Recherches du département : une tuile par recherche, avec son statut ; point vert = à jour. */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Recherches</span>
         <button type="button" onClick={() => setAjoutRpps(true)} disabled={lectureSeule || !dep} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
           <UserPlus className="size-4" /> Ajouter par RPPS
         </button>
-        <button type="button" onClick={() => void lancerMg()} disabled={lectureSeule || !dep || rechercheMg?.statut === "en_cours"}
-          title={lectureSeule ? TEXTES.motifLectureSeule : rechercheMg?.statut === "en_cours" ? "Une recherche est en cours." : undefined}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
-          {rechercheMg?.statut === "en_cours" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          Chercher les généralistes formés à la dermoscopie (IA)
-        </button>
-        <button type="button" onClick={() => setIaGroupee(true)} disabled={lectureSeule || !dep || rechercheIa?.statut === "en_cours"}
-          title={lectureSeule ? TEXTES.motifLectureSeule : rechercheIa?.statut === "en_cours" ? "Une recherche groupée est en cours." : undefined}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
-          {rechercheIa?.statut === "en_cours" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          Recherche IA de toutes les fiches
-        </button>
-        {rechercheMg?.statut === "termine" && (
-          <span className="text-muted-foreground">
-            Dernière recherche, le {dateFr(rechercheMg.fin ?? rechercheMg.debut)} : {rechercheMg.resultat?.propositions ?? 0} trouvés, {rechercheMg.resultat?.crees ?? 0} ajoutés, {rechercheMg.resultat?.deja_la ?? 0} déjà là, {rechercheMg.resultat?.ecartees?.length ?? 0} écartés.
-          </span>
-        )}
       </div>
-      {(rechercheGoogle?.statut === "en_cours" || rechercheGoogle?.statut === "echec" || aChercherLiens > 0) && (
-        <div className="-mt-2 mb-4 max-w-3xl">
-          <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-            <span className="font-semibold text-avisdoc-ink">Carte, fiches Google et Doctolib</span>
-            {rechercheGoogle?.statut === "en_cours" ? (
-              <button type="button" onClick={() => void arreter(rechercheGoogle)} disabled={lectureSeule}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
-                <Square className="size-3" /> Arrêter
-              </button>
-            ) : aChercherLiens > 0 && (
-              <>
-                <span className="text-muted-foreground">{aChercherLiens} praticien{aChercherLiens > 1 ? "s" : ""} pas encore cherché{aChercherLiens > 1 ? "s" : ""}.</span>
-                <button type="button" onClick={() => void lancerLiens()} disabled={lectureSeule} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-                  className="rounded-full border border-border bg-card px-3 py-1 font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
-                  Chercher maintenant
-                </button>
-              </>
-            )}
-          </div>
-          {rechercheGoogle && rechercheGoogle.statut !== "termine" && rechercheGoogle.statut !== "annule" && <AvancementIa recherche={rechercheGoogle} lignesVisibles={3} />}
+      <div className="mb-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        <TuileRecherche
+          icone={<MapPin className="size-4" />} titre="Fiches Google Maps"
+          etat={liensEnCours("google") ? "en_cours" : comptes.google.aChercher ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
+          lignes={[
+            `${comptes.google.trouvees} trouvée${comptes.google.trouvees > 1 ? "s" : ""} · ${comptes.google.aConfirmer} à confirmer · ${comptes.google.sans} sans fiche`,
+            comptes.google.aChercher ? `${comptes.google.aChercher} pas encore cherché${comptes.google.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
+          ]}
+          bouton={liensEnCours("google") ? "Arrêter" : comptes.google.aChercher ? `Chercher (${comptes.google.aChercher})` : null}
+          onClick={() => liensEnCours("google") ? void arreter(rechercheGoogle!) : void lancerLiens("google")}
+          motif={motifLiens("google")} />
+        <TuileRecherche
+          icone={<Check className="size-4" />} titre="Rapprochement Google / RPPS"
+          etat={liensEnCours("rapprochement") ? "en_cours" : comptes.google.aVerifier ? "a_faire" : comptes.google.trouvees ? "a_jour" : "vide"}
+          lignes={[
+            `${comptes.google.confirmees} validée${comptes.google.confirmees > 1 ? "s" : ""} (adresse RPPS ou opérateur)`,
+            comptes.google.aVerifier ? `${comptes.google.aVerifier} à vérifier (trouvées ou à confirmer)` : "Aucune fiche à vérifier",
+          ]}
+          aide="Revérifie les fiches non tranchées : au nom et à l'adresse RPPS, elles sont validées d'office. Une recherche Google par praticien."
+          bouton={liensEnCours("rapprochement") ? "Arrêter" : comptes.google.aRapprocher ? `Revérifier (${comptes.google.aRapprocher})` : null}
+          onClick={() => liensEnCours("rapprochement") ? void arreter(rechercheGoogle!) : void lancerLiens("rapprochement")}
+          motif={motifLiens("rapprochement")} />
+        <TuileRecherche
+          icone={<CalendarCheck className="size-4" />} titre="Doctolib"
+          etat={liensEnCours("doctolib") ? "en_cours" : comptes.doctolib.aChercher ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
+          lignes={[
+            `${comptes.doctolib.liens} lien${comptes.doctolib.liens > 1 ? "s" : ""}${comptes.doctolib.nonReservables ? ` dont ${comptes.doctolib.nonReservables} non réservable${comptes.doctolib.nonReservables > 1 ? "s" : ""}` : ""} · ${comptes.doctolib.aConfirmer} à confirmer · ${comptes.doctolib.sans} absent${comptes.doctolib.sans > 1 ? "s" : ""}`,
+            comptes.doctolib.aChercher ? `${comptes.doctolib.aChercher} pas encore cherché${comptes.doctolib.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
+          ]}
+          bouton={liensEnCours("doctolib") ? "Arrêter" : comptes.doctolib.aChercher ? `Chercher (${comptes.doctolib.aChercher})` : null}
+          onClick={() => liensEnCours("doctolib") ? void arreter(rechercheGoogle!) : void lancerLiens("doctolib")}
+          motif={motifLiens("doctolib")} />
+        <TuileRecherche
+          icone={<Sparkles className="size-4" />} titre="Généralistes dermoscopie (IA)"
+          etat={rechercheMg?.statut === "en_cours" ? "en_cours" : rechercheMg?.statut === "echec" ? "echec" : rechercheMg?.statut === "termine" ? "a_jour" : "a_faire"}
+          lignes={rechercheMg?.statut === "termine" ? [
+            `Le ${dateFr(rechercheMg.fin ?? rechercheMg.debut)} : ${rechercheMg.resultat?.propositions ?? 0} trouvés, ${rechercheMg.resultat?.crees ?? 0} ajoutés`,
+            `${rechercheMg.resultat?.deja_la ?? 0} déjà là · ${rechercheMg.resultat?.ecartees?.length ?? 0} écartés`,
+          ] : rechercheMg?.statut === "echec" ? ["Dernière recherche en échec", rechercheMg.erreur ?? ""] : rechercheMg?.statut === "en_cours" ? ["Recherche en cours…"] : ["Jamais lancée pour ce département"]}
+          bouton={rechercheMg?.statut === "en_cours" ? null : rechercheMg ? "Relancer" : "Lancer"}
+          onClick={() => void lancerMg()}
+          motif={lectureSeule ? TEXTES.motifLectureSeule : !dep ? "Département absent de la liste." : null} />
+        <TuileRecherche
+          icone={<Sparkles className="size-4" />} titre="Recherche IA des fiches"
+          etat={rechercheIa?.statut === "en_cours" ? "en_cours" : iaRestants === null ? "vide" : iaRestants ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
+          lignes={[
+            iaRestants === null ? "Calcul…" : iaRestants ? `${iaRestants} fiche${iaRestants > 1 ? "s" : ""} sans recherche depuis 30 jours` : "Toutes les fiches cherchées depuis moins de 30 jours",
+            rechercheIa?.statut === "termine" ? `Dernière passe le ${dateFr(rechercheIa.fin ?? rechercheIa.debut)}` : "Signaux sourcés, à valider sur chaque fiche",
+          ]}
+          bouton={rechercheIa?.statut === "en_cours" ? "Arrêter" : "Lancer…"}
+          onClick={() => rechercheIa?.statut === "en_cours" ? void arreter(rechercheIa) : setIaGroupee(true)}
+          motif={lectureSeule ? TEXTES.motifLectureSeule : !dep ? "Département absent de la liste." : null} />
+      </div>
+      {rechercheGoogle && (rechercheGoogle.statut === "en_cours" || rechercheGoogle.statut === "echec") && (
+        <div className="mb-4 max-w-3xl">
+          <AvancementIa recherche={rechercheGoogle} lignesVisibles={3} />
         </div>
       )}
       {rechercheIa && (rechercheIa.statut === "en_cours" || rechercheIa.statut === "echec") && (
@@ -496,14 +592,17 @@ export default function ReseauDepartement() {
                   </div>
                 )}
                 {selectionne ? (
-                  <div className="flex justify-center" title={`${DOCTOLIB_LABEL[p.doctolibStatut]} : ${DOCTOLIB_AIDE[p.doctolibStatut]}`}>
-                    <CalendarCheck aria-label={DOCTOLIB_LABEL[p.doctolibStatut]} className={cn("size-4", DOCTOLIB_PICTO[p.doctolibStatut])} />
+                  <div className="flex justify-center" title={nonReservableDoctolib(p) ? `${NON_RESERVABLE.label} : ${NON_RESERVABLE.aide}` : `${DOCTOLIB_LABEL[p.doctolibStatut]} : ${DOCTOLIB_AIDE[p.doctolibStatut]}`}>
+                    <CalendarCheck aria-label={nonReservableDoctolib(p) ? NON_RESERVABLE.label : DOCTOLIB_LABEL[p.doctolibStatut]}
+                      className={cn("size-4", nonReservableDoctolib(p) ? NON_RESERVABLE.picto : DOCTOLIB_PICTO[p.doctolibStatut])} />
                   </div>
                 ) : (
-                  <div title={DOCTOLIB_AIDE[p.doctolibStatut]} onClick={(e) => { if (p.doctolibUrl) e.stopPropagation(); }}>
+                  <div title={nonReservableDoctolib(p) ? NON_RESERVABLE.aide : DOCTOLIB_AIDE[p.doctolibStatut]} onClick={(e) => { if (p.doctolibUrl) e.stopPropagation(); }}>
                     {p.doctolibUrl ? (
                       <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className="inline-flex">
-                        <Badge className={cn(DOCTOLIB_BADGE[p.doctolibStatut], "underline-offset-2 hover:underline")}>{DOCTOLIB_LABEL[p.doctolibStatut]} ↗</Badge>
+                        {nonReservableDoctolib(p)
+                          ? <Badge className={cn(NON_RESERVABLE.badge, "underline-offset-2 hover:underline")}>{NON_RESERVABLE.label} ↗</Badge>
+                          : <Badge className={cn(DOCTOLIB_BADGE[p.doctolibStatut], "underline-offset-2 hover:underline")}>{DOCTOLIB_LABEL[p.doctolibStatut]} ↗</Badge>}
                       </a>
                     ) : (
                       <Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge>

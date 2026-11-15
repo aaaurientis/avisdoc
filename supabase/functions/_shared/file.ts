@@ -10,7 +10,7 @@
 // tant qu'il en reste. L'opérateur peut arrêter la tâche à tout moment.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { chercherLiens } from "./liens.ts";
+import { A_RAPPROCHER, chercherLiens, type Volet } from "./liens.ts";
 import { echouer, rechercherPraticien } from "./ia.ts";
 import { enTacheDeFond, Suivi } from "./suivi.ts";
 
@@ -24,7 +24,7 @@ const JOURS_IA_RECENTE = 30;
 
 /** Les praticiens du département à traiter. */
 export async function praticiensATraiter(
-  db: any, type: TypeFile, departement: string, opts: { inclureRecents?: boolean } = {},
+  db: any, type: TypeFile, departement: string, opts: { inclureRecents?: boolean; volet?: Volet } = {},
 ): Promise<string[]> {
   const { data: lieux } = await db.from("admin_reseau_lieux").select("praticien_id, lat, geo_tente").eq("departement", departement).limit(20000);
   const ici = [...new Set<string>((lieux ?? []).map((l: any) => l.praticien_id as string))];
@@ -36,7 +36,14 @@ export async function praticiensATraiter(
     if (error) throw new Error(error.message);
     for (const p of data ?? []) {
       if (type === "ia_departement") out.push(p.id);
-      else if (p.google_statut === "a_chercher" || p.doctolib_statut === "a_chercher" || sansGeo.has(p.id)) out.push(p.id);
+      else {
+        const v = opts.volet ?? "tout";
+        const a = v === "google" ? p.google_statut === "a_chercher"
+          : v === "doctolib" ? p.doctolib_statut === "a_chercher"
+          : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut)
+          : p.google_statut === "a_chercher" || p.doctolib_statut === "a_chercher" || sansGeo.has(p.id);
+        if (a) out.push(p.id);
+      }
     }
   }
   if (type === "ia_departement" && !opts.inclureRecents && out.length) {
@@ -54,7 +61,7 @@ export async function praticiensATraiter(
 
 /** Crée la tâche et commence le travail en tâche de fond. Une seule tâche du même type à la fois par département. */
 export async function lancerFile(
-  db: any, type: TypeFile, departement: string, ids: string[], acteur: string,
+  db: any, type: TypeFile, departement: string, ids: string[], acteur: string, volet: Volet = "tout",
 ): Promise<{ id: string; total: number; deja: boolean } | null> {
   const { data: enCours } = await db.from("admin_reseau_recherches_ia").select("id, file")
     .eq("departement", departement).eq("type", type).eq("statut", "en_cours").limit(1);
@@ -62,7 +69,7 @@ export async function lancerFile(
   if (!ids.length) return null;
   const { data: r, error } = await db.from("admin_reseau_recherches_ia").insert({
     type, departement, lance_par: acteur, file: ids,
-    resultat: { total: ids.length, faits: 0 },
+    resultat: { total: ids.length, faits: 0, ...(type === "google_departement" ? { volet } : {}) },
     etape: "En attente", progression: 0,
   }).select("id").single();
   if (error) throw new Error(error.message);
@@ -80,8 +87,8 @@ async function relancer(id: string) {
   }).catch((e) => console.error("relance de la file", e));
 }
 
-async function traiterUn(db: any, type: TypeFile, praticienId: string, acteur: string, departement: string): Promise<{ texte: string; niveau: any }[]> {
-  if (type === "google_departement") return await chercherLiens(db, praticienId, [departement]);
+async function traiterUn(db: any, type: TypeFile, praticienId: string, acteur: string, departement: string, volet: Volet): Promise<{ texte: string; niveau: any }[]> {
+  if (type === "google_departement") return await chercherLiens(db, praticienId, [departement], volet);
 
   // Recherche IA d'un praticien : elle a son propre suivi, visible sur sa fiche.
   const { data: p } = await db.from("admin_reseau_praticiens")
@@ -110,7 +117,9 @@ export async function traiterFile(db: any, id: string): Promise<void> {
   const total: number = job.resultat?.total ?? job.file?.length ?? 0;
   let faits: number = job.resultat?.faits ?? 0;
   const suivi = new Suivi(db, id, { etape: job.etape, progression: job.progression, journal: job.journal });
-  const libelle = type === "ia_departement" ? "Recherche IA" : "Carte, fiches Google et Doctolib";
+  const volet: Volet = job.resultat?.volet ?? "tout";
+  const libelle = type === "ia_departement" ? "Recherche IA"
+    : ({ tout: "Carte, fiches Google et Doctolib", google: "Fiches Google Maps", doctolib: "Liens Doctolib", rapprochement: "Rapprochement Google / RPPS" } as const)[volet];
 
   try {
     while (Date.now() - debut < BUDGET_MS[type]) {
@@ -121,7 +130,7 @@ export async function traiterFile(db: any, id: string): Promise<void> {
       const lot = file.slice(0, PARALLELE[type]);
       await suivi.maj({ etape: `${libelle} : ${faits + 1} à ${Math.min(total, faits + lot.length)} sur ${total}`, progression: (100 * faits) / Math.max(1, total) });
       const resultats = await Promise.all(lot.map((pid) =>
-        traiterUn(db, type, pid, job.lance_par, job.departement).catch((e) => [{ texte: `Erreur : ${e instanceof Error ? e.message : String(e)}`, niveau: "ecarte" }])));
+        traiterUn(db, type, pid, job.lance_par, job.departement, volet).catch((e) => [{ texte: `Erreur : ${e instanceof Error ? e.message : String(e)}`, niveau: "ecarte" }])));
       faits += lot.length;
       // Retirer de la file ce qui est fait (relecture : la file a pu changer entre-temps).
       const { data: actuel } = await db.from("admin_reseau_recherches_ia").select("file").eq("id", id).single();

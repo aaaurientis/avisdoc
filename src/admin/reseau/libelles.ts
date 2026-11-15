@@ -188,4 +188,14 @@ export const DOCTOLIB_AIDE: Record<StatutDoctolib, string> = {
   a_chercher: "Pas encore cherché : la recherche automatique s'en charge.",
 };
 
+/** Une page Doctolib existe, mais « n'est pas sur Doctolib » : aucun rendez-vous en ligne. */
+export const nonReservableDoctolib = (p: { doctolibUrl: string | null; doctolibInfos: { reservable?: boolean | null } | null }) =>
+  !!p.doctolibUrl && p.doctolibInfos?.reservable === false;
+export const NON_RESERVABLE = {
+  label: "Non réservable",
+  aide: "Page Doctolib sans prise de rendez-vous en ligne (« n'est pas sur Doctolib »).",
+  badge: "bg-rose-100 text-rose-800",
+  picto: "text-rose-600",
+} as const;
+
 export const FORCE_LABEL = { certaine: "Nom et adresse RPPS", forte: "Nom et code postal", moyenne: "Nom, autre commune", faible: "Sans le nom du praticien" } as const;

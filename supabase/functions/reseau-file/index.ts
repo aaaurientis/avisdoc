@@ -4,6 +4,7 @@
 //   • estimer { departement, type, inclure_recents? } — combien de praticiens, sans rien lancer
 //   • lancer  { departement, type, inclure_recents? } — type : « liens » (carte, Google,
 //              Doctolib) ou « ia » (recherche IA de chaque praticien)
+//              volet (liens) : « tout », « google », « doctolib » ou « rapprochement »
 //   • arreter { job_id }
 // Action interne (la fonction se relance elle-même) :
 //   • suite   { job_id } — en-tête x-reseau-interne = clé service
@@ -15,6 +16,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-sante.ts";
 import { estDepartement } from "../_shared/reseau-rpps.ts";
 import { lancerFile, praticiensATraiter, traiterFile, type TypeFile } from "../_shared/file.ts";
+import { VOLETS, type Volet } from "../_shared/liens.ts";
 import { enTacheDeFond } from "../_shared/suivi.ts";
 
 const TYPES: Record<string, TypeFile> = { liens: "google_departement", ia: "ia_departement" };
@@ -52,10 +54,11 @@ serve(async (req) => {
   if (type === "ia_departement" && !Deno.env.get("ANTHROPIC_API_KEY")) return json({ error: "La clé de l'IA n'est pas configurée sur le projet." }, 500);
 
   try {
-    const ids = await praticiensATraiter(db, type, dep, { inclureRecents: corps.inclure_recents === true });
+    const volet: Volet = VOLETS.includes(corps.volet) ? corps.volet : "tout";
+    const ids = await praticiensATraiter(db, type, dep, { inclureRecents: corps.inclure_recents === true, volet });
     if (corps.action === "estimer") return json({ total: ids.length });
     if (corps.action === "lancer") {
-      const r = await lancerFile(db, type, dep, ids, acces.email);
+      const r = await lancerFile(db, type, dep, ids, acces.email, volet);
       if (!r) return json({ error: "Aucun praticien à traiter." }, 409);
       return json({ job_id: r.id, total: r.total, deja: r.deja }, 202);
     }

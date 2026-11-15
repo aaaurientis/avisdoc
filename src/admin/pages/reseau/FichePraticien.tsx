@@ -21,6 +21,8 @@ import {
   DOCTOLIB_BADGE,
   DOCTOLIB_LABEL,
   FORCE_LABEL,
+  NON_RESERVABLE,
+  nonReservableDoctolib,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
@@ -283,7 +285,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
       </Section>
 
       <Section id="adresses" titre="Adresses et fiches en ligne"
-        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>Doctolib</Badge></span>}>
+        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={nonReservableDoctolib(p) ? NON_RESERVABLE.badge : DOCTOLIB_BADGE[p.doctolibStatut]}>Doctolib</Badge></span>}>
         <SousTitre>Lieux d'exercice (RPPS)</SousTitre>
         <div className="mt-1.5 space-y-2">
           {p.lieux.map((l, i) => (
@@ -605,19 +607,27 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
   const bloque = lectureSeule || p.etat === "exclu";
   const communes = [...new Set(p.lieux.map((l) => l.commune).filter(Boolean))] as string[];
   const perime = releve ? releveCreneauPerime(releve.decideLe) : false;
+  const nonReservable = nonReservableDoctolib(p);
 
   return (
     <>
       <div className="mt-4 flex items-center justify-between gap-2">
         <SousTitre>Doctolib</SousTitre>
-        <span title={DOCTOLIB_AIDE[p.doctolibStatut]}><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge></span>
+        {nonReservable
+          ? <span title={NON_RESERVABLE.aide}><Badge className={NON_RESERVABLE.badge}>{NON_RESERVABLE.label}</Badge></span>
+          : <span title={DOCTOLIB_AIDE[p.doctolibStatut]}><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge></span>}
       </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
       {p.doctolibUrl ? (
         <div className="mt-1.5 rounded-xl bg-muted/50 px-3 py-2.5 text-[12.5px]">
           <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className={lienCls}>{p.doctolibUrl.replace(/^https:\/\/(www\.)?/, "")} <ExternalLink className="size-3" /></a>
-          {p.doctolibStatut === "trouve_auto" && <p className="mt-1 text-[11.5px] text-muted-foreground">{DOCTOLIB_AIDE.trouve_auto}</p>}
+          {nonReservable && (
+            <p className="mt-1 rounded-lg bg-rose-50 px-2 py-1 text-[11.5px] font-semibold text-rose-800">
+              Page Doctolib sans rendez-vous en ligne : « n'est pas sur Doctolib, pas réservable en ligne ».
+            </p>
+          )}
+          {p.doctolibStatut === "trouve_auto" && !nonReservable && <p className="mt-1 text-[11.5px] text-muted-foreground">{DOCTOLIB_AIDE.trouve_auto}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
             {p.doctolibStatut === "trouve_auto" && (
               <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", () => reseauRepo.doctolib(p.id, { confirmer: true }))}
@@ -625,6 +635,11 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
                 <Check className="size-3" /> C'est la bonne fiche
               </button>
             )}
+            <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("reservable", () => reseauRepo.doctolib(p.id, { non_reservable: !nonReservable }))}
+              title={nonReservable ? undefined : "La page indique « n'est pas sur Doctolib » ou « pas réservable en ligne »."}
+              className={cn("rounded-full border px-3 py-1 text-[12px] font-semibold disabled:opacity-50", nonReservable ? "border-border text-muted-foreground" : "border-rose-200 text-rose-700 hover:bg-rose-50")}>
+              {occupe === "reservable" ? "…" : nonReservable ? "Finalement réservable" : "Non réservable en ligne"}
+            </button>
             <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("retirer", () => reseauRepo.doctolib(p.id, { retirer: true }))} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de lien</button>
           </div>
 
@@ -680,6 +695,7 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
 function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: string | null; par: string | null }) {
   const lignes: [string, string | null][] = [
     ["Spécialité", infos.specialite],
+    ["Rendez-vous en ligne", infos.reservable === false ? "Non : pas réservable en ligne" : infos.reservable ? "Oui" : null],
     ["Conventionnement", infos.conventionnement],
     ["Carte Vitale", infos.carteVitale === null ? null : infos.carteVitale ? "Acceptée" : "Non acceptée"],
     ["Téléconsultation", infos.teleconsultation ? "Proposée" : null],
