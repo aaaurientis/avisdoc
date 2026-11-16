@@ -10,6 +10,9 @@ import { DEPARTEMENTS } from "./reseau-rpps.ts";
 import { verifierFichesIa } from "./google-ia.ts";
 
 const RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
+export const DETAILS_URL = "https://places.googleapis.com/v1/places/";
+/** Champs pour vérifier une fiche (adresse, position, nom), sans le reste de son contenu. */
+export const CHAMPS_VERIFICATION = "id,displayName,formattedAddress,location,businessStatus,primaryTypeDisplayName";
 // La clé du projet est restreinte aux appels venant du Hub (référent HTTP), comme pour Merx.
 export const REFERENT_HUB = "https://admin.avisdoc.fr/";
 // Plafonds quotidiens. Google relevé à 10 000 par type le 16/11 (≈ 50 000 requêtes pour

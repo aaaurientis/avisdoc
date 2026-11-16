@@ -104,7 +104,7 @@ export interface RechercheIa {
   statut: "en_cours" | "termine" | "echec" | "annule";
   debut: string;
   fin: string | null;
-  resultat: { total?: number; faits?: number; propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; volet?: "tout" | "google" | "doctolib" | "rapprochement"; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
+  resultat: { total?: number; faits?: number; propositions?: number; retenues?: number; crees?: number; deja_la?: number; a_confirmer?: number; introuvables?: number; restants?: number; quota?: boolean; volet?: "tout" | "google" | "doctolib" | "rapprochement" | "validation"; ecartees?: { motif: string; url?: string; nom?: string; type?: string }[] } | null;
   erreur: string | null;
   /** Avancement en direct : étape en cours, pourcentage, journal. */
   etape: string | null;
@@ -461,7 +461,7 @@ export const reseauRepo = {
   /** Travaux groupés d'un département : « liens » (carte, Google, Doctolib) ou « ia ». */
   estimerFile: (departement: string, type: "liens" | "ia", inclureRecents = false): Promise<{ total: number }> =>
     appeler("reseau-file", { action: "estimer", departement, type, inclure_recents: inclureRecents }),
-  lancerFile: (departement: string, type: "liens" | "ia", inclureRecents = false, volet?: "tout" | "google" | "doctolib" | "rapprochement"): Promise<{ job_id: string; total: number; deja: boolean }> =>
+  lancerFile: (departement: string, type: "liens" | "ia", inclureRecents = false, volet?: "tout" | "google" | "doctolib" | "rapprochement" | "validation"): Promise<{ job_id: string; total: number; deja: boolean }> =>
     appeler("reseau-file", { action: "lancer", departement, type, inclure_recents: inclureRecents, volet }),
   arreterFile: (jobId: string) => appeler("reseau-file", { action: "arreter", job_id: jobId }),
   confirmerGoogle: (praticienId: string) => appeler("reseau-action", { action: "google_confirmer", praticien_id: praticienId }),

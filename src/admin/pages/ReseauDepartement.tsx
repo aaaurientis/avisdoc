@@ -2,7 +2,7 @@
 // rafraîchir) les médecins depuis l'extraction RPPS. Liste filtrable, fiche
 // résumée du praticien, exclusion définitive.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarCheck, Check, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -290,15 +290,27 @@ export default function ReseauDepartement() {
     reseauRepo.estimerFile(code, "ia").then((r) => setIaRestants(r.total)).catch(() => setIaRestants(null));
   }, [code, dep?.code, rechercheIa?.statut]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  type VoletLiens = "google" | "doctolib" | "rapprochement";
+  type VoletLiens = "google" | "doctolib" | "rapprochement" | "validation";
   // La recherche « tout » (lancée à l'import) couvre Google et Doctolib.
   const liensEnCours = (v: VoletLiens) => {
     if (rechercheGoogle?.statut !== "en_cours") return false;
     const enCours = rechercheGoogle.resultat?.volet ?? "tout";
-    return enCours === v || (enCours === "tout" && v !== "rapprochement");
+    return enCours === v || (enCours === "tout" && v !== "rapprochement" && v !== "validation") || (enCours === "validation" && v === "rapprochement");
   };
   const motifLiens = (v: VoletLiens) => lectureSeule ? TEXTES.motifLectureSeule : !dep ? "Département absent de la liste."
     : rechercheGoogle?.statut === "en_cours" && !liensEnCours(v) ? "Une autre recherche Google / Doctolib est en cours : patientez ou arrêtez-la." : null;
+  // Fiches Google « trouvées » : validées en tâche de fond à l'ouverture du département, sans
+  // ouvrir chaque fiche (une seule fois par visite, rien si une recherche tourne déjà).
+  const validationLancee = useRef<string | null>(null);
+  useEffect(() => {
+    if (lectureSeule || !dep || chargement || validationLancee.current === code) return;
+    if (comptes.google.aVerifier === 0 || rechercheGoogle?.statut === "en_cours") return;
+    validationLancee.current = code;
+    reseauRepo.lancerFile(code, "liens", false, "validation")
+      .then(async () => setRechercheGoogle(await reseauRepo.derniereRecherche({ departement: code, type: "google_departement" })))
+      .catch(() => { /* silencieux : le bouton « Revérifier » reste disponible */ });
+  }, [code, dep, chargement, comptes.google.aVerifier, rechercheGoogle?.statut, lectureSeule]);
+
   const lancerLiens = async (volet: VoletLiens) => {
     setErreur(null);
     try {

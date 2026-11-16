@@ -3,7 +3,10 @@
 // Rien n'est deviné : voir google-correspondance.ts et doctolib.ts.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { chercherFiches, cleGoogle, compterAppel, PLAFONDS, type PraticienPourGoogle } from "./google-places.ts";
+import { appelGoogle, CHAMPS_VERIFICATION, chercherFiches, cleGoogle, compterAppel, DETAILS_URL, PLAFONDS, type PraticienPourGoogle } from "./google-places.ts";
+import { forceFiche } from "./google-correspondance.ts";
+import { lieuxPourComparaison } from "./geo.ts";
+import { verifierFichesIa } from "./google-ia.ts";
 import { choisirDoctolib } from "./doctolib.ts";
 import { urlsDoctolib } from "./doctolib-recherche.ts";
 import type { Niveau } from "./suivi.ts";
@@ -19,8 +22,8 @@ export interface LigneJournal { texte: string; niveau: Niveau }
  * seulement Doctolib, ou le « rapprochement » : revérifier les fiches Google non
  * tranchées (à confirmer, trouvées, introuvables) contre les adresses RPPS.
  */
-export type Volet = "tout" | "google" | "doctolib" | "rapprochement";
-export const VOLETS: Volet[] = ["tout", "google", "doctolib", "rapprochement"];
+export type Volet = "tout" | "google" | "doctolib" | "rapprochement" | "validation";
+export const VOLETS: Volet[] = ["tout", "google", "doctolib", "rapprochement", "validation"];
 export const A_RAPPROCHER = ["a_confirmer", "trouvee_auto", "introuvable"];
 
 /**
@@ -40,6 +43,12 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
 
 
   // 2. Fiches Google, dans le département concerné.
+  // Validation des fiches « trouvées » sans ouvrir la fiche : lecture de chaque fiche rattachée.
+  if ((volet === "validation" || volet === "rapprochement") && p.google_statut === "trouvee_auto" && cleGoogle()) {
+    const r = await validerTrouvees(db, p, lieux);
+    lignes.push(...r.lignes);
+    if (r.confirmee) p.google_statut = "confirmee";
+  }
   if (volet === "rapprochement" && A_RAPPROCHER.includes(p.google_statut) && cleGoogle()) {
     lignes.push(...(await rapprocher(db, p, deps)));
   }
@@ -131,4 +140,44 @@ async function rapprocher(db: any, p: any, deps: string[]): Promise<LigneJournal
   }).eq("id", p.id).eq("google_statut", p.google_statut);
   if (error) return [{ texte: `Rapprochement : ${qui} : ${error.message}`, niveau: "ecarte" }];
   return [{ texte: certaines ? `Rapprochement : fiche validée pour ${qui} (adresse RPPS)` : `Rapprochement : fiche trouvée pour ${qui}, à vérifier`, niveau: "ok" }];
+}
+
+/**
+ * Fiches « trouvées » (même nom, même code postal) : chaque fiche rattachée est lue chez Google
+ * (adresse, position, nom ; rien n'est enregistré) et comparée aux lieux RPPS : même rue, ou
+ * moins de 50 m d'un lieu géocodé au numéro, sinon vérification des deux adresses par l'IA.
+ * Toutes vérifiées → « confirmée » (décision du 16/11). Une seule douteuse → reste à vérifier.
+ */
+async function validerTrouvees(db: any, p: any, lieux: any[]): Promise<{ lignes: LigneJournal[]; confirmee: boolean }> {
+  const qui = `${p.prenom} ${p.nom}`;
+  const ids: string[] = p.google_place_ids ?? [];
+  if (!ids.length) return { lignes: [], confirmee: false };
+  const comparaison = lieuxPourComparaison(lieux);
+  const verifiees: { place_id: string; par: string; raison: string | null }[] = [];
+  for (const id of ids) {
+    if (!(await compterAppel(db, "details"))) return { lignes: [{ texte: `Plafond Google du jour atteint : ${qui} sera vérifié demain`, niveau: "ecarte" }], confirmee: false };
+    const x = await appelGoogle(`${DETAILS_URL}${encodeURIComponent(id)}?languageCode=fr&regionCode=FR`, { method: "GET" }, cleGoogle(), CHAMPS_VERIFICATION);
+    const fiche = {
+      place_id: x.id ?? id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "",
+      ferme: x.businessStatus === "CLOSED_PERMANENTLY", lat: x.location?.latitude ?? null, lng: x.location?.longitude ?? null,
+    };
+    const force = forceFiche(fiche, p.nom, comparaison);
+    if (force === "certaine") { verifiees.push({ place_id: id, par: "adresse", raison: null }); continue; }
+    if ((force === "forte" || force === "moyenne") && !fiche.ferme) {
+      const v = (await verifierFichesIa({ nom: p.nom, prenom: p.prenom, population: p.population, lieux },
+        [{ ...fiche, categorie: x.primaryTypeDisplayName?.text ?? null }])).get(fiche.place_id);
+      if (v?.memePraticien && v.memeAdresse) { verifiees.push({ place_id: id, par: "ia", raison: v.raison }); continue; }
+    }
+    return { lignes: [{ texte: `Validation Google : ${qui} reste à vérifier (adresse différente du RPPS)`, niveau: "info" }], confirmee: false };
+  }
+  const maintenant = new Date().toISOString();
+  const { data, error } = await db.from("admin_reseau_praticiens")
+    .update({ google_statut: "confirmee", google_rattache_par: "automatique (adresse RPPS)", google_rattache_le: maintenant })
+    .eq("id", p.id).eq("google_statut", "trouvee_auto").select("id");
+  if (error || !data?.length) return { lignes: [], confirmee: false };
+  for (const v of verifiees) {
+    await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: "automatique", action: "google_fiche_verifiee", detail: v });
+  }
+  await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: "automatique", action: "google_valide_adresse_rpps", detail: { place_ids: ids } });
+  return { lignes: [{ texte: `Validation Google : fiche${ids.length > 1 ? "s" : ""} confirmée${ids.length > 1 ? "s" : ""} pour ${qui}`, niveau: "ok" }], confirmee: true };
 }
