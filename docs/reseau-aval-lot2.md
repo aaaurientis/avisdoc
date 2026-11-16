@@ -307,3 +307,11 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - **« Voir plus »** : sur la page ouverte par l'opérateur, le favori clique lui-même les boutons qui déplient du contenu sur place (« Voir plus », « Afficher plus », « Lire la suite », « +10 »… ; 15 au plus), lit la page après chacun, referme les fenêtres (Échap), puis envoie le tout. Il ne suit aucun lien et ne quitte jamais la page. Les états successifs sont séparés (`§§avisdoc§§`) pour ne pas mélanger les rubriques ; un passage tronqué est remplacé par sa version dépliée.
 - **Créneaux** : l'opérateur ouvre lui-même « Prendre rendez-vous » et choisit le motif, puis clique sur le favori. Le Hub reconnaît la page (adresse `…/booking/…` ou horaires affichés), compte les horaires sous chaque jour, le total sur 7 jours et le premier créneau, et propose le signal « premier créneau ». Écran de vérification avec le détail par jour, à comparer à l'écran Doctolib. Enregistré dans `doctolib_infos.disponibilites` (action `doctolib_creneaux`) ; le lien enregistré reste celui de la fiche.
 - Le favori a changé : les opérateurs doivent le **réinstaller**. Validation DPO toujours requise (extension du relevé manuel, aucun parcours automatique).
+
+## Validation Google par la position (16/11)
+
+- Les lieux RPPS sont géocodés par l'API Adresse avec leur précision (`geo_type`, `geo_score`, migration 0094). Les lieux géocodés avant le 16/11 sont recomplétés à la volée (recherche, rapprochement, affichage d'une fiche).
+- La position des fiches Google (`location`) est demandée dans la recherche et l'affichage (même famille de champs, pas de surcoût annoncé par Google pour ce champ dans ces requêtes — à surveiller sur la facture).
+- **Règle** : fiche au nom du praticien, ouverte, à **50 m au plus** d'un lieu RPPS géocodé **au numéro** (`housenumber`) → validée d'office. Un point au centre d'une rue ou d'une commune ne sert jamais. Le nom reste exigé (un confrère du même immeuble ne doit pas être validé).
+- Affichage : « À 18 m d'un lieu RPPS (positions GPS) » sur la fiche ; distance dans la liste des fiches possibles.
+- Tableau : la colonne « Lieu d'exercice » devient « Ville » (villes seulement ; les structures restent sur la fiche).

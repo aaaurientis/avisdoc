@@ -114,6 +114,8 @@ export interface CandidatGoogle {
   force: "certaine" | "forte" | "moyenne" | "faible";
   /** Adresse reconnue par la vérification IA (raison donnée par l'IA). */
   verifieIa?: string;
+  /** Distance (m) au lieu RPPS géocodé au numéro le plus proche. */
+  distance?: number | null;
 }
 
 export interface FicheGoogle {
@@ -121,6 +123,8 @@ export interface FicheGoogle {
   valideeAuto?: boolean;
   /** Raison de l'IA quand c'est elle qui a reconnu l'adresse RPPS. */
   verificationIa?: string | null;
+  /** Distance (m) au lieu RPPS géocodé au numéro le plus proche. */
+  distance?: number | null;
   place_id: string;
   nom: string;
   adresse: string | null;

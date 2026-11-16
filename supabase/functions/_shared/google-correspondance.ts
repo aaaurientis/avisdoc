@@ -12,6 +12,9 @@ export interface CandidatFiche {
   nom: string;
   adresse: string;
   ferme: boolean;
+  /** Position de la fiche Google (si connue). */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export type Correspondance =
@@ -50,7 +53,37 @@ export function filtrerDepartement<T extends CandidatFiche>(candidats: T[], depa
 export type Force = "certaine" | "forte" | "moyenne" | "faible";
 
 /** Un lieu d'exercice RPPS, pour comparer les adresses. */
-export interface LieuRpps { codePostal: string | null; adresse: string | null }
+export interface LieuRpps {
+  codePostal: string | null;
+  adresse: string | null;
+  /** Position du lieu, géocodé par l'API Adresse ; `precis` = au numéro (type « housenumber »). */
+  lat?: number | null;
+  lng?: number | null;
+  precis?: boolean;
+}
+
+/** Rayon de validation par la position (décision du 16/11). */
+export const RAYON_VALIDATION_M = 50;
+
+/** Distance en mètres entre deux points (formule de haversine). */
+export function distanceMetres(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const r = 6_371_000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
+/** Distance de la fiche au lieu RPPS précis le plus proche (null si l'un des points manque). */
+export function distanceAuLieu(c: { lat?: number | null; lng?: number | null }, lieux: LieuRpps[]): number | null {
+  if (c.lat == null || c.lng == null) return null;
+  let min: number | null = null;
+  for (const l of lieux) {
+    if (!l.precis || l.lat == null || l.lng == null) continue;
+    const d = distanceMetres({ lat: c.lat, lng: c.lng }, { lat: l.lat, lng: l.lng });
+    if (min === null || d < min) min = d;
+  }
+  return min;
+}
 
 const TYPES_VOIE = /\b(rue|avenue|av|boulevard|bd|chemin|route|allee|allees|place|quai|cours|impasse|montee|square|voie|passage|esplanade|parvis|promenade|rond point|faubourg|chaussee|traverse|clos|residence)\b/;
 const MOTS_VIDES = new Set(["de", "du", "des", "la", "le", "les", "l", "d", "et", "en", "sur", "sous", "aux", "au", "bp", "cs", "cedex"]);
@@ -77,7 +110,8 @@ export function memeAdresse(adresseGoogle: string, lieu: LieuRpps): boolean {
 
 /**
  * Force de la correspondance d'une fiche (déjà dans le département) :
- *   certaine — nom du praticien ET adresse RPPS (code postal + voie), fiche ouverte : validée d'office ;
+ *   certaine — nom du praticien ET adresse RPPS (code postal + voie) ou à moins de 50 m d'un lieu
+ *              RPPS géocodé au numéro, fiche ouverte : validée d'office ;
  *   forte    — nom du praticien ET code postal d'un lieu RPPS, fiche ouverte : rattachée, à vérifier ;
  *   moyenne  — nom du praticien, autre commune du département (ou fiche fermée) : proposée ;
  *   faible   — le nom n'y figure pas : jamais mise en avant.
@@ -86,6 +120,9 @@ export function forceFiche(c: CandidatFiche, nomFamille: string, lieux: LieuRpps
   if (!porteLeNom(c.nom, nomFamille)) return "faible";
   if (c.ferme) return "moyenne";
   if (lieux.some((l) => memeAdresse(c.adresse, l))) return "certaine";
+  // Même endroit : à moins de 50 m d'un lieu RPPS géocodé au numéro (décision du 16/11).
+  const d = distanceAuLieu(c, lieux);
+  if (d !== null && d <= RAYON_VALIDATION_M) return "certaine";
   const memeCp = lieux.some((l) => l.codePostal && new RegExp(`\\b${l.codePostal}\\b`).test(c.adresse));
   return memeCp ? "forte" : "moyenne";
 }

@@ -22,12 +22,13 @@ import { clientService, cors, json, verifierAccesSante } from "../_shared/acces-
 import { verifierFichesIa } from "../_shared/google-ia.ts";
 import { appelGoogle, chercherFiches, cleGoogle, compterAppel, quotaAtteint, requeteFiche } from "../_shared/google-places.ts";
 import { estDepartement } from "../_shared/reseau-rpps.ts";
-import { forceFiche } from "../_shared/google-correspondance.ts";
+import { distanceAuLieu, forceFiche } from "../_shared/google-correspondance.ts";
+import { completerGeo, lieuxPourComparaison } from "../_shared/geo.ts";
 
 const DETAILS = "https://places.googleapis.com/v1/places/";
 const CHAMPS_DETAILS = [
   "id", "displayName", "formattedAddress", "nationalPhoneNumber", "websiteUri", "googleMapsUri",
-  "regularOpeningHours.weekdayDescriptions", "rating", "userRatingCount", "businessStatus", "primaryTypeDisplayName",
+  "regularOpeningHours.weekdayDescriptions", "rating", "userRatingCount", "businessStatus", "primaryTypeDisplayName", "location",
 ].join(",");
 
 serve(async (req) => {
@@ -43,10 +44,12 @@ serve(async (req) => {
   const db = clientService();
   const { data: p } = await db
     .from("admin_reseau_praticiens")
-    .select("id, nom, prenom, population, google_statut, google_place_id, google_place_ids, admin_reseau_lieux(commune, code_postal, adresse, departement, raison_sociale)")
+    .select("id, nom, prenom, population, google_statut, google_place_id, google_place_ids, admin_reseau_lieux(id, commune, code_postal, adresse, departement, raison_sociale, lat, lng, geo_tente, geo_type)")
     .eq("id", String(corps.praticien_id ?? ""))
     .maybeSingle();
   if (!p) return json({ error: "Praticien introuvable." }, 404);
+  // Lieux RPPS géocodés (et leur précision) : nécessaires à la validation par la position.
+  p.admin_reseau_lieux = await completerGeo(db, p.admin_reseau_lieux ?? []);
 
   try {
     if (corps.action === "chercher") {
@@ -99,8 +102,11 @@ serve(async (req) => {
           .eq("praticien_id", p.id).eq("action", "google_fiche_verifiee");
         const verifiees = new Set<string>((deja ?? []).map((h: any) => h.detail?.place_id).filter(Boolean));
         if (!verifiees.has(x.id)) {
-          const fiche = { place_id: x.id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "", ferme: x.businessStatus === "CLOSED_PERMANENTLY" };
-          const lieux = (p.admin_reseau_lieux ?? []).map((l: any) => ({ codePostal: l.code_postal, adresse: l.adresse }));
+          const fiche = {
+            place_id: x.id, nom: x.displayName?.text ?? "", adresse: x.formattedAddress ?? "", ferme: x.businessStatus === "CLOSED_PERMANENTLY",
+            lat: x.location?.latitude ?? null, lng: x.location?.longitude ?? null,
+          };
+          const lieux = lieuxPourComparaison(p.admin_reseau_lieux ?? []);
           const force = forceFiche(fiche, p.nom, lieux);
           let ok = force === "certaine";
           if (!ok && (force === "forte" || force === "moyenne") && !fiche.ferme) {
@@ -135,6 +141,8 @@ serve(async (req) => {
       return json({
         valideeAuto,
         verificationIa,
+        // Distance au lieu RPPS géocodé au numéro le plus proche (mètres), pour l'affichage.
+        distance: (() => { const d = distanceAuLieu({ lat: x.location?.latitude ?? null, lng: x.location?.longitude ?? null }, lieuxPourComparaison(p.admin_reseau_lieux ?? [])); return d === null ? null : Math.round(d); })(),
         place_id: x.id,
         nom: x.displayName?.text ?? "",
         adresse: x.formattedAddress ?? null,

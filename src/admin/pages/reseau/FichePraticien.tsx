@@ -415,7 +415,12 @@ function CarteFicheGoogle({ fiche, lieuRpps, onAvis, occupeAvis }: { fiche: Fich
           <Check className="size-3" /> Même adresse que le lieu RPPS « {lieuRpps} »
         </div>
       )}
-      {!lieuRpps && fiche.verificationIa && (
+      {!lieuRpps && fiche.distance != null && fiche.distance <= 50 && (
+        <div className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+          <Check className="size-3" /> À {fiche.distance} m d'un lieu RPPS (positions GPS)
+        </div>
+      )}
+      {!lieuRpps && !(fiche.distance != null && fiche.distance <= 50) && fiche.verificationIa && (
         <div className="mb-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800"><b>Vérifiée par IA :</b> {fiche.verificationIa}</div>
       )}
       <div className="font-semibold text-avisdoc-ink">{fiche.nom}</div>
@@ -581,7 +586,7 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
                 <span className="font-semibold text-avisdoc-ink">{c.nom}{c.ferme ? " · fermé définitivement" : ""}</span>
                 <span className="block text-muted-foreground">{[c.categorie, c.adresse].filter(Boolean).join(" · ")}</span>
                 <span className={cn("text-[11px] font-semibold", c.force === "certaine" || c.force === "forte" ? "text-emerald-700" : c.force === "moyenne" ? "text-amber-700" : "text-slate-500")}>
-                  {FORCE_LABEL[c.force]}{c.verifieIa ? " (vérifié par IA)" : ""}
+                  {FORCE_LABEL[c.force]}{c.verifieIa ? " (vérifié par IA)" : ""}{c.distance != null ? ` · à ${c.distance < 1000 ? `${Math.round(c.distance)} m` : `${(c.distance / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km`} du lieu RPPS` : ""}
                 </span>
                 {c.verifieIa && <span className="block text-[11px] text-muted-foreground">{c.verifieIa}</span>}
               </span>
