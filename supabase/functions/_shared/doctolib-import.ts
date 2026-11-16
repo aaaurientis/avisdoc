@@ -6,7 +6,9 @@
 // « inconnue » ; une valeur illisible est signalée et ignorée, jamais interprétée.
 
 export const COLONNES_EXPORT = [
-  "rpps", "nom", "prenom", "population", "ville", "statut_lien", "url_doctolib",
+  // « dernier_releve » : date du dernier chargement de la page (favori ou import), pour information ;
+  // l'import ne la lit pas (la date à remplir est « releve_le »).
+  "rpps", "nom", "prenom", "population", "ville", "statut_lien", "url_doctolib", "dernier_releve",
   "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le",
 ] as const;
 

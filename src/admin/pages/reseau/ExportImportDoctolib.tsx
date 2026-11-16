@@ -39,6 +39,7 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
           rpps: p.rpps, nom: p.nom, prenom: p.prenom, population: POPULATION_LIBELLE[p.population],
           ville: [...new Set(p.lieux.map((l) => l.commune).filter(Boolean))].join(", "),
           statut_lien: DOCTOLIB_LABEL[p.doctolibStatut], url_doctolib: p.doctolibUrl,
+          dernier_releve: [p.doctolibReleveLe, p.doctolibInfos?.disponibilites?.releve_le].filter((d): d is string => !!d).sort().pop()?.slice(0, 10) ?? "",
         }));
       telecharger(`liens-doctolib-${new Date().toISOString().slice(0, 10)}.csv`, versCsv(lignes, COLONNES_EXPORT));
       toast.success(`${lignes.length} liens exportés.`);
