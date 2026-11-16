@@ -7,12 +7,18 @@ import { Link } from "react-router-dom";
 import { Check, Download, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Card, Modal } from "../../components/ui";
-import { reseauRepo } from "../../reseau/reseauRepo";
-import { DOCTOLIB_LABEL, POPULATION_LIBELLE, TEXTES } from "../../reseau/libelles";
+import { reseauRepo, type PraticienReseau } from "../../reseau/reseauRepo";
+import { cn } from "@/lib/utils";
+import { DOCTOLIB_LABEL, doctolibRenseigne, POPULATION_LIBELLE, TEXTES } from "../../reseau/libelles";
 import { analyserImport, COLONNES_EXPORT, versCsv, type LectureImport } from "../../../../supabase/functions/_shared/doctolib-import";
 import { VALEUR_LIBELLE } from "../../../../supabase/functions/_shared/reseau-signaux";
 
 const btn = "inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50";
+
+/** Date du dernier relevé de la page Doctolib (relevé de fiche ou de créneaux, import). */
+function dernierReleve(p: PraticienReseau): string | null {
+  return [p.doctolibReleveLe, p.doctolibInfos?.disponibilites?.releve_le].filter((d): d is string => !!d).sort().pop() ?? null;
+}
 
 function telecharger(nom: string, contenu: string) {
   const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8" }));
@@ -29,6 +35,22 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
   const [enAttente, setEnAttente] = useState(0);
   const [validation, setValidation] = useState(false);
   useEffect(() => { reseauRepo.nbPropositionsImport().then(setEnAttente).catch(() => setEnAttente(0)); }, []);
+
+  // Point sur la collecte (tous départements, praticiens non exclus ayant un lien).
+  const [point, setPoint] = useState<{ liens: number; aCollecter: number; jamais: number; anciens: number; aValider: number; aChoisir: number } | null>(null);
+  const calculerPoint = () => Promise.all([reseauRepo.praticiensAvecDoctolib(), reseauRepo.nbDoctolibAChoisir().catch(() => 0)]).then(([ps, aChoisir]) => {
+    const limite = Date.now() - 180 * 86_400_000;
+    let jamais = 0, anciens = 0, aValider = 0;
+    for (const p of ps) {
+      const d = dernierReleve(p);
+      if (!d) jamais++;
+      else if (Date.parse(d) < limite) anciens++;
+      // Lien trouvé automatiquement, page jamais relevée : à vérifier.
+      if (p.doctolibStatut === "trouve_auto" && !doctolibRenseigne(p)) aValider++;
+    }
+    setPoint({ liens: ps.length, aCollecter: jamais + anciens, jamais, anciens, aValider, aChoisir });
+  }).catch(() => setPoint(null));
+  useEffect(() => { void calculerPoint(); }, []);
   const validerTout = async () => {
     setValidation(true);
     try {
@@ -55,7 +77,7 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
           rpps: p.rpps, nom: p.nom, prenom: p.prenom, population: POPULATION_LIBELLE[p.population],
           ville: [...new Set(p.lieux.map((l) => l.commune).filter(Boolean))].join(", "),
           statut_lien: DOCTOLIB_LABEL[p.doctolibStatut], url_doctolib: p.doctolibUrl,
-          dernier_releve: [p.doctolibReleveLe, p.doctolibInfos?.disponibilites?.releve_le].filter((d): d is string => !!d).sort().pop()?.slice(0, 10) ?? "",
+          dernier_releve: dernierReleve(p)?.slice(0, 10) ?? "",
         }));
       telecharger(`liens-doctolib-${new Date().toISOString().slice(0, 10)}.csv`, versCsv(lignes, COLONNES_EXPORT));
       toast.success(`${lignes.length} liens exportés.`);
@@ -74,11 +96,24 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
   return (
     <Card className="mt-6 p-5 text-[13px]">
       <div className="font-display text-base font-semibold text-avisdoc-ink">Liens Doctolib : export et import des résultats</div>
-      <p className="mt-1 text-muted-foreground">
-        Exportez les liens Doctolib de tous les départements (fichier pour Excel), complétez les colonnes de résultats
-        (<i>reservable</i>, <i>nouveaux_patients</i>, <i>premier_creneau</i>, <i>creneaux_7j</i>, <i>releve_le</i>), puis importez le fichier.
-        Le Hub vous montre ce qu'il a compris avant d'enregistrer.
-      </p>
+      {/* Point rapide sur la collecte : liens, jamais relevés, relevés de plus de 180 jours. */}
+      <div className="mt-2 flex flex-wrap gap-2 text-[12.5px]">
+        {point === null ? <span className="text-muted-foreground">Calcul…</span> : (
+          <>
+            <span className="rounded-full bg-muted/60 px-3 py-1"><b className="text-avisdoc-ink">{point.liens}</b> <span className="text-muted-foreground">lien{point.liens > 1 ? "s" : ""} Doctolib</span></span>
+            <span className={cn("rounded-full px-3 py-1", point.aCollecter ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
+              <b>{point.aCollecter}</b> à collecter
+              {point.aCollecter > 0 && <span className="opacity-80"> · {point.jamais} jamais relevé{point.jamais > 1 ? "s" : ""}, {point.anciens} de plus de 180 jours</span>}
+            </span>
+            <span className="rounded-full bg-muted/60 px-3 py-1"><b className="text-avisdoc-ink">{point.liens - point.aCollecter}</b> <span className="text-muted-foreground">relevé{point.liens - point.aCollecter > 1 ? "s" : ""} depuis moins de 180 jours</span></span>
+            <span className={cn("rounded-full px-3 py-1", point.aValider + point.aChoisir ? "bg-violet-50 text-violet-900" : "bg-muted/60 text-muted-foreground")}
+              title="Liens trouvés automatiquement à confirmer, et fiches à choisir (plusieurs fiches possibles)">
+              <b>{point.aValider + point.aChoisir}</b> lien{point.aValider + point.aChoisir > 1 ? "s" : ""} à valider
+              {point.aValider + point.aChoisir > 0 && <span className="opacity-80"> · {point.aValider} trouvé{point.aValider > 1 ? "s" : ""}, {point.aChoisir} à choisir</span>}
+            </span>
+          </>
+        )}
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => void exporter()} disabled={exportEnCours} className={btn}>
           {exportEnCours ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />} Exporter les liens Doctolib
@@ -95,11 +130,7 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
         <input ref={fichier} type="file" accept=".csv,text/csv" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void lire(f); e.target.value = ""; }} />
       </div>
-      <p className="mt-2 text-[11.5px] text-muted-foreground">
-        Chaque ligne importée doit porter le lien de la fiche Doctolib (la source) et la date du relevé. Une case vide reste « inconnue » ;
-        une valeur illisible est signalée, jamais devinée. Les relevés doivent avoir été faits à la main, fiche par fiche.
-      </p>
-      {lecture && <ApercuImport lecture={lecture} onClose={() => setLecture(null)} />}
+      {lecture && <ApercuImport lecture={lecture} onClose={() => { setLecture(null); void calculerPoint(); }} />}
     </Card>
   );
 }

@@ -296,7 +296,7 @@ serve(async (req) => {
       const rpps = [...new Set(lignes.map((l: any) => String(l?.rpps ?? "")).filter((r: string) => /^\d{11}$/.test(r)))] as string[];
       const parRpps = new Map<string, any>();
       for (let i = 0; i < rpps.length; i += 200) {
-        const { data } = await db.from("admin_reseau_praticiens").select("id, rpps, nom, prenom, etat, doctolib_infos, admin_reseau_lieux(departement)").in("rpps", rpps.slice(i, i + 200));
+        const { data } = await db.from("admin_reseau_praticiens").select("id, rpps, nom, prenom, etat, doctolib_infos, doctolib_releve_le, admin_reseau_lieux(departement)").in("rpps", rpps.slice(i, i + 200));
         for (const p of data ?? []) parRpps.set(p.rpps, p);
       }
       const bilan = {
@@ -326,6 +326,9 @@ serve(async (req) => {
         }
         const { error } = await db.from("admin_reseau_praticiens").update({
           doctolib_url: lien, doctolib_statut: "confirme", doctolib_par: `${email} (import)`, doctolib_le: new Date().toISOString(), doctolib_infos: infos,
+          // Date du dernier relevé de la page (le plus récent l'emporte) : sert au suivi de la collecte.
+          ...(!p.doctolib_releve_le || Date.parse(p.doctolib_releve_le) < Date.parse(`${releve}T12:00:00Z`)
+            ? { doctolib_releve_le: `${releve}T12:00:00Z`, doctolib_releve_par: `${email} (import)` } : {}),
         }).eq("id", p.id);
         if (error) { bilan.refuses.push(r); continue; }
         bilan.mis_a_jour++;
