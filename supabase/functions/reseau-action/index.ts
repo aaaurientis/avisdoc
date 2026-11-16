@@ -10,7 +10,8 @@
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
 //   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
-//   • doctolib_import      { lignes: ResultatDoctolib[] } — résultats relevés par l'équipe (fichier importé)
+//   • doctolib_import      { lignes: ResultatDoctolib[] } — résultats relevés par l'équipe (fichier importé), validés d'office
+//   • valider_propositions_import {} — valide les propositions laissées par les imports précédents
 //   • doctolib_creneaux    { praticien_id, url, disponibilites, creneau? } — créneaux relevés sur la page de rendez-vous
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //                          | { praticien_id, non_reservable: boolean } (page « n'est pas sur Doctolib »)
@@ -285,8 +286,9 @@ serve(async (req) => {
         }).eq("id", p.id);
         if (error) { bilan.refuses.push(r); continue; }
         bilan.mis_a_jour++;
-        // Signaux : PROPOSÉS, à valider sur la fiche (décision du 16/11). Datés du relevé (la
-        // péremption du créneau part de cette date), source = la fiche, valeur lue en extrait.
+        // Signaux : VALIDÉS d'office au nom de l'importateur (décision du 16/11, qui remplace la
+        // validation une à une). Datés du relevé (la péremption du créneau part de cette date),
+        // source = la fiche Doctolib.
         const dateFr = (d: string) => d.split("-").reverse().join("/");
         const signaux: [string, unknown, string][] = [
           ["creneau_doctolib", l?.creneau, premier ? `Import Doctolib, relevé du ${dateFr(releve)} : premier créneau le ${dateFr(premier)}${sept !== null ? `, ${sept} créneau(x) sur 7 jours` : ""}.` : `Import Doctolib, relevé du ${dateFr(releve)} : aucun créneau pour un nouveau patient.`],
@@ -308,11 +310,14 @@ serve(async (req) => {
             bilan.deja_valides++;
             continue;
           }
-          // Une proposition identique d'un import précédent est remplacée, pas doublée.
-          await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").eq("url", lien);
+          void extrait;
+          // Les propositions d'imports précédents pour ce signal n'ont plus lieu d'être.
+          await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").like("propose_par", "%(import)");
+          await remplacerAncien(db, p.id, type);
           const { error: eS } = await db.from("admin_reseau_signaux").insert({
-            praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "propose", extrait,
+            praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "valide",
             propose_par: `${email} (import)`, propose_le: `${releve}T12:00:00Z`,
+            decide_par: `${email} (import)`, decide_le: `${releve}T12:00:00Z`,
           });
           if (!eS) { bilan.signaux++; points.push(type === "creneau_doctolib" ? "premier créneau" : "nouveaux patients"); }
         }
@@ -322,6 +327,30 @@ serve(async (req) => {
         await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib_import", detail: { url: lien, releve_le: releve } });
       }
       return json(bilan);
+    }
+
+    case "valider_propositions_import": {
+      // Valide d'un coup toutes les propositions laissées en attente par les imports Doctolib
+      // précédents (décision du 16/11). Datées du relevé ; un signal validé du même type est remplacé.
+      const { data: props, error: eL } = await db.from("admin_reseau_signaux")
+        .select("id, praticien_id, type, valeur, url, propose_le").eq("statut", "propose").like("propose_par", "%(import)").limit(5000);
+      if (eL) return json({ error: eL.message }, 500);
+      let valides = 0;
+      // Du plus ancien au plus récent : pour un même praticien et un même signal, le dernier relevé l'emporte.
+      for (const sg of (props ?? []).sort((a: any, b: any) => String(a.propose_le).localeCompare(String(b.propose_le)))) {
+        await remplacerAncien(db, sg.praticien_id, sg.type, sg.id);
+        const { error } = await db.from("admin_reseau_signaux").update({
+          statut: "valide", extrait: null, decide_par: `${email} (import)`, decide_le: sg.propose_le,
+        }).eq("id", sg.id).eq("statut", "propose");
+        if (!error) {
+          valides++;
+          await db.from("admin_reseau_historique").insert({
+            praticien_id: sg.praticien_id, acteur: email, action: "signal_valide",
+            detail: { type: sg.type, valeur: sg.valeur, url: sg.url, par: "validation groupée des imports Doctolib" },
+          });
+        }
+      }
+      return json({ valides });
     }
 
     case "doctolib_creneaux": {

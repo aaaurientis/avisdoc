@@ -2,9 +2,9 @@
 // relevés par l'équipe. Le fichier importé est analysé et montré AVANT tout envoi : lignes
 // retenues, erreurs ligne par ligne. Chaque résultat garde sa source (lien) et sa date.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, Loader2, Upload } from "lucide-react";
+import { Check, Download, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Card, Modal } from "../../components/ui";
 import { reseauRepo } from "../../reseau/reseauRepo";
@@ -25,6 +25,22 @@ function telecharger(nom: string, contenu: string) {
 
 export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: boolean }) {
   const [exportEnCours, setExportEnCours] = useState(false);
+  // Propositions laissées en attente par des imports antérieurs au 16/11 (validation une à une, abandonnée).
+  const [enAttente, setEnAttente] = useState(0);
+  const [validation, setValidation] = useState(false);
+  useEffect(() => { reseauRepo.nbPropositionsImport().then(setEnAttente).catch(() => setEnAttente(0)); }, []);
+  const validerTout = async () => {
+    setValidation(true);
+    try {
+      const r = await reseauRepo.validerPropositionsImport();
+      toast.success(`${r.valides} signal${r.valides > 1 ? "aux" : ""} d'import validé${r.valides > 1 ? "s" : ""}.`);
+      setEnAttente(await reseauRepo.nbPropositionsImport().catch(() => 0));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setValidation(false);
+    }
+  };
   const [lecture, setLecture] = useState<(LectureImport & { fichier: string }) | null>(null);
   const fichier = useRef<HTMLInputElement>(null);
 
@@ -70,6 +86,12 @@ export default function ExportImportDoctolib({ lectureSeule }: { lectureSeule: b
         <button type="button" onClick={() => fichier.current?.click()} disabled={lectureSeule} title={lectureSeule ? TEXTES.motifLectureSeule : undefined} className={btn}>
           <Upload className="size-4" /> Importer les résultats
         </button>
+        {enAttente > 0 && (
+          <button type="button" onClick={() => void validerTout()} disabled={lectureSeule || validation}
+            className="inline-flex items-center gap-1.5 rounded-full bg-violet-600 px-4 py-2 text-[13px] font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+            {validation ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Valider les {enAttente} proposition{enAttente > 1 ? "s" : ""} des imports précédents
+          </button>
+        )}
         <input ref={fichier} type="file" accept=".csv,text/csv" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void lire(f); e.target.value = ""; }} />
       </div>
@@ -94,7 +116,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
     try {
       const b = await reseauRepo.importerResultatsDoctolib(resultats);
       setBilan(b);
-      toast.success(`${b.mis_a_jour} praticien${b.mis_a_jour > 1 ? "s" : ""} mis à jour, ${b.signaux} proposition${b.signaux > 1 ? "s" : ""} à valider.`);
+      toast.success(`${b.mis_a_jour} praticien${b.mis_a_jour > 1 ? "s" : ""} mis à jour, ${b.signaux} signal${b.signaux > 1 ? "aux" : ""} validé${b.signaux > 1 ? "s" : ""}.`);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e));
     } finally {
@@ -110,11 +132,11 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
 
       {bilan ? (
         <div className="mt-4 space-y-1.5 text-[13px]">
-          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> proposition{bilan.signaux > 1 ? "s" : ""} à valider
-            {bilan.deja_valides > 0 ? <> · {bilan.deja_valides} déjà validée{bilan.deja_valides > 1 ? "s" : ""} (non redemandée{bilan.deja_valides > 1 ? "s" : ""})</> : null}.</p>
+          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> signal{bilan.signaux > 1 ? "aux" : ""} validé{bilan.signaux > 1 ? "s" : ""}
+            {bilan.deja_valides > 0 ? <> · {bilan.deja_valides} inchangé{bilan.deja_valides > 1 ? "s" : ""} (déjà validé{bilan.deja_valides > 1 ? "s" : ""} avec la même valeur)</> : null}.</p>
           {bilan.a_valider.length > 0 && (
             <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2">
-              <div className="font-semibold text-violet-900">Points à valider ({bilan.a_valider.length} praticien{bilan.a_valider.length > 1 ? "s" : ""})</div>
+              <div className="font-semibold text-violet-900">Signaux mis à jour ({bilan.a_valider.length} praticien{bilan.a_valider.length > 1 ? "s" : ""})</div>
               <ul className="mt-1 max-h-56 space-y-0.5 overflow-y-auto text-[12.5px]">
                 {bilan.a_valider.map((x) => (
                   <li key={x.id}>
@@ -124,7 +146,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-[11.5px] text-violet-900/80">Sur chaque fiche : encadré « points à valider », puis Valider ou Rejeter chaque proposition après avoir ouvert la fiche Doctolib.</p>
+              <p className="mt-1 text-[11.5px] text-violet-900/80">Validés à votre nom, datés du relevé, avec la fiche Doctolib comme source. Un signal se corrige sur la fiche du praticien (« Modifier »).</p>
             </div>
           )}
           {bilan.inconnus.length > 0 && <p className="text-amber-800">RPPS absents de la liste (ignorés) : {bilan.inconnus.join(", ")}</p>}
@@ -160,7 +182,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
               </table>
             </div>
           ) : <p className="mt-3 text-[13px] text-muted-foreground">Aucune ligne remplie à importer.</p>}
-          <p className="mt-2 text-[11.5px] text-muted-foreground">À l'enregistrement : lien confirmé, « réservable » et créneaux mis à jour. « Premier créneau » et « nouveaux patients » arrivent en <b>propositions à valider</b> sur chaque fiche, datées du relevé, avec la fiche Doctolib comme source.</p>
+          <p className="mt-2 text-[11.5px] text-muted-foreground">À l'enregistrement : lien confirmé, « réservable » et créneaux mis à jour. « Premier créneau » et « nouveaux patients » sont <b>validés d'office</b> à votre nom, datés du relevé, avec la fiche Doctolib comme source.</p>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
             <button type="button" onClick={() => void importer()} disabled={!resultats.length || envoi}
