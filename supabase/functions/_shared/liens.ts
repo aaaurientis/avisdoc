@@ -7,27 +7,10 @@ import { chercherFiches, cleGoogle, compterAppel, PLAFONDS, type PraticienPourGo
 import { choisirDoctolib } from "./doctolib.ts";
 import { urlsDoctolib } from "./doctolib-recherche.ts";
 import type { Niveau } from "./suivi.ts";
+import { completerGeo } from "./geo.ts";
 
 const SELECT = "id, nom, prenom, population, etat, google_statut, google_place_ids, doctolib_statut, " +
-  "admin_reseau_lieux(id, departement, raison_sociale, adresse, code_postal, commune, lat, lng, geo_tente)";
-
-/** Géocodage par l'API Adresse (BAN, data.gouv.fr) : gratuit, sans clé, adresses françaises. */
-async function geocoder(l: any): Promise<{ lat: number; lng: number } | null> {
-  const q = [l.adresse, l.code_postal, l.commune].filter(Boolean).join(" ");
-  if (!q.trim()) return null;
-  const u = new URL("https://api-adresse.data.gouv.fr/search/");
-  u.searchParams.set("q", q);
-  u.searchParams.set("limit", "1");
-  if (/^\d{5}$/.test(l.code_postal ?? "")) u.searchParams.set("postcode", l.code_postal);
-  try {
-    const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return null;
-    const c = (await r.json())?.features?.[0]?.geometry?.coordinates;
-    return Array.isArray(c) && c.length === 2 ? { lat: c[1], lng: c[0] } : null;
-  } catch {
-    return null;
-  }
-}
+  "admin_reseau_lieux(id, departement, raison_sociale, adresse, code_postal, commune, lat, lng, geo_tente, geo_type)";
 
 export interface LigneJournal { texte: string; niveau: Niveau }
 
@@ -50,14 +33,11 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
   const { data: p } = await db.from("admin_reseau_praticiens").select(SELECT).eq("id", praticienId).maybeSingle();
   if (!p || p.etat === "exclu") return lignes;
   const qui = `${p.prenom} ${p.nom}`;
-  const lieux: any[] = p.admin_reseau_lieux ?? [];
+  // 1. Carte et validation par la position : coordonnées des lieux (et leur précision).
+  const lieux: any[] = await completerGeo(db, p.admin_reseau_lieux ?? []);
+  p.admin_reseau_lieux = lieux;
   const deps = departements?.length ? departements : [...new Set(lieux.map((l) => l.departement).filter(Boolean))] as string[];
 
-  // 1. Carte : coordonnées des lieux, une seule tentative par lieu.
-  for (const l of lieux.filter((x) => x.lat == null && !x.geo_tente)) {
-    const g = await geocoder(l);
-    await db.from("admin_reseau_lieux").update({ ...(g ?? {}), geo_tente: true }).eq("id", l.id);
-  }
 
   // 2. Fiches Google, dans le département concerné.
   if (volet === "rapprochement" && A_RAPPROCHER.includes(p.google_statut) && cleGoogle()) {

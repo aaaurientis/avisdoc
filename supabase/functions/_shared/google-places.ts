@@ -4,7 +4,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { POPULATION_LIBELLE } from "./reseau-rpps.ts";
-import { type CandidatFiche, type Force, qualifierFiches } from "./google-correspondance.ts";
+import { type CandidatFiche, distanceAuLieu, type Force, qualifierFiches } from "./google-correspondance.ts";
+import { lieuxPourComparaison } from "./geo.ts";
 import { DEPARTEMENTS } from "./reseau-rpps.ts";
 import { verifierFichesIa } from "./google-ia.ts";
 
@@ -17,7 +18,7 @@ export const PLAFONDS = {
   details: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_DETAILS") ?? 300),
   details_avis: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_AVIS") ?? 100),
 };
-const CHAMPS_RECHERCHE = "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.businessStatus";
+const CHAMPS_RECHERCHE = "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.businessStatus,places.location";
 
 const QUOTA_LIBELLE: Record<keyof typeof PLAFONDS, string> = {
   recherche: "recherches de fiches Google Maps",
@@ -63,7 +64,7 @@ export interface PraticienPourGoogle {
   nom: string;
   prenom: string;
   population: string;
-  admin_reseau_lieux?: { commune: string | null; code_postal: string | null; adresse?: string | null; departement?: string | null; raison_sociale?: string | null }[];
+  admin_reseau_lieux?: { commune: string | null; code_postal: string | null; adresse?: string | null; departement?: string | null; raison_sociale?: string | null; lat?: number | null; lng?: number | null; geo_type?: string | null }[];
 }
 
 /** La requête : nom, spécialité, commune d'exercice dans le département, nom du département. */
@@ -80,21 +81,24 @@ export function requeteFiche(p: PraticienPourGoogle, departements: string[]): st
  */
 export async function chercherFiches(
   p: PraticienPourGoogle, departements: string[], cle: string,
-): Promise<(CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string })[]> {
+): Promise<(CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string; distance?: number | null })[]> {
   const d = await appelGoogle(RECHERCHE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ textQuery: requeteFiche(p, departements), languageCode: "fr", regionCode: "FR", maxResultCount: 10 }),
   }, cle, CHAMPS_RECHERCHE);
-  const bruts = (d?.places ?? []).map((x: any) => ({
+  const bruts: (CandidatFiche & { categorie: string | null })[] = (d?.places ?? []).map((x: any) => ({
     place_id: x.id as string,
     nom: (x.displayName?.text ?? "") as string,
     adresse: (x.formattedAddress ?? "") as string,
     categorie: (x.primaryTypeDisplayName?.text ?? null) as string | null,
     ferme: x.businessStatus === "CLOSED_PERMANENTLY",
+    lat: typeof x.location?.latitude === "number" ? x.location.latitude : null,
+    lng: typeof x.location?.longitude === "number" ? x.location.longitude : null,
   }));
-  const lieux = (p.admin_reseau_lieux ?? []).map((l) => ({ codePostal: l.code_postal, adresse: l.adresse ?? null }));
-  const q: (CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string })[] = qualifierFiches(bruts, p.nom, lieux, departements);
+  const lieux = lieuxPourComparaison(p.admin_reseau_lieux ?? []);
+  const q: (CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string; distance?: number | null })[] =
+    qualifierFiches(bruts, p.nom, lieux, departements).map((c) => ({ ...c, distance: distanceAuLieu(c, lieux) }));
   // Au nom du praticien mais adresse non reconnue mot à mot : l'IA compare les adresses.
   // Elle ne peut que confirmer (→ certaine), jamais rétrograder ni retenir une fiche sans le nom.
   const douteuses = q.filter((c) => (c.force === "forte" || c.force === "moyenne") && !c.ferme);

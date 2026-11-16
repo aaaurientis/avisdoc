@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choisirFiche, dansLeDepartement, memeAdresse, motsDeLaVoie, porteLeNom, qualifierFiches } from "../../../supabase/functions/_shared/google-correspondance";
+import { choisirFiche, dansLeDepartement, distanceMetres, forceFiche, memeAdresse, motsDeLaVoie, porteLeNom, qualifierFiches } from "../../../supabase/functions/_shared/google-correspondance";
 
 const fiche = (place_id: string, nom: string, adresse: string, ferme = false) => ({ place_id, nom, adresse, ferme });
 
@@ -96,5 +96,25 @@ describe("adresse RPPS avec complément après une virgule", () => {
   it("« 21 RUE DE SARLIEVE, LE TRIANGLE » : seule la voie compte", () => {
     expect(motsDeLaVoie("21 RUE DE SARLIEVE, LE TRIANGLE")).toEqual(["sarlieve"]);
     expect(memeAdresse("21 Rue de Sarliève, 63800 Cournon-d'Auvergne, France", { codePostal: "63800", adresse: "21 RUE DE SARLIEVE, LE TRIANGLE" })).toBe(true);
+  });
+});
+
+describe("validation par la position (rayon de 50 m)", () => {
+  const lieu = { codePostal: "63000", adresse: "29 AVENUE DE GRANDE BRETAGNE", lat: 45.7710, lng: 3.0950, precis: true };
+  const fiche = (lat: number, lng: number, nom = "Dr Pierre CHASTENET") => ({ place_id: "a", nom, adresse: "Autre écriture, 63000 Clermont-Ferrand, France", ferme: false, lat, lng });
+  it("au nom et à moins de 50 m : certaine", () => {
+    expect(forceFiche(fiche(45.7712, 3.0952), "CHASTENET", [lieu])).toBe("certaine"); // ≈ 27 m
+  });
+  it("au-delà de 50 m : la position ne suffit pas", () => {
+    expect(forceFiche(fiche(45.7720, 3.0950), "CHASTENET", [lieu])).toBe("forte"); // ≈ 111 m
+  });
+  it("sans le nom du praticien : jamais retenue, même au même endroit", () => {
+    expect(forceFiche(fiche(45.7710, 3.0950, "Cabinet médical"), "CHASTENET", [lieu])).toBe("faible");
+  });
+  it("lieu géocodé à la rue seulement : la position ne compte pas", () => {
+    expect(forceFiche(fiche(45.7710, 3.0950), "CHASTENET", [{ ...lieu, precis: false }])).toBe("forte");
+  });
+  it("distance en mètres", () => {
+    expect(Math.round(distanceMetres({ lat: 45.7710, lng: 3.0950 }, { lat: 45.7720, lng: 3.0950 }))).toBe(111);
   });
 });

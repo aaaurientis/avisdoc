@@ -23,6 +23,7 @@ import {
 } from "../reseau/libelles";
 import { reseauRepo, type DepartementReseau, type ResumeDepartement } from "../reseau/reseauRepo";
 import { codeFavori } from "../reseau/favori";
+import ExportImportDoctolib from "./reseau/ExportImportDoctolib";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +168,7 @@ export default function ReseauDepartements() {
         </div>
       </Card>
 
+      <ExportImportDoctolib lectureSeule={lectureSeule} />
       <FavoriDoctolib />
 
       {ajout && (

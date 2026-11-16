@@ -58,7 +58,7 @@ const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   a_chercher: "text-slate-200",
 };
 
-const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(150px,1.4fr) 84px 104px 140px 120px 70px";
+const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(120px,1fr) 84px 104px 140px 120px 70px";
 const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
 
 const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
@@ -575,7 +575,7 @@ export default function ReseauDepartement() {
             <EnTete cle="nom" tri={tri} onTri={trier}>Praticien</EnTete>
             <EnTete cle="population" tri={tri} onTri={trier}>Population</EnTete>
             {!selectionne && <>
-              <EnTete cle="lieu" tri={tri} onTri={trier}>Lieu d'exercice</EnTete>
+              <EnTete cle="lieu" tri={tri} onTri={trier}>Ville</EnTete>
               <EnTete cle="exercice" tri={tri} onTri={trier}>Exercice</EnTete>
               <EnTete cle="etat" tri={tri} onTri={trier}>État</EnTete>
             </>}
@@ -609,8 +609,10 @@ export default function ReseauDepartement() {
                 {!selectionne && (
                   <>
                     <div className="min-w-0 text-[12.5px] text-muted-foreground">
-                      <div className="truncate">{ici[0]?.raisonSociale ?? "—"}</div>
-                      <div className="truncate">{ici[0]?.commune ?? ""}{ici.length > 1 ? ` · +${ici.length - 1} lieu${ici.length > 2 ? "x" : ""}` : ""}</div>
+                      {/* Seulement la ville (les structures sont sur la fiche) ; plusieurs villes séparées par des virgules. */}
+                      <div className="line-clamp-2" title={[...new Set(ici.map((l) => l.commune).filter(Boolean))].join(", ")}>
+                        {[...new Set(ici.map((l) => l.commune).filter(Boolean))].join(", ") || "—"}
+                      </div>
                     </div>
                     <div className="text-[12.5px] text-muted-foreground">{[...new Set(ici.map((l) => l.modeExercice).filter(Boolean))].join(", ") || "—"}</div>
                     <div><Badge className={ETAT_PRATICIEN_BADGE[p.etat]}>{ETAT_PRATICIEN_LABEL[p.etat]}</Badge></div>

@@ -27,6 +27,9 @@ export interface LieuReseau {
   finess: string | null;
   lat: number | null;
   lng: number | null;
+  /** Précision du géocodage (« housenumber » = adresse trouvée au numéro) et adresse normalisée (BAN). */
+  geoType: string | null;
+  geoLabel: string | null;
 }
 
 export interface PraticienReseau {
@@ -114,6 +117,8 @@ export interface CandidatGoogle {
   force: "certaine" | "forte" | "moyenne" | "faible";
   /** Adresse reconnue par la vérification IA (raison donnée par l'IA). */
   verifieIa?: string;
+  /** Distance (m) au lieu RPPS géocodé au numéro le plus proche. */
+  distance?: number | null;
 }
 
 export interface FicheGoogle {
@@ -121,6 +126,8 @@ export interface FicheGoogle {
   valideeAuto?: boolean;
   /** Raison de l'IA quand c'est elle qui a reconnu l'adresse RPPS. */
   verificationIa?: string | null;
+  /** Distance (m) au lieu RPPS géocodé au numéro le plus proche. */
+  distance?: number | null;
   place_id: string;
   nom: string;
   adresse: string | null;
@@ -177,6 +184,8 @@ const toLieu = (l: any): LieuReseau => ({
   finess: l.finess ?? null,
   lat: typeof l.lat === "number" ? l.lat : null,
   lng: typeof l.lng === "number" ? l.lng : null,
+  geoType: l.geo_type ?? null,
+  geoLabel: l.geo_label ?? null,
 });
 
 const toPraticien = (r: any): PraticienReseau => ({
@@ -399,6 +408,14 @@ export const reseauRepo = {
   },
   enregistrerFicheDoctolib: (praticienId: string, url: string, infos: InfosDoctolib, signaux: { type: TypeSignal; valeur: string }[]) =>
     appeler("reseau-action", { action: "doctolib_fiche", praticien_id: praticienId, url, infos, signaux }),
+  /** Tous les praticiens non exclus qui ont un lien Doctolib (export, tous départements). */
+  async praticiensAvecDoctolib(): Promise<PraticienReseau[]> {
+    const lignes = await toutLire((de, a) =>
+      sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").not("doctolib_url", "is", null).neq("etat", "exclu").order("id").range(de, a));
+    return lignes.map(toPraticien);
+  },
+  importerResultatsDoctolib: (lignes: unknown[]): Promise<{ mis_a_jour: number; signaux: number; inconnus: string[]; exclus: string[]; refuses: string[] }> =>
+    appeler("reseau-action", { action: "doctolib_import", lignes }),
   enregistrerCreneauxDoctolib: (praticienId: string, url: string, disponibilites: { creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[]; premier: { date: string; jours: number } | null; motif: string | null }, creneau: string | null) =>
     appeler("reseau-action", { action: "doctolib_creneaux", praticien_id: praticienId, url, disponibilites, creneau }),
   doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean }) =>

@@ -10,6 +10,7 @@
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
 //   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
+//   • doctolib_import      { lignes: ResultatDoctolib[] } — résultats relevés par l'équipe (fichier importé)
 //   • doctolib_creneaux    { praticien_id, url, disponibilites, creneau? } — créneaux relevés sur la page de rendez-vous
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //                          | { praticien_id, non_reservable: boolean } (page « n'est pas sur Doctolib »)
@@ -236,6 +237,61 @@ serve(async (req) => {
         praticien_id: p.id, acteur: email, action: "doctolib_releve", detail: { url: lien, signaux: enregistres },
       });
       return json({ id: p.id, signaux: enregistres });
+    }
+
+    case "doctolib_import": {
+      // Résultats Doctolib relevés par l'équipe (fichier importé, vérifié à l'écran avant envoi).
+      // Chaque ligne porte sa source (lien de la fiche) et la date du relevé ; rien n'est déduit d'autre.
+      const lignes = Array.isArray(corps.lignes) ? corps.lignes.slice(0, 2000) : [];
+      if (!lignes.length) return json({ error: "Aucune ligne à importer." }, 400);
+      const jour = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+      const aujourdhui = new Date().toISOString().slice(0, 10);
+      const rpps = [...new Set(lignes.map((l: any) => String(l?.rpps ?? "")).filter((r: string) => /^\d{11}$/.test(r)))] as string[];
+      const parRpps = new Map<string, any>();
+      for (let i = 0; i < rpps.length; i += 200) {
+        const { data } = await db.from("admin_reseau_praticiens").select("id, rpps, etat, doctolib_infos").in("rpps", rpps.slice(i, i + 200));
+        for (const p of data ?? []) parRpps.set(p.rpps, p);
+      }
+      const bilan = { mis_a_jour: 0, signaux: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[] };
+      for (const l of lignes) {
+        const r = String(l?.rpps ?? "");
+        const p = parRpps.get(r);
+        const releve = jour(l?.releveLe);
+        if (!p) { bilan.inconnus.push(r); continue; }
+        if (p.etat === "exclu") { bilan.exclus.push(r); continue; }
+        if (!urlDoctolibValide(l?.url) || !releve || releve > aujourdhui) { bilan.refuses.push(r); continue; }
+        const lien = urlPropre(l.url);
+        const premier = jour(l?.premierCreneau);
+        const sept = Number.isFinite(l?.creneaux7j) && l.creneaux7j >= 0 ? Math.min(Math.round(l.creneaux7j), 10000) : null;
+        const reservable = typeof l?.reservable === "boolean" ? l.reservable : null;
+        const infos: Record<string, unknown> = { ...(p.doctolib_infos ?? {}) };
+        if (reservable !== null) infos.reservable = reservable;
+        if (premier || sept !== null) {
+          infos.disponibilites = {
+            creneaux: sept ?? 0, sous7Jours: sept ?? 0, parJour: [],
+            premier: premier ? { date: premier, jours: Math.max(0, Math.round((Date.parse(premier) - Date.parse(releve)) / 86_400_000)) } : null,
+            motif: null, releve_le: `${releve}T12:00:00Z`, releve_par: `${email} (import)`,
+          };
+        }
+        const { error } = await db.from("admin_reseau_praticiens").update({
+          doctolib_url: lien, doctolib_statut: "confirme", doctolib_par: `${email} (import)`, doctolib_le: new Date().toISOString(), doctolib_infos: infos,
+        }).eq("id", p.id);
+        if (error) { bilan.refuses.push(r); continue; }
+        bilan.mis_a_jour++;
+        // Signaux : datés du relevé (la péremption du créneau part de cette date), source = la fiche.
+        const signaux: [string, unknown][] = [["creneau_doctolib", l?.creneau], ["nouveaux_patients", l?.nouveauxPatients]];
+        for (const [type, valeur] of signaux) {
+          if (typeof valeur !== "string" || !valeurAdmise(type as any, valeur)) continue;
+          await remplacerAncien(db, p.id, type);
+          const { error: eS } = await db.from("admin_reseau_signaux").insert({
+            praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "valide",
+            propose_par: `${email} (import)`, decide_par: `${email} (import)`, decide_le: `${releve}T12:00:00Z`,
+          });
+          if (!eS) bilan.signaux++;
+        }
+        await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib_import", detail: { url: lien, releve_le: releve } });
+      }
+      return json(bilan);
     }
 
     case "doctolib_creneaux": {
