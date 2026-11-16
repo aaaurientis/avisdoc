@@ -414,7 +414,10 @@ export const reseauRepo = {
       sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").not("doctolib_url", "is", null).neq("etat", "exclu").order("id").range(de, a));
     return lignes.map(toPraticien);
   },
-  importerResultatsDoctolib: (lignes: unknown[]): Promise<{ mis_a_jour: number; signaux: number; inconnus: string[]; exclus: string[]; refuses: string[] }> =>
+  importerResultatsDoctolib: (lignes: unknown[]): Promise<{
+    mis_a_jour: number; signaux: number; inconnus: string[]; exclus: string[]; refuses: string[];
+    a_valider: { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[];
+  }> =>
     appeler("reseau-action", { action: "doctolib_import", lignes }),
   enregistrerCreneauxDoctolib: (praticienId: string, url: string, disponibilites: { creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[]; premier: { date: string; jours: number } | null; motif: string | null }, creneau: string | null) =>
     appeler("reseau-action", { action: "doctolib_creneaux", praticien_id: praticienId, url, disponibilites, creneau }),

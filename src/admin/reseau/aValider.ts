@@ -24,7 +24,7 @@ export function pointsAValider(p: PraticienPourPoints, signaux: SignalPourPoints
   if (p.etat === "exclu") return [];
   const out: PointAValider[] = [];
   const propositions = signaux.filter((s) => s.statut === "propose").length;
-  if (propositions) out.push({ cle: "ia", libelle: `${propositions} proposition${propositions > 1 ? "s" : ""} de l'IA à valider ou rejeter`, section: "ia" });
+  if (propositions) out.push({ cle: "ia", libelle: `${propositions} proposition${propositions > 1 ? "s" : ""} (IA ou import Doctolib) à valider ou rejeter`, section: "ia" });
   if (p.googleStatut === "trouvee_auto") out.push({ cle: "google", libelle: "Fiche Google trouvée : vérifier et confirmer", section: "adresses" });
   // Une information déjà récupérée sur la fiche (relevé, import) vaut confirmation du lien.
   const renseigne = !!p.doctolibUrl && !!p.doctolibInfos;
