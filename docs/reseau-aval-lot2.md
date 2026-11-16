@@ -328,3 +328,10 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - Sous le nom : chaque adresse d'exercice, normalisée par la Base Adresse Nationale (`geo_label`, migration 0094), avec « vérifiée » si elle a été trouvée au numéro, sinon l'adresse RPPS telle quelle et « non vérifiée ».
 - Téléphones dédoublonnés, chacun avec sa source : RPPS, et Google pour les fiches confirmées ou trouvées (lu à l'affichage, jamais enregistré). Cliquables (appel).
 - 16/11 : l'import accepte « inconnu » (= case vide), une valeur suivie d'un commentaire entre parenthèses (« non (bloqué…) » = non ; « (parcours interrompu…) » = vide), une date avec heure, et une colonne facultative `statut_fiche` (« non relevé » ignoré, « page inexistante » signalé). Import ponctuel d'un fichier de 53 lignes issu d'une collecte automatisée, décidé par l'utilisateur en connaissance de cause (CGU Doctolib, validation DPO à obtenir) ; aucun outil de collecte n'est fourni par le Hub.
+
+## Points à valider (16/11)
+
+- Par praticien (logique pure `src/admin/reseau/aValider.ts`, testée) : propositions IA en attente ; fiche Google « trouvée » à confirmer ; lien Doctolib « trouvé » à confirmer ou « fiche à choisir » ; hors cible repéré sur Doctolib ; premier créneau Doctolib périmé (> 14 jours) ; absent de la dernière extraction RPPS. Une fiche Doctolib déjà renseignée (relevé, import) n'est plus à confirmer.
+- Tableau : la colonne « État » est remplacée par « À valider » (« 2 points à valider », détail au survol ; « À jour » sinon ; « Exclu » reste affiché). Tri et filtre « À valider ». L'état reste sur la fiche et dans le filtre État.
+- Fiche : encadré « N points à valider » en tête ; un clic ouvre la section concernée et y descend.
+- Doctolib : « À confirmer » devient « Fiche à choisir » (plusieurs fiches à son nom, aucune sûre), et ne s'affiche plus dès qu'une information a été récupérée : « Fiche relevée ».
