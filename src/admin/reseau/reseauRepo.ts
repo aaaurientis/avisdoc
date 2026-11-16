@@ -415,7 +415,7 @@ export const reseauRepo = {
     return lignes.map(toPraticien);
   },
   importerResultatsDoctolib: (lignes: unknown[]): Promise<{
-    mis_a_jour: number; signaux: number; inconnus: string[]; exclus: string[]; refuses: string[];
+    mis_a_jour: number; signaux: number; deja_valides: number; inconnus: string[]; exclus: string[]; refuses: string[];
     a_valider: { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[];
   }> =>
     appeler("reseau-action", { action: "doctolib_import", lignes }),

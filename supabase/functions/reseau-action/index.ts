@@ -255,7 +255,7 @@ serve(async (req) => {
         for (const p of data ?? []) parRpps.set(p.rpps, p);
       }
       const bilan = {
-        mis_a_jour: 0, signaux: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[],
+        mis_a_jour: 0, signaux: 0, deja_valides: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[],
         /** Praticiens qui ont désormais des propositions à valider (lien vers leur fiche). */
         a_valider: [] as { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[],
       };
@@ -294,6 +294,19 @@ serve(async (req) => {
         const points: string[] = [];
         for (const [type, valeur, extrait] of signaux) {
           if (typeof valeur !== "string" || !valeurAdmise(type as any, valeur)) continue;
+          // Déjà validé avec la même valeur : on ne redemande pas (décision du 16/11). Pour un
+          // créneau, un relevé plus récent rafraîchit seulement sa date (péremption à 14 jours).
+          const { data: deja } = await db.from("admin_reseau_signaux").select("id, decide_le")
+            .eq("praticien_id", p.id).eq("type", type).eq("statut", "valide").eq("valeur", valeur).maybeSingle();
+          if (deja) {
+            const releveIso = `${releve}T12:00:00Z`;
+            if (type === "creneau_doctolib" && (!deja.decide_le || Date.parse(deja.decide_le) < Date.parse(releveIso))) {
+              await db.from("admin_reseau_signaux").update({ decide_le: releveIso, url: lien }).eq("id", deja.id);
+            }
+            await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").eq("url", lien);
+            bilan.deja_valides++;
+            continue;
+          }
           // Une proposition identique d'un import précédent est remplacée, pas doublée.
           await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").eq("url", lien);
           const { error: eS } = await db.from("admin_reseau_signaux").insert({

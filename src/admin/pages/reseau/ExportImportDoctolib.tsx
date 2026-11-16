@@ -109,7 +109,8 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
 
       {bilan ? (
         <div className="mt-4 space-y-1.5 text-[13px]">
-          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> proposition{bilan.signaux > 1 ? "s" : ""} à valider.</p>
+          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> proposition{bilan.signaux > 1 ? "s" : ""} à valider
+            {bilan.deja_valides > 0 ? <> · {bilan.deja_valides} déjà validée{bilan.deja_valides > 1 ? "s" : ""} (non redemandée{bilan.deja_valides > 1 ? "s" : ""})</> : null}.</p>
           {bilan.a_valider.length > 0 && (
             <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2">
               <div className="font-semibold text-violet-900">Points à valider ({bilan.a_valider.length} praticien{bilan.a_valider.length > 1 ? "s" : ""})</div>
