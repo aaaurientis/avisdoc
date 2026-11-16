@@ -205,7 +205,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
 
       {horsCible && p.etat !== "exclu" && (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12.5px] text-amber-900">
-          <span><b>Hors cible ?</b> Doctolib le présente comme {horsCible}. S'il n'a pas sa place dans le réseau d'aval, excluez-le.</span>
+          <span><b>Hors cible ?</b> Doctolib le présente comme {horsCible}.</span>
           <button type="button" onClick={() => setExclusion(true)} disabled={!!motifExclure}
             className="ml-auto rounded-full border border-amber-400 bg-white px-3 py-1 text-[12px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">
             Exclure : non concerné
@@ -217,14 +217,13 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         <div className="rounded-xl bg-muted/50 px-3.5 py-3">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-display text-3xl font-semibold text-avisdoc-ink">{pourcent(score.probabilite)}</span>
-            <span className="text-right text-[11.5px] text-muted-foreground">{score.calibre ? "Probabilité calibrée" : "Estimation a priori, non calibrée"}<br />{score.version}</span>
           </div>
           {score.elimine ? (
             <p className="mt-2 text-[12.5px] font-semibold text-rose-700">Critère éliminatoire : {score.elimine}</p>
           ) : (
             <table className="mt-2 w-full text-[12px]">
               <tbody>
-                <tr className="text-muted-foreground"><td className="py-0.5">Base (taux d'adhésion attendu 20 %)</td><td className="text-right tabular-nums">{virgule(score.base)}</td></tr>
+                <tr className="text-muted-foreground"><td className="py-0.5">Base</td><td className="text-right tabular-nums">{virgule(score.base)}</td></tr>
                 {score.contributions.map((c) => (
                   <tr key={c.libelle}>
                     <td className="py-0.5">
@@ -234,7 +233,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
                     <td className={cn("text-right tabular-nums font-semibold", c.points > 0 ? "text-emerald-700" : "text-rose-700")}>{virgule(c.points)}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-border/60 font-semibold"><td className="pt-1">Somme z</td><td className="pt-1 text-right tabular-nums">{virgule(score.z)}</td></tr>
+                <tr className="border-t border-border/60 font-semibold"><td className="pt-1">Total</td><td className="pt-1 text-right tabular-nums">{virgule(score.z)}</td></tr>
               </tbody>
             </table>
           )}
@@ -273,7 +272,6 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
                 </div>
               ))}
             </div>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">Ouvrez la source avant de valider. L'extrait est effacé dès la décision.</p>
           </>
         )}
       </Section>
@@ -295,7 +293,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
                         {" · "}{dateFr(s.decideLe)}{" · "}{s.origine === "ia" ? `IA, validé par ${s.decidePar}` : s.decidePar}
                       </div>
                     ) : (
-                      <div className="text-[11.5px] text-muted-foreground">Inconnu · d'habitude : {SIGNAUX[t].source}</div>
+                      <div className="text-[11.5px] text-muted-foreground">Inconnu</div>
                     )}
                   </div>
                   <button type="button" onClick={() => setSaisie(saisie === t ? null : t)} disabled={lectureSeule || p.etat === "exclu"}
@@ -447,7 +445,7 @@ function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienResea
 }
 
 function ResumeRecherche({ recherche: r }: { recherche: RechercheIa | null }) {
-  if (!r) return <p className="mt-1 text-[12px] text-muted-foreground">Jamais lancée. L'IA cherche sur le web public les signaux absents de la fiche Google ; chaque proposition est contrôlée sur sa source, puis validée par vous.</p>;
+  if (!r) return <p className="mt-1 text-[12px] text-muted-foreground">Jamais lancée.</p>;
   if (r.statut !== "termine") return <AvancementIa recherche={r} />;
   const nbEcartees = r.resultat?.ecartees?.length ?? 0;
   return (
@@ -534,7 +532,6 @@ function CarteFicheGoogle({ fiche, lieuRpps, onAvis, occupeAvis }: { fiche: Fich
               <div>{a.texte}</div>
             </div>
           ))}
-          <p className="text-[11px] text-muted-foreground">Avis lus à l'écran, jamais enregistrés. Saisissez le signal « Plaintes sur les délais » avec le lien de la fiche.</p>
         </div>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11.5px]">
@@ -544,7 +541,6 @@ function CarteFicheGoogle({ fiche, lieuRpps, onAvis, occupeAvis }: { fiche: Fich
             {occupeAvis ? "Chargement…" : "Voir les avis"}
           </button>
         )}
-        <span className="ml-auto text-muted-foreground">Données Google Maps, affichées sans être enregistrées</span>
       </div>
     </div>
   );
@@ -622,15 +618,10 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange, onFiche
       {/* Fiches rattachées, affichées directement */}
       {p.googlePlaceIds.length > 0 && !candidats && (
         <div className="mt-1.5 space-y-2">
-          {p.googleStatut === "trouvee_auto" && (
-            <p className="text-[11.5px] text-muted-foreground">Rattachée automatiquement : même nom et même code postal qu'un lieu RPPS. Vérifiez puis confirmez.</p>
-          )}
           {p.googleStatut === "confirmee" && p.googlePlaceIds.length > 0 && (
             <p className="text-[11.5px] text-muted-foreground">
-              {p.googleRattachePar?.startsWith("automatique")
-                ? "Validée automatiquement : même nom et même adresse qu'un lieu RPPS."
-                : p.googleRattachePar ? `Choisie par ${p.googleRattachePar}.` : "Validée."}
-              {p.googleRattacheLe ? ` Le ${dateFr(p.googleRattacheLe)}.` : ""}
+              {p.googleRattachePar?.startsWith("automatique") ? "Validée automatiquement" : p.googleRattachePar ? `Choisie par ${p.googleRattachePar}` : "Validée"}
+              {p.googleRattacheLe ? `, le ${dateFr(p.googleRattacheLe)}` : ""}
             </p>
           )}
           {p.googlePlaceIds.map((id) => {
@@ -656,10 +647,10 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange, onFiche
       {p.googlePlaceIds.length === 0 && !candidats && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {p.googleAucuneFiche ? (
-            <span className="text-[12px] text-muted-foreground">Pas de fiche Google (cela ne pénalise pas).</span>
+            <span className="text-[12px] text-muted-foreground">Pas de fiche Google.</span>
           ) : (
             <span className="text-[11.5px] text-muted-foreground">
-              {p.googleStatut === "a_confirmer" ? "Aucune fiche à une adresse RPPS. Des fiches portent son nom dans une autre commune du département : choisissez-en une si elle correspond." : p.googleStatut === "introuvable" ? "Aucune fiche à son nom dans le département." : "Pas encore cherchée."}
+              {p.googleStatut === "a_confirmer" ? "Aucune fiche à une adresse RPPS." : p.googleStatut === "introuvable" ? "Aucune fiche à son nom dans le département." : "Pas encore cherchée."}
             </span>
           )}
           <button type="button" onClick={() => void chercher()} disabled={bloque || !!occupe} className={btnSec}>
@@ -736,10 +727,9 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
           <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className={lienCls}>{p.doctolibUrl.replace(/^https:\/\/(www\.)?/, "")} <ExternalLink className="size-3" /></a>
           {nonReservable && (
             <p className="mt-1 rounded-lg bg-rose-50 px-2 py-1 text-[11.5px] font-semibold text-rose-800">
-              Page Doctolib sans rendez-vous en ligne : « n'est pas sur Doctolib, pas réservable en ligne ».
+              Non réservable en ligne.
             </p>
           )}
-          {p.doctolibStatut === "trouve_auto" && !nonReservable && <p className="mt-1 text-[11.5px] text-muted-foreground">{DOCTOLIB_AIDE.trouve_auto}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
             {p.doctolibStatut === "trouve_auto" && (
               <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("confirmer", () => reseauRepo.doctolib(p.id, { confirmer: true }))}
@@ -784,7 +774,6 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Ouvrez la fiche Doctolib, regardez le premier créneau proposé, puis cliquez. Le Hub ne lit jamais Doctolib lui-même.</p>
           </div>
         </div>
       ) : (
@@ -839,7 +828,6 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
       {infos.presentation && (
         <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Présentation</summary><p className="mt-1 text-muted-foreground">{infos.presentation}</p></details>
       )}
-      <p className="mt-1 text-[11px] text-muted-foreground">Pour mettre à jour : ouvrez la fiche Doctolib et cliquez sur le favori « Relever sur Doctolib ».</p>
     </div>
   );
 }
