@@ -359,7 +359,7 @@ export const reseauRepo = {
   async signauxDe(ids: string[]): Promise<SignalReseau[]> {
     const out: SignalReseau[] = [];
     for (let i = 0; i < ids.length; i += 200) {
-      const { data, error } = await sb.from("admin_reseau_signaux").select("id, praticien_id, type, valeur, url, origine, statut, propose_par, propose_le")
+      const { data, error } = await sb.from("admin_reseau_signaux").select("id, praticien_id, type, valeur, url, origine, statut, propose_par, propose_le, decide_par, decide_le")
         .in("praticien_id", ids.slice(i, i + 200)).in("statut", ["valide", "propose"]);
       if (error) throw new Error(error.message);
       out.push(...(data ?? []).map(toSignal));
