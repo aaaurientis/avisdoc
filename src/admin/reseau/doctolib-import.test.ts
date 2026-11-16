@@ -36,3 +36,24 @@ describe("export / import des liens Doctolib", () => {
     expect(analyserImport("rpps;nom\n1;2", auj).erreurs[0].message).toMatch(/url_doctolib/);
   });
 });
+
+describe("import : valeurs commentées et statut de la fiche", () => {
+  const h = "rpps;url_doctolib;statut_fiche;reservable;nouveaux_patients;premier_creneau;creneaux_7j;releve_le";
+  it("« inconnu » vaut vide, « non (commentaire) » vaut non, date avec heure acceptée", () => {
+    const r = analyserImport([h,
+      "10000000001;https://www.doctolib.fr/a/b/c;fiche active;oui;inconnu;2026-11-26 16:30;0;2026-11-16T10:06:05.425Z",
+      "10000000002;https://www.doctolib.fr/a/b/d;fiche active;oui;non (bloqué dans le parcours de RDV en ligne);(parcours interrompu : aucune option);;2026-11-16T10:06:05Z",
+    ].join("\n"), auj);
+    expect(r.erreurs).toEqual([]);
+    expect(r.resultats[0]).toMatchObject({ nouveauxPatients: null, premierCreneau: "2026-11-26", creneau: "7_30j", creneaux7j: 0, releveLe: "2026-11-16" });
+    expect(r.resultats[1]).toMatchObject({ nouveauxPatients: "non", premierCreneau: null, creneau: "aucun_nouveau" });
+  });
+  it("page disparue : signalée ; non relevée : ignorée", () => {
+    const r = analyserImport([h,
+      "10000000003;https://www.doctolib.fr/a/b/e;page inexistante (« Cette page n'existe plus »);non;inconnu;;;2026-11-16T10:06:05Z",
+      "10000000004;https://www.doctolib.fr/a/b/f;non relevé (Doctolib a limité les requêtes);;;;;2026-11-16T10:06:05Z",
+    ].join("\n"), auj);
+    expect(r.resultats).toEqual([]);
+    expect(r.erreurs.map((e) => e.ligne)).toEqual([2]);
+  });
+});

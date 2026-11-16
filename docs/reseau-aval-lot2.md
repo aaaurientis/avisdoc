@@ -327,3 +327,4 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 
 - Sous le nom : chaque adresse d'exercice, normalisée par la Base Adresse Nationale (`geo_label`, migration 0094), avec « vérifiée » si elle a été trouvée au numéro, sinon l'adresse RPPS telle quelle et « non vérifiée ».
 - Téléphones dédoublonnés, chacun avec sa source : RPPS, et Google pour les fiches confirmées ou trouvées (lu à l'affichage, jamais enregistré). Cliquables (appel).
+- 16/11 : l'import accepte « inconnu » (= case vide), une valeur suivie d'un commentaire entre parenthèses (« non (bloqué…) » = non ; « (parcours interrompu…) » = vide), une date avec heure, et une colonne facultative `statut_fiche` (« non relevé » ignoré, « page inexistante » signalé). Import ponctuel d'un fichier de 53 lignes issu d'une collecte automatisée, décidé par l'utilisateur en connaissance de cause (CGU Doctolib, validation DPO à obtenir) ; aucun outil de collecte n'est fourni par le Hub.

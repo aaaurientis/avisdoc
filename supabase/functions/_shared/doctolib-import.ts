@@ -64,9 +64,13 @@ export interface LectureImport { resultats: ResultatDoctolib[]; erreurs: { ligne
 
 const sansAccents = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
+/** Un commentaire entre parenthèses suit parfois la valeur : « non (bloqué dans le parcours) » → « non ». */
+const sansCommentaire = (v: string) => v.replace(/\s*\(.*\)\s*$/, "").trim();
+
 function ouiNon(v: string): boolean | null | "illisible" {
-  const x = sansAccents(v);
-  if (!x) return null;
+  const x = sansAccents(sansCommentaire(v));
+  // « inconnu » = case vide : on ne sait pas, on n'en déduit rien.
+  if (!x || x === "inconnu" || x === "?" || x === "nc") return null;
   if (["oui", "o", "yes", "y", "1", "vrai", "true", "x"].includes(x)) return true;
   if (["non", "n", "no", "0", "faux", "false"].includes(x)) return false;
   return "illisible";
@@ -74,8 +78,8 @@ function ouiNon(v: string): boolean | null | "illisible" {
 
 /** « 2026-11-20 », « 20/11/2026 » ou « 20/11/26 » → AAAA-MM-JJ ; null si vide ; "illisible" sinon. */
 export function dateImport(v: string): string | null | "illisible" {
-  const x = v.trim();
-  if (!x) return null;
+  const x = sansCommentaire(v);
+  if (!x || sansAccents(x) === "inconnu") return null;
   let m = x.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   m = x.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
@@ -112,6 +116,10 @@ export function analyserImport(texte: string, aujourdhui: Date = new Date()): Le
     if (!rpps && resultatsVides) return;
     if (resultatsVides) return; // ligne exportée, pas encore relevée : ignorée sans erreur
     const err = (message: string) => erreurs.push({ ligne: n, message: `${rpps || "RPPS ?"} : ${message}` });
+    // Colonne facultative « statut_fiche » : une page disparue ou non relevée n'apporte aucun résultat.
+    const statutFiche = sansAccents(v("statut_fiche"));
+    if (statutFiche.startsWith("non releve")) return;
+    if (statutFiche.startsWith("page inexistante")) return err("la page Doctolib n'existe plus : lien à corriger sur la fiche, ligne ignorée.");
     if (!/^\d{11}$/.test(rpps)) return err("RPPS absent ou invalide (11 chiffres).");
     if (vus.has(rpps)) return err("RPPS en double dans le fichier : seule la première ligne est prise.");
     const url = v("url_doctolib");
