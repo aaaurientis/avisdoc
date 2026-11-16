@@ -22,6 +22,26 @@ const COULEUR: Record<Population, string> = {
 
 const echapper = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
+// Contours des départements : API Découpage administratif d'abord, sinon le fichier public
+// france-geojson (IGN, Licence Ouverte) — chargé une fois, gardé en mémoire.
+const SOURCE_CONTOURS = "https://cdn.jsdelivr.net/gh/gregoiredavid/france-geojson@master/departements-version-simplifiee.geojson";
+let contoursFrance: Promise<any | null> | null = null;
+
+async function contourDepartement(code: string): Promise<any | null> {
+  try {
+    const r = await fetch(`https://geo.api.gouv.fr/departements/${encodeURIComponent(code)}?fields=contour&format=geojson&geometry=contour`, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) {
+      const geo = await r.json();
+      const geometrie = geo?.type === "Feature" ? geo.geometry : geo?.contour ?? (geo?.type === "Polygon" || geo?.type === "MultiPolygon" ? geo : null);
+      if (geometrie?.type === "Polygon" || geometrie?.type === "MultiPolygon") return { type: "Feature", geometry: geometrie, properties: { code } };
+    }
+  } catch { /* source suivante */ }
+  contoursFrance ??= fetch(SOURCE_CONTOURS, { signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const tous = await contoursFrance;
+  if (!tous) { contoursFrance = null; return null; }
+  return (tous.features ?? []).find((f: any) => String(f?.properties?.code ?? "").toUpperCase() === code.toUpperCase()) ?? null;
+}
+
 export default function ReseauCarte({ praticiens, departement, scores, selection, onSelect }: {
   praticiens: PraticienReseau[];
   departement: string;
@@ -51,6 +71,43 @@ export default function ReseauCarte({ praticiens, departement, scores, selection
       .catch((e) => { if (!annule) setEtat(e?.message === "missing-key" ? "sans-cle" : "erreur"); });
     return () => { annule = true; };
   }, []);
+
+  // Contour officiel du département (API Découpage administratif, geo.api.gouv.fr) : dessiné,
+  // et la carte est cadrée et bornée dessus. Sans contour (réseau), cadrage sur les lieux.
+  const contourRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (etat !== "prete" || !carteRef.current) return;
+    const google = (window as any).google;
+    const carte = carteRef.current;
+    let annule = false;
+    carte.data.forEach((f: any) => carte.data.remove(f));
+    carte.setOptions({ restriction: null, minZoom: null });
+    contourRef.current = null;
+    contourDepartement(departement)
+      .then((geo) => {
+        if (annule || !geo) return;
+        carte.data.addGeoJson(geo);
+        carte.data.setStyle({ fillColor: "#0e7490", fillOpacity: 0.04, strokeColor: "#0e7490", strokeOpacity: 0.7, strokeWeight: 2, clickable: false });
+        const cadre = new google.maps.LatLngBounds();
+        carte.data.forEach((f: any) => f.getGeometry().forEachLatLng((p: any) => cadre.extend(p)));
+        if (cadre.isEmpty()) return;
+        carte.fitBounds(cadre, 16);
+        // Bornes : le département et une petite marge, pas au-delà (on peut zoomer, pas s'éloigner).
+        const ne = cadre.getNorthEast(), so = cadre.getSouthWest();
+        const dLat = (ne.lat() - so.lat()) * 0.15, dLng = (ne.lng() - so.lng()) * 0.15;
+        google.maps.event.addListenerOnce(carte, "idle", () => {
+          if (annule) return;
+          carte.setOptions({
+            restriction: { latLngBounds: { north: ne.lat() + dLat, south: so.lat() - dLat, east: ne.lng() + dLng, west: so.lng() - dLng }, strictBounds: false },
+            minZoom: Math.max(5, (carte.getZoom() ?? 8) - 1),
+          });
+        });
+        contourRef.current = departement;
+        cadreRef.current = "";
+      })
+      .catch(() => { /* sans contour : cadrage sur les lieux (effet suivant) */ });
+    return () => { annule = true; };
+  }, [etat, departement]);
 
   useEffect(() => {
     if (etat !== "prete" || !carteRef.current) return;
@@ -95,7 +152,8 @@ export default function ReseauCarte({ praticiens, departement, scores, selection
     }
     // Recadrer seulement quand la liste change, pas à chaque sélection.
     const cle = `${departement}|${praticiens.map((p) => p.id).join(",")}`;
-    if (places > 0 && cadreRef.current !== cle) {
+    // Le contour du département, s'il est chargé, fixe déjà le cadre.
+    if (places > 0 && cadreRef.current !== cle && contourRef.current !== departement) {
       carteRef.current.fitBounds(cadre, 48);
       if (places === 1) carteRef.current.setZoom(12);
       cadreRef.current = cle;
