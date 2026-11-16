@@ -144,3 +144,9 @@ verify_jwt = true
 # vérifié dans la fonction (utilisateur « sante » ou appel interne signé).
 [functions.reseau-file]
 verify_jwt = false
+
+[functions.reseau-mcp]
+verify_jwt = false
+
+[functions.mcp-cles]
+verify_jwt = true

@@ -10,6 +10,7 @@ import {
   ChevronDown,
   FileText,
   KeyRound,
+  Plug,
   LayoutDashboard,
   LayoutGrid,
   LifeBuoy,
@@ -163,6 +164,7 @@ const MENU: Entree[] = [
     { to: "/parametrage-veille", label: "Paramétrage veille", icon: Radar },
     { to: "/cpr", label: "CPR veille", icon: Calculator },
     { to: "/droits", label: "Droits d'accès", icon: KeyRound },
+    { to: "/cles-mcp", label: "Clés d'accès (MCP)", icon: Plug },
     { to: "/audit", label: "Auditabilité", icon: ScrollText },
   ] },
 ];

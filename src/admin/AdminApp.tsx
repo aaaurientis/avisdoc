@@ -32,6 +32,7 @@ import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
 import TypologiesClients from "./pages/TypologiesClients";
 import Audit from "./pages/Audit";
+import ClesMcp from "./pages/ClesMcp";
 import Droits from "./pages/Droits";
 import Veille from "./pages/Veille";
 import VeilleSurveiller from "./pages/VeilleSurveiller";
@@ -176,6 +177,7 @@ function Gate() {
           <Route path="/infirmieres/:id" element={<Garde module="sante"><InfirmiereFiche /></Garde>} />
           <Route path="/audit" element={<Garde module="admin"><Audit /></Garde>} />
           <Route path="/droits" element={<Garde module="admin"><Droits /></Garde>} />
+          <Route path="/cles-mcp" element={<Garde module="admin"><ClesMcp /></Garde>} />
           <Route path="/settings" element={<Garde module="admin"><Settings /></Garde>} />
           <Route path="/parametrage-veille" element={<Garde module="admin"><VeilleSurveiller /></Garde>} />
           <Route path="/cpr" element={<Garde module="admin"><VeilleCpr /></Garde>} />
