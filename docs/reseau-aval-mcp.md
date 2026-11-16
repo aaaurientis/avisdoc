@@ -27,3 +27,15 @@ Connecteur pour Cowork / Claude Desktop : point de collecte Doctolib, fiches à 
 
 - Le connecteur ne parcourt pas Doctolib : il fournit la liste et reçoit les résultats. La collecte reste de la responsabilité de l'utilisateur (CGU Doctolib, avis DPO en attente).
 - Testé localement (base simulée : clé absente/invalide → 401, initialize, tools/list, appels, import avec erreur ligne par ligne). Non testé de bout en bout contre Supabase depuis l'environnement de développement.
+
+## Contenu complet (16/11, suite)
+
+`importer_resultats_doctolib` (et l'import CSV, même logique) accepte tout ce qui est relevé :
+- `texte_fiche` (texte intégral, « Voir plus » compris ; en CSV : `fiche_texte_integral`, `voirplus_*`, `autres_lieux_texte_integral`), `texte_creneaux` (`page_creneaux_texte_integral`), `site_web` (`site_web_et_liens`), `telephones`, `motifs` (`motifs_reservables`), `lieux`, `creneaux` (`prochains_30_creneaux`, « AAAA-MM-JJ HH:MM ») ;
+- `autres` : toute autre information (en CSV : toute autre colonne remplie), gardée telle quelle.
+
+Le Hub analyse les textes (`analyserFicheDoctolib`, `analyserCreneaux` : spécialité, expertises, tarifs, langues, conventionnement, carte Vitale, téléconsultation, présentation, nouveaux patients, réservable, créneaux par jour — jours écrits en entier « Mercredi 20 janvier 2027 » reconnus) et enregistre les signaux de la grille trouvés (premier créneau, nouveaux patients, dermoscopie, exérèse, chirurgie sur place), validés au nom de l'importateur, datés du relevé, source = la fiche. Les valeurs explicites priment sur l'analyse.
+
+Bilan : `signaux` (enregistrés), `deja_valides` (même valeur déjà validée : non redemandés — cause habituelle d'un « signaux : 0 » sur un fichier déjà importé), `erreurs_signaux` (raison de chaque échec).
+
+Fiche praticien (section Doctolib) : téléphones, lieux, site, motifs, créneaux par jour, texte intégral, texte de la page de rendez-vous, autres informations ; téléphones et site Doctolib aussi en tête de fiche.

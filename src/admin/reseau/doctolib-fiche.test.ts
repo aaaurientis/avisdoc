@@ -124,3 +124,11 @@ describe("relevé avec « Voir plus » ouverts par le favori", () => {
     expect(f.nom).toBe("Dr Claire Arnoux");
   });
 });
+
+describe("page de rendez-vous : jours écrits en entier", () => {
+  it("« Mercredi 20 janvier 2027 » puis les horaires", () => {
+    const d = analyserCreneaux("Choisissez la date de consultation\nMercredi 20 janvier 2027\n11:45\nMercredi 27 janvier 2027\n11:15\n11:45", new Date("2026-11-16T12:00:00Z"));
+    expect(d.parJour).toEqual([{ date: "2027-01-20", n: 1 }, { date: "2027-01-27", n: 2 }]);
+    expect(d.valeur).toBe("plus_30j");
+  });
+});

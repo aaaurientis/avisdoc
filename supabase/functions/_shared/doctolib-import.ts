@@ -60,7 +60,29 @@ export interface ResultatDoctolib {
   creneaux7j: number | null;
   /** Valeur du signal « premier créneau », déduite du délai entre le relevé et le premier créneau. */
   creneau: "moins_7j" | "7_30j" | "plus_30j" | "aucun_nouveau" | null;
+  /** Contenu complet relevé (facultatif) : analysé par le Hub, conservé sur la fiche. */
+  texteFiche?: string | null;
+  texteCreneaux?: string | null;
+  siteWeb?: string | null;
+  telephones?: string[];
+  motifs?: string[];
+  lieux?: string[];
+  /** Horaires affichés, « AAAA-MM-JJ HH:MM » (liste structurée, si le relevé la fournit). */
+  creneaux?: string[];
+  /** Toute autre colonne remplie, gardée telle quelle (rien ne se perd). */
+  autres?: Record<string, string>;
 }
+
+/** Colonnes connues (lues et interprétées) : tout le reste part dans « autres ». */
+const CONNUES = new Set(["rpps", "nom", "prenom", "population", "ville", "statut_lien", "url_doctolib", "dernier_releve", "statut_fiche",
+  "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le", "texte_fiche", "fiche_texte_integral",
+  "autres_lieux_texte_integral", "texte_creneaux", "page_creneaux_texte_integral", "site_web", "site_web_et_liens", "telephones",
+  "motifs", "motifs_reservables", "lieux", "creneaux", "prochains_30_creneaux"]);
+
+/** Séparateur entre les rubriques de texte (fiche, « Voir plus ») — reconnu par l'analyse de la fiche. */
+const SEPARATEUR = "\n§§avisdoc§§\n";
+const MAX_TEXTE = 60000;
+const liste = (v: string) => [...new Set(v.split(/\s*(?:\||;|\n)\s*/).map((x) => x.trim()).filter(Boolean))].slice(0, 30);
 
 export interface LectureImport { resultats: ResultatDoctolib[]; erreurs: { ligne: number; message: string }[] }
 
@@ -114,7 +136,23 @@ export function analyserImport(texte: string, aujourdhui: Date = new Date()): Le
     const n = i + 2;
     const v = (nom: string) => (col(nom) >= 0 ? (l[col(nom)] ?? "").trim() : "");
     const rpps = v("rpps").replace(/\s/g, "");
-    const resultatsVides = COLONNES_RESULTATS.every((c) => !v(c));
+    // Contenu complet (facultatif) : texte de la fiche et de ses « Voir plus », page des créneaux, site, téléphones, motifs, lieux.
+    const commence = (prefixe: string) => entete.map((c, k) => (c.startsWith(prefixe) ? (l[k] ?? "").trim() : "")).filter(Boolean);
+    const texteFiche = [v("texte_fiche"), v("fiche_texte_integral"), ...commence("voirplus_"), v("autres_lieux_texte_integral")].filter(Boolean).join(SEPARATEUR).slice(0, MAX_TEXTE);
+    const texteCreneaux = (v("texte_creneaux") || v("page_creneaux_texte_integral")).slice(0, MAX_TEXTE);
+    const siteWeb = v("site_web") || v("site_web_et_liens");
+    const telephones = liste(v("telephones"));
+    const motifs = liste(v("motifs") || v("motifs_reservables"));
+    const lieux = liste(v("lieux"));
+    const creneauxListe = liste(v("creneaux") || v("prochains_30_creneaux")).filter((c) => /^\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}/.test(c)).slice(0, 200);
+    const autres: Record<string, string> = {};
+    entete.forEach((c, k) => {
+      if (!c || CONNUES.has(c) || c.startsWith("voirplus_")) return;
+      const val = (l[k] ?? "").trim();
+      if (val) autres[c] = val.slice(0, 20000);
+    });
+    const contenu = !!(texteFiche || texteCreneaux || siteWeb || telephones.length || motifs.length || lieux.length || creneauxListe.length);
+    const resultatsVides = COLONNES_RESULTATS.every((c) => !v(c)) && !contenu;
     if (!rpps && resultatsVides) return;
     if (resultatsVides) return; // ligne exportée, pas encore relevée : ignorée sans erreur
     const err = (message: string) => erreurs.push({ ligne: n, message: `${rpps || "RPPS ?"} : ${message}` });
@@ -147,6 +185,8 @@ export function analyserImport(texte: string, aujourdhui: Date = new Date()): Le
     resultats.push({
       ligne: n, rpps, url, releveLe: releve, reservable, nouveauxPatients: nouveaux === null ? null : nouveaux ? "oui" : "non",
       premierCreneau: premier, creneaux7j: sept ? Number(sept) : null, creneau,
+      ...(contenu ? { texteFiche: texteFiche || null, texteCreneaux: texteCreneaux || null, siteWeb: siteWeb || null, telephones, motifs, lieux, creneaux: creneauxListe } : {}),
+      ...(Object.keys(autres).length ? { autres } : {}),
     });
   });
   return { resultats, erreurs };

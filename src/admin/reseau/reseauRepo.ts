@@ -81,6 +81,14 @@ export interface InfosDoctolib {
     premier: { date: string; jours: number } | null; motif: string | null; releve_le: string; releve_par: string;
   } | null;
   premierCreneau: { date: string | null; jours: number | null; valeur: string | null } | null;
+  /** Contenu complet relevé (import, connecteur). */
+  site_web?: string | null;
+  telephones?: string[];
+  motifs?: string[];
+  lieux?: string[];
+  texte_integral?: string | null;
+  texte_creneaux?: string | null;
+  autres?: Record<string, string> | null;
 }
 
 export interface SignalReseau {
@@ -235,6 +243,9 @@ export function normaliserInfosDoctolib(i: any): InfosDoctolib | null {
     tarifs: liste(i.tarifs), langues: liste(i.langues), presentation: texte(i.presentation), adresses: liste(i.adresses),
     reservable: typeof i.reservable === "boolean" ? i.reservable : null,
     premierCreneau: i.premierCreneau && typeof i.premierCreneau === "object" ? i.premierCreneau : null,
+    site_web: texte(i.site_web), telephones: liste(i.telephones), motifs: liste(i.motifs), lieux: liste(i.lieux),
+    texte_integral: texte(i.texte_integral), texte_creneaux: texte(i.texte_creneaux),
+    autres: i.autres && typeof i.autres === "object" ? Object.fromEntries(Object.entries(i.autres).filter(([, v]) => typeof v === "string")) as Record<string, string> : null,
     disponibilites: d ? {
       creneaux: Number(d.creneaux) || 0, sous7Jours: Number(d.sous7Jours) || 0,
       parJour: Array.isArray(d.parJour) ? d.parJour : [], premier: d.premier && d.premier.date ? d.premier : null,

@@ -55,19 +55,27 @@ const OUTILS = [
   },
   {
     name: "importer_resultats_doctolib",
-    description: "Enregistre les résultats relevés sur les fiches Doctolib. Chaque ligne : rpps, url_doctolib (la fiche relevée, obligatoire) et releve_le (date du relevé, obligatoire) ; reservable (oui/non), nouveaux_patients (oui/non), premier_creneau (AAAA-MM-JJ), creneaux_7j (nombre) si connus. Une valeur inconnue se laisse vide ; rien n'est deviné. Renvoie le bilan et les erreurs ligne par ligne.",
+    description: "Enregistre tout ce qui a été relevé sur les fiches Doctolib. Chaque ligne : rpps, url_doctolib (la fiche relevée, obligatoire) et releve_le (date du relevé, obligatoire). Puis, si connus : reservable (oui/non), nouveaux_patients (oui/non), premier_creneau (AAAA-MM-JJ), creneaux_7j (nombre), et le contenu complet : texte_fiche (texte intégral de la fiche, « Voir plus » dépliés compris), texte_creneaux (texte de la page de prise de rendez-vous), site_web, telephones, motifs, lieux. Le Hub analyse les textes (expertises, tarifs, langues, conventionnement, nouveaux patients, créneaux par jour) et en tire les signaux de la grille (dermoscopie, exérèse, chirurgie sur place, nouveaux patients, premier créneau), validés avec la fiche pour source. Une valeur inconnue se laisse vide ; rien n'est deviné. Renvoie le bilan (dont les signaux enregistrés, déjà validés, et les erreurs éventuelles) et les erreurs ligne par ligne.",
     inputSchema: {
       type: "object",
       required: ["lignes"],
       properties: {
         lignes: {
-          type: "array", maxItems: 500,
+          type: "array", maxItems: 200,
           items: {
             type: "object", required: ["rpps", "url_doctolib", "releve_le"], additionalProperties: false,
             properties: {
               rpps: { type: "string" }, url_doctolib: { type: "string" }, releve_le: { type: "string", description: "AAAA-MM-JJ" },
               reservable: { type: "string", enum: ["oui", "non", ""] }, nouveaux_patients: { type: "string", enum: ["oui", "non", ""] },
               premier_creneau: { type: "string", description: "AAAA-MM-JJ, ou vide" }, creneaux_7j: { type: ["integer", "string"] },
+              texte_fiche: { type: "string", description: "Texte intégral de la fiche, « Voir plus » dépliés compris (rubriques séparées par des retours à la ligne)." },
+              texte_creneaux: { type: "string", description: "Texte de la page de prise de rendez-vous (jours et horaires affichés)." },
+              site_web: { type: "string" },
+              telephones: { type: "array", items: { type: "string" } },
+              motifs: { type: "array", items: { type: "string" }, description: "Motifs de consultation réservables." },
+              lieux: { type: "array", items: { type: "string" }, description: "Lieux d'exercice indiqués sur la fiche." },
+              creneaux: { type: "array", items: { type: "string" }, description: "Horaires affichés, « AAAA-MM-JJ HH:MM »." },
+              autres: { type: "object", additionalProperties: { type: "string" }, description: "Toute autre information relevée (parcours de rendez-vous, FAQ, motif relevé…), gardée telle quelle." },
             },
           },
         },
@@ -139,12 +147,19 @@ async function appelerOutil(db: any, acteur: string, nom: string, args: any): Pr
     };
   }
   if (nom === "importer_resultats_doctolib") {
-    const lignes = Array.isArray(args?.lignes) ? args.lignes.slice(0, 500) : [];
+    const lignes = Array.isArray(args?.lignes) ? args.lignes.slice(0, 200) : [];
     if (!lignes.length) throw new Error("Aucune ligne.");
     // Mêmes contrôles que l'import du fichier : on repasse par l'analyse du CSV.
-    const colonnes = ["rpps", "url_doctolib", "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le"];
-    const csv = versCsv(lignes.map((l: any) => Object.fromEntries(colonnes.map((c) => [c, l?.[c] == null ? "" : String(l[c])]))), colonnes);
+    const colonnes = ["rpps", "url_doctolib", "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le",
+      "texte_fiche", "texte_creneaux", "site_web", "telephones", "motifs", "lieux", "creneaux"];
+    const valeur = (v: unknown) => (v == null ? "" : Array.isArray(v) ? v.map(String).join(" | ") : String(v));
+    const csv = versCsv(lignes.map((l: any) => Object.fromEntries(colonnes.map((c) => [c, valeur(l?.[c])]))), colonnes);
     const lecture = analyserImport(csv);
+    // « autres » (objet libre) ne passe pas par le CSV : rattaché ligne à ligne, par RPPS.
+    for (const r of lecture.resultats) {
+      const src = lignes.find((l: any) => String(l?.rpps ?? "").replace(/\s/g, "") === r.rpps);
+      if (src?.autres && typeof src.autres === "object") r.autres = Object.fromEntries(Object.entries(src.autres).map(([k, v]) => [k, String(v ?? "")]));
+    }
     const bilan = lecture.resultats.length ? await importerResultatsDoctolib(db, acteur, lecture.resultats) : null;
     return { lignes_recues: lignes.length, lignes_retenues: lecture.resultats.length, erreurs: lecture.erreurs, bilan };
   }
