@@ -8,7 +8,7 @@ Connecteur pour Cowork / Claude Desktop : point de collecte Doctolib, fiches à 
 2. Admin › **Clés d'accès (MCP)** : créer une clé nommée (ex. « Cowork Arthur »). Elle ne s'affiche qu'une fois ; le Hub n'en garde que l'empreinte SHA-256. Révocation immédiate depuis la même page ; date de dernière utilisation affichée.
 3. Dans Cowork / Claude Desktop (`claude_desktop_config.json`), coller la configuration proposée par la page :
    `npx -y mcp-remote https://<projet>.supabase.co/functions/v1/reseau-mcp --header Authorization:${AVISDOC_CLE}` avec `AVISDOC_CLE = "Bearer avd_…"`.
-   Un client qui ne sait pas envoyer d'en-tête peut passer la clé en paramètre `?cle=avd_…` (déconseillé : l'adresse peut être journalisée).
+   Connecteur personnalisé Claude (Paramètres › Connecteurs) : adresse `…/reseau-mcp?cle=avd_…` proposée par la page (la clé est dans l'adresse : une clé dédiée par connecteur, révocable).
 
 ## Fonctions
 
