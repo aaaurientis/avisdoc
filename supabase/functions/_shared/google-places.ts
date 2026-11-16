@@ -14,10 +14,10 @@ const RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 export const REFERENT_HUB = "https://admin.avisdoc.fr/";
 // Plafonds quotidiens. Google relevé à 10 000 par type le 16/11 (≈ 50 000 requêtes pour
 // 100 $, selon l'utilisateur) : un simple garde-fou contre un emballement, le budget se
-// pilote dans la console Google Cloud. Doctolib (recherche web par l'IA) inchangé.
+// pilote dans la console Google Cloud. Doctolib (recherche web par l'IA) relevé de même le 16/11.
 export const PLAFONDS = {
   recherche: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_RECHERCHE") ?? 10000),
-  doctolib: Number(Deno.env.get("RESEAU_DOCTOLIB_PLAFOND") ?? 200),
+  doctolib: Number(Deno.env.get("RESEAU_DOCTOLIB_PLAFOND") ?? 10000),
   details: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_DETAILS") ?? 10000),
   details_avis: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_AVIS") ?? 10000),
 };
