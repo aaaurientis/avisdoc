@@ -9,7 +9,7 @@ import { urlsDoctolib } from "./doctolib-recherche.ts";
 import type { Niveau } from "./suivi.ts";
 import { completerGeo } from "./geo.ts";
 
-const SELECT = "id, nom, prenom, population, etat, google_statut, google_place_ids, doctolib_statut, " +
+const SELECT = "id, nom, prenom, population, etat, google_statut, google_place_ids, doctolib_statut, doctolib_infos, " +
   "admin_reseau_lieux(id, departement, raison_sociale, adresse, code_postal, commune, lat, lng, geo_tente, geo_type)";
 
 export interface LigneJournal { texte: string; niveau: Niveau }
@@ -81,7 +81,11 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
       lignes.push({ texte: `Plafond Doctolib du jour atteint (${PLAFONDS.doctolib} recherches) : ${qui} sera cherché demain`, niveau: "ecarte" });
     } else {
       const communes = [...new Set(lieux.map((l) => l.commune).filter(Boolean))] as string[];
-      const c = choisirDoctolib(await urlsDoctolib({ nom: p.nom, prenom: p.prenom, population: p.population, communes }), { nom: p.nom, prenom: p.prenom, communes });
+      // Les pages signalées « n'existe plus » ne sont jamais reproposées.
+      const disparues = new Set<string>(Array.isArray(p.doctolib_infos?.pages_disparues) ? p.doctolib_infos.pages_disparues : []);
+      const urls = (await urlsDoctolib({ nom: p.nom, prenom: p.prenom, population: p.population, communes }))
+        .filter((u) => !disparues.has(u.split("?")[0].replace(/\/+$/, "")));
+      const c = choisirDoctolib(urls, { nom: p.nom, prenom: p.prenom, communes });
       const maj: Record<string, unknown> = c.statut === "trouve_auto"
         ? { doctolib_statut: "trouve_auto", doctolib_url: c.url, doctolib_par: "automatique", doctolib_le: new Date().toISOString() }
         : { doctolib_statut: c.statut };

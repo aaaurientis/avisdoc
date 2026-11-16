@@ -743,6 +743,15 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
               className={cn("rounded-full border px-3 py-1 text-[12px] font-semibold disabled:opacity-50", nonReservable ? "border-border text-muted-foreground" : "border-rose-200 text-rose-700 hover:bg-rose-50")}>
               {occupe === "reservable" ? "…" : nonReservable ? "Finalement réservable" : "Non réservable en ligne"}
             </button>
+            <button type="button" disabled={bloque || !!occupe}
+              title="La page Doctolib affiche « Cette page n'existe plus » : le lien est retiré et ne sera plus reproposé."
+              onClick={() => void faire("disparue", async () => {
+                if (!(await confirmer({ titre: "La page Doctolib n'existe plus ?", message: "Le lien est retiré, le praticien passe en « Pas sur Doctolib ». L'ancien lien reste dans l'historique et ne sera plus reproposé.", action: "Retirer le lien" }))) return;
+                await reseauRepo.doctolib(p.id, { page_disparue: true });
+              })}
+              className="rounded-full border border-border px-3 py-1 text-[12px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+              {occupe === "disparue" ? "…" : "N'existe plus"}
+            </button>
             <button type="button" disabled={bloque || !!occupe} onClick={() => void faire("retirer", () => reseauRepo.doctolib(p.id, { retirer: true }))} className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50">Changer de lien</button>
           </div>
 

@@ -14,6 +14,7 @@
 //   • doctolib_creneaux    { praticien_id, url, disponibilites, creneau? } — créneaux relevés sur la page de rendez-vous
 //   • doctolib             { praticien_id, url } | { praticien_id, aucun: true } | { praticien_id, retirer: true } | { praticien_id, confirmer: true }
 //                          | { praticien_id, non_reservable: boolean } (page « n'est pas sur Doctolib »)
+//                          | { praticien_id, page_disparue: true } (« Cette page n'existe plus »)
 //   • google_confirmer     { praticien_id } — la fiche trouvée automatiquement est la bonne
 //   • ajouter_rpps         { rpps } — contrôlé dans l'extraction RPPS (MG_DERM compris)
 //
@@ -368,7 +369,15 @@ serve(async (req) => {
       const maintenant = new Date().toISOString();
       let maj: Record<string, unknown>;
       if (corps.retirer) maj = { doctolib_url: null, doctolib_statut: "a_confirmer", doctolib_par: null, doctolib_le: null };
-      else if (typeof corps.non_reservable === "boolean") {
+      else if (corps.page_disparue === true) {
+        // « Cette page n'existe plus » : le lien est retiré, gardé en mémoire pour ne pas être reproposé.
+        if (!p.doctolib_url) return json({ error: "Aucune fiche Doctolib rattachée." }, 409);
+        const disparues = [...new Set([...(Array.isArray(p.doctolib_infos?.pages_disparues) ? p.doctolib_infos.pages_disparues : []), p.doctolib_url])].slice(-10);
+        maj = {
+          doctolib_url: null, doctolib_statut: "aucun", doctolib_par: email, doctolib_le: maintenant,
+          doctolib_infos: { ...(p.doctolib_infos ?? {}), reservable: null, disponibilites: null, pages_disparues: disparues },
+        };
+      } else if (typeof corps.non_reservable === "boolean") {
         // Constaté par l'opérateur sur la fiche : « … n'est pas sur Doctolib, pas réservable en ligne ».
         if (!p.doctolib_url) return json({ error: "Aucune fiche Doctolib rattachée." }, 409);
         maj = { doctolib_infos: { ...(p.doctolib_infos ?? {}), reservable: !corps.non_reservable }, doctolib_statut: "confirme", doctolib_par: email, doctolib_le: maintenant };
@@ -382,7 +391,7 @@ serve(async (req) => {
       }
       const { error } = await db.from("admin_reseau_praticiens").update(maj).eq("id", p.id);
       if (error) return json({ error: error.message }, 500);
-      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: maj.doctolib_url ?? p.doctolib_url ?? null, statut: maj.doctolib_statut, ...(typeof corps.non_reservable === "boolean" ? { non_reservable: corps.non_reservable } : {}) } });
+      await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: maj.doctolib_url ?? p.doctolib_url ?? null, statut: maj.doctolib_statut, ...(typeof corps.non_reservable === "boolean" ? { non_reservable: corps.non_reservable } : {}), ...(corps.page_disparue === true ? { page_disparue: p.doctolib_url } : {}) } });
       return json({ id: p.id });
     }
 
