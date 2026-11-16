@@ -34,7 +34,8 @@ export function pointsAValider(p: PraticienPourPoints, signaux: SignalPourPoints
   const horsCible = specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite);
   if (horsCible) out.push({ cle: "hors_cible", libelle: `Hors cible ? Doctolib le présente comme ${horsCible}`, section: "exclusion" });
   const creneau = signaux.find((s) => s.type === "creneau_doctolib" && s.statut === "valide");
-  if (creneau && p.doctolibInfos?.reservable !== false && releveCreneauPerime(creneau.decideLe, maintenant)) {
+  // Date inconnue : on ne conclut pas à un relevé périmé.
+  if (creneau?.decideLe && p.doctolibInfos?.reservable !== false && releveCreneauPerime(creneau.decideLe, maintenant)) {
     out.push({ cle: "creneau", libelle: "Premier créneau Doctolib périmé (plus de 14 jours) : à relever", section: "adresses" });
   }
   if (!p.vuAuDernierImport) out.push({ cle: "rpps", libelle: "Absent de la dernière extraction RPPS : exerce-t-il encore ?", section: "exclusion" });
