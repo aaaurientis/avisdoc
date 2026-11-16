@@ -720,7 +720,7 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
     ["Spécialité", infos.specialite],
     ["Rendez-vous en ligne", infos.reservable === false ? "Non : pas réservable en ligne" : infos.reservable ? "Oui" : null],
     ["Créneaux affichés", infos.disponibilites
-      ? `${infos.disponibilites.creneaux} (dont ${infos.disponibilites.sous7Jours} dans les 7 jours)${infos.disponibilites.premier ? `, premier le ${new Date(infos.disponibilites.premier.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""} · relevé le ${dateFr(infos.disponibilites.releve_le)}`
+      ? `${infos.disponibilites.parJour.length ? `${infos.disponibilites.creneaux} (dont ${infos.disponibilites.sous7Jours} dans les 7 jours)` : `${infos.disponibilites.sous7Jours} dans les 7 jours`}${infos.disponibilites.premier ? `, premier le ${new Date(infos.disponibilites.premier.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""} · relevé le ${dateFr(infos.disponibilites.releve_le)}`
       : null],
     ["Conventionnement", infos.conventionnement],
     ["Carte Vitale", infos.carteVitale === null ? null : infos.carteVitale ? "Acceptée" : "Non acceptée"],

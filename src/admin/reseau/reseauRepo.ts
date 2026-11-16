@@ -403,6 +403,14 @@ export const reseauRepo = {
   },
   enregistrerFicheDoctolib: (praticienId: string, url: string, infos: InfosDoctolib, signaux: { type: TypeSignal; valeur: string }[]) =>
     appeler("reseau-action", { action: "doctolib_fiche", praticien_id: praticienId, url, infos, signaux }),
+  /** Tous les praticiens non exclus qui ont un lien Doctolib (export, tous départements). */
+  async praticiensAvecDoctolib(): Promise<PraticienReseau[]> {
+    const lignes = await toutLire((de, a) =>
+      sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").not("doctolib_url", "is", null).neq("etat", "exclu").order("id").range(de, a));
+    return lignes.map(toPraticien);
+  },
+  importerResultatsDoctolib: (lignes: unknown[]): Promise<{ mis_a_jour: number; signaux: number; inconnus: string[]; exclus: string[]; refuses: string[] }> =>
+    appeler("reseau-action", { action: "doctolib_import", lignes }),
   enregistrerCreneauxDoctolib: (praticienId: string, url: string, disponibilites: { creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[]; premier: { date: string; jours: number } | null; motif: string | null }, creneau: string | null) =>
     appeler("reseau-action", { action: "doctolib_creneaux", praticien_id: praticienId, url, disponibilites, creneau }),
   doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean }) =>

@@ -315,3 +315,10 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - **Règle** : fiche au nom du praticien, ouverte, à **50 m au plus** d'un lieu RPPS géocodé **au numéro** (`housenumber`) → validée d'office. Un point au centre d'une rue ou d'une commune ne sert jamais. Le nom reste exigé (un confrère du même immeuble ne doit pas être validé).
 - Affichage : « À 18 m d'un lieu RPPS (positions GPS) » sur la fiche ; distance dans la liste des fiches possibles.
 - Tableau : la colonne « Lieu d'exercice » devient « Ville » (villes seulement ; les structures restent sur la fiche).
+
+## Export / import des liens Doctolib (16/11)
+
+- Page « Trouver des médecins » : **Exporter les liens Doctolib** (tous départements, praticiens non exclus ayant un lien ; CSV « ; » pour Excel, UTF-8) et **Importer les résultats**.
+- Colonnes à remplir : `reservable` (oui/non), `nouveaux_patients` (oui/non), `premier_creneau` (date), `creneaux_7j` (nombre), `releve_le` (date, obligatoire). `rpps` et `url_doctolib` (la source) obligatoires. Lignes non remplies ignorées ; valeurs illisibles signalées ligne par ligne, jamais devinées.
+- Aperçu avant envoi. À l'enregistrement (action `doctolib_import`) : lien confirmé, `reservable` et `disponibilites` mis à jour, signaux « premier créneau » (délai entre relevé et premier créneau) et « nouveaux patients » validés au nom de l'importateur, **datés du relevé** (péremption du créneau à 14 jours), source = la fiche.
+- Les relevés du fichier doivent être faits à la main, fiche par fiche (pas de collecte automatisée de Doctolib).
