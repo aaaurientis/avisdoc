@@ -10,6 +10,15 @@ import { MODULES, MODULES_DEFAUT, type Module } from "../lib/modules";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 
+/** Intitulés courts pour tenir sur une page ; le nom complet reste au survol. */
+const COURT: Partial<Record<Module, string>> = {
+  commercial: "Entrep.", crm_collectivites: "Collect.", crm_mutuelles: "Mutuel.", crm_intermediaires: "Interméd.",
+  crm_synthese: "Synthèse", veille: "Veille", sante: "Santé", journee: "Stats", finance: "Finance", documents: "Docs", admin: "Admin",
+};
+const ESTCRM = (m: Module) => m === "commercial" || m.startsWith("crm_");
+/** Ordre d'affichage : les CRM ensemble, puis le reste. */
+const COLONNES = [...MODULES.filter((m) => ESTCRM(m.key)), ...MODULES.filter((m) => !ESTCRM(m.key))];
+
 interface Ligne {
   email: string;
   modules: Module[];
@@ -85,16 +94,9 @@ export default function Droits() {
         subtitle="Modules du menu autorisés par utilisateur"
       />
 
-      <Card className="mb-4 p-5 text-[13px] leading-relaxed text-muted-foreground">
-        <p>
-          <strong className="text-avisdoc-ink">Règles :</strong> un utilisateur
-          @avisdoc.fr <em>non listé</em> a CRM Entreprise, Veille Marché, Professionnels de Santé,
-          Finance et Documents ; les autres CRM, la CRM Synthèse, Journée et Admin se cochent
-          ici, personne par personne. Une ligne ci-dessous remplace ces défauts ; les <strong>super-admins</strong>
-          {" "}(dont {user?.email}) ont toujours tous les modules — leur liste se
-          gère au SQL Editor (table <code>admin_superadmins</code>).
-        </p>
-      </Card>
+      <p className="mb-3 text-[12px] text-muted-foreground" title={`Non listé : CRM Entreprise, Veille, Santé, Finance, Documents. Super-admins (dont ${user?.email ?? "vous"}) : tous les modules, gérés au SQL Editor (admin_superadmins).`}>
+        Non listé = droits par défaut ; une ligne ici les remplace. Super-admins : tous les modules.
+      </p>
 
       {err && (
         <p className="mb-4 break-words rounded-xl border border-orange-400/40 bg-orange-50 px-3.5 py-2 text-[12.5px] text-orange-700">
@@ -103,9 +105,9 @@ export default function Droits() {
       )}
 
       {/* Ajout d'un utilisateur */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         <input
-          className="ad-input w-full max-w-[320px] rounded-full border border-border bg-card px-4 py-2.5 text-[13.5px] outline-none transition-colors focus:border-avisdoc-teal"
+          className="ad-input w-full max-w-[280px] rounded-full border border-border bg-card px-4 py-1.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           placeholder="email@avisdoc.fr"
           value={nouvelEmail}
           onChange={(e) => setNouvelEmail(e.target.value)}
@@ -115,38 +117,55 @@ export default function Droits() {
           type="button"
           onClick={ajouter}
           disabled={busy || !nouvelEmail.includes("@")}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-1.5 text-[13px] font-bold text-white disabled:opacity-40"
         >
           <Plus className="size-4" /> Ajouter
         </button>
       </div>
 
       <Card className="overflow-x-auto">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full table-fixed text-left text-[13px]">
+          <colgroup>
+            <col className="w-[22%]" />
+            {COLONNES.map((m) => <col key={m.key} />)}
+            <col className="w-8" />
+          </colgroup>
           <thead>
-            <tr className="border-b border-border text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-              <th className="px-5 py-3">Utilisateur</th>
-              {MODULES.map((m) => (
-                <th key={m.key} className="px-3 py-3 text-center">{m.label}</th>
+            <tr className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-muted-foreground">
+              <th />
+              {COLONNES.map((m, i) => {
+                // « CRM » coiffe les colonnes CRM consécutives.
+                if (!ESTCRM(m.key)) return <th key={m.key} />;
+                if (i > 0 && ESTCRM(COLONNES[i - 1].key)) return null;
+                let n = 0;
+                while (i + n < COLONNES.length && ESTCRM(COLONNES[i + n].key)) n++;
+                return <th key={m.key} colSpan={n} className="border-b border-border/60 px-1 pt-2 text-center">CRM</th>;
+              })}
+              <th />
+            </tr>
+            <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
+              <th className="px-4 py-2">Utilisateur</th>
+              {COLONNES.map((m) => (
+                <th key={m.key} className="truncate px-1 py-2 text-center" title={m.label}>{COURT[m.key] ?? m.label}</th>
               ))}
-              <th className="w-10 px-3 py-3" />
+              <th />
             </tr>
           </thead>
           <tbody>
             {lignes.map((l) => (
               <tr key={l.email} className="border-b border-border/60 last:border-b-0">
-                <td className="px-5 py-3 font-semibold text-avisdoc-ink">{l.email}</td>
-                {MODULES.map((m) => {
+                <td className="truncate px-4 py-2 font-semibold text-avisdoc-ink" title={l.email}>{l.email.replace(/@avisdoc\.fr$/i, "")}</td>
+                {COLONNES.map((m) => {
                   const on = l.modules.includes(m.key);
                   return (
-                    <td key={m.key} className="px-3 py-3 text-center">
+                    <td key={m.key} className="px-1 py-2 text-center">
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => basculer(l, m.key)}
                         title={`${m.label} : ${on ? "autorisé" : "refusé"}`}
                         className={cn(
-                          "size-6 rounded-full border-2 text-[12px] font-bold leading-none transition-colors",
+                          "size-5 rounded-full border-2 text-[10px] font-bold leading-none transition-colors",
                           on
                             ? "border-avisdoc-teal bg-avisdoc-teal text-white"
                             : "border-border bg-card text-transparent hover:border-avisdoc-ink",
@@ -157,7 +176,7 @@ export default function Droits() {
                     </td>
                   );
                 })}
-                <td className="px-3 py-3">
+                <td className="px-1 py-2">
                   <button
                     type="button"
                     disabled={busy}
@@ -172,7 +191,7 @@ export default function Droits() {
             ))}
             {lignes.length === 0 && (
               <tr>
-                <td colSpan={MODULES.length + 2} className="px-5 py-8 text-center text-muted-foreground">
+                <td colSpan={COLONNES.length + 2} className="px-5 py-8 text-center text-muted-foreground">
                   Aucun utilisateur listé — tout le monde a les droits par défaut.
                 </td>
               </tr>
