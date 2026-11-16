@@ -440,6 +440,14 @@ export const reseauRepo = {
       sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").not("doctolib_url", "is", null).neq("etat", "exclu").order("id").range(de, a));
     return lignes.map(toPraticien);
   },
+  /** Propositions laissées en attente par des imports Doctolib précédents. */
+  async nbPropositionsImport(): Promise<number> {
+    const { count, error } = await sb.from("admin_reseau_signaux").select("id", { count: "exact", head: true })
+      .eq("statut", "propose").like("propose_par", "%(import)");
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  },
+  validerPropositionsImport: (): Promise<{ valides: number }> => appeler("reseau-action", { action: "valider_propositions_import" }),
   importerResultatsDoctolib: (lignes: unknown[]): Promise<{
     mis_a_jour: number; signaux: number; deja_valides: number; inconnus: string[]; exclus: string[]; refuses: string[];
     a_valider: { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[];
