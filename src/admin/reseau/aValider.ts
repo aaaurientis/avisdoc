@@ -5,7 +5,7 @@
 import { specialiteDuLienDoctolib, specialiteHorsCible } from "../../../supabase/functions/_shared/doctolib";
 import { releveCreneauPerime } from "../../../supabase/functions/_shared/reseau-signaux";
 
-export type SectionFiche = "ia" | "adresses" | "exclusion";
+export type SectionFiche = "ia" | "adresses" | "doctolib" | "exclusion";
 
 export interface PointAValider { cle: string; libelle: string; section: SectionFiche }
 
@@ -29,14 +29,14 @@ export function pointsAValider(p: PraticienPourPoints, signaux: SignalPourPoints
   // Une information déjà récupérée sur la fiche (relevé, import) vaut confirmation du lien.
   const renseigne = !!p.doctolibUrl && !!p.doctolibInfos;
   if (renseigne) { /* rien à confirmer côté lien */ }
-  else if (p.doctolibStatut === "trouve_auto") out.push({ cle: "doctolib", libelle: "Lien Doctolib trouvé : vérifier et confirmer", section: "adresses" });
-  else if (p.doctolibStatut === "a_confirmer") out.push({ cle: "doctolib", libelle: "Fiche Doctolib à choisir (plusieurs fiches à son nom)", section: "adresses" });
+  else if (p.doctolibStatut === "trouve_auto") out.push({ cle: "doctolib", libelle: "Lien Doctolib trouvé : vérifier et confirmer", section: "doctolib" });
+  else if (p.doctolibStatut === "a_confirmer") out.push({ cle: "doctolib", libelle: "Fiche Doctolib à choisir (plusieurs fiches à son nom)", section: "doctolib" });
   const horsCible = specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite);
   if (horsCible) out.push({ cle: "hors_cible", libelle: `Hors cible ? Doctolib le présente comme ${horsCible}`, section: "exclusion" });
   const creneau = signaux.find((s) => s.type === "creneau_doctolib" && s.statut === "valide");
   // Date inconnue : on ne conclut pas à un relevé périmé.
   if (creneau?.decideLe && p.doctolibInfos?.reservable !== false && releveCreneauPerime(creneau.decideLe, maintenant)) {
-    out.push({ cle: "creneau", libelle: "Premier créneau Doctolib périmé (plus de 14 jours) : à relever", section: "adresses" });
+    out.push({ cle: "creneau", libelle: "Premier créneau Doctolib périmé (plus de 14 jours) : à relever", section: "doctolib" });
   }
   if (!p.vuAuDernierImport) out.push({ cle: "rpps", libelle: "Absent de la dernière extraction RPPS : exerce-t-il encore ?", section: "exclusion" });
   return out;
