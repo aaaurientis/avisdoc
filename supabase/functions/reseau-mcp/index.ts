@@ -18,7 +18,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { clientService } from "../_shared/acces-sante.ts";
 import { empreinteCle } from "../_shared/mcp-cle.ts";
 import { analyserImport, versCsv } from "../_shared/doctolib-import.ts";
-import { importerResultatsDoctolib } from "../_shared/doctolib-import-serveur.ts";
+import { importerResultatsDoctolib, retirerPageDisparue } from "../_shared/doctolib-import-serveur.ts";
 import { estDepartement, POPULATION_LIBELLE } from "../_shared/reseau-rpps.ts";
 
 const VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -55,7 +55,7 @@ const OUTILS = [
   },
   {
     name: "importer_resultats_doctolib",
-    description: "Enregistre tout ce qui a été relevé sur les fiches Doctolib. Chaque ligne : rpps, url_doctolib (la fiche relevée, obligatoire) et releve_le (date du relevé, obligatoire). Puis, si connus : reservable (oui/non), nouveaux_patients (oui/non), premier_creneau (AAAA-MM-JJ), creneaux_7j (nombre), et le contenu complet : texte_fiche (texte intégral de la fiche, « Voir plus » dépliés compris), texte_creneaux (texte de la page de prise de rendez-vous), site_web, telephones, motifs, lieux. Le Hub analyse les textes (expertises, tarifs, langues, conventionnement, nouveaux patients, créneaux par jour) et en tire les signaux de la grille (dermoscopie, exérèse, chirurgie sur place, nouveaux patients, premier créneau), validés avec la fiche pour source. Une valeur inconnue se laisse vide ; rien n'est deviné. Renvoie le bilan (dont les signaux enregistrés, déjà validés, et les erreurs éventuelles) et les erreurs ligne par ligne.",
+    description: "Enregistre ce qui a été relevé sur les fiches Doctolib (200 lignes au plus par appel). Obligatoires : rpps, url_doctolib (la fiche relevée), releve_le (AAAA-MM-JJ). Facultatifs, si lus sur la fiche : statut_fiche (« active », « non revendiquée » = pas réservable en ligne, « inexistante » = le lien est retiré), reservable (oui/non), nouveaux_patients (oui/non), premier_creneau (AAAA-MM-JJ), creneaux_7j (nombre), telephones, site_web, motifs (motifs réservables), lieu_releve et motif_releve (sur quoi les créneaux ont été relevés), lieux, creneaux (« AAAA-MM-JJ HH:MM »), texte_fiche, texte_creneaux. Autres noms acceptés : telephone, site, motifs_reservables, lieu_motif_releve… Tout champ non reconnu est gardé tel quel sur la fiche (rien ne se perd). Le Hub tire des textes et valeurs les signaux de la grille (premier créneau, nouveaux patients, dermoscopie, exérèse, chirurgie sur place), validés avec la fiche pour source. Une valeur non lue se laisse vide ; rien n'est deviné. La réponse détaille, ligne par ligne, les champs enregistrés et ceux gardés tels quels.",
     inputSchema: {
       type: "object",
       required: ["lignes"],
@@ -63,19 +63,21 @@ const OUTILS = [
         lignes: {
           type: "array", maxItems: 200,
           items: {
-            type: "object", required: ["rpps", "url_doctolib", "releve_le"], additionalProperties: false,
+            type: "object", required: ["rpps", "url_doctolib", "releve_le"], additionalProperties: true,
             properties: {
               rpps: { type: "string" }, url_doctolib: { type: "string" }, releve_le: { type: "string", description: "AAAA-MM-JJ" },
+              statut_fiche: { type: "string", description: "active | non revendiquée | inexistante" },
               reservable: { type: "string", enum: ["oui", "non", ""] }, nouveaux_patients: { type: "string", enum: ["oui", "non", ""] },
-              premier_creneau: { type: "string", description: "AAAA-MM-JJ, ou vide" }, creneaux_7j: { type: ["integer", "string"] },
-              texte_fiche: { type: "string", description: "Texte intégral de la fiche, « Voir plus » dépliés compris (rubriques séparées par des retours à la ligne)." },
-              texte_creneaux: { type: "string", description: "Texte de la page de prise de rendez-vous (jours et horaires affichés)." },
-              site_web: { type: "string" },
-              telephones: { type: "array", items: { type: "string" } },
-              motifs: { type: "array", items: { type: "string" }, description: "Motifs de consultation réservables." },
-              lieux: { type: "array", items: { type: "string" }, description: "Lieux d'exercice indiqués sur la fiche." },
-              creneaux: { type: "array", items: { type: "string" }, description: "Horaires affichés, « AAAA-MM-JJ HH:MM »." },
-              autres: { type: "object", additionalProperties: { type: "string" }, description: "Toute autre information relevée (parcours de rendez-vous, FAQ, motif relevé…), gardée telle quelle." },
+              premier_creneau: { type: "string", description: "AAAA-MM-JJ (l'heure est acceptée), ou vide" }, creneaux_7j: { type: ["integer", "string"] },
+              telephones: { type: ["array", "string"], items: { type: "string" } }, site_web: { type: "string" },
+              motifs: { type: ["array", "string"], items: { type: "string" }, description: "Motifs réservables." },
+              lieu_releve: { type: "string", description: "Lieu sur lequel les créneaux ont été relevés." },
+              motif_releve: { type: "string", description: "Motif sur lequel les créneaux ont été relevés." },
+              lieux: { type: ["array", "string"], items: { type: "string" } },
+              creneaux: { type: ["array", "string"], items: { type: "string" }, description: "Horaires affichés, « AAAA-MM-JJ HH:MM »." },
+              texte_fiche: { type: "string", description: "Texte intégral de la fiche (« Voir plus » compris). Pour de gros volumes, préférer l'import CSV du Hub." },
+              texte_creneaux: { type: "string", description: "Texte de la page de prise de rendez-vous." },
+              autres: { type: "object", additionalProperties: { type: "string" }, description: "Toute autre information, gardée telle quelle." },
             },
           },
         },
@@ -147,23 +149,77 @@ async function appelerOutil(db: any, acteur: string, nom: string, args: any): Pr
     };
   }
   if (nom === "importer_resultats_doctolib") {
-    const lignes = Array.isArray(args?.lignes) ? args.lignes.slice(0, 200) : [];
-    if (!lignes.length) throw new Error("Aucune ligne.");
+    const brutes = Array.isArray(args?.lignes) ? args.lignes.slice(0, 200) : [];
+    if (!brutes.length) throw new Error("Aucune ligne.");
+    type Ligne = ReturnType<typeof normaliserLigne>;
+    const lignes: Ligne[] = brutes.map((x: unknown) => normaliserLigne(x));
+    const detail: Record<string, unknown>[] = [];
+    // Fiches « inexistantes » : lien retiré (comme le bouton « N'existe plus »), pas d'import.
+    const aImporter: Ligne[] = [];
+    for (const l of lignes) {
+      if (/inexistant|n.existe plus/.test(sansAccents(l.champs.statut_fiche ?? ""))) {
+        const r = await retirerPageDisparue(db, acteur, l.champs.rpps ?? "", l.champs.url_doctolib ?? "");
+        detail.push({ rpps: l.champs.rpps, resultat: r === "retiree" ? "lien retiré (page inexistante)" : r === "inconnu" ? "RPPS inconnu" : "lien différent de celui de la fiche : rien touché" });
+      } else aImporter.push(l);
+    }
     // Mêmes contrôles que l'import du fichier : on repasse par l'analyse du CSV.
-    const colonnes = ["rpps", "url_doctolib", "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le",
-      "texte_fiche", "texte_creneaux", "site_web", "telephones", "motifs", "lieux", "creneaux"];
-    const valeur = (v: unknown) => (v == null ? "" : Array.isArray(v) ? v.map(String).join(" | ") : String(v));
-    const csv = versCsv(lignes.map((l: any) => Object.fromEntries(colonnes.map((c) => [c, valeur(l?.[c])]))), colonnes);
-    const lecture = analyserImport(csv);
-    // « autres » (objet libre) ne passe pas par le CSV : rattaché ligne à ligne, par RPPS.
+    const csv = versCsv(aImporter.map((l) => Object.fromEntries(COLONNES_IMPORT.map((c) => [c, l.champs[c] ?? ""]))), COLONNES_IMPORT);
+    const lecture = aImporter.length ? analyserImport(csv) : { resultats: [], erreurs: [] };
     for (const r of lecture.resultats) {
-      const src = lignes.find((l: any) => String(l?.rpps ?? "").replace(/\s/g, "") === r.rpps);
-      if (src?.autres && typeof src.autres === "object") r.autres = Object.fromEntries(Object.entries(src.autres).map(([k, v]) => [k, String(v ?? "")]));
+      const src = aImporter.find((l) => (l.champs.rpps ?? "").replace(/\s/g, "") === r.rpps);
+      if (src && Object.keys(src.autres).length) r.autres = src.autres;
     }
     const bilan = lecture.resultats.length ? await importerResultatsDoctolib(db, acteur, lecture.resultats) : null;
-    return { lignes_recues: lignes.length, lignes_retenues: lecture.resultats.length, erreurs: lecture.erreurs, bilan };
+    // Compte rendu ligne par ligne : ce qui est enregistré, ce qui est gardé tel quel, les erreurs.
+    for (const l of aImporter) {
+      const rpps = (l.champs.rpps ?? "").replace(/\s/g, "");
+      const retenue = lecture.resultats.some((r) => r.rpps === rpps);
+      const erreur = lecture.erreurs.find((e) => e.message.startsWith(`${rpps} :`))?.message ?? null;
+      detail.push({
+        rpps, resultat: retenue ? "enregistrée" : erreur ? "refusée" : "ignorée (aucun résultat)",
+        champs_enregistres: Object.keys(l.champs).filter((c) => c !== "rpps" && l.champs[c]),
+        champs_conserves_tels_quels: Object.keys(l.autres), ...(erreur ? { erreur } : {}),
+      });
+    }
+    return { lignes_recues: brutes.length, lignes_retenues: lecture.resultats.length, detail, erreurs: lecture.erreurs, bilan };
   }
   throw new Error(`Outil inconnu : ${nom}`);
+}
+
+// ── Champs de l'import ───────────────────────────────────────────────────────
+
+/** Champs reconnus (noms officiels), dans l'ordre des colonnes du CSV équivalent. */
+const COLONNES_IMPORT = ["rpps", "url_doctolib", "releve_le", "statut_fiche", "reservable", "nouveaux_patients", "premier_creneau",
+  "creneaux_7j", "telephones", "site_web", "motifs", "lieu_releve", "motif_releve", "lieux", "creneaux", "texte_fiche", "texte_creneaux"];
+
+/** Autres noms acceptés → nom officiel. */
+const ALIAS: Record<string, string> = {
+  telephone: "telephones", tel: "telephones", tels: "telephones", site: "site_web", site_internet: "site_web", site_web_et_liens: "site_web",
+  motifs_reservables: "motifs", motif: "motifs", lieu: "lieux", lieu_du_releve: "lieu_releve", lieu_creneaux: "lieu_releve",
+  motif_du_releve: "motif_releve", motif_creneaux: "motif_releve", lieu_motif_releve: "lieu_releve", statut: "statut_fiche",
+  url: "url_doctolib", lien: "url_doctolib", date_releve: "releve_le", releve: "releve_le", nb_creneaux_7j: "creneaux_7j",
+  prochains_creneaux: "creneaux", prochains_30_creneaux: "creneaux", fiche_texte_integral: "texte_fiche", page_creneaux_texte_integral: "texte_creneaux",
+};
+
+const sansAccents = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** Ligne reçue → champs reconnus (texte) + tout le reste, gardé tel quel (rien ne se perd). */
+function normaliserLigne(l: any): { champs: Record<string, string>; autres: Record<string, string> } {
+  const champs: Record<string, string> = {};
+  const autres: Record<string, string> = {};
+  const enTexte = (v: unknown) => (v == null ? "" : Array.isArray(v) ? v.map(String).join(" | ") : typeof v === "object" ? JSON.stringify(v) : String(v));
+  for (const [k, v] of Object.entries(l && typeof l === "object" ? l : {})) {
+    if (k === "autres" && v && typeof v === "object") { for (const [k2, v2] of Object.entries(v)) autres[k2.slice(0, 60)] = enTexte(v2).slice(0, 20000); continue; }
+    const cle = sansAccents(k).replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const officiel = COLONNES_IMPORT.includes(cle) ? cle : ALIAS[cle];
+    const val = enTexte(v).trim();
+    if (!val) continue;
+    if (officiel) champs[officiel] = champs[officiel] ? `${champs[officiel]} | ${val}` : val;
+    else autres[k.slice(0, 60)] = val.slice(0, 20000);
+  }
+  // Fiche « non revendiquée » (« n'est pas sur Doctolib ») : non réservable, sauf valeur explicite.
+  if (!champs.reservable && /non revendiqu|pas sur doctolib/.test(sansAccents(champs.statut_fiche ?? ""))) champs.reservable = "non";
+  return { champs, autres };
 }
 
 // ── Accès par clé ────────────────────────────────────────────────────────────

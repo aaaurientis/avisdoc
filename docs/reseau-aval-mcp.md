@@ -39,3 +39,11 @@ Le Hub analyse les textes (`analyserFicheDoctolib`, `analyserCreneaux` : spécia
 Bilan : `signaux` (enregistrés), `deja_valides` (même valeur déjà validée : non redemandés — cause habituelle d'un « signaux : 0 » sur un fichier déjà importé), `erreurs_signaux` (raison de chaque échec).
 
 Fiche praticien (section Doctolib) : téléphones, lieux, site, motifs, créneaux par jour, texte intégral, texte de la page de rendez-vous, autres informations ; téléphones et site Doctolib aussi en tête de fiche.
+
+## Champs de l'import par le connecteur (16/11, version 3)
+
+Obligatoires : `rpps`, `url_doctolib`, `releve_le` (AAAA-MM-JJ).
+Facultatifs : `statut_fiche` (active | non revendiquée → non réservable | inexistante → lien retiré, comme « N'existe plus »), `reservable`, `nouveaux_patients` (oui/non), `premier_creneau` (AAAA-MM-JJ), `creneaux_7j`, `telephones`, `site_web`, `motifs`, `lieu_releve`, `motif_releve`, `lieux`, `creneaux` (« AAAA-MM-JJ HH:MM »), `texte_fiche`, `texte_creneaux`, `autres` (objet libre).
+Alias acceptés : `telephone`, `tel`, `site`, `site_web_et_liens`, `motifs_reservables`, `lieu_motif_releve`, `statut`, `url`, `prochains_30_creneaux`, `fiche_texte_integral`, `page_creneaux_texte_integral`…
+Tout autre champ est gardé tel quel (`autres`). La réponse contient `detail` : pour chaque ligne, le résultat, les champs enregistrés et ceux gardés tels quels. Les gros textes (« Voir plus ») passent de préférence par l'import CSV.
+Les clients MCP gardent la description des outils en mémoire : ouvrir une nouvelle conversation pour voir la version à jour.

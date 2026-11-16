@@ -69,6 +69,8 @@ export interface ResultatDoctolib {
   lieux?: string[];
   /** Horaires affichés, « AAAA-MM-JJ HH:MM » (liste structurée, si le relevé la fournit). */
   creneaux?: string[];
+  /** Lieu et motif sur lesquels les créneaux ont été relevés. */
+  releveSur?: string | null;
   /** Toute autre colonne remplie, gardée telle quelle (rien ne se perd). */
   autres?: Record<string, string>;
 }
@@ -77,7 +79,7 @@ export interface ResultatDoctolib {
 const CONNUES = new Set(["rpps", "nom", "prenom", "population", "ville", "statut_lien", "url_doctolib", "dernier_releve", "statut_fiche",
   "reservable", "nouveaux_patients", "premier_creneau", "creneaux_7j", "releve_le", "texte_fiche", "fiche_texte_integral",
   "autres_lieux_texte_integral", "texte_creneaux", "page_creneaux_texte_integral", "site_web", "site_web_et_liens", "telephones",
-  "motifs", "motifs_reservables", "lieux", "creneaux", "prochains_30_creneaux"]);
+  "motifs", "motifs_reservables", "lieux", "creneaux", "prochains_30_creneaux", "lieu_releve", "motif_releve", "lieu_motif_releve"]);
 
 /** Séparateur entre les rubriques de texte (fiche, « Voir plus ») — reconnu par l'analyse de la fiche. */
 const SEPARATEUR = "\n§§avisdoc§§\n";
@@ -151,7 +153,8 @@ export function analyserImport(texte: string, aujourdhui: Date = new Date()): Le
       const val = (l[k] ?? "").trim();
       if (val) autres[c] = val.slice(0, 20000);
     });
-    const contenu = !!(texteFiche || texteCreneaux || siteWeb || telephones.length || motifs.length || lieux.length || creneauxListe.length);
+    const releveSur = (v("lieu_motif_releve") || [v("lieu_releve"), v("motif_releve")].filter(Boolean).join(" · ")).slice(0, 300);
+    const contenu = !!(texteFiche || texteCreneaux || siteWeb || telephones.length || motifs.length || lieux.length || creneauxListe.length || releveSur);
     const resultatsVides = COLONNES_RESULTATS.every((c) => !v(c)) && !contenu;
     if (!rpps && resultatsVides) return;
     if (resultatsVides) return; // ligne exportée, pas encore relevée : ignorée sans erreur
@@ -185,7 +188,7 @@ export function analyserImport(texte: string, aujourdhui: Date = new Date()): Le
     resultats.push({
       ligne: n, rpps, url, releveLe: releve, reservable, nouveauxPatients: nouveaux === null ? null : nouveaux ? "oui" : "non",
       premierCreneau: premier, creneaux7j: sept ? Number(sept) : null, creneau,
-      ...(contenu ? { texteFiche: texteFiche || null, texteCreneaux: texteCreneaux || null, siteWeb: siteWeb || null, telephones, motifs, lieux, creneaux: creneauxListe } : {}),
+      ...(contenu ? { texteFiche: texteFiche || null, texteCreneaux: texteCreneaux || null, siteWeb: siteWeb || null, telephones, motifs, lieux, creneaux: creneauxListe, releveSur: releveSur || null } : {}),
       ...(Object.keys(autres).length ? { autres } : {}),
     });
   });
