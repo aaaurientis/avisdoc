@@ -79,29 +79,65 @@ export function requeteFiche(p: PraticienPourGoogle, departements: string[]): st
 }
 
 /**
- * Les fiches candidates EN FRANCE et DANS LE DÉPARTEMENT, qualifiées (forte, moyenne,
+ * Les requêtes à essayer, dans l'ordre, tant qu'aucune fiche ne porte le nom du praticien :
+ *   1. « Dr Prénom Nom, spécialité, commune, département » (sans position) ;
+ *   2. pour chaque lieu RPPS géocodé du département : le nom de famille seul, autour du point
+ *      (rayon 3 km) — rattrape « Cabinet Dermatologie Dr VENAULT - Pôle Santé » ;
+ *   3. « Nom spécialité commune » pour chaque autre commune d'exercice.
+ */
+export function requetesFiche(p: PraticienPourGoogle, departements: string[]): { textQuery: string; locationBias?: unknown }[] {
+  const lieux = (p.admin_reseau_lieux ?? []).filter((l) => !l.departement || departements.includes(l.departement));
+  const specialite = POPULATION_LIBELLE[p.population as keyof typeof POPULATION_LIBELLE] ?? "";
+  const out: { textQuery: string; locationBias?: unknown }[] = [{ textQuery: requeteFiche(p, departements) }];
+  const vus = new Set<string>();
+  for (const l of lieux) {
+    if (l.lat == null || l.lng == null) continue;
+    const cle = `${l.lat.toFixed(3)},${l.lng.toFixed(3)}`;
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    out.push({ textQuery: `${p.nom} ${specialite}`.trim(), locationBias: { circle: { center: { latitude: l.lat, longitude: l.lng }, radius: 3000 } } });
+  }
+  for (const c of [...new Set(lieux.map((l) => l.commune).filter(Boolean))].slice(1)) out.push({ textQuery: `${p.nom} ${specialite} ${c}` });
+  return out.slice(0, 5);
+}
+
+/**
+ * Les fiches candidates EN FRANCE et DANS LE DÉPARTEMENT, qualifiées (certaine, forte, moyenne,
  * faible) et triées : les plus sûres d'abord. Le contenu n'est jamais enregistré.
+ * `compter` : appelé avant chaque requête supplémentaire (plafond du jour) ; sans lui, une seule requête.
  */
 export async function chercherFiches(
-  p: PraticienPourGoogle, departements: string[], cle: string,
+  p: PraticienPourGoogle, departements: string[], cle: string, compter?: () => Promise<boolean>,
 ): Promise<(CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string; distance?: number | null })[]> {
-  const d = await appelGoogle(RECHERCHE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ textQuery: requeteFiche(p, departements), languageCode: "fr", regionCode: "FR", maxResultCount: 10 }),
-  }, cle, CHAMPS_RECHERCHE);
-  const bruts: (CandidatFiche & { categorie: string | null })[] = (d?.places ?? []).map((x: any) => ({
-    place_id: x.id as string,
-    nom: (x.displayName?.text ?? "") as string,
-    adresse: (x.formattedAddress ?? "") as string,
-    categorie: (x.primaryTypeDisplayName?.text ?? null) as string | null,
-    ferme: x.businessStatus === "CLOSED_PERMANENTLY",
-    lat: typeof x.location?.latitude === "number" ? x.location.latitude : null,
-    lng: typeof x.location?.longitude === "number" ? x.location.longitude : null,
-  }));
   const lieux = lieuxPourComparaison(p.admin_reseau_lieux ?? []);
+  const parId = new Map<string, CandidatFiche & { categorie: string | null }>();
+  const requetes = requetesFiche(p, departements);
+  for (let i = 0; i < requetes.length; i++) {
+    if (i > 0) {
+      // On s'arrête dès qu'une fiche du département porte le nom du praticien.
+      const dejaAuNom = qualifierFiches([...parId.values()], p.nom, lieux, departements).some((c) => c.force !== "faible");
+      if (dejaAuNom || !compter || !(await compter())) break;
+    }
+    const d = await appelGoogle(RECHERCHE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...requetes[i], languageCode: "fr", regionCode: "FR", maxResultCount: 10 }),
+    }, cle, CHAMPS_RECHERCHE);
+    for (const x of d?.places ?? []) {
+      if (parId.has(x.id)) continue;
+      parId.set(x.id, {
+        place_id: x.id as string,
+        nom: (x.displayName?.text ?? "") as string,
+        adresse: (x.formattedAddress ?? "") as string,
+        categorie: (x.primaryTypeDisplayName?.text ?? null) as string | null,
+        ferme: x.businessStatus === "CLOSED_PERMANENTLY",
+        lat: typeof x.location?.latitude === "number" ? x.location.latitude : null,
+        lng: typeof x.location?.longitude === "number" ? x.location.longitude : null,
+      });
+    }
+  }
   const q: (CandidatFiche & { categorie: string | null; force: Force; verifieIa?: string; distance?: number | null })[] =
-    qualifierFiches(bruts, p.nom, lieux, departements).map((c) => ({ ...c, distance: distanceAuLieu(c, lieux) }));
+    qualifierFiches([...parId.values()], p.nom, lieux, departements).map((c) => ({ ...c, distance: distanceAuLieu(c, lieux) }));
   // Au nom du praticien mais adresse non reconnue mot à mot : l'IA compare les adresses.
   // Elle ne peut que confirmer (→ certaine), jamais rétrograder ni retenir une fiche sans le nom.
   const douteuses = q.filter((c) => (c.force === "forte" || c.force === "moyenne") && !c.ferme);
