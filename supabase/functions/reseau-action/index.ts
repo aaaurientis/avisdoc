@@ -10,6 +10,7 @@
 //   • signal_rejeter       { signal_id }
 //   • google_rattacher     { praticien_id, place_ids: [...] } | { praticien_id, aucune: true } | { praticien_id, retirer: true }
 //   • doctolib_fiche       { praticien_id, url, infos, signaux: [{ type, valeur }] } — relevé vérifié par l'opérateur
+//   • integrer_reseau      { praticien_id } — ajoute le praticien à la liste « Réseau Aval » (contact créé ou complété)
 //   • doctolib_import      { lignes: ResultatDoctolib[] } — résultats relevés par l'équipe (fichier importé), validés d'office
 //   • valider_propositions_import {} — valide les propositions laissées par les imports précédents
 //   • doctolib_creneaux    { praticien_id, url, disponibilites, creneau? } — créneaux relevés sur la page de rendez-vous
@@ -105,6 +106,48 @@ serve(async (req) => {
         });
       }
       return json({ code });
+    }
+
+    case "integrer_reseau": {
+      // Intégration à la liste « Réseau Aval » (contacts du réseau). Contact existant (même RPPS) :
+      // on lui ajoute le rôle « Réseau d'Aval » ; sinon il est créé depuis les données RPPS.
+      const { data: p } = await db.from("admin_reseau_praticiens")
+        .select("id, rpps, civilite, nom, prenom, etat, specialites, contact_id, admin_reseau_lieux(raison_sociale, adresse, code_postal, commune, telephone, lat, lng)")
+        .eq("id", String(corps.praticien_id ?? "")).maybeSingle();
+      if (!p) return json({ error: "Praticien introuvable." }, 404);
+      if (p.etat === "exclu") return json({ error: "Ce praticien est exclu." }, 409);
+      const AVAL = "Réseau d'Aval";
+      let contact: any = null;
+      if (p.contact_id) contact = (await db.from("admin_network_contacts").select("id, type, types").eq("id", p.contact_id).maybeSingle()).data;
+      if (!contact) contact = (await db.from("admin_network_contacts").select("id, type, types").eq("rpps", p.rpps).limit(1)).data?.[0] ?? null;
+      let deja = false;
+      if (contact) {
+        const types: string[] = Array.isArray(contact.types) && contact.types.length ? contact.types : contact.type ? [contact.type] : [];
+        deja = types.includes(AVAL);
+        if (!deja) {
+          const { error } = await db.from("admin_network_contacts").update({ types: [...types, AVAL] }).eq("id", contact.id);
+          if (error) return json({ error: error.message }, 500);
+        }
+      } else {
+        const lieux: any[] = p.admin_reseau_lieux ?? [];
+        const l0 = lieux[0] ?? {};
+        const { data: cree, error } = await db.from("admin_network_contacts").insert({
+          name: `Dr ${p.prenom} ${p.nom}`.trim(), prenom: p.prenom, nom: p.nom, rpps: p.rpps,
+          type: AVAL, types: [AVAL], statut: "Accepté", role: (p.specialites ?? [])[0] ?? "",
+          profession: "Médecin", specialite: (p.specialites ?? []).join(", ") || null,
+          structure: l0.raison_sociale ?? null, adresse: l0.adresse ?? "", code_postal: l0.code_postal ?? null, ville: l0.commune ?? "",
+          tel: l0.telephone ?? "", lat: l0.lat ?? null, lng: l0.lng ?? null, source: "annuaire_sante",
+          activites: lieux.map((l) => ({ fonction: "", structure: l.raison_sociale ?? "", ville: l.commune ?? "", telephone: l.telephone ?? "", email: "" })),
+          notes: `Intégré depuis « Trouver des médecins » par ${email} le ${new Date().toLocaleDateString("fr-FR")}.`,
+        }).select("id").single();
+        if (error) return json({ error: error.message }, 500);
+        contact = cree;
+      }
+      await db.from("admin_reseau_praticiens").update({ contact_id: contact.id, etat: "accord" }).eq("id", p.id);
+      await db.from("admin_reseau_historique").insert({
+        praticien_id: p.id, acteur: email, action: "integre_reseau_aval", detail: { contact_id: contact.id, contact_existant: !!p.contact_id || deja },
+      });
+      return json({ contact_id: contact.id, deja });
     }
 
     case "exclure": {
