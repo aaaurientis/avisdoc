@@ -454,6 +454,13 @@ export const reseauRepo = {
   },
   integrerReseau: (praticienId: string): Promise<{ contact_id: string; deja: boolean }> =>
     appeler("reseau-action", { action: "integrer_reseau", praticien_id: praticienId }),
+  /** Praticiens (non exclus) dont la fiche Doctolib est à choisir : plusieurs fiches possibles, aucun lien retenu. */
+  async nbDoctolibAChoisir(): Promise<number> {
+    const { count, error } = await sb.from("admin_reseau_praticiens").select("id", { count: "exact", head: true })
+      .eq("doctolib_statut", "a_confirmer").neq("etat", "exclu");
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  },
   /** Propositions laissées en attente par des imports Doctolib précédents. */
   async nbPropositionsImport(): Promise<number> {
     const { count, error } = await sb.from("admin_reseau_signaux").select("id", { count: "exact", head: true })
