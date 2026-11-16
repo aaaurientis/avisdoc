@@ -72,6 +72,8 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
         });
       }
       if (texteCreneaux) infos.texte_creneaux = texteCreneaux;
+      const releveSur = texte(l?.releveSur, 300);
+      if (releveSur) infos.releve_creneaux_sur = releveSur;
       const site = texte(l?.siteWeb, 500);
       if (site) infos.site_web = site;
       for (const [cle, val] of [["telephones", liste(l?.telephones)], ["motifs", liste(l?.motifs, 60)], ["lieux", liste(l?.lieux)]] as const) {
@@ -162,4 +164,22 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
       await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib_import", detail: { url: lien, releve_le: releve } });
     }
     return bilan;
+}
+
+/**
+ * Fiche Doctolib « inexistante » (« Cette page n'existe plus ») signalée par un relevé : le lien
+ * est retiré et mémorisé pour ne plus être reproposé — comme le bouton « N'existe plus ».
+ * Seulement si le lien signalé est bien celui de la fiche (sinon rien n'est touché).
+ */
+export async function retirerPageDisparue(db: any, email: string, rpps: string, url: string): Promise<"retiree" | "inconnu" | "autre_lien"> {
+  const { data: p } = await db.from("admin_reseau_praticiens").select("id, doctolib_url, doctolib_infos").eq("rpps", rpps).maybeSingle();
+  if (!p) return "inconnu";
+  if (!p.doctolib_url || !urlDoctolibValide(url) || urlPropre(url) !== p.doctolib_url) return "autre_lien";
+  const disparues = [...new Set([...(Array.isArray(p.doctolib_infos?.pages_disparues) ? p.doctolib_infos.pages_disparues : []), p.doctolib_url])].slice(-10);
+  await db.from("admin_reseau_praticiens").update({
+    doctolib_url: null, doctolib_statut: "aucun", doctolib_par: `${email} (import)`, doctolib_le: new Date().toISOString(),
+    doctolib_infos: { ...(p.doctolib_infos ?? {}), reservable: null, disponibilites: null, pages_disparues: disparues },
+  }).eq("id", p.id);
+  await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib", detail: { url: p.doctolib_url, statut: "aucun", page_disparue: p.doctolib_url } });
+  return "retiree";
 }

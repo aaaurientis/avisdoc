@@ -89,6 +89,8 @@ export interface InfosDoctolib {
   texte_integral?: string | null;
   texte_creneaux?: string | null;
   autres?: Record<string, string> | null;
+  /** Lieu et motif sur lesquels les créneaux ont été relevés. */
+  releve_creneaux_sur?: string | null;
 }
 
 export interface SignalReseau {
@@ -244,7 +246,7 @@ export function normaliserInfosDoctolib(i: any): InfosDoctolib | null {
     reservable: typeof i.reservable === "boolean" ? i.reservable : null,
     premierCreneau: i.premierCreneau && typeof i.premierCreneau === "object" ? i.premierCreneau : null,
     site_web: texte(i.site_web), telephones: liste(i.telephones), motifs: liste(i.motifs), lieux: liste(i.lieux),
-    texte_integral: texte(i.texte_integral), texte_creneaux: texte(i.texte_creneaux),
+    texte_integral: texte(i.texte_integral), texte_creneaux: texte(i.texte_creneaux), releve_creneaux_sur: texte(i.releve_creneaux_sur),
     autres: i.autres && typeof i.autres === "object" ? Object.fromEntries(Object.entries(i.autres).filter(([, v]) => typeof v === "string")) as Record<string, string> : null,
     disponibilites: d ? {
       creneaux: Number(d.creneaux) || 0, sous7Jours: Number(d.sous7Jours) || 0,

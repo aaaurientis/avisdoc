@@ -821,6 +821,7 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
     ["Téléconsultation", infos.teleconsultation ? "Proposée" : null],
     ["Langues", infos.langues.join(", ") || null],
     ["Tarifs", infos.tarifs.join(" · ") || null],
+    ["Relevé sur", infos.releve_creneaux_sur ?? null],
     ["Téléphones", (infos.telephones ?? []).join(" · ") || null],
     ["Lieux", (infos.lieux ?? []).join(" · ") || null],
   ];
