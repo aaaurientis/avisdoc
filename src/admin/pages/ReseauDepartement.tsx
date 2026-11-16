@@ -28,6 +28,7 @@ import {
   DOCTOLIB_LABEL,
   NON_RESERVABLE,
   nonReservableDoctolib,
+  affichageDoctolib,
   PLAFONDS_JOUR,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
@@ -47,6 +48,7 @@ import AvancementIa from "./reseau/AvancementIa";
 import ReseauCarte from "./reseau/ReseauCarte";
 import { specialiteDuLienDoctolib, specialiteHorsCible } from "../../../supabase/functions/_shared/doctolib";
 import { cn } from "@/lib/utils";
+import { pointsAValider } from "../reseau/aValider";
 
 /** Pictogramme de la vue resserrée (fiche ouverte) : vert trouvée, gris sans correspondance RPPS. */
 const GOOGLE_PICTO: Record<StatutGoogle, string> = {
@@ -58,17 +60,9 @@ const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   a_chercher: "text-slate-200",
 };
 
-const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(120px,1fr) 84px 104px 140px 120px 70px";
+const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(120px,1fr) 84px 130px 140px 120px 70px";
 const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
 
-const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
-  confirme: "text-sky-700",
-  trouve_auto: "text-sky-500",
-  a_confirmer: "text-amber-500",
-  introuvable: "text-slate-300",
-  aucun: "text-slate-300",
-  a_chercher: "text-slate-200",
-};
 /** Coût indicatif d'une recherche IA par praticien (modèle + recherches web), à ajuster sur les factures réelles. */
 const COUT_IA_EUROS = 0.25;
 
@@ -129,13 +123,13 @@ export default function ReseauDepartement() {
   const [ajoutRpps, setAjoutRpps] = useState(false);
   /** Le journal reste affiché à la fin d'une recherche suivie à l'écran. */
   const [suiviMgOuvert, setSuiviMgOuvert] = useState(false);
-  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle; doctolib: "" | StatutDoctolib | "non_reservable" }>({
-    q: "", population: "", role: "", etat: "", google: "", doctolib: "",
+  const [filtres, setFiltres] = useState<{ q: string; population: "" | Population; role: "" | Role; etat: "" | EtatPraticien; google: "" | StatutGoogle; doctolib: "" | StatutDoctolib | "non_reservable"; aValider: "" | "oui" | "non" }>({
+    q: "", population: "", role: "", etat: "", google: "", doctolib: "", aValider: "",
   });
   const lectureSeule = lectureSeuleActive();
   // Tri du tableau : clic sur un en-tête ; deuxième clic = sens inverse. Par défaut, le score.
   const [tri, setTri] = useState<{ cle: CleTri; sens: 1 | -1 }>({ cle: "score", sens: -1 });
-  const trier = (cle: CleTri) => setTri((t) => (t.cle === cle ? { cle, sens: t.sens === 1 ? -1 : 1 } : { cle, sens: cle === "score" ? -1 : 1 }));
+  const trier = (cle: CleTri) => setTri((t) => (t.cle === cle ? { cle, sens: t.sens === 1 ? -1 : 1 } : { cle, sens: cle === "score" || cle === "avalider" ? -1 : 1 }));
 
   const charger = async () => {
     setChargement(true);
@@ -190,12 +184,20 @@ export default function ReseauDepartement() {
     return new Map(praticiens.map((p) => [p.id, { probabilite: calculerScore(p, (valides.get(p.id) ?? []).map((v) => ({ ...v, le: v.decideLe }))).probabilite, aValider: enAttente.get(p.id) ?? 0 }]));
   }, [praticiens, signaux]);
 
+  // Points à trancher par praticien (propositions IA, liens à confirmer, hors cible…).
+  const points = useMemo(() => {
+    const parPraticien = new Map<string, SignalReseau[]>();
+    for (const sg of signaux) parPraticien.set(sg.praticienId, [...(parPraticien.get(sg.praticienId) ?? []), sg]);
+    return new Map(praticiens.map((p) => [p.id, pointsAValider(p, parPraticien.get(p.id) ?? [])]));
+  }, [praticiens, signaux]);
+
   const rows = useMemo(() => {
     const q = filtres.q.trim().toLowerCase();
     return praticiens.filter((p) =>
       (!filtres.population || p.population === filtres.population) &&
       (!filtres.role || p.roles.includes(filtres.role)) &&
       (!filtres.etat || p.etat === filtres.etat) &&
+      (!filtres.aValider || (filtres.aValider === "oui") === ((points.get(p.id)?.length ?? 0) > 0)) &&
       (!filtres.google || p.googleStatut === filtres.google) &&
       (!filtres.doctolib || (filtres.doctolib === "non_reservable" ? nonReservableDoctolib(p) : p.doctolibStatut === filtres.doctolib && !nonReservableDoctolib(p))) &&
       (!q || `${p.nom} ${p.prenom} ${p.rpps} ${p.lieux.map((l) => `${l.raisonSociale ?? ""} ${l.commune ?? ""}`).join(" ")}`.toLowerCase().includes(q)))
@@ -207,7 +209,7 @@ export default function ReseauDepartement() {
             case "population": return POPULATION_LIBELLE[p.population];
             case "lieu": return p.lieux.find((l) => l.departement === code)?.commune ?? "~";
             case "exercice": return p.lieux.find((l) => l.departement === code)?.modeExercice ?? "~";
-            case "etat": return ETATS_PRATICIEN.indexOf(p.etat);
+            case "avalider": return points.get(p.id)?.length ?? 0;
             case "google": return STATUTS_GOOGLE.indexOf(p.googleStatut);
             case "doctolib": return nonReservableDoctolib(p) ? 1.5 : STATUTS_DOCTOLIB.indexOf(p.doctolibStatut);
           }
@@ -216,7 +218,7 @@ export default function ReseauDepartement() {
         const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "fr");
         return c * tri.sens || (scores.get(b.id)?.probabilite ?? 0) - (scores.get(a.id)?.probabilite ?? 0) || a.nom.localeCompare(b.nom, "fr");
       });
-  }, [praticiens, filtres, scores, tri, code]);
+  }, [praticiens, filtres, scores, tri, code, points]);
 
   // Recherche IA des généralistes formés à la dermoscopie : suivie toutes les 5 secondes.
   useEffect(() => {
@@ -551,6 +553,8 @@ export default function ReseauDepartement() {
           options={STATUTS_GOOGLE.map((g) => [g, GOOGLE_LABEL[g]])} />
         <Filtre label="Doctolib" tous="tous" valeur={filtres.doctolib} onChange={(v) => setFiltres((f) => ({ ...f, doctolib: v as "" | StatutDoctolib | "non_reservable" }))}
           options={[...STATUTS_DOCTOLIB.map((d) => [d, DOCTOLIB_LABEL[d]] as [string, string]), ["non_reservable", NON_RESERVABLE.label]]} />
+        <Filtre label="À valider" tous="tous" valeur={filtres.aValider} onChange={(v) => setFiltres((f) => ({ ...f, aValider: v as "" | "oui" | "non" }))}
+          options={[["oui", "Avec points à valider"], ["non", "À jour"]]} />
         <Filtre label="État" tous="tous" valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
           options={ETATS_PRATICIEN.map((e) => [e, ETAT_PRATICIEN_LABEL[e]])} />
         <span className="ml-auto text-[12.5px] text-muted-foreground">{rows.length} affichés · triés par {LIBELLE_TRI[tri.cle]}{tri.sens === 1 ? " (croissant)" : " (décroissant)"}</span>
@@ -577,7 +581,7 @@ export default function ReseauDepartement() {
             {!selectionne && <>
               <EnTete cle="lieu" tri={tri} onTri={trier}>Ville</EnTete>
               <EnTete cle="exercice" tri={tri} onTri={trier}>Exercice</EnTete>
-              <EnTete cle="etat" tri={tri} onTri={trier}>État</EnTete>
+              <EnTete cle="avalider" tri={tri} onTri={trier}>À valider</EnTete>
             </>}
             <EnTete cle="google" tri={tri} onTri={trier} centre={!!selectionne} titre="Google">{selectionne ? "G" : "Google"}</EnTete>
             <EnTete cle="doctolib" tri={tri} onTri={trier} centre={!!selectionne} titre="Doctolib">{selectionne ? "D" : "Doctolib"}</EnTete>
@@ -615,7 +619,17 @@ export default function ReseauDepartement() {
                       </div>
                     </div>
                     <div className="text-[12.5px] text-muted-foreground">{[...new Set(ici.map((l) => l.modeExercice).filter(Boolean))].join(", ") || "—"}</div>
-                    <div><Badge className={ETAT_PRATICIEN_BADGE[p.etat]}>{ETAT_PRATICIEN_LABEL[p.etat]}</Badge></div>
+                    <div>
+                      {p.etat === "exclu" ? (
+                        <Badge className={ETAT_PRATICIEN_BADGE.exclu}>{ETAT_PRATICIEN_LABEL.exclu}</Badge>
+                      ) : (points.get(p.id)?.length ?? 0) > 0 ? (
+                        <span title={points.get(p.id)!.map((x) => `• ${x.libelle}`).join("\n")}>
+                          <Badge className="bg-violet-100 text-violet-800">{points.get(p.id)!.length} point{points.get(p.id)!.length > 1 ? "s" : ""} à valider</Badge>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-emerald-700"><Check className="size-3.5" /> À jour</span>
+                      )}
+                    </div>
                   </>
                 )}
                 {selectionne ? (
@@ -628,17 +642,14 @@ export default function ReseauDepartement() {
                   </div>
                 )}
                 {selectionne ? (
-                  <div className="flex justify-center" title={nonReservableDoctolib(p) ? `${NON_RESERVABLE.label} : ${NON_RESERVABLE.aide}` : `${DOCTOLIB_LABEL[p.doctolibStatut]} : ${DOCTOLIB_AIDE[p.doctolibStatut]}`}>
-                    <CalendarCheck aria-label={nonReservableDoctolib(p) ? NON_RESERVABLE.label : DOCTOLIB_LABEL[p.doctolibStatut]}
-                      className={cn("size-4", nonReservableDoctolib(p) ? NON_RESERVABLE.picto : DOCTOLIB_PICTO[p.doctolibStatut])} />
+                  <div className="flex justify-center" title={`${affichageDoctolib(p).label} : ${affichageDoctolib(p).aide}`}>
+                    <CalendarCheck aria-label={affichageDoctolib(p).label} className={cn("size-4", affichageDoctolib(p).picto)} />
                   </div>
                 ) : (
-                  <div title={nonReservableDoctolib(p) ? NON_RESERVABLE.aide : DOCTOLIB_AIDE[p.doctolibStatut]} onClick={(e) => { if (p.doctolibUrl) e.stopPropagation(); }}>
+                  <div title={affichageDoctolib(p).aide} onClick={(e) => { if (p.doctolibUrl) e.stopPropagation(); }}>
                     {p.doctolibUrl ? (
                       <a href={p.doctolibUrl} target="_blank" rel="noreferrer" className="inline-flex">
-                        {nonReservableDoctolib(p)
-                          ? <Badge className={cn(NON_RESERVABLE.badge, "underline-offset-2 hover:underline")}>{NON_RESERVABLE.label} ↗</Badge>
-                          : <Badge className={cn(DOCTOLIB_BADGE[p.doctolibStatut], "underline-offset-2 hover:underline")}>{DOCTOLIB_LABEL[p.doctolibStatut]} ↗</Badge>}
+                        <Badge className={cn(affichageDoctolib(p).badge, "underline-offset-2 hover:underline")}>{affichageDoctolib(p).label} ↗</Badge>
                       </a>
                     ) : (
                       <Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge>
@@ -647,7 +658,9 @@ export default function ReseauDepartement() {
                 )}
                 <div className="text-right">
                   <div className="text-[13px] font-semibold tabular-nums text-avisdoc-ink">{Math.round((scores.get(p.id)?.probabilite ?? 0) * 100)} %</div>
-                  {(scores.get(p.id)?.aValider ?? 0) > 0 && <div className="text-[10.5px] font-semibold text-violet-700">{scores.get(p.id)?.aValider} à valider</div>}
+                  {selectionne && (points.get(p.id)?.length ?? 0) > 0 && (
+                    <div className="text-[10.5px] font-semibold text-violet-700" title={points.get(p.id)!.map((x) => `• ${x.libelle}`).join("\n")}>{points.get(p.id)!.length} à valider</div>
+                  )}
                 </div>
               </button>
             );
@@ -792,10 +805,10 @@ function AjoutRpps({ onClose, onAjoute }: { onClose: () => void; onAjoute: (id: 
   );
 }
 
-type CleTri = "score" | "nom" | "population" | "lieu" | "exercice" | "etat" | "google" | "doctolib";
+type CleTri = "score" | "nom" | "population" | "lieu" | "exercice" | "avalider" | "google" | "doctolib";
 const LIBELLE_TRI: Record<CleTri, string> = {
   score: "probabilité d'adhésion", nom: "nom", population: "population", lieu: "commune", exercice: "mode d'exercice",
-  etat: "état", google: "statut Google", doctolib: "statut Doctolib",
+  avalider: "points à valider", google: "statut Google", doctolib: "statut Doctolib",
 };
 
 /** En-tête de colonne cliquable pour trier ; la flèche montre le tri en cours. */

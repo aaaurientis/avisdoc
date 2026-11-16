@@ -164,7 +164,7 @@ export const STATUTS_DOCTOLIB: StatutDoctolib[] = ["confirme", "trouve_auto", "a
 export const DOCTOLIB_LABEL: Record<StatutDoctolib, string> = {
   confirme: "Lien confirmé",
   trouve_auto: "Lien trouvé",
-  a_confirmer: "À confirmer",
+  a_confirmer: "Fiche à choisir",
   introuvable: "Introuvable",
   aucun: "Pas sur Doctolib",
   a_chercher: "À chercher",
@@ -182,7 +182,7 @@ export const DOCTOLIB_BADGE: Record<StatutDoctolib, string> = {
 export const DOCTOLIB_AIDE: Record<StatutDoctolib, string> = {
   confirme: "Lien vérifié par un opérateur.",
   trouve_auto: "Trouvé automatiquement : la seule fiche Doctolib au nom, au prénom et dans une commune d'exercice du praticien. À vérifier.",
-  a_confirmer: "Des fiches Doctolib portent son nom, sans certitude : vérifiez.",
+  a_confirmer: "Plusieurs fiches Doctolib portent son nom, aucune n'est sûre : choisissez la bonne (ou « Pas sur Doctolib »).",
   introuvable: "Aucune fiche Doctolib à son nom dans les résultats de recherche.",
   aucun: "Un opérateur a indiqué qu'il n'est pas sur Doctolib.",
   a_chercher: "Pas encore cherché : la recherche automatique s'en charge.",
@@ -200,5 +200,30 @@ export const NON_RESERVABLE = {
 
 /** Plafonds quotidiens par défaut (variables RESEAU_GOOGLE_PLAFOND_* / RESEAU_DOCTOLIB_PLAFOND côté serveur). */
 export const PLAFONDS_JOUR = { recherche: 200, details: 300, details_avis: 100, doctolib: 200 } as const;
+
+/** Une information Doctolib a déjà été récupérée (relevé, import) : le lien n'est plus « à choisir ». */
+export const doctolibRenseigne = (p: { doctolibUrl: string | null; doctolibInfos: object | null }) => !!p.doctolibUrl && !!p.doctolibInfos;
+
+/**
+ * Statut Doctolib tel qu'il s'affiche : « non réservable » d'abord, puis « fiche relevée »
+ * dès qu'une information a été récupérée, sinon le statut du lien.
+ */
+export function affichageDoctolib(p: { doctolibStatut: StatutDoctolib; doctolibUrl: string | null; doctolibInfos: { reservable?: boolean | null } | null }):
+  { label: string; badge: string; aide: string; picto: string } {
+  if (nonReservableDoctolib(p)) return { label: NON_RESERVABLE.label, badge: NON_RESERVABLE.badge, aide: NON_RESERVABLE.aide, picto: NON_RESERVABLE.picto };
+  if (doctolibRenseigne(p) && p.doctolibStatut !== "confirme") {
+    return { label: "Fiche relevée", badge: "bg-sky-100 text-sky-800", aide: "Des informations ont été récupérées sur cette fiche Doctolib (relevé ou import).", picto: "text-sky-700" };
+  }
+  return { label: DOCTOLIB_LABEL[p.doctolibStatut], badge: DOCTOLIB_BADGE[p.doctolibStatut], aide: DOCTOLIB_AIDE[p.doctolibStatut], picto: DOCTOLIB_PICTO[p.doctolibStatut] };
+}
+
+export const DOCTOLIB_PICTO: Record<StatutDoctolib, string> = {
+  confirme: "text-sky-700",
+  trouve_auto: "text-sky-500",
+  a_confirmer: "text-amber-500",
+  introuvable: "text-slate-300",
+  aucun: "text-slate-300",
+  a_chercher: "text-slate-200",
+};
 
 export const FORCE_LABEL = { certaine: "Nom et adresse RPPS", forte: "Nom et code postal", moyenne: "Nom, autre commune", faible: "Sans le nom du praticien" } as const;

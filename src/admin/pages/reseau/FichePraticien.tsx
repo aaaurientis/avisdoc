@@ -23,6 +23,7 @@ import {
   FORCE_LABEL,
   NON_RESERVABLE,
   nonReservableDoctolib,
+  affichageDoctolib,
   GOOGLE_AIDE,
   GOOGLE_BADGE,
   GOOGLE_LABEL,
@@ -50,6 +51,7 @@ import {
 import { cn } from "@/lib/utils";
 import { memeAdresse, porteLeNom } from "../../../../supabase/functions/_shared/google-correspondance";
 import AvancementIa from "./AvancementIa";
+import { pointsAValider, type SectionFiche } from "../../reseau/aValider";
 import { lienRechercheDoctolib, specialiteDuLienDoctolib, specialiteHorsCible, urlDoctolibValide } from "../../../../supabase/functions/_shared/doctolib";
 
 const lienCls = "inline-flex items-center gap-1 font-semibold text-avisdoc-ink underline-offset-2 hover:underline";
@@ -146,6 +148,15 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
     }
   };
 
+  const points = useMemo(() => pointsAValider(p, signaux), [p, signaux]);
+  // Clic sur un point : ouvrir la section concernée et y descendre.
+  const [cible, setCible] = useState<SectionFiche | null>(null);
+  const allerA = (section: SectionFiche) => {
+    setCible(section);
+    window.setTimeout(() => { document.getElementById(`fiche-section-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); setCible(null); }, 50);
+  };
+  useEffect(() => setCible(null), [p.id]);
+
   const perime = estPerime(p.rppsExtraitLe);
   // Spécialité hors du réseau repérée sur Doctolib (adresse de la fiche ou relevé) : simple alerte.
   const horsCible = specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite);
@@ -173,6 +184,19 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
       </div>
 
       {erreur && <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-800">{erreur}</div>}
+
+      {points.length > 0 && (
+        <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5 text-[12.5px]">
+          <div className="font-semibold text-violet-900">{points.length} point{points.length > 1 ? "s" : ""} à valider</div>
+          <ul className="mt-1 space-y-0.5">
+            {points.map((pt) => (
+              <li key={pt.cle}>
+                <button type="button" onClick={() => allerA(pt.section)} className="text-left text-violet-900 underline-offset-2 hover:underline">• {pt.libelle}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {horsCible && p.etat !== "exclu" && (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12.5px] text-amber-900">
@@ -215,7 +239,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         </div>
       </Section>
 
-      <Section id="ia" titre="Recherche assistée par IA" resume={propositions.length ? `${propositions.length} à valider` : enCours ? "En cours…" : undefined} forcerOuvert={propositions.length > 0 || enCours}>
+      <Section id="ia" titre="Recherche assistée par IA" resume={propositions.length ? `${propositions.length} à valider` : enCours ? "En cours…" : undefined} forcerOuvert={propositions.length > 0 || enCours || cible === "ia"}>
         {/* Recherche IA */}
         <div className="flex items-center justify-end gap-3">
           <button type="button" onClick={() => void lancerIa()} disabled={!!motifIa} title={motifIa ?? undefined} className={btnSec}>
@@ -288,8 +312,8 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         </div>
       </Section>
 
-      <Section id="adresses" titre="Adresses et fiches en ligne"
-        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={nonReservableDoctolib(p) ? NON_RESERVABLE.badge : DOCTOLIB_BADGE[p.doctolibStatut]}>Doctolib</Badge></span>}>
+      <Section id="adresses" titre="Adresses et fiches en ligne" forcerOuvert={cible === "adresses"}
+        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={affichageDoctolib(p).badge}>Doctolib</Badge></span>}>
         <SousTitre>Lieux d'exercice (RPPS)</SousTitre>
         <div className="mt-1.5 space-y-2">
           {p.lieux.map((l, i) => (
@@ -312,7 +336,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
       </Section>
 
-      <div className="mt-5 border-t border-border/60 pt-4">
+      <div id="fiche-section-exclusion" className="mt-5 border-t border-border/60 pt-4">
         <button type="button" onClick={() => setExclusion(true)} disabled={!!motifExclure} title={motifExclure ?? undefined}
           className="rounded-full border border-rose-200 px-4 py-2 text-[13px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
           {TEXTES.exclure}
@@ -343,7 +367,7 @@ function Section({ id, titre, resume, ouvertParDefaut = true, forcerOuvert = fal
     try { localStorage.setItem(CLE_SECTIONS, JSON.stringify({ ...lireSections(), [id]: n })); } catch { /* sans mémoire */ }
   };
   return (
-    <section className="mt-4 rounded-2xl border border-border/70">
+    <section id={`fiche-section-${id}`} className="mt-4 scroll-mt-4 rounded-2xl border border-border/70">
       <button type="button" onClick={basculer} aria-expanded={ouvert}
         className="flex w-full items-center gap-2 rounded-2xl px-3.5 py-2.5 text-left hover:bg-muted/40">
         <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouvert && "rotate-90")} />
@@ -689,9 +713,7 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
     <>
       <div className="mt-4 flex items-center justify-between gap-2">
         <SousTitre>Doctolib</SousTitre>
-        {nonReservable
-          ? <span title={NON_RESERVABLE.aide}><Badge className={NON_RESERVABLE.badge}>{NON_RESERVABLE.label}</Badge></span>
-          : <span title={DOCTOLIB_AIDE[p.doctolibStatut]}><Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge></span>}
+        <span title={affichageDoctolib(p).aide}><Badge className={affichageDoctolib(p).badge}>{affichageDoctolib(p).label}</Badge></span>
       </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
