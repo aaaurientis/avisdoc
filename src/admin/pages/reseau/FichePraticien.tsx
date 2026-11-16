@@ -411,10 +411,17 @@ function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienResea
   for (const l of p.lieux) ajouter(l.telephone, "RPPS");
   const googleRetenue = p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto";
   if (googleRetenue) for (const f of fichesGoogle) ajouter(f.telephone, "Google");
+  for (const t of p.doctolibInfos?.telephones ?? []) ajouter(t, "Doctolib");
   // Site web de la fiche Google (un lien vers Doctolib n'est pas un site : il est dans la section Doctolib).
   const sites = googleRetenue
     ? [...new Set(fichesGoogle.map((f) => f.site).filter((u): u is string => !!u && !/(^|\.)doctolib\.(fr|de|it)$/.test(hote(u))))]
     : [];
+  const sourceSite = new Map<string, string>();
+  const siteDoctolib = p.doctolibInfos?.site_web;
+  if (siteDoctolib) {
+    const u = /^https?:\/\//.test(siteDoctolib) ? siteDoctolib : `https://${siteDoctolib}`;
+    if (!/(^|\.)doctolib\.(fr|de|it)$/.test(hote(u)) && !sites.some((x) => hote(x) === hote(u))) { sites.push(u); sourceSite.set(u, "Doctolib"); }
+  }
   if (!adresses.length && !tels.size && !sites.length) return null;
   return (
     <div className="mt-2 space-y-0.5 text-[12.5px] text-avisdoc-ink">
@@ -437,7 +444,7 @@ function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienResea
         <div key={u} className="flex items-center gap-1.5">
           <Globe className="size-3.5 shrink-0 text-muted-foreground" />
           <a href={u} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold underline-offset-2 hover:underline">{hote(u)} <ExternalLink className="size-3" /></a>
-          <span className="text-[11px] text-muted-foreground">Google</span>
+          <span className="text-[11px] text-muted-foreground">{sourceSite.get(u) ?? "Google"}</span>
         </div>
       ))}
     </div>
@@ -814,7 +821,10 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
     ["Téléconsultation", infos.teleconsultation ? "Proposée" : null],
     ["Langues", infos.langues.join(", ") || null],
     ["Tarifs", infos.tarifs.join(" · ") || null],
+    ["Téléphones", (infos.telephones ?? []).join(" · ") || null],
+    ["Lieux", (infos.lieux ?? []).join(" · ") || null],
   ];
+  const autres = Object.entries(infos.autres ?? {});
   return (
     <div className="mt-3 border-t border-border/60 pt-2 text-[12px]">
       <div className="font-semibold text-avisdoc-ink">Relevé de la fiche Doctolib</div>
@@ -825,8 +835,36 @@ function InfosDoctolibBloc({ infos, le, par }: { infos: InfosDoctolib; le: strin
       {infos.expertises.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">{infos.expertises.map((x) => <Badge key={x} className="bg-card text-avisdoc-ink">{x}</Badge>)}</div>
       )}
+      {infos.site_web && (
+        <div className="mt-1 grid grid-cols-[110px_1fr] gap-2"><span className="text-muted-foreground">Site</span>
+          <a href={/^https?:\/\//.test(infos.site_web) ? infos.site_web : `https://${infos.site_web}`} target="_blank" rel="noreferrer" className="break-all text-avisdoc-ink underline-offset-2 hover:underline">{infos.site_web}</a></div>
+      )}
+      {(infos.motifs ?? []).length > 0 && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Motifs ({infos.motifs!.length})</summary>
+          <ul className="mt-1 list-disc pl-4 text-muted-foreground">{infos.motifs!.map((m) => <li key={m}>{m}</li>)}</ul></details>
+      )}
       {infos.presentation && (
         <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Présentation</summary><p className="mt-1 text-muted-foreground">{infos.presentation}</p></details>
+      )}
+      {infos.disponibilites && infos.disponibilites.parJour.length > 0 && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Créneaux par jour</summary>
+          <ul className="mt-1 text-muted-foreground">{infos.disponibilites.parJour.slice(0, 31).map((j) => <li key={j.date}>{new Date(j.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} : {j.n}</li>)}</ul></details>
+      )}
+      {infos.texte_integral && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Texte intégral de la fiche</summary>
+          <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-card p-2 text-[11px] text-muted-foreground">{infos.texte_integral.replace(/\n?§§avisdoc§§\n?/g, "\n—\n")}</pre></details>
+      )}
+      {infos.texte_creneaux && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Texte de la page de rendez-vous</summary>
+          <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-card p-2 text-[11px] text-muted-foreground">{infos.texte_creneaux}</pre></details>
+      )}
+      {autres.length > 0 && (
+        <details className="mt-1.5"><summary className="cursor-pointer font-semibold text-avisdoc-ink">Autres informations relevées ({autres.length})</summary>
+          {autres.map(([k, v]) => (
+            <div key={k} className="mt-1"><div className="font-semibold text-muted-foreground">{k.replace(/_/g, " ")}</div>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-card p-2 text-[11px] text-muted-foreground">{v}</pre></div>
+          ))}
+        </details>
       )}
     </div>
   );

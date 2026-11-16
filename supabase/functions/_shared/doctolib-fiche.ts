@@ -97,7 +97,7 @@ function compartiment(jours: number): "moins_7j" | "7_30j" | "plus_30j" {
 
 /** Liste propre : lignes courtes, sans doublon, sans les boutons de l'interface. */
 function liste(lignes: string[] | undefined, max = 40): string[] {
-  const bruit = /^(voir plus|voir moins|afficher plus|afficher moins|prendre rendez-vous|en savoir plus|lire la suite|\+ ?\d+)$/;
+  const bruit = /^(voir plus|voir moins|afficher plus|afficher moins|prendre rendez-vous|en savoir plus|lire la suite|consignes|\+ ?\d+)$|^(voir plus|afficher plus) d/;
   return [...new Set((lignes ?? []).map((l) => l.replace(/\s+\+\s?\d+$/, "").trim()).filter((l) => l && l.length <= 120 && !bruit.test(norm(l))))].slice(0, max);
 }
 
@@ -214,7 +214,8 @@ export function urlFicheDepuisRendezVous(url: string): string {
   return `${x.origin}${chemin}`;
 }
 
-const JOUR_ENTETE = /^(lun|mar|mer|jeu|ven|sam|dim)[a-z]*\.?\s*(\d{1,2})?\s*([a-zéû]+\.?)?$/i;
+// « lun. 17 nov. », « lun. » + « 17 nov. », ou « Mercredi 20 janvier 2027 ».
+const JOUR_ENTETE = /^(lun|mar|mer|jeu|ven|sam|dim)[a-z]*\.?\s*(\d{1,2})?\s*([a-zéû]+\.?)?(?:\s+\d{4})?$/i;
 
 export function analyserCreneaux(texte: string, aujourdhui: Date = new Date()): Disponibilites {
   const lignes = texte.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);

@@ -5,6 +5,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { valeurAdmise } from "./reseau-signaux.ts";
 import { urlDoctolibValide, urlPropre } from "./doctolib.ts";
+import { analyserCreneaux, analyserFicheDoctolib } from "./doctolib-fiche.ts";
+
+const texte = (v: unknown, n: number) => (typeof v === "string" && v.trim() ? v.slice(0, n) : null);
+const liste = (v: unknown, n = 30, m = 200) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x: string) => x.trim().slice(0, m)).slice(0, n) : []);
 
 /** Le signal validé précédent du même type passe à « remplacé » (un seul validé à la fois). */
 export async function remplacerAncien(db: any, praticienId: string, type: string, saufId?: string) {
@@ -16,6 +20,11 @@ export async function remplacerAncien(db: any, praticienId: string, type: string
 }
 
 /** `email` : l'importateur (opérateur, ou « MCP <nom de la clé> »). Lève une erreur si rien à importer. */
+const LIBELLE_POINT: Record<string, string> = {
+  creneau_doctolib: "premier créneau", nouveaux_patients: "nouveaux patients", dermoscopie: "dermoscopie",
+  motif_exerese: "exérèse", chirurgie_sur_place: "chirurgie sur place",
+};
+
 export async function importerResultatsDoctolib(db: any, email: string, lignesRecues: unknown) {
     // Résultats Doctolib relevés par l'équipe (fichier importé, vérifié à l'écran avant envoi).
     // Chaque ligne porte sa source (lien de la fiche) et la date du relevé ; rien n'est déduit d'autre.
@@ -31,6 +40,8 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
     }
     const bilan = {
       mis_a_jour: 0, signaux: 0, deja_valides: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[],
+      /** Signaux qui n'ont pas pu être enregistrés, avec la raison (pour ne plus avoir « 0 » sans explication). */
+      erreurs_signaux: [] as string[],
       /** Praticiens qui ont désormais des propositions à valider (lien vers leur fiche). */
       a_valider: [] as { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[],
     };
@@ -44,10 +55,49 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
       const lien = urlPropre(l.url);
       const premier = jour(l?.premierCreneau);
       const sept = Number.isFinite(l?.creneaux7j) && l.creneaux7j >= 0 ? Math.min(Math.round(l.creneaux7j), 10000) : null;
-      const reservable = typeof l?.reservable === "boolean" ? l.reservable : null;
+      const releveDate = new Date(`${releve}T12:00:00Z`);
+      // Contenu complet relevé : analysé comme une fiche Doctolib (rubriques, « Voir plus »), conservé.
+      const texteFiche = texte(l?.texteFiche, 60000);
+      const texteCreneaux = texte(l?.texteCreneaux, 60000);
+      const fiche = texteFiche ? analyserFicheDoctolib(texteFiche, releveDate) : null;
+      const dispo = texteCreneaux ? analyserCreneaux(texteCreneaux, releveDate) : null;
+      const reservable = typeof l?.reservable === "boolean" ? l.reservable : fiche?.reservable ?? null;
       const infos: Record<string, unknown> = { ...(p.doctolib_infos ?? {}) };
       if (reservable !== null) infos.reservable = reservable;
-      if (premier || sept !== null) {
+      if (fiche) {
+        Object.assign(infos, {
+          specialite: fiche.specialite ?? infos.specialite ?? null, expertises: fiche.expertises, conventionnement: fiche.conventionnement,
+          carteVitale: fiche.carteVitale, teleconsultation: fiche.teleconsultation, tarifs: fiche.tarifs, langues: fiche.langues,
+          presentation: fiche.presentation, adresses: fiche.adresses, texte_integral: texteFiche,
+        });
+      }
+      if (texteCreneaux) infos.texte_creneaux = texteCreneaux;
+      const site = texte(l?.siteWeb, 500);
+      if (site) infos.site_web = site;
+      for (const [cle, val] of [["telephones", liste(l?.telephones)], ["motifs", liste(l?.motifs, 60)], ["lieux", liste(l?.lieux)]] as const) {
+        if (val.length) infos[cle] = val;
+      }
+      // Liste structurée des horaires (« AAAA-MM-JJ HH:MM ») : comptés par jour.
+      const horaires = liste(l?.creneaux, 200, 30).map((c) => c.slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+      const dispoListe = horaires.length ? (() => {
+        const parJour = [...horaires.reduce((m, d) => m.set(d, (m.get(d) ?? 0) + 1), new Map<string, number>())].map(([date, n]) => ({ date, n }));
+        const jours = (d: string) => Math.round((Date.parse(d) - Date.parse(releve)) / 86_400_000);
+        const premierJ = parJour[0];
+        return {
+          creneaux: horaires.length, sous7Jours: horaires.filter((d) => jours(d) >= 0 && jours(d) < 7).length, parJour,
+          premier: premierJ ? { date: premierJ.date, jours: Math.max(0, jours(premierJ.date)) } : null,
+        };
+      })() : null;
+      const autres = l?.autres && typeof l.autres === "object" ? Object.fromEntries(Object.entries(l.autres).filter(([, v]) => typeof v === "string" && v.trim()).slice(0, 40).map(([k, v]) => [String(k).slice(0, 60), String(v).slice(0, 20000)])) : null;
+      if (autres && Object.keys(autres).length) infos.autres = { ...(infos.autres as object ?? {}), ...autres };
+      if (dispoListe) {
+        infos.disponibilites = { ...dispoListe, motif: null, releve_le: `${releve}T12:00:00Z`, releve_par: `${email} (import)` };
+      } else if (dispo && dispo.parJour.length) {
+        infos.disponibilites = {
+          creneaux: dispo.creneaux, sous7Jours: dispo.sous7Jours, parJour: dispo.parJour, premier: dispo.premier,
+          motif: null, releve_le: `${releve}T12:00:00Z`, releve_par: `${email} (import)`,
+        };
+      } else if (premier || sept !== null) {
         infos.disponibilites = {
           creneaux: sept ?? 0, sous7Jours: sept ?? 0, parJour: [],
           premier: premier ? { date: premier, jours: Math.max(0, Math.round((Date.parse(premier) - Date.parse(releve)) / 86_400_000)) } : null,
@@ -66,9 +116,17 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
       // validation une à une). Datés du relevé (la péremption du créneau part de cette date),
       // source = la fiche Doctolib.
       const dateFr = (d: string) => d.split("-").reverse().join("/");
+      // Valeurs explicites d'abord ; à défaut, ce que l'analyse des textes a trouvé sur la fiche.
+      const delai = dispoListe?.premier?.jours;
+      const creneauListe = delai == null ? null : delai < 7 ? "moins_7j" : delai <= 30 ? "7_30j" : "plus_30j";
+      const creneau = l?.creneau ?? creneauListe ?? dispo?.valeur ?? fiche?.premierCreneau?.valeur ?? null;
+      const nouveaux = l?.nouveauxPatients ?? fiche?.nouveauxPatients?.valeur ?? null;
       const signaux: [string, unknown, string][] = [
-        ["creneau_doctolib", l?.creneau, premier ? `Import Doctolib, relevé du ${dateFr(releve)} : premier créneau le ${dateFr(premier)}${sept !== null ? `, ${sept} créneau(x) sur 7 jours` : ""}.` : `Import Doctolib, relevé du ${dateFr(releve)} : aucun créneau pour un nouveau patient.`],
-        ["nouveaux_patients", l?.nouveauxPatients, `Import Doctolib, relevé du ${dateFr(releve)} : nouveaux patients « ${l?.nouveauxPatients} ».`],
+        ["creneau_doctolib", creneau, premier ? `Import Doctolib, relevé du ${dateFr(releve)} : premier créneau le ${dateFr(premier)}${sept !== null ? `, ${sept} créneau(x) sur 7 jours` : ""}.` : `Import Doctolib, relevé du ${dateFr(releve)}.`],
+        ["nouveaux_patients", nouveaux, `Import Doctolib, relevé du ${dateFr(releve)} : nouveaux patients « ${nouveaux} ».`],
+        // Grille du brief : signaux repérés dans les expertises de la fiche (dermoscopie, exérèse, chirurgie).
+        ...(fiche?.signaux ?? []).filter((x) => !["creneau_doctolib", "nouveaux_patients"].includes(x.type))
+          .map((x) => [x.type, x.valeur, x.extrait] as [string, unknown, string]),
       ];
       const points: string[] = [];
       for (const [type, valeur, extrait] of signaux) {
@@ -89,13 +147,14 @@ export async function importerResultatsDoctolib(db: any, email: string, lignesRe
         void extrait;
         // Les propositions d'imports précédents pour ce signal n'ont plus lieu d'être.
         await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").like("propose_par", "%(import)");
-        await remplacerAncien(db, p.id, type);
+        try { await remplacerAncien(db, p.id, type); } catch (e) { bilan.erreurs_signaux.push(`${r} · ${type} : ${(e as Error).message}`); continue; }
         const { error: eS } = await db.from("admin_reseau_signaux").insert({
           praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "valide",
           propose_par: `${email} (import)`, propose_le: `${releve}T12:00:00Z`,
           decide_par: `${email} (import)`, decide_le: `${releve}T12:00:00Z`,
         });
-        if (!eS) { bilan.signaux++; points.push(type === "creneau_doctolib" ? "premier créneau" : "nouveaux patients"); }
+        if (!eS) { bilan.signaux++; points.push(LIBELLE_POINT[type] ?? type); }
+        else bilan.erreurs_signaux.push(`${r} · ${type} : ${eS.message}`);
       }
       if (points.length) {
         bilan.a_valider.push({ id: p.id, rpps: r, nom: p.nom, prenom: p.prenom, departement: p.admin_reseau_lieux?.[0]?.departement ?? null, points });

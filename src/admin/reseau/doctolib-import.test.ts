@@ -70,3 +70,17 @@ describe("export : date du dernier relevé", () => {
     expect(r).toEqual({ resultats: [], erreurs: [] });
   });
 });
+
+describe("import : contenu complet", () => {
+  it("texte de la fiche et « Voir plus », téléphones, motifs, horaires et autres colonnes", () => {
+    const h = "rpps;url_doctolib;releve_le;fiche_texte_integral;voirplus_tarifs;telephones;motifs_reservables;prochains_30_creneaux;parcours_rdv";
+    const r = analyserImport([h, '10001234567;https://www.doctolib.fr/a/b/c;2026-11-16;"Dr A B\nDermatologue";"Tarifs\n50 €";0471 | 0472;Première consultation;2026-11-20 10:00 | 2026-11-20 11:00;Nouveau patient → motif'].join("\n"), auj);
+    expect(r.erreurs).toEqual([]);
+    const x = r.resultats[0];
+    expect(x.texteFiche).toContain("§§avisdoc§§");
+    expect(x.telephones).toEqual(["0471", "0472"]);
+    expect(x.motifs).toEqual(["Première consultation"]);
+    expect(x.creneaux).toEqual(["2026-11-20 10:00", "2026-11-20 11:00"]);
+    expect(x.autres).toEqual({ parcours_rdv: "Nouveau patient → motif" });
+  });
+});
