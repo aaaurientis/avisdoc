@@ -27,19 +27,38 @@ const echapper = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<
 const SOURCE_CONTOURS = "https://cdn.jsdelivr.net/gh/gregoiredavid/france-geojson@master/departements-version-simplifiee.geojson";
 let contoursFrance: Promise<any | null> | null = null;
 
-async function contourDepartement(code: string): Promise<any | null> {
-  try {
-    const r = await fetch(`https://geo.api.gouv.fr/departements/${encodeURIComponent(code)}?fields=contour&format=geojson&geometry=contour`, { signal: AbortSignal.timeout(6000) });
-    if (r.ok) {
-      const geo = await r.json();
-      const geometrie = geo?.type === "Feature" ? geo.geometry : geo?.contour ?? (geo?.type === "Polygon" || geo?.type === "MultiPolygon" ? geo : null);
-      if (geometrie?.type === "Polygon" || geometrie?.type === "MultiPolygon") return { type: "Feature", geometry: geometrie, properties: { code } };
-    }
-  } catch { /* source suivante */ }
+async function depuisGeoApi(code: string): Promise<any | null> {
+  const r = await fetch(`https://geo.api.gouv.fr/departements/${encodeURIComponent(code)}?fields=contour&format=geojson&geometry=contour`, { signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error(String(r.status));
+  const geo = await r.json();
+  const geometrie = geo?.type === "Feature" ? geo.geometry : geo?.contour ?? (geo?.type === "Polygon" || geo?.type === "MultiPolygon" ? geo : null);
+  if (geometrie?.type === "Polygon" || geometrie?.type === "MultiPolygon") return { type: "Feature", geometry: geometrie, properties: { code } };
+  throw new Error("sans contour");
+}
+
+async function depuisFichier(code: string): Promise<any | null> {
   contoursFrance ??= fetch(SOURCE_CONTOURS, { signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const tous = await contoursFrance;
-  if (!tous) { contoursFrance = null; return null; }
-  return (tous.features ?? []).find((f: any) => String(f?.properties?.code ?? "").toUpperCase() === code.toUpperCase()) ?? null;
+  if (!tous) { contoursFrance = null; throw new Error("fichier indisponible"); }
+  const f = (tous.features ?? []).find((x: any) => String(x?.properties?.code ?? "").toUpperCase() === code.toUpperCase());
+  if (!f) throw new Error("département absent");
+  return f;
+}
+
+/** Les deux sources en même temps : la première qui répond l'emporte. */
+async function contourDepartement(code: string): Promise<any | null> {
+  try { return await Promise.any([depuisGeoApi(code), depuisFichier(code)]); } catch { return null; }
+}
+
+/**
+ * Masque gris autour du département : un grand rectangle dont le département est « percé »
+ * (chaque polygone du département devient un trou, sens inverse comme le veut GeoJSON).
+ */
+function masqueAutour(contour: any): any {
+  const polygones: number[][][][] = contour.geometry.type === "Polygon" ? [contour.geometry.coordinates] : contour.geometry.coordinates;
+  const exterieur = [[-30, 20], [40, 20], [40, 65], [-30, 65], [-30, 20]];
+  const trous = polygones.map((p) => [...p[0]].reverse());
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [exterieur, ...trous] }, properties: { masque: true } };
 }
 
 export default function ReseauCarte({ praticiens, departement, scores, selection, onSelect }: {
@@ -86,10 +105,13 @@ export default function ReseauCarte({ praticiens, departement, scores, selection
     contourDepartement(departement)
       .then((geo) => {
         if (annule || !geo) return;
+        carte.data.addGeoJson(masqueAutour(geo));
         carte.data.addGeoJson(geo);
-        carte.data.setStyle({ fillColor: "#0e7490", fillOpacity: 0.04, strokeColor: "#0e7490", strokeOpacity: 0.7, strokeWeight: 2, clickable: false });
+        carte.data.setStyle((f: any) => f.getProperty("masque")
+          ? { fillColor: "#475569", fillOpacity: 0.35, strokeWeight: 0, clickable: false, zIndex: 0 }
+          : { fillOpacity: 0, strokeColor: "#0e7490", strokeOpacity: 0.8, strokeWeight: 2, clickable: false, zIndex: 1 });
         const cadre = new google.maps.LatLngBounds();
-        carte.data.forEach((f: any) => f.getGeometry().forEachLatLng((p: any) => cadre.extend(p)));
+        carte.data.forEach((f: any) => { if (!f.getProperty("masque")) f.getGeometry().forEachLatLng((p: any) => cadre.extend(p)); });
         if (cadre.isEmpty()) return;
         carte.fitBounds(cadre, 16);
         // Bornes : le département et une petite marge, pas au-delà (on peut zoomer, pas s'éloigner).
