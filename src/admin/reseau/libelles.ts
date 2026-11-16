@@ -180,7 +180,7 @@ export const DOCTOLIB_BADGE: Record<StatutDoctolib, string> = {
 };
 
 export const DOCTOLIB_AIDE: Record<StatutDoctolib, string> = {
-  confirme: "Lien vérifié par un opérateur.",
+  confirme: "Lien vérifié par un opérateur. La page n'a pas encore été relevée (favori ou import).",
   trouve_auto: "Trouvé automatiquement : la seule fiche Doctolib au nom, au prénom et dans une commune d'exercice du praticien. À vérifier.",
   a_confirmer: "Plusieurs fiches Doctolib portent son nom, aucune n'est sûre : choisissez la bonne (ou « Pas sur Doctolib »).",
   introuvable: "Aucune fiche Doctolib à son nom dans les résultats de recherche.",
@@ -208,11 +208,21 @@ export const doctolibRenseigne = (p: { doctolibUrl: string | null; doctolibInfos
  * Statut Doctolib tel qu'il s'affiche : « non réservable » d'abord, puis « fiche relevée »
  * dès qu'une information a été récupérée, sinon le statut du lien.
  */
-export function affichageDoctolib(p: { doctolibStatut: StatutDoctolib; doctolibUrl: string | null; doctolibInfos: { reservable?: boolean | null } | null }):
-  { label: string; badge: string; aide: string; picto: string } {
+export function affichageDoctolib(p: {
+  doctolibStatut: StatutDoctolib; doctolibUrl: string | null; doctolibReleveLe?: string | null;
+  doctolibInfos: { reservable?: boolean | null; disponibilites?: { releve_le?: string | null } | null } | null;
+}): { label: string; badge: string; aide: string; picto: string } {
   if (nonReservableDoctolib(p)) return { label: NON_RESERVABLE.label, badge: NON_RESERVABLE.badge, aide: NON_RESERVABLE.aide, picto: NON_RESERVABLE.picto };
-  if (doctolibRenseigne(p) && p.doctolibStatut !== "confirme") {
-    return { label: "Fiche relevée", badge: "bg-sky-100 text-sky-800", aide: "Des informations ont été récupérées sur cette fiche Doctolib (relevé ou import).", picto: "text-sky-700" };
+  // Page déjà chargée (favori ou import) : on le dit, avec la date du dernier relevé.
+  if (doctolibRenseigne(p)) {
+    const dates = [p.doctolibReleveLe, p.doctolibInfos?.disponibilites?.releve_le].filter((d): d is string => !!d).sort();
+    const le = dates.length ? new Date(dates[dates.length - 1]) : null;
+    const jour = le && !Number.isNaN(le.getTime()) ? le.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : null;
+    return {
+      label: jour ? `Relevée le ${jour}` : "Fiche relevée", badge: "bg-sky-600 text-white",
+      aide: `Page Doctolib déjà chargée (favori ou import)${le ? `, dernier relevé le ${le.toLocaleDateString("fr-FR")}` : ""}. Les informations sont sur la fiche.`,
+      picto: "fill-sky-100 text-sky-700",
+    };
   }
   return { label: DOCTOLIB_LABEL[p.doctolibStatut], badge: DOCTOLIB_BADGE[p.doctolibStatut], aide: DOCTOLIB_AIDE[p.doctolibStatut], picto: DOCTOLIB_PICTO[p.doctolibStatut] };
 }

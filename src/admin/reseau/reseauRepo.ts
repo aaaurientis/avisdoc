@@ -210,13 +210,39 @@ const toPraticien = (r: any): PraticienReseau => ({
   googlePlaceIds: Array.isArray(r.google_place_ids) && r.google_place_ids.length ? r.google_place_ids : r.google_place_id ? [r.google_place_id] : [],
   doctolibUrl: r.doctolib_url ?? null,
   doctolibStatut: r.doctolib_statut ?? "a_chercher",
-  doctolibInfos: r.doctolib_infos ?? null,
+  doctolibInfos: normaliserInfosDoctolib(r.doctolib_infos),
   doctolibReleveLe: r.doctolib_releve_le ?? null,
   doctolibRelevePar: r.doctolib_releve_par ?? null,
   lieux: (r.admin_reseau_lieux ?? []).map(toLieu),
 });
 
 /** Lit toutes les lignes d'une requête, par pages de 1 000 (limite de Supabase). */
+/**
+ * Les informations Doctolib viennent de plusieurs chemins (relevé complet, page de rendez-vous,
+ * import CSV, boutons « non réservable » / « n'existe plus ») : certaines sont partielles.
+ * On complète ici pour que l'écran puisse toujours lire chaque champ.
+ */
+export function normaliserInfosDoctolib(i: any): InfosDoctolib | null {
+  if (!i || typeof i !== "object") return null;
+  const liste = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+  const texte = (v: unknown) => (typeof v === "string" ? v : null);
+  const d = i.disponibilites && typeof i.disponibilites === "object" ? i.disponibilites : null;
+  return {
+    ...i,
+    specialite: texte(i.specialite), expertises: liste(i.expertises), conventionnement: texte(i.conventionnement),
+    carteVitale: typeof i.carteVitale === "boolean" ? i.carteVitale : null,
+    teleconsultation: typeof i.teleconsultation === "boolean" ? i.teleconsultation : null,
+    tarifs: liste(i.tarifs), langues: liste(i.langues), presentation: texte(i.presentation), adresses: liste(i.adresses),
+    reservable: typeof i.reservable === "boolean" ? i.reservable : null,
+    premierCreneau: i.premierCreneau && typeof i.premierCreneau === "object" ? i.premierCreneau : null,
+    disponibilites: d ? {
+      creneaux: Number(d.creneaux) || 0, sous7Jours: Number(d.sous7Jours) || 0,
+      parJour: Array.isArray(d.parJour) ? d.parJour : [], premier: d.premier && d.premier.date ? d.premier : null,
+      motif: texte(d.motif), releve_le: texte(d.releve_le) ?? "", releve_par: texte(d.releve_par) ?? "",
+    } : null,
+  };
+}
+
 async function toutLire(requete: (de: number, a: number) => PromiseLike<{ data: any[] | null; error: any }>): Promise<any[]> {
   const out: any[] = [];
   for (let de = 0; ; de += 1000) {
