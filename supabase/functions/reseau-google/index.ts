@@ -60,7 +60,7 @@ serve(async (req) => {
         : [...new Set((p.admin_reseau_lieux ?? []).map((l: any) => l.departement).filter(Boolean))] as string[];
       if (!departements.length) return json({ error: "Aucun département connu pour ce praticien." }, 400);
       if (!(await compterAppel(db, "recherche"))) return json({ error: quotaAtteint("recherche") }, 429);
-      const candidats = await chercherFiches(p, departements, cle);
+      const candidats = await chercherFiches(p, departements, cle, () => compterAppel(db, "recherche"));
       // Personne n'a encore tranché (à chercher, à confirmer, introuvable) et des fiches sont
       // au nom ET à l'adresse RPPS : validées d'office (décision du 14/11), sans attendre de clic.
       let valideesAuto: string[] = [];

@@ -47,7 +47,7 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
     if (!(await compterAppel(db, "recherche"))) {
       lignes.push({ texte: `Plafond Google du jour atteint (${PLAFONDS.recherche} recherches) : ${qui} sera cherché demain`, niveau: "ecarte" });
     } else {
-      const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle());
+      const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle(), () => compterAppel(db, "recherche"));
       const retenues = candidats.filter((c) => c.force === "certaine" || c.force === "forte");
       const moyennes = candidats.filter((c) => c.force === "moyenne");
       let maj: Record<string, unknown>;
@@ -109,7 +109,7 @@ export async function chercherLiens(db: any, praticienId: string, departements?:
 async function rapprocher(db: any, p: any, deps: string[]): Promise<LigneJournal[]> {
   const qui = `${p.prenom} ${p.nom}`;
   if (!(await compterAppel(db, "recherche"))) return [{ texte: `Plafond Google du jour atteint (${PLAFONDS.recherche} recherches) : ${qui} sera revérifié demain`, niveau: "ecarte" }];
-  const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle());
+  const candidats = await chercherFiches(p as PraticienPourGoogle, deps, cleGoogle(), () => compterAppel(db, "recherche"));
   const force = new Map(candidats.map((c) => [c.place_id, c.force]));
   const retenues = candidats.filter((c) => c.force === "certaine" || c.force === "forte").map((c) => c.place_id);
   const existantes: string[] = p.google_statut === "trouvee_auto" ? (p.google_place_ids ?? []) : [];
