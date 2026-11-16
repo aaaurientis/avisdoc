@@ -47,7 +47,13 @@ async function depuisFichier(code: string): Promise<any | null> {
 
 /** Les deux sources en même temps : la première qui répond l'emporte. */
 async function contourDepartement(code: string): Promise<any | null> {
-  try { return await Promise.any([depuisGeoApi(code), depuisFichier(code)]); } catch { return null; }
+  // Équivalent de Promise.any (non disponible dans la cible TypeScript du projet).
+  return new Promise((resoudre) => {
+    let echecs = 0;
+    for (const p of [depuisGeoApi(code), depuisFichier(code)]) {
+      p.then((v) => resoudre(v)).catch(() => { if (++echecs === 2) resoudre(null); });
+    }
+  });
 }
 
 /**

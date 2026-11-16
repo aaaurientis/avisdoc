@@ -34,6 +34,9 @@ const SUPABASE_KEY = (useAdmin
   ? ADMIN_KEY
   : import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string;
 
+/** Adresse du projet Supabase du Hub (connecteur MCP : adresse des fonctions). */
+export const SUPABASE_URL_HUB = SUPABASE_URL;
+
 export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
