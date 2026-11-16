@@ -41,6 +41,7 @@ export async function praticiensATraiter(
         const a = v === "google" ? p.google_statut === "a_chercher"
           : v === "doctolib" ? p.doctolib_statut === "a_chercher"
           : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut)
+          : v === "validation" ? p.google_statut === "trouvee_auto"
           : p.google_statut === "a_chercher" || p.doctolib_statut === "a_chercher" || sansGeo.has(p.id);
         if (a) out.push(p.id);
       }
@@ -119,7 +120,7 @@ export async function traiterFile(db: any, id: string): Promise<void> {
   const suivi = new Suivi(db, id, { etape: job.etape, progression: job.progression, journal: job.journal });
   const volet: Volet = job.resultat?.volet ?? "tout";
   const libelle = type === "ia_departement" ? "Recherche IA"
-    : ({ tout: "Carte, fiches Google et Doctolib", google: "Fiches Google Maps", doctolib: "Liens Doctolib", rapprochement: "Rapprochement Google / RPPS" } as const)[volet];
+    : ({ tout: "Carte, fiches Google et Doctolib", google: "Fiches Google Maps", doctolib: "Liens Doctolib", rapprochement: "Rapprochement Google / RPPS", validation: "Validation des fiches Google trouvées" } as const)[volet];
 
   try {
     while (Date.now() - debut < BUDGET_MS[type]) {
