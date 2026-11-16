@@ -180,7 +180,7 @@ export const DOCTOLIB_BADGE: Record<StatutDoctolib, string> = {
 };
 
 export const DOCTOLIB_AIDE: Record<StatutDoctolib, string> = {
-  confirme: "Lien vérifié par un opérateur. La page n'a pas encore été relevée (favori ou import).",
+  confirme: "Lien vérifié par un opérateur. La page n'a pas encore été relevée (import).",
   trouve_auto: "Trouvé automatiquement : la seule fiche Doctolib au nom, au prénom et dans une commune d'exercice du praticien. À vérifier.",
   a_confirmer: "Plusieurs fiches Doctolib portent son nom, aucune n'est sûre : choisissez la bonne (ou « Pas sur Doctolib »).",
   introuvable: "Aucune fiche Doctolib à son nom dans les résultats de recherche.",
@@ -213,7 +213,7 @@ export function affichageDoctolib(p: {
   doctolibInfos: { reservable?: boolean | null; disponibilites?: { releve_le?: string | null } | null } | null;
 }): { label: string; badge: string; aide: string; picto: string } {
   if (nonReservableDoctolib(p)) return { label: NON_RESERVABLE.label, badge: NON_RESERVABLE.badge, aide: NON_RESERVABLE.aide, picto: NON_RESERVABLE.picto };
-  // Page déjà chargée (favori ou import) : on le dit, avec la date du dernier relevé.
+  // Page déjà chargée (import) : on le dit, avec la date du dernier relevé.
   if (doctolibRenseigne(p)) {
     const dates = [p.doctolibReleveLe, p.doctolibInfos?.disponibilites?.releve_le].filter((d): d is string => !!d).sort();
     const le = dates.length ? new Date(dates[dates.length - 1]) : null;
