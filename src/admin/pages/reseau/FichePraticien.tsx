@@ -185,6 +185,11 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
 
       {erreur && <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[12.5px] text-rose-800">{erreur}</div>}
 
+      {p.etat !== "exclu" && points.length === 0 && (
+        <div className="mt-4 flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[12.5px] text-emerald-800">
+          <Check className="size-3.5" /> Aucun point à valider sur cette fiche.
+        </div>
+      )}
       {points.length > 0 && (
         <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5 text-[12.5px]">
           <div className="font-semibold text-violet-900">{points.length} point{points.length > 1 ? "s" : ""} à valider</div>
