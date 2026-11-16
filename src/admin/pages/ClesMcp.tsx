@@ -95,7 +95,13 @@ export default function ClesMcp() {
             <code className="break-all rounded-lg bg-white px-2 py-1 text-[12px]">{nouvelle.cle}</code>
             <Copier texte={nouvelle.cle} libelle="la clé" />
           </div>
-          <div className="mt-3 text-[12.5px] font-semibold text-avisdoc-ink">Configuration Cowork / Claude Desktop (claude_desktop_config.json)</div>
+          <div className="mt-3 text-[12.5px] font-semibold text-avisdoc-ink">Connecteur Claude (Paramètres › Connecteurs › Ajouter un connecteur personnalisé)</div>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <code className="break-all rounded-lg bg-white px-2 py-1 text-[12px]">{`${URL_MCP}?cle=${nouvelle.cle}`}</code>
+            <Copier texte={`${URL_MCP}?cle=${nouvelle.cle}`} libelle="l'adresse du connecteur" />
+          </div>
+          <p className="mt-1 text-[11.5px] text-amber-900">L'adresse contient la clé : ne la partagez pas. Une clé par connecteur, révocable ici.</p>
+          <div className="mt-3 text-[12.5px] font-semibold text-avisdoc-ink">Ou : configuration Claude Desktop (claude_desktop_config.json)</div>
           <pre className="mt-1 overflow-x-auto rounded-lg bg-white p-3 text-[11.5px]">{configCowork(nouvelle.cle)}</pre>
           <div className="mt-1 flex gap-2">
             <Copier texte={configCowork(nouvelle.cle)} libelle="la configuration" />
