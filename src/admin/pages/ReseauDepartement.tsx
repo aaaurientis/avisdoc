@@ -68,8 +68,8 @@ const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
 const COUT_IA_EUROS = 0.25;
 
 /** Une recherche du département : son statut en clair, un point vert quand elle est à jour. */
-function TuileRecherche({ icone, titre, etat, lignes, aide, bouton, onClick, motif }: {
-  icone: React.ReactNode; titre: string;
+function TuileRecherche({ titre, etat, lignes, aide, bouton, onClick, motif }: {
+  icone?: React.ReactNode; titre: string;
   etat: "a_jour" | "a_faire" | "en_cours" | "echec" | "vide";
   /** La première ligne s'affiche ; toutes sont au survol. */
   lignes: string[]; aide?: string; bouton: string | null; onClick: () => void; motif: string | null;
@@ -86,7 +86,6 @@ function TuileRecherche({ icone, titre, etat, lignes, aide, bouton, onClick, mot
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2" title={detail}>
       <span className={cn("size-2 shrink-0 rounded-full", pastille.cls)} aria-label={pastille.txt} />
-      <span className="shrink-0 text-muted-foreground">{icone}</span>
       <div className="min-w-0 flex-1 leading-tight">
         <div className="truncate text-[12.5px] font-semibold text-avisdoc-ink">{titre}</div>
         <div className="truncate text-[11.5px] text-muted-foreground">{lignes[0]}</div>
@@ -535,29 +534,29 @@ export default function ReseauDepartement() {
       {/* Filtres */}
       <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
         <input
-          className="ad-input w-44 shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] outline-none focus:border-avisdoc-teal"
+          className="ad-input w-36 shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] outline-none focus:border-avisdoc-teal"
           placeholder="Nom, RPPS, ville…"
           value={filtres.q}
           onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
         />
-        <Filtre label="Population" tous="toutes" valeur={filtres.population} onChange={(v) => setFiltres((f) => ({ ...f, population: v as "" | Population }))}
+        <Filtre label="Population" tous="toutes" largeur={122} valeur={filtres.population} onChange={(v) => setFiltres((f) => ({ ...f, population: v as "" | Population }))}
           options={POPULATIONS.map((p) => [p, POPULATION_LIBELLE[p]])} />
-        <Filtre label="Rôle" tous="tous" valeur={filtres.role} onChange={(v) => setFiltres((f) => ({ ...f, role: v as "" | Role }))}
+        <Filtre label="Rôle" tous="tous" largeur={92} valeur={filtres.role} onChange={(v) => setFiltres((f) => ({ ...f, role: v as "" | Role }))}
           options={ROLES.map((r) => [r, ROLE_LABEL[r]])} />
         <Filtre label="Google" tous="tous" valeur={filtres.google} onChange={(v) => setFiltres((f) => ({ ...f, google: v as "" | StatutGoogle }))}
           options={STATUTS_GOOGLE.map((g) => [g, GOOGLE_LABEL[g]])} />
         <Filtre label="Doctolib" tous="tous" valeur={filtres.doctolib} onChange={(v) => setFiltres((f) => ({ ...f, doctolib: v as "" | StatutDoctolib | "non_reservable" }))}
           options={[...STATUTS_DOCTOLIB.map((d) => [d, DOCTOLIB_LABEL[d]] as [string, string]), ["non_reservable", NON_RESERVABLE.label]]} />
-        <Filtre label="À valider" tous="tous" valeur={filtres.aValider} onChange={(v) => setFiltres((f) => ({ ...f, aValider: v as "" | "oui" | "non" }))}
+        <Filtre label="À valider" tous="tous" largeur={114} valeur={filtres.aValider} onChange={(v) => setFiltres((f) => ({ ...f, aValider: v as "" | "oui" | "non" }))}
           options={[["oui", "Avec points à valider"], ["non", "À jour"]]} />
-        <Filtre label="État" tous="tous" valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
+        <Filtre label="État" tous="tous" largeur={92} valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
           options={ETATS_PRATICIEN.map((e) => [e, ETAT_PRATICIEN_LABEL[e]])} />
         <div className="ml-auto flex shrink-0 gap-0.5 rounded-full border border-border bg-card p-0.5">
           {([{ v: "liste", label: "Liste", icon: List }, { v: "carte", label: "Carte", icon: MapIcon }] as const).map(({ v, label, icon: Icon }) => (
-            <button key={v} type="button" onClick={() => setVue(v)}
-              className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
+            <button key={v} type="button" onClick={() => setVue(v)} title={label} aria-label={label}
+              className={cn("grid size-7 place-items-center rounded-full transition-colors",
                 vue === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink")}>
-              <Icon className="size-3.5" /> {label}
+              <Icon className="size-3.5" />
             </button>
           ))}
         </div>
@@ -857,12 +856,13 @@ function EnTete({ cle, tri, onTri, children, centre, droite, titre }: {
   );
 }
 
-function Filtre({ label, tous, valeur, onChange, options }: {
-  label: string; tous: string; valeur: string; onChange: (v: string) => void; options: [string, string][];
+function Filtre({ label, tous, valeur, onChange, options, largeur = 112 }: {
+  label: string; tous: string; valeur: string; onChange: (v: string) => void; options: [string, string][]; largeur?: number;
 }) {
   return (
     <select aria-label={label} value={valeur} onChange={(e) => onChange(e.target.value)} title={`${label} : ${tous}`}
-      className={cn("max-w-[150px] shrink-0 rounded-full border border-border bg-card py-1.5 pl-3 pr-7 text-[12.5px]", valeur && "border-avisdoc-teal font-semibold")}>
+      style={{ width: largeur }}
+      className={cn("shrink-0 truncate rounded-full border border-border bg-card py-1.5 pl-3 pr-6 text-[12.5px]", valeur && "border-avisdoc-teal font-semibold")}>
       <option value="">{label}</option>
       {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
     </select>
