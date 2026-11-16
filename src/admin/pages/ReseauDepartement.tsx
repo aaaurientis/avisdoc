@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CalendarCheck, Check, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Check, Play, RefreshCw, Search, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { confirmer } from "../components/Confirmation";
 import { Badge, Card, Modal, PageHeader } from "../components/ui";
@@ -43,7 +43,7 @@ import {
   type Role,
 } from "../reseau/libelles";
 import { reseauRepo, type DepartementReseau, type ImportReseau, type PraticienReseau, type RechercheIa, type SignalReseau } from "../reseau/reseauRepo";
-import { calculerScore, releveCreneauPerime, VALEUR_LIBELLE } from "../../../supabase/functions/_shared/reseau-signaux";
+import { calculerScore } from "../../../supabase/functions/_shared/reseau-signaux";
 import FichePraticien from "./reseau/FichePraticien";
 import AvancementIa from "./reseau/AvancementIa";
 import ReseauCarte from "./reseau/ReseauCarte";
@@ -71,33 +71,31 @@ const COUT_IA_EUROS = 0.25;
 function TuileRecherche({ icone, titre, etat, lignes, aide, bouton, onClick, motif }: {
   icone: React.ReactNode; titre: string;
   etat: "a_jour" | "a_faire" | "en_cours" | "echec" | "vide";
+  /** La première ligne s'affiche ; toutes sont au survol. */
   lignes: string[]; aide?: string; bouton: string | null; onClick: () => void; motif: string | null;
 }) {
   const pastille = {
-    a_jour: { cls: "bg-emerald-500", txt: "À jour", txtCls: "text-emerald-700" },
-    a_faire: { cls: "bg-amber-400", txt: "À faire", txtCls: "text-amber-700" },
-    en_cours: { cls: "bg-sky-500 animate-pulse", txt: "En cours", txtCls: "text-sky-700" },
-    echec: { cls: "bg-rose-500", txt: "Échec", txtCls: "text-rose-700" },
-    vide: { cls: "bg-slate-300", txt: "—", txtCls: "text-muted-foreground" },
+    a_jour: { cls: "bg-emerald-500", txt: "À jour" },
+    a_faire: { cls: "bg-amber-400", txt: "À faire" },
+    en_cours: { cls: "bg-sky-500 animate-pulse", txt: "En cours" },
+    echec: { cls: "bg-rose-500", txt: "Échec" },
+    vide: { cls: "bg-slate-300", txt: "—" },
   }[etat];
   const arret = bouton === "Arrêter";
+  const detail = [pastille.txt, ...lignes.filter(Boolean), aide].filter(Boolean).join("\n");
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card px-3.5 py-3" title={aide}>
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">{icone}</span>
-        <span className="min-w-0 flex-1 text-[13px] font-semibold leading-tight text-avisdoc-ink">{titre}</span>
-        <span className={cn("inline-flex items-center gap-1.5 text-[11.5px] font-semibold", pastille.txtCls)}>
-          <span className={cn("size-2.5 rounded-full", pastille.cls)} aria-hidden /> {pastille.txt}
-        </span>
-      </div>
-      <div className="mt-1.5 flex-1 space-y-0.5 text-[11.5px] leading-snug text-muted-foreground">
-        {lignes.filter(Boolean).map((l) => <div key={l}>{l}</div>)}
+    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2" title={detail}>
+      <span className={cn("size-2 shrink-0 rounded-full", pastille.cls)} aria-label={pastille.txt} />
+      <span className="shrink-0 text-muted-foreground">{icone}</span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate text-[12.5px] font-semibold text-avisdoc-ink">{titre}</div>
+        <div className="truncate text-[11.5px] text-muted-foreground">{lignes[0]}</div>
       </div>
       {bouton && (
-        <button type="button" onClick={onClick} disabled={!!motif && !arret} title={motif ?? aide}
-          className={cn("mt-2 inline-flex items-center justify-center gap-1.5 self-start rounded-full border px-3 py-1 text-[12px] font-semibold disabled:opacity-50",
+        <button type="button" onClick={onClick} disabled={!!motif && !arret} title={motif ?? bouton} aria-label={bouton}
+          className={cn("grid size-7 shrink-0 place-items-center rounded-full border disabled:opacity-50",
             arret ? "border-border text-muted-foreground hover:bg-muted" : "border-avisdoc-teal text-avisdoc-teal hover:bg-sky-50")}>
-          {etat === "en_cours" && (arret ? <Square className="size-3" /> : <Loader2 className="size-3 animate-spin" />)} {bouton}
+          {arret ? <Square className="size-3" /> : /^Chercher/.test(bouton) ? <Search className="size-3.5" /> : /^Lancer/.test(bouton) ? <Play className="size-3.5" /> : <RefreshCw className="size-3.5" />}
         </button>
       )}
     </div>
@@ -360,17 +358,6 @@ export default function ReseauDepartement() {
     }
   };
 
-  // Synthèse Doctolib : liens et créneaux relevés (relevés de moins de 14 jours).
-  const syntheseDoctolib = useMemo(() => {
-    const actifs = praticiens.filter((p) => p.etat !== "exclu");
-    const liens = actifs.filter((p) => p.doctolibUrl).length;
-    const creneaux = new Map<string, number>();
-    for (const sg of signaux) {
-      if (sg.type !== "creneau_doctolib" || sg.statut !== "valide" || releveCreneauPerime(sg.decideLe)) continue;
-      creneaux.set(sg.valeur, (creneaux.get(sg.valeur) ?? 0) + 1);
-    }
-    return { total: actifs.length, liens, creneaux };
-  }, [praticiens, signaux]);
 
   const lancerMg = async () => {
     setErreur(null);
@@ -413,6 +400,11 @@ export default function ReseauDepartement() {
         subtitle={dep ? `${ETAT_DEPARTEMENT_LABEL[dep.etat]} · ${praticiens.length} praticiens` : undefined}
         action={
           <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setAjoutRpps(true)} disabled={lectureSeule || !dep} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
+              <UserPlus className="size-4" /> Ajouter par RPPS
+            </button>
             <button
               type="button"
               onClick={() => void importer()}
@@ -423,6 +415,7 @@ export default function ReseauDepartement() {
               {importEnCours ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
               {importEnCours ? TEXTES.importEnCours : dep?.dernierImportLe ? TEXTES.rafraichir : TEXTES.importer}
             </button>
+            </div>
             {motifImport && <span className="text-[11.5px] text-muted-foreground">{motifImport}</span>}
           </div>
         }
@@ -432,123 +425,83 @@ export default function ReseauDepartement() {
         <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-800">{erreur}</div>
       )}
 
-      {/* Source et fraîcheur, puis contexte du département. */}
-      <Card className="mb-4 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted-foreground">
-          <span>
-            Source :{" "}
-            <a href={SOURCE_RPPS.url} target="_blank" rel="noreferrer" className="font-semibold text-avisdoc-ink underline-offset-2 hover:underline">
-              {SOURCE_RPPS.libelle}
-            </a>
+      {/* Source, dates et effectifs par spécialité, sur une ligne ; le détail au survol. */}
+      <Card className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 text-[12.5px]">
+        <a href={SOURCE_RPPS.url} target="_blank" rel="noreferrer" title={SOURCE_RPPS.libelle}
+          className={cn("inline-flex items-center gap-1 underline-offset-2 hover:underline", extraitLe && estPerime(extraitLe) ? "font-semibold text-amber-700" : "text-muted-foreground")}>
+          RPPS <b className={cn(extraitLe && estPerime(extraitLe) ? "" : "text-avisdoc-ink")}>{extraitLe ? dateFr(extraitLe) : "non importé"}</b>
+          {extraitLe && estPerime(extraitLe) ? " · périmé" : ""}
+        </a>
+        {dep?.dernierImportLe && (
+          <span className="text-muted-foreground" title={dernier?.compteurs ? `Dernier import : ${dernier.compteurs.crees ?? 0} ajoutés, ${dernier.compteurs.mis_a_jour ?? 0} déjà présents, ${dernier.compteurs.exclus_ignores ?? 0} exclus ignorés` : undefined}>
+            Import <b className="text-avisdoc-ink">{dateFr(dep.dernierImportLe)}</b>
+            {dernier?.statut === "echec" && <span className="font-semibold text-rose-700"> · en échec</span>}
           </span>
-          {extraitLe ? (
-            <span className={cn(estPerime(extraitLe) && "font-semibold text-amber-700")}>
-              Extraction du {dateFr(extraitLe)}{estPerime(extraitLe) ? ` · ${TEXTES.perime}` : ""}
-            </span>
-          ) : (
-            <span>{TEXTES.pasEncoreImporte}</span>
-          )}
-          {dernier?.statut === "echec" && <span className="font-semibold text-rose-700">Dernier import en échec : {dernier.erreur}</span>}
-          {dernier?.statut === "termine" && dernier.compteurs && (
-            <span>
-              Dernier import : {dernier.compteurs.crees ?? 0} ajoutés, {dernier.compteurs.mis_a_jour ?? 0} déjà présents (complétés sans rien écraser)
-              {dernier.compteurs.lieux_ajoutes ? `, ${dernier.compteurs.lieux_ajoutes} lieux ajoutés` : ""}
-              {dernier.compteurs.absents_extraction ? `, ${dernier.compteurs.absents_extraction} absents de l'extraction (conservés)` : ""}
-              {`, ${dernier.compteurs.exclus_ignores ?? 0} exclus ignorés, ${dernier.compteurs.relies_liste ?? 0} déjà dans la liste`}
-            </span>
-          )}
-        </div>
-        {syntheseDoctolib.total > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1 font-semibold text-avisdoc-ink"><CalendarCheck className="size-3.5" /> Doctolib</span>
-            <span>{syntheseDoctolib.liens}/{syntheseDoctolib.total} fiches liées</span>
-            {syntheseDoctolib.creneaux.size > 0 ? (
-              <span>
-                Premier créneau (relevés de moins de 14 jours) :{" "}
-                {(["moins_7j", "7_30j", "plus_30j", "aucun_nouveau"] as const).filter((v) => syntheseDoctolib.creneaux.get(v))
-                  .map((v) => `${VALEUR_LIBELLE[v].toLowerCase()} ${syntheseDoctolib.creneaux.get(v)}`).join(" · ")}
-              </span>
-            ) : (
-              <span>aucun créneau relevé récemment</span>
-            )}
-          </div>
         )}
-        {contexte.size > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {POPULATIONS.filter((p) => contexte.has(p)).map((p) => {
-              const c = contexte.get(p)!;
-              return (
-                <span key={p} className="rounded-xl bg-muted/60 px-3 py-1.5 text-[12.5px]">
-                  <b className="text-avisdoc-ink">{c.total}</b> {c.total > 1 ? POPULATION_PLURIEL[p] : p === "ORL" ? "ORL" : POPULATION_LIBELLE[p].toLowerCase()}
-                  <span className="text-muted-foreground">
-                    {" · "}{c.liberaux} {c.liberaux > 1 ? "libéraux" : "libéral"}, {c.salaries} {c.salaries > 1 ? "salariés" : "salarié"}
-                  </span>
-                </span>
-              );
-            })}
-          </div>
-        )}
+        <span className="text-muted-foreground"><b className="text-avisdoc-ink">{[...contexte.values()].reduce((t, c) => t + c.total, 0)}</b> praticiens</span>
+        {POPULATIONS.filter((p) => contexte.has(p)).map((p) => {
+          const c = contexte.get(p)!;
+          return (
+            <span key={p} className="rounded-full bg-muted/60 px-2.5 py-0.5" title={`${c.liberaux} ${c.liberaux > 1 ? "libéraux" : "libéral"}, ${c.salaries} ${c.salaries > 1 ? "salariés" : "salarié"}`}>
+              <b className="text-avisdoc-ink">{c.total}</b> <span className="text-muted-foreground">{c.total > 1 ? POPULATION_PLURIEL[p] : p === "ORL" ? "ORL" : POPULATION_LIBELLE[p].toLowerCase()}</span>
+            </span>
+          );
+        })}
       </Card>
 
       {/* Recherches du département : une tuile par recherche, avec son statut ; point vert = à jour. */}
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12px] font-bold uppercase tracking-wide text-muted-foreground">Recherches</span>
-        <button type="button" onClick={() => setAjoutRpps(true)} disabled={lectureSeule || !dep} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-semibold text-avisdoc-ink hover:bg-muted disabled:opacity-50">
-          <UserPlus className="size-4" /> Ajouter par RPPS
-        </button>
-      </div>
-      <div className="mb-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <TuileRecherche
-          icone={<MapPin className="size-4" />} titre="Fiches Google Maps"
+          icone={<MapPin className="size-4" />} titre="Google Maps"
           etat={liensEnCours("google") ? "en_cours" : comptes.google.aChercher ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
           lignes={[
-            `${comptes.google.trouvees} trouvée${comptes.google.trouvees > 1 ? "s" : ""} · ${comptes.google.aConfirmer + comptes.google.sans} sans correspondance`,
+            `${comptes.google.trouvees} trouvées · ${comptes.google.aConfirmer + comptes.google.sans} sans`,
             comptes.google.aChercher ? `${comptes.google.aChercher} pas encore cherché${comptes.google.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
             plafondGoogle,
           ]}
-          bouton={liensEnCours("google") ? "Arrêter" : comptes.google.aChercher ? `Chercher (${comptes.google.aChercher})` : null}
+          bouton={liensEnCours("google") ? "Arrêter" : comptes.google.aChercher ? `Chercher ${comptes.google.aChercher}` : null}
           onClick={() => liensEnCours("google") ? void arreter(rechercheGoogle!) : void lancerLiens("google")}
           motif={motifLiens("google")} />
         <TuileRecherche
-          icone={<Check className="size-4" />} titre="Rapprochement Google / RPPS"
+          icone={<Check className="size-4" />} titre="Google / RPPS"
           etat={liensEnCours("rapprochement") ? "en_cours" : comptes.google.aVerifier ? "a_faire" : comptes.google.trouvees ? "a_jour" : "vide"}
           lignes={[
-            `${comptes.google.confirmees} validée${comptes.google.confirmees > 1 ? "s" : ""} (adresse RPPS ou opérateur)`,
+            `${comptes.google.confirmees} validées${comptes.google.aVerifier ? ` · ${comptes.google.aVerifier} à vérifier` : ""}`,
             comptes.google.aVerifier ? `${comptes.google.aVerifier} trouvée${comptes.google.aVerifier > 1 ? "s" : ""} à vérifier (même nom et code postal)` : "Aucune fiche à vérifier",
             plafondGoogle,
           ]}
-          aide="Revérifie les fiches non tranchées : au nom et à l'adresse RPPS, elles sont validées d'office. Une recherche Google par praticien."
-          bouton={liensEnCours("rapprochement") ? "Arrêter" : comptes.google.aRapprocher ? `Revérifier (${comptes.google.aRapprocher})` : null}
+          aide="Revérifier : une recherche Google par praticien non tranché."
+          bouton={liensEnCours("rapprochement") ? "Arrêter" : comptes.google.aRapprocher ? "Revérifier" : null}
           onClick={() => liensEnCours("rapprochement") ? void arreter(rechercheGoogle!) : void lancerLiens("rapprochement")}
           motif={motifLiens("rapprochement")} />
         <TuileRecherche
           icone={<CalendarCheck className="size-4" />} titre="Doctolib"
           etat={liensEnCours("doctolib") ? "en_cours" : comptes.doctolib.aChercher ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
           lignes={[
-            `${comptes.doctolib.liens} lien${comptes.doctolib.liens > 1 ? "s" : ""}${comptes.doctolib.nonReservables ? ` dont ${comptes.doctolib.nonReservables} non réservable${comptes.doctolib.nonReservables > 1 ? "s" : ""}` : ""} · ${comptes.doctolib.aConfirmer} à confirmer · ${comptes.doctolib.sans} absent${comptes.doctolib.sans > 1 ? "s" : ""}`,
+            `${comptes.doctolib.liens} liens · ${comptes.doctolib.nonReservables} non réserv. · ${comptes.doctolib.sans} absents`,
             comptes.doctolib.aChercher ? `${comptes.doctolib.aChercher} pas encore cherché${comptes.doctolib.aChercher > 1 ? "s" : ""}` : "Tous les praticiens ont été cherchés",
             `Aujourd'hui : ${appels.doctolib ?? 0} / ${PLAFONDS_JOUR.doctolib} recherches Doctolib`,
           ]}
-          bouton={liensEnCours("doctolib") ? "Arrêter" : comptes.doctolib.aChercher ? `Chercher (${comptes.doctolib.aChercher})` : null}
+          bouton={liensEnCours("doctolib") ? "Arrêter" : comptes.doctolib.aChercher ? `Chercher ${comptes.doctolib.aChercher}` : null}
           onClick={() => liensEnCours("doctolib") ? void arreter(rechercheGoogle!) : void lancerLiens("doctolib")}
           motif={motifLiens("doctolib")} />
         <TuileRecherche
-          icone={<Sparkles className="size-4" />} titre="Généralistes dermoscopie (IA)"
+          icone={<Sparkles className="size-4" />} titre="Généralistes (IA)"
           etat={rechercheMg?.statut === "en_cours" ? "en_cours" : rechercheMg?.statut === "echec" ? "echec" : rechercheMg?.statut === "termine" ? "a_jour" : "a_faire"}
           lignes={rechercheMg?.statut === "termine" ? [
-            `Le ${dateFr(rechercheMg.fin ?? rechercheMg.debut)} : ${rechercheMg.resultat?.propositions ?? 0} trouvés, ${rechercheMg.resultat?.crees ?? 0} ajoutés`,
+            `${rechercheMg.resultat?.crees ?? 0} ajoutés le ${dateFr(rechercheMg.fin ?? rechercheMg.debut)}`,
+            `${rechercheMg.resultat?.propositions ?? 0} trouvés`,
             `${rechercheMg.resultat?.deja_la ?? 0} déjà là · ${rechercheMg.resultat?.ecartees?.length ?? 0} écartés`,
-          ] : rechercheMg?.statut === "echec" ? ["Dernière recherche en échec", rechercheMg.erreur ?? ""] : rechercheMg?.statut === "en_cours" ? ["Recherche en cours…"] : ["Jamais lancée pour ce département"]}
+          ] : rechercheMg?.statut === "echec" ? ["En échec", rechercheMg.erreur ?? ""] : rechercheMg?.statut === "en_cours" ? ["En cours…"] : ["Jamais lancée"]}
           bouton={rechercheMg?.statut === "en_cours" ? null : rechercheMg ? "Relancer" : "Lancer"}
           onClick={() => void lancerMg()}
           motif={lectureSeule ? TEXTES.motifLectureSeule : !dep ? "Département absent de la liste." : null} />
         <TuileRecherche
-          icone={<Sparkles className="size-4" />} titre="Recherche IA des fiches"
+          icone={<Sparkles className="size-4" />} titre="IA des fiches"
           etat={rechercheIa?.statut === "en_cours" ? "en_cours" : iaRestants === null ? "vide" : iaRestants ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
           lignes={[
-            iaRestants === null ? "Calcul…" : iaRestants ? `${iaRestants} fiche${iaRestants > 1 ? "s" : ""} sans recherche depuis 30 jours` : "Toutes les fiches cherchées depuis moins de 30 jours",
-            rechercheIa?.statut === "termine" ? `Dernière passe le ${dateFr(rechercheIa.fin ?? rechercheIa.debut)}` : "Signaux sourcés, à valider sur chaque fiche",
+            iaRestants === null ? "Calcul…" : iaRestants ? `${iaRestants} à chercher (30 j)` : "Toutes cherchées (30 j)",
+            rechercheIa?.statut === "termine" ? `Dernière passe le ${dateFr(rechercheIa.fin ?? rechercheIa.debut)}` : "",
           ]}
           bouton={rechercheIa?.statut === "en_cours" ? "Arrêter" : "Lancer…"}
           onClick={() => rechercheIa?.statut === "en_cours" ? void arreter(rechercheIa) : setIaGroupee(true)}
@@ -580,10 +533,10 @@ export default function ReseauDepartement() {
       )}
 
       {/* Filtres */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
         <input
-          className="ad-input max-w-[280px] flex-1 rounded-full border border-border bg-card px-4 py-2.5 text-[13.5px] outline-none focus:border-avisdoc-teal"
-          placeholder="Nom, RPPS, structure, commune…"
+          className="ad-input w-44 shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] outline-none focus:border-avisdoc-teal"
+          placeholder="Nom, RPPS, ville…"
           value={filtres.q}
           onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
         />
@@ -599,11 +552,10 @@ export default function ReseauDepartement() {
           options={[["oui", "Avec points à valider"], ["non", "À jour"]]} />
         <Filtre label="État" tous="tous" valeur={filtres.etat} onChange={(v) => setFiltres((f) => ({ ...f, etat: v as "" | EtatPraticien }))}
           options={ETATS_PRATICIEN.map((e) => [e, ETAT_PRATICIEN_LABEL[e]])} />
-        <span className="ml-auto text-[12.5px] text-muted-foreground">{rows.length} affichés · triés par {LIBELLE_TRI[tri.cle]}{tri.sens === 1 ? " (croissant)" : " (décroissant)"}</span>
-        <div className="flex gap-1 rounded-full border border-border bg-card p-1">
+        <div className="ml-auto flex shrink-0 gap-0.5 rounded-full border border-border bg-card p-0.5">
           {([{ v: "liste", label: "Liste", icon: List }, { v: "carte", label: "Carte", icon: MapIcon }] as const).map(({ v, label, icon: Icon }) => (
             <button key={v} type="button" onClick={() => setVue(v)}
-              className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+              className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
                 vue === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink")}>
               <Icon className="size-3.5" /> {label}
             </button>
@@ -909,9 +861,9 @@ function Filtre({ label, tous, valeur, onChange, options }: {
   label: string; tous: string; valeur: string; onChange: (v: string) => void; options: [string, string][];
 }) {
   return (
-    <select aria-label={label} value={valeur} onChange={(e) => onChange(e.target.value)}
-      className={cn("rounded-full border border-border bg-card px-3.5 py-2.5 text-[13px]", valeur && "border-avisdoc-teal font-semibold")}>
-      <option value="">{label} : {tous}</option>
+    <select aria-label={label} value={valeur} onChange={(e) => onChange(e.target.value)} title={`${label} : ${tous}`}
+      className={cn("max-w-[150px] shrink-0 rounded-full border border-border bg-card py-1.5 pl-3 pr-7 text-[12.5px]", valeur && "border-avisdoc-teal font-semibold")}>
+      <option value="">{label}</option>
       {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
     </select>
   );
