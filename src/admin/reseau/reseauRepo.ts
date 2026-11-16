@@ -421,7 +421,7 @@ export const reseauRepo = {
     appeler("reseau-action", { action: "doctolib_import", lignes }),
   enregistrerCreneauxDoctolib: (praticienId: string, url: string, disponibilites: { creneaux: number; sous7Jours: number; parJour: { date: string; n: number }[]; premier: { date: string; jours: number } | null; motif: string | null }, creneau: string | null) =>
     appeler("reseau-action", { action: "doctolib_creneaux", praticien_id: praticienId, url, disponibilites, creneau }),
-  doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean }) =>
+  doctolib: (praticienId: string, choix: { url: string } | { aucun: true } | { retirer: true } | { confirmer: true } | { non_reservable: boolean } | { page_disparue: true }) =>
     appeler("reseau-action", { action: "doctolib", praticien_id: praticienId, ...choix }),
 
   /** Travaux groupés d'un département : « liens » (carte, Google, Doctolib) ou « ia ». */
