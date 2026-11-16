@@ -27,6 +27,9 @@ export interface LieuReseau {
   finess: string | null;
   lat: number | null;
   lng: number | null;
+  /** Précision du géocodage (« housenumber » = adresse trouvée au numéro) et adresse normalisée (BAN). */
+  geoType: string | null;
+  geoLabel: string | null;
 }
 
 export interface PraticienReseau {
@@ -181,6 +184,8 @@ const toLieu = (l: any): LieuReseau => ({
   finess: l.finess ?? null,
   lat: typeof l.lat === "number" ? l.lat : null,
   lng: typeof l.lng === "number" ? l.lng : null,
+  geoType: l.geo_type ?? null,
+  geoLabel: l.geo_label ?? null,
 });
 
 const toPraticien = (r: any): PraticienReseau => ({

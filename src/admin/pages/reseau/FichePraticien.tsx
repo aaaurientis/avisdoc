@@ -3,7 +3,7 @@
 // Toute information affichée porte sa source ; rien n'est écrit sans validation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronRight, ExternalLink, Loader2, Search, Sparkles, Star, X } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Loader2, MapPin, Phone, Search, Sparkles, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { confirmer } from "../../components/Confirmation";
 import { Badge, Card, Modal, SectionLabel } from "../../components/ui";
@@ -73,7 +73,9 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
   const [exclusion, setExclusion] = useState(false);
   const [saisie, setSaisie] = useState<TypeSignal | null>(null);
   const [occupe, setOccupe] = useState<string | null>(null);
+  const [fichesGoogle, setFichesGoogle] = useState<FicheGoogle[]>([]);
   const suivi = useRef<number | null>(null);
+  useEffect(() => setFichesGoogle([]), [p.id]);
 
   const charger = useCallback(async () => {
     try {
@@ -156,6 +158,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
           <div className="font-display text-lg font-semibold text-avisdoc-ink">{p.civilite ? `${p.civilite} ` : ""}{p.prenom} {p.nom}</div>
           <div className="text-[12.5px] text-muted-foreground">{POPULATION_LIBELLE[p.population]} · RPPS {p.rpps}</div>
           {p.specialites.length > 0 && <div className="text-[12px] text-muted-foreground">Spécialités RPPS : {p.specialites.join(", ")}</div>}
+          <Coordonnees praticien={p} fichesGoogle={fichesGoogle} />
         </div>
         <button type="button" onClick={onClose} aria-label="Fermer la fiche" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted">
           <X className="size-4" />
@@ -305,7 +308,7 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
           </a>
           {" · "}{p.rppsExtraitLe ? `extraction du ${dateFr(p.rppsExtraitLe)}` : "date d'extraction inconnue"}{perime ? ` · ${TEXTES.perime}` : ""}
         </div>
-        <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} />
+        <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} onFiches={setFichesGoogle} />
         <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
       </Section>
 
@@ -354,6 +357,51 @@ function Section({ id, titre, resume, ouvertParDefaut = true, forcerOuvert = fal
 
 function SousTitre({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={cn("text-[11.5px] font-bold uppercase tracking-wide text-muted-foreground", className)}>{children}</div>;
+}
+
+/** Tél. au format français (« 04 73 98 75 57 ») pour comparer et afficher. */
+const telNorme = (t: string) => {
+  const c = t.replace(/[^\d+]/g, "").replace(/^\+33/, "0").replace(/^0033/, "0");
+  return /^0\d{9}$/.test(c) ? c.replace(/(\d{2})(?=\d)/g, "$1 ") : t.trim();
+};
+
+/**
+ * En tête de fiche : adresses d'exercice normalisées (Base Adresse Nationale ; « vérifiée »
+ * quand elle est trouvée au numéro) et téléphones, chacun avec sa source.
+ */
+function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienReseau; fichesGoogle: FicheGoogle[] }) {
+  const adresses = p.lieux.map((l) => ({
+    texte: l.geoLabel ?? [l.adresse, [l.codePostal, l.commune].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+    verifiee: l.geoType === "housenumber",
+  })).filter((a, i, t) => a.texte && t.findIndex((x) => x.texte === a.texte) === i);
+  const tels = new Map<string, Set<string>>();
+  const ajouter = (t: string | null | undefined, source: string) => {
+    if (!t) return;
+    const n = telNorme(t);
+    tels.set(n, (tels.get(n) ?? new Set()).add(source));
+  };
+  for (const l of p.lieux) ajouter(l.telephone, "RPPS");
+  if (p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto") for (const f of fichesGoogle) ajouter(f.telephone, "Google");
+  if (!adresses.length && !tels.size) return null;
+  return (
+    <div className="mt-2 space-y-0.5 text-[12.5px] text-avisdoc-ink">
+      {adresses.map((a) => (
+        <div key={a.texte} className="flex items-start gap-1.5">
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <span>{a.texte}{a.verifiee
+            ? <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-700" title="Adresse trouvée au numéro dans la Base Adresse Nationale"><Check className="size-3" />vérifiée</span>
+            : <span className="ml-1.5 text-[11px] text-muted-foreground" title="Adresse RPPS non retrouvée au numéro dans la Base Adresse Nationale">non vérifiée</span>}</span>
+        </div>
+      ))}
+      {[...tels].map(([t, sources]) => (
+        <div key={t} className="flex items-center gap-1.5">
+          <Phone className="size-3.5 shrink-0 text-muted-foreground" />
+          <a href={`tel:${t.replace(/\s/g, "")}`} className="font-semibold underline-offset-2 hover:underline">{t}</a>
+          <span className="text-[11px] text-muted-foreground">{[...sources].join(", ")}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ResumeRecherche({ recherche: r }: { recherche: RechercheIa | null }) {
@@ -460,8 +508,10 @@ function CarteFicheGoogle({ fiche, lieuRpps, onAvis, occupeAvis }: { fiche: Fich
   );
 }
 
-function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
+function BlocGoogle({ praticien: p, departement, lectureSeule, onChange, onFiches }: {
   praticien: PraticienReseau; departement?: string; lectureSeule: boolean; onChange: () => void;
+  /** Les fiches Google chargées (pour les téléphones en tête de fiche). */
+  onFiches?: (f: FicheGoogle[]) => void;
 }) {
   const [candidats, setCandidats] = useState<CandidatGoogle[] | null>(null);
   const [coches, setCoches] = useState<Set<string>>(new Set());
@@ -470,6 +520,9 @@ function BlocGoogle({ praticien: p, departement, lectureSeule, onChange }: {
   const [occupe, setOccupe] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const cleFiches = p.googlePlaceIds.join(",");
+  useEffect(() => {
+    onFiches?.(p.googlePlaceIds.map((id) => fiches[id]).filter((f): f is FicheGoogle => !!f && f !== "erreur"));
+  }, [fiches, cleFiches]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Les fiches rattachées s'affichent d'elles-mêmes, pour valider d'un coup d'œil.
   useEffect(() => {

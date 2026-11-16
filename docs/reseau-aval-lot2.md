@@ -322,3 +322,8 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - Colonnes à remplir : `reservable` (oui/non), `nouveaux_patients` (oui/non), `premier_creneau` (date), `creneaux_7j` (nombre), `releve_le` (date, obligatoire). `rpps` et `url_doctolib` (la source) obligatoires. Lignes non remplies ignorées ; valeurs illisibles signalées ligne par ligne, jamais devinées.
 - Aperçu avant envoi. À l'enregistrement (action `doctolib_import`) : lien confirmé, `reservable` et `disponibilites` mis à jour, signaux « premier créneau » (délai entre relevé et premier créneau) et « nouveaux patients » validés au nom de l'importateur, **datés du relevé** (péremption du créneau à 14 jours), source = la fiche.
 - Les relevés du fichier doivent être faits à la main, fiche par fiche (pas de collecte automatisée de Doctolib).
+
+## En-tête de fiche : adresses normalisées et téléphones (16/11)
+
+- Sous le nom : chaque adresse d'exercice, normalisée par la Base Adresse Nationale (`geo_label`, migration 0094), avec « vérifiée » si elle a été trouvée au numéro, sinon l'adresse RPPS telle quelle et « non vérifiée ».
+- Téléphones dédoublonnés, chacun avec sa source : RPPS, et Google pour les fiches confirmées ou trouvées (lu à l'affichage, jamais enregistré). Cliquables (appel).

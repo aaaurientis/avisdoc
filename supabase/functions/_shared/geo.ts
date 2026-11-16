@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { LieuRpps } from "./google-correspondance.ts";
 
-export interface Geo { lat: number; lng: number; geo_type: string; geo_score: number | null }
+export interface Geo { lat: number; lng: number; geo_type: string; geo_score: number | null; geo_label: string | null }
 
 export async function geocoder(l: { adresse?: string | null; code_postal?: string | null; commune?: string | null }): Promise<Geo | null> {
   // « 21 RUE DE SARLIEVE, LE TRIANGLE » : le complément gêne l'API, on garde la voie.
@@ -22,7 +22,8 @@ export async function geocoder(l: { adresse?: string | null; code_postal?: strin
     const f = (await r.json())?.features?.[0];
     const c = f?.geometry?.coordinates;
     if (!Array.isArray(c) || c.length !== 2) return null;
-    return { lat: c[1], lng: c[0], geo_type: String(f.properties?.type ?? "inconnu"), geo_score: typeof f.properties?.score === "number" ? f.properties.score : null };
+    return { lat: c[1], lng: c[0], geo_type: String(f.properties?.type ?? "inconnu"), geo_score: typeof f.properties?.score === "number" ? f.properties.score : null,
+      geo_label: typeof f.properties?.label === "string" ? f.properties.label.slice(0, 200) : null };
   } catch {
     return null;
   }

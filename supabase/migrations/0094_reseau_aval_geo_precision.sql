@@ -5,7 +5,11 @@
 
 alter table public.admin_reseau_lieux
   add column if not exists geo_type  text,
-  add column if not exists geo_score double precision;
+  add column if not exists geo_score double precision,
+  add column if not exists geo_label text;
+
+comment on column public.admin_reseau_lieux.geo_label is
+  'Adresse normalisée renvoyée par l''API Adresse (Base Adresse Nationale), affichée en tête de fiche.';
 
 comment on column public.admin_reseau_lieux.geo_type is
   'Précision du géocodage (API Adresse) : housenumber, street, locality, municipality. Seul « housenumber » sert à valider une fiche Google.';
