@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarCheck, Check, Download, List, Loader2, MapIcon, MapPin, Sparkles, Square, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { confirmer } from "../components/Confirmation";
 import { Badge, Card, Modal, PageHeader } from "../components/ui";
 import { lectureSeuleActive } from "../lib/lectureSeule";
 import {
@@ -60,7 +61,7 @@ const GOOGLE_PICTO: Record<StatutGoogle, string> = {
   a_chercher: "text-slate-200",
 };
 
-const COLS_FULL = "minmax(160px,1.5fr) 120px minmax(120px,1fr) 84px 130px 140px 120px 70px";
+const COLS_FULL = "minmax(130px,1.3fr) 100px minmax(100px,1fr) 72px 122px 128px 118px 108px 52px";
 const COLS_COMPACT = "minmax(150px,1.4fr) 100px 40px 40px 60px";
 
 /** Coût indicatif d'une recherche IA par praticien (modèle + recherches web), à ajuster sur les factures réelles. */
@@ -184,6 +185,34 @@ export default function ReseauDepartement() {
     return new Map(praticiens.map((p) => [p.id, { probabilite: calculerScore(p, (valides.get(p.id) ?? []).map((v) => ({ ...v, le: v.decideLe }))).probabilite, aValider: enAttente.get(p.id) ?? 0 }]));
   }, [praticiens, signaux]);
 
+  // Liste « Réseau Aval » (contacts du réseau) : qui y est déjà, avec quel rôle.
+  const [contacts, setContacts] = useState<Map<string, { id: string; types: string[]; statut: string }>>(new Map());
+  const [integration, setIntegration] = useState<string | null>(null);
+  useEffect(() => {
+    if (!praticiens.length) return;
+    reseauRepo.contactsReseau(praticiens.map((p) => p.rpps)).then(setContacts).catch(() => setContacts(new Map()));
+  }, [praticiens]);
+  const integrer = async (p: PraticienReseau) => {
+    const c = contacts.get(p.rpps);
+    const ok = await confirmer({
+      titre: `Intégrer Dr ${p.prenom} ${p.nom} au réseau d'aval ?`,
+      message: c ? "Il est déjà dans la liste des contacts : le rôle « Réseau d'Aval » lui est ajouté." : "Un contact « Réseau d'Aval » est créé (statut « Accepté ») avec ses données RPPS. Le praticien passe en état « Accord ».",
+      action: "Intégrer",
+    });
+    if (!ok) return;
+    setIntegration(p.id);
+    try {
+      await reseauRepo.integrerReseau(p.id);
+      toast.success(`Dr ${p.prenom} ${p.nom} intégré au réseau d'aval.`);
+      setContacts(await reseauRepo.contactsReseau(praticiens.map((x) => x.rpps)));
+      void charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIntegration(null);
+    }
+  };
+
   // Points à trancher par praticien (propositions IA, liens à confirmer, hors cible…).
   const points = useMemo(() => {
     const parPraticien = new Map<string, SignalReseau[]>();
@@ -210,6 +239,7 @@ export default function ReseauDepartement() {
             case "lieu": return p.lieux.find((l) => l.departement === code)?.commune ?? "~";
             case "exercice": return p.lieux.find((l) => l.departement === code)?.modeExercice ?? "~";
             case "avalider": return points.get(p.id)?.length ?? 0;
+            case "reseau": { const c = contacts.get(p.rpps); return c?.types.includes(AVAL) ? 2 : c ? 1 : 0; }
             case "google": return STATUTS_GOOGLE.indexOf(p.googleStatut);
             case "doctolib": return nonReservableDoctolib(p) ? 1.5 : STATUTS_DOCTOLIB.indexOf(p.doctolibStatut);
           }
@@ -218,7 +248,7 @@ export default function ReseauDepartement() {
         const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "fr");
         return c * tri.sens || (scores.get(b.id)?.probabilite ?? 0) - (scores.get(a.id)?.probabilite ?? 0) || a.nom.localeCompare(b.nom, "fr");
       });
-  }, [praticiens, filtres, scores, tri, code, points]);
+  }, [praticiens, filtres, scores, tri, code, points, contacts]);
 
   // Recherche IA des généralistes formés à la dermoscopie : suivie toutes les 5 secondes.
   useEffect(() => {
@@ -585,9 +615,9 @@ export default function ReseauDepartement() {
         {vue === "carte" ? (
           <ReseauCarte praticiens={rows} departement={code} scores={scores} selection={selection} onSelect={setSelection} />
         ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-x-auto">
           <div className="grid gap-3 border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
-            style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL }}>
+            style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL, minWidth: selectionne ? undefined : 1040 }}>
             <EnTete cle="nom" tri={tri} onTri={trier}>Praticien</EnTete>
             <EnTete cle="population" tri={tri} onTri={trier}>Population</EnTete>
             {!selectionne && <>
@@ -597,6 +627,7 @@ export default function ReseauDepartement() {
             </>}
             <EnTete cle="google" tri={tri} onTri={trier} centre={!!selectionne} titre="Google">{selectionne ? "G" : "Google"}</EnTete>
             <EnTete cle="doctolib" tri={tri} onTri={trier} centre={!!selectionne} titre="Doctolib">{selectionne ? "D" : "Doctolib"}</EnTete>
+            {!selectionne && <EnTete cle="reseau" tri={tri} onTri={trier}>Réseau d'aval</EnTete>}
             <EnTete cle="score" tri={tri} onTri={trier} droite>Score</EnTete>
           </div>
           {chargement && (
@@ -610,11 +641,10 @@ export default function ReseauDepartement() {
               <button key={p.id} type="button" onClick={() => setSelection(p.id)}
                 className={cn("ad-row grid w-full items-center gap-3 border-b border-border/60 px-5 py-3 text-left last:border-b-0",
                   selection === p.id && "bg-sky-50/70")}
-                style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL }}>
+                style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL, minWidth: selectionne ? undefined : 1040 }}>
                 <div className="min-w-0">
                   <div className="truncate text-[13.5px] font-semibold text-avisdoc-ink">{p.nom} {p.prenom}</div>
                   <div className="flex flex-wrap gap-1 pt-0.5">
-                    {p.contactId && <Badge className="bg-emerald-50 text-emerald-800">{TEXTES.dejaDansLaListe}</Badge>}
                     {!p.vuAuDernierImport && <Badge className="bg-amber-50 text-amber-800">{TEXTES.absentExtraction}</Badge>}
                     {p.etat !== "exclu" && specialiteHorsCible(specialiteDuLienDoctolib(p.doctolibUrl), p.doctolibInfos?.specialite) && (
                       <Badge className="bg-amber-100 text-amber-900">Hors cible ?</Badge>
@@ -666,6 +696,12 @@ export default function ReseauDepartement() {
                     ) : (
                       <Badge className={DOCTOLIB_BADGE[p.doctolibStatut]}>{DOCTOLIB_LABEL[p.doctolibStatut]}</Badge>
                     )}
+                  </div>
+                )}
+                {!selectionne && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <CelluleReseau contact={contacts.get(p.rpps)} exclu={p.etat === "exclu"} lectureSeule={lectureSeule}
+                      enCours={integration === p.id} onIntegrer={() => void integrer(p)} />
                   </div>
                 )}
                 <div className="text-right">
@@ -817,10 +853,40 @@ function AjoutRpps({ onClose, onAjoute }: { onClose: () => void; onAjoute: (id: 
   );
 }
 
-type CleTri = "score" | "nom" | "population" | "lieu" | "exercice" | "avalider" | "google" | "doctolib";
+type CleTri = "score" | "nom" | "population" | "lieu" | "exercice" | "avalider" | "google" | "doctolib" | "reseau";
+const AVAL = "Réseau d'Aval";
+
+/** Colonne « Réseau d'aval » : intégré, dans la liste avec un autre rôle, ou à intégrer. */
+function CelluleReseau({ contact, exclu, lectureSeule, enCours, onIntegrer }: {
+  contact: { id: string; types: string[]; statut: string } | undefined; exclu: boolean; lectureSeule: boolean; enCours: boolean; onIntegrer: () => void;
+}) {
+  if (contact?.types.includes(AVAL)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-700" title={`Dans la liste Réseau Aval${contact.statut ? ` (${contact.statut})` : ""}`}>
+        <Check className="size-3.5" /> Intégré{contact.statut && contact.statut !== "Accepté" ? ` · ${contact.statut.toLowerCase()}` : ""}
+      </span>
+    );
+  }
+  if (exclu) return <span className="text-[12px] text-muted-foreground">—</span>;
+  const bouton = (libelle: string) => (
+    <button type="button" onClick={onIntegrer} disabled={lectureSeule || enCours} title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
+      className="inline-flex items-center gap-1 rounded-full border border-avisdoc-teal px-2.5 py-1 text-[11.5px] font-semibold text-avisdoc-teal hover:bg-sky-50 disabled:opacity-50">
+      {enCours ? <Loader2 className="size-3 animate-spin" /> : <UserPlus className="size-3" />} {libelle}
+    </button>
+  );
+  if (contact) {
+    return (
+      <div className="space-y-1">
+        <div className="text-[11px] text-muted-foreground">{contact.types.join(", ") || "Dans la liste"}</div>
+        {bouton("+ Aval")}
+      </div>
+    );
+  }
+  return bouton("Intégrer");
+}
 const LIBELLE_TRI: Record<CleTri, string> = {
   score: "probabilité d'adhésion", nom: "nom", population: "population", lieu: "commune", exercice: "mode d'exercice",
-  avalider: "points à valider", google: "statut Google", doctolib: "statut Doctolib",
+  avalider: "points à valider", reseau: "réseau d'aval", google: "statut Google", doctolib: "statut Doctolib",
 };
 
 /** En-tête de colonne cliquable pour trier ; la flèche montre le tri en cours. */

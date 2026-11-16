@@ -440,6 +440,20 @@ export const reseauRepo = {
       sb.from("admin_reseau_praticiens").select("*, admin_reseau_lieux(*)").not("doctolib_url", "is", null).neq("etat", "exclu").order("id").range(de, a));
     return lignes.map(toPraticien);
   },
+  /** Contacts du réseau (liste « Réseau Aval ») correspondant à ces RPPS : rôles et statut. */
+  async contactsReseau(rpps: string[]): Promise<Map<string, { id: string; types: string[]; statut: string }>> {
+    const out = new Map<string, { id: string; types: string[]; statut: string }>();
+    for (let i = 0; i < rpps.length; i += 200) {
+      const { data, error } = await sb.from("admin_network_contacts").select("id, rpps, type, types, statut").in("rpps", rpps.slice(i, i + 200));
+      if (error) throw new Error(error.message);
+      for (const c of data ?? []) {
+        out.set(c.rpps, { id: c.id, types: Array.isArray(c.types) && c.types.length ? c.types : c.type ? [c.type] : [], statut: c.statut ?? "" });
+      }
+    }
+    return out;
+  },
+  integrerReseau: (praticienId: string): Promise<{ contact_id: string; deja: boolean }> =>
+    appeler("reseau-action", { action: "integrer_reseau", praticien_id: praticienId }),
   /** Propositions laissées en attente par des imports Doctolib précédents. */
   async nbPropositionsImport(): Promise<number> {
     const { count, error } = await sb.from("admin_reseau_signaux").select("id", { count: "exact", head: true })
