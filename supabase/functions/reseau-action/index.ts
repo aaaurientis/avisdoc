@@ -150,7 +150,7 @@ serve(async (req) => {
     case "signal_valider":
     case "signal_rejeter": {
       const { data: sig } = await db.from("admin_reseau_signaux")
-        .select("id, praticien_id, type, valeur, url, statut").eq("id", String(corps.signal_id ?? "")).maybeSingle();
+        .select("id, praticien_id, type, valeur, url, statut, propose_le").eq("id", String(corps.signal_id ?? "")).maybeSingle();
       if (!sig) return json({ error: "Proposition introuvable." }, 404);
       if (sig.statut !== "propose") return json({ error: "Cette proposition a déjà été traitée." }, 409);
       const valider = corps.action === "signal_valider";
@@ -158,8 +158,10 @@ serve(async (req) => {
         try { await remplacerAncien(db, sig.praticien_id, sig.type, sig.id); } catch (e) { return json({ error: (e as Error).message }, 500); }
       }
       // L'extrait est effacé dès la décision : aucun verbatim n'est conservé.
+      // Un créneau relevé (import) date du relevé, pas de la validation : sa péremption (14 j) part de là.
+      const decideLe = valider && sig.type === "creneau_doctolib" && sig.propose_le ? sig.propose_le : new Date().toISOString();
       const { error } = await db.from("admin_reseau_signaux").update({
-        statut: valider ? "valide" : "rejete", extrait: null, decide_par: email, decide_le: new Date().toISOString(),
+        statut: valider ? "valide" : "rejete", extrait: null, decide_par: email, decide_le: decideLe,
       }).eq("id", sig.id).eq("statut", "propose");
       if (error) return json({ error: error.message }, 500);
       if (sig.type === "teleexpertise") await majRoleRequerant(db, sig.praticien_id);
@@ -249,10 +251,14 @@ serve(async (req) => {
       const rpps = [...new Set(lignes.map((l: any) => String(l?.rpps ?? "")).filter((r: string) => /^\d{11}$/.test(r)))] as string[];
       const parRpps = new Map<string, any>();
       for (let i = 0; i < rpps.length; i += 200) {
-        const { data } = await db.from("admin_reseau_praticiens").select("id, rpps, etat, doctolib_infos").in("rpps", rpps.slice(i, i + 200));
+        const { data } = await db.from("admin_reseau_praticiens").select("id, rpps, nom, prenom, etat, doctolib_infos, admin_reseau_lieux(departement)").in("rpps", rpps.slice(i, i + 200));
         for (const p of data ?? []) parRpps.set(p.rpps, p);
       }
-      const bilan = { mis_a_jour: 0, signaux: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[] };
+      const bilan = {
+        mis_a_jour: 0, signaux: 0, inconnus: [] as string[], exclus: [] as string[], refuses: [] as string[],
+        /** Praticiens qui ont désormais des propositions à valider (lien vers leur fiche). */
+        a_valider: [] as { id: string; rpps: string; nom: string; prenom: string; departement: string | null; points: string[] }[],
+      };
       for (const l of lignes) {
         const r = String(l?.rpps ?? "");
         const p = parRpps.get(r);
@@ -278,16 +284,26 @@ serve(async (req) => {
         }).eq("id", p.id);
         if (error) { bilan.refuses.push(r); continue; }
         bilan.mis_a_jour++;
-        // Signaux : datés du relevé (la péremption du créneau part de cette date), source = la fiche.
-        const signaux: [string, unknown][] = [["creneau_doctolib", l?.creneau], ["nouveaux_patients", l?.nouveauxPatients]];
-        for (const [type, valeur] of signaux) {
+        // Signaux : PROPOSÉS, à valider sur la fiche (décision du 16/11). Datés du relevé (la
+        // péremption du créneau part de cette date), source = la fiche, valeur lue en extrait.
+        const dateFr = (d: string) => d.split("-").reverse().join("/");
+        const signaux: [string, unknown, string][] = [
+          ["creneau_doctolib", l?.creneau, premier ? `Import Doctolib, relevé du ${dateFr(releve)} : premier créneau le ${dateFr(premier)}${sept !== null ? `, ${sept} créneau(x) sur 7 jours` : ""}.` : `Import Doctolib, relevé du ${dateFr(releve)} : aucun créneau pour un nouveau patient.`],
+          ["nouveaux_patients", l?.nouveauxPatients, `Import Doctolib, relevé du ${dateFr(releve)} : nouveaux patients « ${l?.nouveauxPatients} ».`],
+        ];
+        const points: string[] = [];
+        for (const [type, valeur, extrait] of signaux) {
           if (typeof valeur !== "string" || !valeurAdmise(type as any, valeur)) continue;
-          await remplacerAncien(db, p.id, type);
+          // Une proposition identique d'un import précédent est remplacée, pas doublée.
+          await db.from("admin_reseau_signaux").delete().eq("praticien_id", p.id).eq("type", type).eq("statut", "propose").eq("url", lien);
           const { error: eS } = await db.from("admin_reseau_signaux").insert({
-            praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "valide",
-            propose_par: `${email} (import)`, decide_par: `${email} (import)`, decide_le: `${releve}T12:00:00Z`,
+            praticien_id: p.id, type, valeur, url: lien, origine: "operateur", statut: "propose", extrait,
+            propose_par: `${email} (import)`, propose_le: `${releve}T12:00:00Z`,
           });
-          if (!eS) bilan.signaux++;
+          if (!eS) { bilan.signaux++; points.push(type === "creneau_doctolib" ? "premier créneau" : "nouveaux patients"); }
+        }
+        if (points.length) {
+          bilan.a_valider.push({ id: p.id, rpps: r, nom: p.nom, prenom: p.prenom, departement: p.admin_reseau_lieux?.[0]?.departement ?? null, points });
         }
         await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: email, action: "doctolib_import", detail: { url: lien, releve_le: releve } });
       }

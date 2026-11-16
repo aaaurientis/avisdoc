@@ -3,6 +3,7 @@
 // retenues, erreurs ligne par ligne. Chaque résultat garde sa source (lien) et sa date.
 
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Download, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Card, Modal } from "../../components/ui";
@@ -92,7 +93,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
     try {
       const b = await reseauRepo.importerResultatsDoctolib(resultats);
       setBilan(b);
-      toast.success(`${b.mis_a_jour} praticien${b.mis_a_jour > 1 ? "s" : ""} mis à jour, ${b.signaux} signal${b.signaux > 1 ? "aux" : ""} enregistré${b.signaux > 1 ? "s" : ""}.`);
+      toast.success(`${b.mis_a_jour} praticien${b.mis_a_jour > 1 ? "s" : ""} mis à jour, ${b.signaux} proposition${b.signaux > 1 ? "s" : ""} à valider.`);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e));
     } finally {
@@ -108,7 +109,22 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
 
       {bilan ? (
         <div className="mt-4 space-y-1.5 text-[13px]">
-          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> signal{bilan.signaux > 1 ? "aux" : ""} enregistré{bilan.signaux > 1 ? "s" : ""}.</p>
+          <p><b>{bilan.mis_a_jour}</b> praticien{bilan.mis_a_jour > 1 ? "s" : ""} mis à jour · <b>{bilan.signaux}</b> proposition{bilan.signaux > 1 ? "s" : ""} à valider.</p>
+          {bilan.a_valider.length > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2">
+              <div className="font-semibold text-violet-900">Points à valider ({bilan.a_valider.length} praticien{bilan.a_valider.length > 1 ? "s" : ""})</div>
+              <ul className="mt-1 max-h-56 space-y-0.5 overflow-y-auto text-[12.5px]">
+                {bilan.a_valider.map((x) => (
+                  <li key={x.id}>
+                    <Link to={x.departement ? `/reseau-aval/${x.departement}?praticien=${x.id}` : "/reseau-aval"} onClick={onClose}
+                      className="font-semibold text-violet-900 underline-offset-2 hover:underline">{x.prenom} {x.nom}</Link>
+                    <span className="text-violet-900/80"> · {x.points.join(", ")}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[11.5px] text-violet-900/80">Sur chaque fiche : encadré « points à valider », puis Valider ou Rejeter chaque proposition après avoir ouvert la fiche Doctolib.</p>
+            </div>
+          )}
           {bilan.inconnus.length > 0 && <p className="text-amber-800">RPPS absents de la liste (ignorés) : {bilan.inconnus.join(", ")}</p>}
           {bilan.exclus.length > 0 && <p className="text-muted-foreground">Praticiens exclus (ignorés) : {bilan.exclus.join(", ")}</p>}
           {bilan.refuses.length > 0 && <p className="text-rose-700">Refusés par le serveur : {bilan.refuses.join(", ")}</p>}
@@ -142,7 +158,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
               </table>
             </div>
           ) : <p className="mt-3 text-[13px] text-muted-foreground">Aucune ligne remplie à importer.</p>}
-          <p className="mt-2 text-[11.5px] text-muted-foreground">À l'enregistrement : lien confirmé, « réservable » et créneaux mis à jour, signaux « premier créneau » et « nouveaux patients » validés à votre nom, datés du relevé, avec la fiche comme source.</p>
+          <p className="mt-2 text-[11.5px] text-muted-foreground">À l'enregistrement : lien confirmé, « réservable » et créneaux mis à jour. « Premier créneau » et « nouveaux patients » arrivent en <b>propositions à valider</b> sur chaque fiche, datées du relevé, avec la fiche Doctolib comme source.</p>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
             <button type="button" onClick={() => void importer()} disabled={!resultats.length || envoi}
