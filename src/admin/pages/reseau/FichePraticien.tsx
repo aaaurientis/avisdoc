@@ -3,7 +3,7 @@
 // Toute information affichée porte sa source ; rien n'est écrit sans validation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronRight, ExternalLink, Loader2, MapPin, Phone, Search, Sparkles, Star, X } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Globe, Loader2, MapPin, Phone, Search, Sparkles, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { confirmer } from "../../components/Confirmation";
 import { Badge, Card, Modal, SectionLabel } from "../../components/ui";
@@ -317,8 +317,8 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
         </div>
       </Section>
 
-      <Section id="adresses" titre="Adresses et fiches en ligne" forcerOuvert={cible === "adresses"}
-        resume={<span className="flex gap-1"><Badge className={GOOGLE_BADGE[p.googleStatut]}>Google</Badge><Badge className={affichageDoctolib(p).badge}>Doctolib</Badge></span>}>
+      <Section id="adresses" titre="Adresses et Google Maps" forcerOuvert={cible === "adresses"}
+        resume={<Badge className={GOOGLE_BADGE[p.googleStatut]}>{GOOGLE_LABEL[p.googleStatut]}</Badge>}>
         <SousTitre>Lieux d'exercice (RPPS)</SousTitre>
         <div className="mt-1.5 space-y-2">
           {p.lieux.map((l, i) => (
@@ -338,6 +338,10 @@ export default function FichePraticien({ praticien: p, departement, lectureSeule
           {" · "}{p.rppsExtraitLe ? `extraction du ${dateFr(p.rppsExtraitLe)}` : "date d'extraction inconnue"}{perime ? ` · ${TEXTES.perime}` : ""}
         </div>
         <BlocGoogle praticien={p} departement={departement} lectureSeule={lectureSeule} onChange={onChange} onFiches={setFichesGoogle} />
+      </Section>
+
+      <Section id="doctolib" titre="Doctolib" forcerOuvert={cible === "doctolib"}
+        resume={<Badge className={affichageDoctolib(p).badge}>{affichageDoctolib(p).label}</Badge>}>
         <BlocDoctolib praticien={p} releve={parType.get("creneau_doctolib")} lectureSeule={lectureSeule} onChange={() => { void charger(); onChange(); }} />
       </Section>
 
@@ -410,8 +414,13 @@ function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienResea
     tels.set(n, (tels.get(n) ?? new Set()).add(source));
   };
   for (const l of p.lieux) ajouter(l.telephone, "RPPS");
-  if (p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto") for (const f of fichesGoogle) ajouter(f.telephone, "Google");
-  if (!adresses.length && !tels.size) return null;
+  const googleRetenue = p.googleStatut === "confirmee" || p.googleStatut === "trouvee_auto";
+  if (googleRetenue) for (const f of fichesGoogle) ajouter(f.telephone, "Google");
+  // Site web de la fiche Google (un lien vers Doctolib n'est pas un site : il est dans la section Doctolib).
+  const sites = googleRetenue
+    ? [...new Set(fichesGoogle.map((f) => f.site).filter((u): u is string => !!u && !/(^|\.)doctolib\.(fr|de|it)$/.test(hote(u))))]
+    : [];
+  if (!adresses.length && !tels.size && !sites.length) return null;
   return (
     <div className="mt-2 space-y-0.5 text-[12.5px] text-avisdoc-ink">
       {adresses.map((a) => (
@@ -427,6 +436,13 @@ function Coordonnees({ praticien: p, fichesGoogle }: { praticien: PraticienResea
           <Phone className="size-3.5 shrink-0 text-muted-foreground" />
           <a href={`tel:${t.replace(/\s/g, "")}`} className="font-semibold underline-offset-2 hover:underline">{t}</a>
           <span className="text-[11px] text-muted-foreground">{[...sources].join(", ")}</span>
+        </div>
+      ))}
+      {sites.map((u) => (
+        <div key={u} className="flex items-center gap-1.5">
+          <Globe className="size-3.5 shrink-0 text-muted-foreground" />
+          <a href={u} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold underline-offset-2 hover:underline">{hote(u)} <ExternalLink className="size-3" /></a>
+          <span className="text-[11px] text-muted-foreground">Google</span>
         </div>
       ))}
     </div>
@@ -716,10 +732,6 @@ function BlocDoctolib({ praticien: p, releve, lectureSeule, onChange }: {
 
   return (
     <>
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <SousTitre>Doctolib</SousTitre>
-        <span title={affichageDoctolib(p).aide}><Badge className={affichageDoctolib(p).badge}>{affichageDoctolib(p).label}</Badge></span>
-      </div>
       {erreur && <div role="alert" className="mt-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{erreur}</div>}
 
       {p.doctolibUrl ? (
