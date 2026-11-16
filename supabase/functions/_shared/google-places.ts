@@ -12,11 +12,14 @@ import { verifierFichesIa } from "./google-ia.ts";
 const RECHERCHE = "https://places.googleapis.com/v1/places:searchText";
 // La clé du projet est restreinte aux appels venant du Hub (référent HTTP), comme pour Merx.
 export const REFERENT_HUB = "https://admin.avisdoc.fr/";
+// Plafonds quotidiens. Google relevé à 10 000 par type le 16/11 (≈ 50 000 requêtes pour
+// 100 $, selon l'utilisateur) : un simple garde-fou contre un emballement, le budget se
+// pilote dans la console Google Cloud. Doctolib (recherche web par l'IA) inchangé.
 export const PLAFONDS = {
-  recherche: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_RECHERCHE") ?? 200),
+  recherche: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_RECHERCHE") ?? 10000),
   doctolib: Number(Deno.env.get("RESEAU_DOCTOLIB_PLAFOND") ?? 200),
-  details: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_DETAILS") ?? 300),
-  details_avis: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_AVIS") ?? 100),
+  details: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_DETAILS") ?? 10000),
+  details_avis: Number(Deno.env.get("RESEAU_GOOGLE_PLAFOND_AVIS") ?? 10000),
 };
 const CHAMPS_RECHERCHE = "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.businessStatus,places.location";
 

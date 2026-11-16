@@ -199,7 +199,7 @@ export const NON_RESERVABLE = {
 } as const;
 
 /** Plafonds quotidiens par défaut (variables RESEAU_GOOGLE_PLAFOND_* / RESEAU_DOCTOLIB_PLAFOND côté serveur). */
-export const PLAFONDS_JOUR = { recherche: 200, details: 300, details_avis: 100, doctolib: 200 } as const;
+export const PLAFONDS_JOUR = { recherche: 10000, details: 10000, details_avis: 10000, doctolib: 200 } as const;
 
 /** Une information Doctolib a déjà été récupérée (relevé, import) : le lien n'est plus « à choisir ». */
 export const doctolibRenseigne = (p: { doctolibUrl: string | null; doctolibInfos: object | null }) => !!p.doctolibUrl && !!p.doctolibInfos;
