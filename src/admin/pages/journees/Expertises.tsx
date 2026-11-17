@@ -18,6 +18,7 @@ import {
   resultatsVisibles,
   parMois,
   parRequis,
+  delaiSuiviMoyen,
   resumer,
   type Expertise,
   type Part,
@@ -313,31 +314,39 @@ function BarresMois({ liste }: { liste: Expertise[] }) {
  * le trait vertical marque le taux de l'ensemble des requis, pour comparer d'un coup d'œil.
  */
 function TableRequis({ liste }: { liste: Expertise[] }) {
-  const [tri, setTri] = useState<"avis" | "taux">("avis");
+  const [tri, setTri] = useState<"avis" | "taux" | "suivi">("avis");
   const lignes = useMemo(() => {
     const l = parRequis(liste);
+    if (tri === "suivi") return [...l].sort((a, b) => (delaiSuiviMoyen(a) ?? Infinity) - (delaiSuiviMoyen(b) ?? Infinity));
     return tri === "taux" ? [...l].sort((a, b) => b.orientations / (b.renseignes || 1) - a.orientations / (a.renseignes || 1)) : l;
   }, [liste, tri]);
   const tous = lignes.reduce((s, l) => ({ o: s.o + l.orientations, r: s.r + l.renseignes }), { o: 0, r: 0 });
   const tauxGlobal = pct(tous.o, tous.r);
+  // Délai moyen de suivi : même lecture que le taux — barre par requis, trait = ensemble des requis.
+  const suiviTous = lignes.reduce((s, l) => ({ somme: s.somme + l.delaiSuiviSomme, n: s.n + l.delaiSuiviMesures }), { somme: 0, n: 0 });
+  const suiviGlobal = suiviTous.n ? suiviTous.somme / suiviTous.n : null;
+  const suiviMax = Math.max(1, ...lignes.filter((l) => resultatsVisibles(l.total)).map((l) => delaiSuiviMoyen(l) ?? 0), suiviGlobal ?? 0);
+  const jours = (v: number | null) => (v === null ? "—" : `${Math.round(v)} j`);
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-3 text-[12px] text-muted-foreground">
         <span>
-          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? `${tauxGlobal} %` : MASQUE}</b>. Un requis à {20} avis ou moins n'affiche pas ses résultats (règle de l'AIPD).
+          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? `${tauxGlobal} %` : MASQUE}</b>, délai moyen de suivi <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? jours(suiviGlobal) : MASQUE}</b>. Un requis à {20} avis ou moins n'affiche pas ses résultats (règle de l'AIPD).
         </span>
-        <select value={tri} onChange={(e) => setTri(e.target.value as "avis" | "taux")} className={selectCls} aria-label="Trier">
+        <select value={tri} onChange={(e) => setTri(e.target.value as "avis" | "taux" | "suivi")} className={selectCls} aria-label="Trier">
           <option value="avis">Trier par nombre d'avis</option>
           <option value="taux">Trier par taux de consultation</option>
+          <option value="suivi">Trier par délai de suivi</option>
         </select>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-left text-[13px]">
+        <table className="w-full min-w-[980px] text-left text-[13px]">
           <thead>
             <tr className="text-[11.5px] text-muted-foreground">
               <th className="px-5 py-2.5 font-semibold">Requis</th>
               <th className="px-3 py-2.5 text-right font-semibold">Avis</th>
               <th className="w-56 px-3 py-2.5 font-semibold">Taux de consultation</th>
+              <th className="w-48 px-3 py-2.5 font-semibold" title="Délai de suivi recommandé dans les avis (jours), en moyenne ; le trait marque l'ensemble des requis">Délai moyen de suivi</th>
               <th className="px-3 py-2.5 text-right font-semibold">Consultation</th>
               <th className="px-3 py-2.5 text-right font-semibold">Exérèse</th>
               <th className="px-3 py-2.5 text-right font-semibold">Non indispensable</th>
@@ -360,6 +369,15 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
                         <div className="absolute -top-1 h-4 w-0.5 bg-avisdoc-ink/60" style={{ left: `${tauxGlobal}%` }} />
                       </div>
                       <span className="w-10 shrink-0 text-right font-semibold text-avisdoc-ink">{visible && l.renseignes ? `${taux} %` : MASQUE}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5" title={visible ? `${l.delaiSuiviMesures} avis avec un délai recommandé` : MOTIF_MASQUE}>
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-2 flex-1 rounded-full bg-muted">
+                        <div className="h-2 rounded-full bg-avisdoc-teal" style={{ width: `${visible && delaiSuiviMoyen(l) !== null ? (100 * delaiSuiviMoyen(l)!) / suiviMax : 0}%` }} />
+                        {suiviGlobal !== null && <div className="absolute -top-1 h-4 w-0.5 bg-avisdoc-ink/60" style={{ left: `${(100 * suiviGlobal) / suiviMax}%` }} />}
+                      </div>
+                      <span className="w-12 shrink-0 text-right font-semibold text-avisdoc-ink">{visible ? jours(delaiSuiviMoyen(l)) : MASQUE}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-right text-muted-foreground">{visible ? `${pct(l.consultations, l.renseignes)} %` : MASQUE}</td>

@@ -241,7 +241,14 @@ export interface LigneRequis {
   /** Avis qui orientent vers un dermatologue : consultation conseillée ou exérèse. */
   orientations: number;
   urgentes: number;
+  /** Délai de suivi recommandé (jours) : somme et nombre d'avis qui en donnent un (> 0). */
+  delaiSuiviSomme: number;
+  delaiSuiviMesures: number;
 }
+
+/** Délai moyen de suivi recommandé (jours), ou null s'il n'y en a aucun. */
+export const delaiSuiviMoyen = (l: { delaiSuiviSomme: number; delaiSuiviMesures: number }) =>
+  l.delaiSuiviMesures ? l.delaiSuiviSomme / l.delaiSuiviMesures : null;
 
 /** Trois issues possibles d'un avis. */
 export type Issue = "non-indispensable" | "consultation" | "exerese" | null;
@@ -272,6 +279,10 @@ export function parRequis(liste: Expertise[]): LigneRequis[] {
       exereses: l.filter((e) => issueDe(e) === "exerese").length,
       orientations: l.filter((e) => issueDe(e) === "consultation" || issueDe(e) === "exerese").length,
       urgentes: l.filter((e) => e.urgent).length,
+      ...(() => {
+        const d = l.map((e) => e.delaiRecoJours).filter((x): x is number => x !== null && x > 0);
+        return { delaiSuiviSomme: d.reduce((s, x) => s + x, 0), delaiSuiviMesures: d.length };
+      })(),
     }))
     .sort((a, b) => b.total - a.total);
 }
