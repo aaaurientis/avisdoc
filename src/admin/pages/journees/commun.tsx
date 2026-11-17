@@ -1,11 +1,12 @@
 // Éléments partagés par les pages Journée (Statistiques, Calendrier) et l'encart du tableau de bord.
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, ChevronRight, Download, Loader2, RefreshCw } from "lucide-react";
 import { Card, PageHeader } from "../../components/ui";
-import { chargerJournees, choisirExtraction, useJournees, useRegles } from "../../data/journeesStore";
+import { chargerJournees, choisirExtraction, useExpertisesStats, useJournees, useRegles } from "../../data/journeesStore";
 import { useAuth } from "../../auth/AuthContext";
 import { dateDuFichier, telechargerExtraction } from "../../data/journeesRepo";
-import { etatDe, manques, type JourneeDepistage } from "../../lib/journees";
+import { aujourdhuiISO, blocsJournees, datesRegroupement, estPassee, etatDe, manques, type JourneeDepistage } from "../../lib/journees";
+import { cleJournee } from "../../lib/expertises";
 import { exigences } from "../../lib/typologies";
 import ExpertisesJournee, { useAvisDeLaJournee } from "./ExpertisesJournee";
 import { cn } from "@/lib/utils";
@@ -153,11 +154,14 @@ export function LigneJournee({
   ouverte,
   basculer,
   avecDate = true,
+  dansGroupe = false,
 }: {
   j: JourneeDepistage;
   ouverte: boolean;
   basculer: () => void;
   avecDate?: boolean;
+  /** Affichée sous la ligne de sa journée regroupée : en retrait, sans le rappel du regroupement. */
+  dansGroupe?: boolean;
 }) {
   const { reglesDe, typologieDe } = useRegles();
   const regles = reglesDe(j);
@@ -166,13 +170,14 @@ export function LigneJournee({
   const { avis } = useAvisDeLaJournee(j);
   return (
     <div className="border-b border-border last:border-b-0">
-      <button type="button" onClick={basculer} className="flex w-full items-center gap-3 px-5 py-3 text-left text-[13px] transition-colors hover:bg-accent">
+      <button type="button" onClick={basculer}
+        className={cn("flex w-full items-center gap-3 py-3 pr-5 text-left text-[13px] transition-colors hover:bg-accent", dansGroupe ? "border-l-2 border-avisdoc-ink/25 bg-background/60 pl-11" : "pl-5")}>
         <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouverte && "rotate-90")} />
         {avecDate && <span className="w-24 shrink-0 font-semibold text-avisdoc-ink">{jour(j.date)}</span>}
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold text-avisdoc-ink">
             {j.client}
-            {(j.groupeTaille ?? 1) > 1 && (
+            {!dansGroupe && (j.groupeTaille ?? 1) > 1 && (
               <span className="ml-1.5 inline-flex items-center rounded-full bg-avisdoc-ink/10 px-1.5 text-[11px] font-semibold text-avisdoc-ink"
                 title="Même client, même ville, jours consécutifs : comptés comme une seule journée">
                 jour {j.groupeRang}/{j.groupeTaille} · une seule journée
@@ -227,6 +232,109 @@ export function LigneJournee({
 }
 
 const oui = (v: boolean) => (v ? "oui" : "non");
+
+/** Une liste de journées, les journées regroupées (même client, même ville) sous une ligne principale. */
+export function ListeJourneesGroupees({ liste, avecDate = true }: { liste: JourneeDepistage[]; avecDate?: boolean }) {
+  const [ouverte, setOuverte] = useState<number | null>(null);
+  const [groupesOuverts, setGroupesOuverts] = useState<Set<string>>(new Set());
+  const ligne = (j: JourneeDepistage, dansGroupe = false) => (
+    <LigneJournee key={j.id} j={j} avecDate={avecDate} dansGroupe={dansGroupe} ouverte={ouverte === j.id} basculer={() => setOuverte((o) => (o === j.id ? null : j.id))} />
+  );
+  return (
+    <div>
+      {blocsJournees(liste).map((b) =>
+        b.journees.length === 1 ? (
+          ligne(b.journees[0])
+        ) : (
+          <LigneGroupe
+            key={b.groupe}
+            journees={b.journees}
+            avecDate={avecDate}
+            ouvert={groupesOuverts.has(b.groupe)}
+            basculer={() =>
+              setGroupesOuverts((s) => {
+                const n = new Set(s);
+                if (n.has(b.groupe)) n.delete(b.groupe);
+                else n.add(b.groupe);
+                return n;
+              })
+            }
+          >
+            {b.journees.map((j) => ligne(j, true))}
+          </LigneGroupe>
+        ),
+      )}
+    </div>
+  );
+}
+
+/** La journée principale (fictive) d'un regroupement : ce qui est commun, et le total des avis. */
+function LigneGroupe({
+  journees,
+  avecDate,
+  ouvert,
+  basculer,
+  children,
+}: {
+  journees: JourneeDepistage[];
+  avecDate: boolean;
+  ouvert: boolean;
+  basculer: () => void;
+  children: ReactNode;
+}) {
+  const { index } = useExpertisesStats();
+  const premiere = journees[0];
+  const ids = new Set<string>();
+  for (const j of journees) for (const e of index.get(cleJournee(j)) ?? []) ids.add(e.id);
+  const dates = journees.map((j) => j.date);
+  const nbJours = new Set(dates).size;
+  const requis = [...new Set(journees.map((j) => j.requis).filter(Boolean))];
+  const lieux = [...new Set(journees.map((j) => j.lieu).filter(Boolean))];
+  const numeros = [...new Set(journees.map((j) => j.numero).filter((n): n is number => n !== null))].sort((a, b) => a - b);
+  const auj = aujourdhuiISO();
+  const aVenir = journees.find((j) => !estPassee(j, auj));
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <button type="button" onClick={basculer} className="flex w-full items-center gap-3 px-5 py-3 text-left text-[13px] transition-colors hover:bg-accent">
+        <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouvert && "rotate-90")} />
+        {avecDate && <span className="w-24 shrink-0 font-semibold text-avisdoc-ink">{datesRegroupement(dates)}</span>}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-avisdoc-ink">
+            {premiere.client}
+            <span className="ml-1.5 inline-flex items-center rounded-full bg-avisdoc-ink px-2 text-[11px] font-semibold text-white"
+              title="Même client, même ville, dates consécutives : comptées comme une seule journée">
+              1 journée · {journees.length} créneaux{nbJours > 1 ? ` sur ${nbJours} jours` : ""}
+            </span>
+            {numeros.length > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                · {numeros.length > 1 ? "journées" : "journée"} {numeros.join(", ")}
+                {premiere.commandees ? `/${premiere.commandees}` : ""}
+              </span>
+            )}
+          </span>
+          <span className="block truncate text-[12px] text-muted-foreground">
+            {lieux.length > 1 ? `${lieux[0]} (+${lieux.length - 1} lieu${lieux.length > 2 ? "x" : ""})` : lieux[0] || "lieu non renseigné"} ·{" "}
+            {requis.length
+              ? requis.map((r, i) => (
+                  <span key={r}>
+                    {i > 0 && ", "}
+                    <NomPro nom={r} vide="" />
+                  </span>
+                ))
+              : "requis non renseigné"}
+          </span>
+        </span>
+        {ids.size > 0 && (
+          <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-semibold text-avisdoc-ink md:inline">{ids.size} avis</span>
+        )}
+        <span className="hidden sm:inline">
+          <PastilleEtat j={aVenir ?? journees[journees.length - 1]} court />
+        </span>
+      </button>
+      {ouvert && <div className="border-t border-border">{children}</div>}
+    </div>
+  );
+}
 
 function Info({ label, valeur, nom = false }: { label: string; valeur: string; nom?: boolean }) {
   return (

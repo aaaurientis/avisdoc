@@ -279,6 +279,46 @@ export function unParGroupe<T extends JourneeDepistage>(journees: T[]): T[] {
     .filter((j) => { const g = j.groupe ?? `j${j.id}`; if (vus.has(g)) return false; vus.add(g); return true; });
 }
 
+/** Les journées d'une liste réunies par regroupement, dans l'ordre de la liste (chaque bloc à la place de son premier élément). */
+export interface BlocJournees<T extends JourneeDepistage = JourneeDepistage> {
+  groupe: string;
+  /** Par date, puis par ordre de l'extraction. */
+  journees: T[];
+}
+
+export function blocsJournees<T extends JourneeDepistage>(liste: T[]): BlocJournees<T>[] {
+  const parGroupe = new Map<string, BlocJournees<T>>();
+  const blocs: BlocJournees<T>[] = [];
+  for (const j of liste) {
+    const g = j.groupe ?? `j${j.id}`;
+    let b = parGroupe.get(g);
+    if (!b) { b = { groupe: g, journees: [] }; parGroupe.set(g, b); blocs.push(b); }
+    b.journees.push(j);
+  }
+  for (const b of blocs) b.journees.sort((a, c) => (a.date || "").localeCompare(c.date || "") || a.id - c.id);
+  return blocs;
+}
+
+const dateFr = (iso: string, opts: Intl.DateTimeFormatOptions) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("fr-FR", opts);
+
+/** Dates d'un regroupement : « 4 nov. 2026 », « 4 au 5 nov. 2026 », « 30 oct. au 2 nov. 2026 ». */
+export function datesRegroupement(dates: string[]): string {
+  const d = [...new Set(dates.filter(Boolean))].sort();
+  if (!d.length) return "—";
+  const complet: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  if (d.length === 1) return dateFr(d[0], complet);
+  const [a, b] = [d[0], d[d.length - 1]];
+  const debut =
+    a.slice(0, 7) === b.slice(0, 7) ? dateFr(a, { day: "numeric" }) : a.slice(0, 4) === b.slice(0, 4) ? dateFr(a, { day: "numeric", month: "short" }) : dateFr(a, complet);
+  return `${debut} au ${dateFr(b, complet)}`;
+}
+
+/** Toutes les journées du même regroupement que `j` (elle comprise). */
+export const memeRegroupement = <T extends JourneeDepistage>(toutes: T[], j: JourneeDepistage): T[] => {
+  const g = j.groupe ?? `j${j.id}`;
+  return toutes.filter((x) => (x.groupe ?? `j${x.id}`) === g);
+};
+
 // ── Statistiques ─────────────────────────────────────────────────────────────
 
 export const aujourdhuiISO = (d = new Date()) =>

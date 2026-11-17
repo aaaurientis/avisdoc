@@ -12,7 +12,7 @@ import logo from "@/assets/avisdoc-logo.png";
 import { fabriquerPdfRapport, type ContenuRapport } from "./rapportPdf";
 import { useExpertises, useJournees } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resumer, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
-import type { JourneeDepistage } from "../../lib/journees";
+import { blocsJournees, datesRegroupement, memeRegroupement, type JourneeDepistage } from "../../lib/journees";
 
 // Charte AvisDoc.
 const C = {
@@ -140,7 +140,13 @@ export default function Rapport() {
     const cle = params.get("journee");
     if (cle) {
       const j = toutes.find((x) => cleJournee(x) === cle);
-      return j ? { titre: j.client, sousTitre: `Journée du ${jourLong(j.date)} · ${j.lieu}`, journees: [j], uneJournee: true } : null;
+      if (!j) return null;
+      // Une journée regroupée (même client, même ville) : le rapport couvre tout le regroupement.
+      const membres = memeRegroupement(toutes, j).sort((a, b) => a.date.localeCompare(b.date));
+      const debut = membres[0].date;
+      const fin = membres[membres.length - 1].date;
+      const quand = debut === fin ? `Journée du ${jourLong(debut)}` : `Journée du ${jourLong(debut)} au ${jourLong(fin)}`;
+      return { titre: j.client, sousTitre: `${quand} · ${j.lieu}`, journees: membres, uneJournee: true };
     }
     const client = params.get("client") ?? "";
     const devis = params.get("devis") ?? "";
@@ -155,7 +161,8 @@ export default function Rapport() {
     () => (portee?.journees ?? []).map((j) => ({ j, avis: index.get(cleJournee(j)) ?? [] })).filter((l) => l.avis.length > 0),
     [portee, index],
   );
-  const avis = useMemo(() => lignes.flatMap((l) => l.avis), [lignes]);
+  // Deux créneaux d'un même lieu le même jour partagent leurs avis : chacun n'est compté qu'une fois.
+  const avis = useMemo(() => [...new Map(lignes.flatMap((l) => l.avis).map((e) => [e.id, e])).values()], [lignes]);
 
   // Le navigateur propose le titre de la page comme nom du PDF (impression) : on le rend précis.
   useEffect(() => {
@@ -254,7 +261,7 @@ function Ecran({ children }: { children: React.ReactNode }) {
 }
 
 /** Ce que dit le rapport, pour le PDF dessiné (mêmes calculs que la page affichée ci-dessous). */
-function contenuRapport(portee: Portee, lignes: { j: JourneeDepistage; avis: Expertise[] }[], avis: Expertise[], dateExport: string, nomFichier: string): ContenuRapport {
+function contenuRapport(portee: Portee, lignes: Ligne[], avis: Expertise[], dateExport: string, nomFichier: string): ContenuRapport {
   const r = resumer(avis);
   const n = { non: 0, consult: 0, exerese: 0 };
   for (const e of avis) {
@@ -276,7 +283,7 @@ function contenuRapport(portee: Portee, lignes: { j: JourneeDepistage; avis: Exp
     donneesArretees: dateExport ? `Données arrêtées au ${jourLong(dateExport)}` : null,
     chiffres: [
       [nb(r.total), "avis dermatologiques rendus"],
-      portee.uneJournee ? [nb(r.requis.length), "dermatologue(s) mobilisé(s)"] : [nb(lignes.length), "journées réalisées"],
+      portee.uneJournee ? [nb(r.requis.length), "dermatologue(s) mobilisé(s)"] : [nb(nbRealisees(lignes)), "journées réalisées"],
       [`${pNon} %`, "des avis sans consultation nécessaire"],
       [`${pConsult + pExerese} %`, "des avis orientant vers un dermatologue"],
     ],
@@ -297,7 +304,7 @@ function contenuRapport(portee: Portee, lignes: { j: JourneeDepistage; avis: Exp
           [`${pct(r.delais.sous48h, r.delais.mesures)} %`, "des avis rendus en moins de 48 h"],
         ]
       : null,
-    journees: portee.uneJournee ? null : lignes.map((l) => ({ date: jourCourt(l.j.date), lieu: l.j.lieu, avis: nb(l.avis.length) })),
+    journees: portee.uneJournee ? null : tableauJournees(lignes).map((l) => ({ date: l.date, lieu: l.lieu, avis: nb(l.avis), niveau: l.niveau })),
     note: `Chiffres établis à partir des avis rendus par les dermatologues du réseau AvisDoc lors des journées citées. Ce bilan ne contient aucune donnée individuelle ; il n'est établi qu'au-delà de ${SEUIL_RAPPORT} avis, pour qu'aucun chiffre ne permette d'identifier une personne.`,
     moisEdition: capitaliser(new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })),
   };
@@ -320,6 +327,42 @@ function nomDuRapport(portee: Portee): string {
     .trim();
 }
 
+type Ligne = { j: JourneeDepistage; avis: Expertise[] };
+
+/** Une ligne du tableau « Les journées » : une journée, ou la journée principale d'un regroupement et ses créneaux. */
+interface LigneTableau {
+  cle: string;
+  date: string;
+  lieu: string;
+  avis: number;
+  /** 1 : créneau d'une journée regroupée, affiché sous sa journée principale. */
+  niveau: 0 | 1;
+}
+
+const compterAvis = (ls: Ligne[]) => new Set(ls.flatMap((l) => l.avis.map((e) => e.id))).size;
+
+function tableauJournees(lignes: Ligne[]): LigneTableau[] {
+  const parJ = new Map(lignes.map((l) => [l.j, l]));
+  return blocsJournees(lignes.map((l) => l.j)).flatMap((b) => {
+    const ls = b.journees.map((j) => parJ.get(j) as Ligne);
+    if (ls.length === 1) return [{ cle: cleJournee(ls[0].j), date: jourCourt(ls[0].j.date), lieu: ls[0].j.lieu, avis: ls[0].avis.length, niveau: 0 as const }];
+    const debut = ls[0].j.date;
+    const fin = ls[ls.length - 1].j.date;
+    const lieux = [...new Set(ls.map((l) => l.j.lieu))];
+    const principale: LigneTableau = {
+      cle: b.groupe,
+      date: datesRegroupement([debut, fin]),
+      lieu: `${lieux[0]}${lieux.length > 1 ? ` (+${lieux.length - 1})` : ""} · ${ls.length} créneaux`,
+      avis: compterAvis(ls),
+      niveau: 0,
+    };
+    return [principale, ...ls.map((l, i) => ({ cle: `${b.groupe}#${i}`, date: jourCourt(l.j.date), lieu: l.j.lieu, avis: l.avis.length, niveau: 1 as const }))];
+  });
+}
+
+/** Journées réalisées, au sens du regroupement (même client, même ville = une journée). */
+const nbRealisees = (lignes: Ligne[]) => blocsJournees(lignes.map((l) => l.j)).length;
+
 interface Portee {
   titre: string;
   sousTitre: string;
@@ -327,7 +370,7 @@ interface Portee {
   uneJournee: boolean;
 }
 
-function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { j: JourneeDepistage; avis: Expertise[] }[]; avis: Expertise[]; dateExport: string }) {
+function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: Ligne[]; avis: Expertise[]; dateExport: string }) {
   const r = resumer(avis);
   const n = { non: 0, consult: 0, exerese: 0 };
   for (const e of avis) {
@@ -394,7 +437,7 @@ function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { 
         {(
           [
             [nb(r.total), "avis dermatologiques rendus"],
-            [portee.uneJournee ? `${nb(r.requis.length)}` : nb(lignes.length), portee.uneJournee ? "dermatologue(s) mobilisé(s)" : "journées réalisées"],
+            [portee.uneJournee ? `${nb(r.requis.length)}` : nb(nbRealisees(lignes)), portee.uneJournee ? "dermatologue(s) mobilisé(s)" : "journées réalisées"],
             [`${pNon} %`, "des avis sans consultation nécessaire"],
             [`${pConsult + pExerese} %`, "des avis orientant vers un dermatologue"],
           ] as const
@@ -463,11 +506,19 @@ function Page({ portee, lignes, avis, dateExport }: { portee: Portee; lignes: { 
               </tr>
             </thead>
             <tbody>
-              {lignes.map((l, i) => (
-                <tr key={cleJournee(l.j)} style={{ background: i % 2 ? C.cyanClair : "#fff", borderBottom: `1px solid ${C.filet}` }}>
-                  <td style={{ padding: "5px 10px" }}>{jourCourt(l.j.date)}</td>
-                  <td style={{ padding: "5px 10px" }}>{l.j.lieu}</td>
-                  <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 600 }}>{nb(l.avis.length)}</td>
+              {tableauJournees(lignes).map((l, i) => (
+                <tr
+                  key={l.cle}
+                  style={{
+                    background: l.niveau ? "#fff" : i % 2 ? C.cyanClair : "#fff",
+                    borderBottom: `1px solid ${C.filet}`,
+                    color: l.niveau ? C.ardoise : C.marine,
+                    fontSize: l.niveau ? 10.5 : undefined,
+                  }}
+                >
+                  <td style={{ padding: l.niveau ? "3px 10px 3px 24px" : "5px 10px" }}>{l.niveau ? `└ ${l.date}` : l.date}</td>
+                  <td style={{ padding: l.niveau ? "3px 10px" : "5px 10px" }}>{l.lieu}</td>
+                  <td style={{ padding: l.niveau ? "3px 10px" : "5px 10px", textAlign: "right", fontWeight: l.niveau ? 400 : 600 }}>{nb(l.avis)}</td>
                 </tr>
               ))}
             </tbody>

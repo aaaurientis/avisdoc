@@ -139,6 +139,20 @@ function demo(): string {
       );
     }
   }
+  // Une journée regroupée : même client, même ville, deux dermatologues sur deux jours de suite.
+  [[-12, 11, 0], [-12, 12, 1], [-11, 11, 2]].forEach(([decalage, n, e], i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + decalage);
+    const date = d.toISOString().slice(0, 10);
+    lignes.push(
+      [
+        `"2026-09-01T08:00:00.000Z"`, `"Société Exemple"`, 12, `"DEV 2026 001"`, `"${infirmieres[i]}"`, `"${experts[e]}"`,
+        `"${date}T00:00:00.000Z"`, `"${date}T02:00:00.000Z"`, `"Salle des fêtes, 58700 Prémery"`, n,
+        `"Contact R"`, `"=""0600000000"""`, `"contactr@exemple.fr"`, `""`, `""`, `""`,
+        `"Oui"`, `""`, `"Oui"`, `""`, `"Oui"`, `""`, `"300"`, `""`, `"301"`, `""`,
+      ].join(","),
+    );
+  });
   return lignes.join("\n");
 }
 
