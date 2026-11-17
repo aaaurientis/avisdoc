@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowUp, Download, Upload, X } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowUp, ArrowUpDown, ArrowUpNarrowWide, ChevronDown, Download, Search, Tag, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
 import { DOC_EXT, catPalette } from "../lib/ui-tokens";
@@ -18,7 +18,28 @@ interface ImportDraft {
   tags: string[];
 }
 
-const COLS = "minmax(180px,2.2fr) 210px 60px 84px minmax(64px,0.8fr) 150px";
+const COLS = "minmax(180px,2.4fr) 210px 92px minmax(64px,0.8fr) 150px";
+
+type CleTri = "nom" | "categorie" | "date" | "par";
+type Tri = { cle: CleTri; sens: 1 | -1 };
+
+function Compteur({ n, on }: { n: number; on: boolean }) {
+  return (
+    <span className={cn("rounded-full px-1.5 text-[10.5px] font-bold leading-[18px]", on ? "bg-white/25 text-white" : "bg-muted text-muted-foreground")}>{n}</span>
+  );
+}
+
+function EnTete({ cle, tri, trier, children }: { cle: CleTri; tri: Tri; trier: (c: CleTri) => void; children: React.ReactNode }) {
+  const actif = tri.cle === cle;
+  return (
+    <button type="button" onClick={() => trier(cle)} className={cn("inline-flex items-center gap-1 truncate text-left uppercase hover:text-avisdoc-ink", actif && "text-avisdoc-ink")}>
+      {children}
+      {actif ? (tri.sens === 1 ? <ArrowUpNarrowWide className="size-3" /> : <ArrowDownWideNarrow className="size-3" />) : <ArrowUpDown className="size-3 opacity-40" />}
+    </button>
+  );
+}
+
+const sansAccents = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 // Séparateur interne (caractère de contrôle « unit separator ») pour encoder
 // « catégorie ␟ sous-catégorie » dans la valeur d'un <option>.
 const SEP = "␟";
@@ -42,6 +63,20 @@ export default function Documents() {
   const urlCat = searchParams.get("cat"); // catégorie demandée via le menu latéral
   const prevUrlCat = useRef<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]); // filtre par tags (OU)
+  const [recherche, setRecherche] = useState("");
+  const [tagsOuverts, setTagsOuverts] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  // « date » croissant = du plus récent au plus ancien.
+  const [tri, setTri] = useState<Tri>({ cle: "date", sens: 1 });
+  const trier = (cle: CleTri) => setTri((t) => (t.cle === cle ? { cle, sens: t.sens === 1 ? -1 : 1 } : { cle, sens: 1 }));
+
+  // Le menu des tags se ferme au clic ailleurs.
+  useEffect(() => {
+    if (!tagsOuverts) return;
+    const fermer = (e: MouseEvent) => { if (!tagsRef.current?.contains(e.target as Node)) setTagsOuverts(false); };
+    document.addEventListener("mousedown", fermer);
+    return () => document.removeEventListener("mousedown", fermer);
+  }, [tagsOuverts]);
   const [importDraft, setImportDraft] = useState<ImportDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -81,13 +116,40 @@ export default function Documents() {
     }
   }, [docTree, urlCat, cat]);
 
-  const rows = docs.filter((d) => {
-    if (d.catParent !== cat) return false;
-    if (sub != null && d.cat !== sub) return false;
-    // Filtre par tags : le document doit porter au moins un des tags cochés.
-    if (tagFilter.length && !tagFilter.some((t) => d.tags.includes(t))) return false;
-    return true;
-  });
+  // Une recherche porte sur tous les documents, quelle que soit la catégorie choisie.
+  const mots = sansAccents(recherche.trim()).split(/\s+/).filter(Boolean);
+  const correspond = (d: DocItem) => {
+    if (!mots.length) return true;
+    const texte = sansAccents([d.name, d.catParent, d.cat, d.owner, ...d.tags].join(" "));
+    return mots.every((m) => texte.includes(m));
+  };
+  const dansPortee = (d: DocItem) => (mots.length ? correspond(d) : d.catParent === cat && (sub == null || d.cat === sub));
+  const avecTags = (d: DocItem) => !tagFilter.length || tagFilter.some((t) => d.tags.includes(t));
+
+  // Compteurs : catégories et sous-catégories (avec les tags choisis), tags (dans la portée courante).
+  const nbParCat = new Map<string, number>();
+  const nbParSub = new Map<string, number>();
+  for (const d of docs) {
+    if (!avecTags(d)) continue;
+    nbParCat.set(d.catParent, (nbParCat.get(d.catParent) ?? 0) + 1);
+    if (d.catParent === cat) nbParSub.set(d.cat, (nbParSub.get(d.cat) ?? 0) + 1);
+  }
+  const nbParTag = new Map<string, number>();
+  for (const d of docs) if (dansPortee(d)) for (const t of d.tags) nbParTag.set(t, (nbParTag.get(t) ?? 0) + 1);
+
+  const ordre = new Map(docs.map((d, i) => [d.id, i])); // chargés du plus récent au plus ancien
+  const cleDe = (d: DocItem): string | number =>
+    tri.cle === "nom" ? sansAccents(d.name)
+    : tri.cle === "categorie" ? sansAccents(`${d.catParent} ${d.cat}`)
+    : tri.cle === "par" ? sansAccents(d.owner)
+    : d.createdAt ? -Date.parse(d.createdAt) : (ordre.get(d.id) ?? 0);
+  const rows = docs
+    .filter((d) => dansPortee(d) && avecTags(d))
+    .sort((a, b) => {
+      const x = cleDe(a), y = cleDe(b);
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "fr");
+      return c * tri.sens;
+    });
 
   // Sous-catégorie cible d'un import : la catégorie courante + la sous-catégorie
   // sélectionnée (ou la première de la catégorie).
@@ -227,106 +289,137 @@ export default function Documents() {
       <input ref={importInputRef} type="file" hidden onChange={onPickImport} />
       <input ref={versionInputRef} type="file" hidden onChange={onPickVersion} />
 
-      {/* Niveau 1 : catégories */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {docTree.map((c, i) => {
-          const on = cat === c.name;
-          const pal = catPalette(i);
-          return (
-            <button
-              key={c.name}
-              type="button"
-              onClick={() => selectCat(c.name)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors",
-                on ? pal.active : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
-              )}
-            >
-              {!on && <span className={cn("size-2 shrink-0 rounded-full", pal.dot)} />}
-              {c.name}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Niveau 2 : sous-catégories de la catégorie sélectionnée */}
-      {currentCat && currentCat.subs.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 border-l-2 border-border pl-3">
-          <button
-            type="button"
-            onClick={() => setSub(null)}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors",
-              sub === null
-                ? "bg-avisdoc-teal text-white"
-                : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
-            )}
-          >
-            Toutes
-          </button>
-          {currentCat.subs.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSub(s)}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors",
-                sub === s
-                  ? "bg-avisdoc-teal text-white"
-                  : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
-              )}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Filtre par tags standardisés (OU) */}
-      {docTags.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
-            Tags
-          </span>
-          {docTags.map((t) => {
-            const on = tagFilter.includes(t);
+      {/* Filtres : catégorie, sous-catégorie, puis recherche et tags sur une ligne. Chacun avec son nombre de documents. */}
+      <Card className="mb-4 p-3">
+        <div className="flex flex-wrap gap-1.5">
+          {docTree.map((c, i) => {
+            const on = cat === c.name && !recherche;
+            const pal = catPalette(i);
             return (
               <button
-                key={t}
+                key={c.name}
                 type="button"
-                onClick={() => setTagFilter((f) => (on ? f.filter((x) => x !== t) : [...f, t]))}
+                onClick={() => { selectCat(c.name); setRecherche(""); }}
                 className={cn(
-                  "rounded-full px-3 py-1 text-[12px] font-semibold transition-colors",
-                  on ? "bg-avisdoc-ink text-white" : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                  on ? pal.active : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
                 )}
               >
-                {t}
+                {!on && <span className={cn("size-2 shrink-0 rounded-full", pal.dot)} />}
+                {c.name}
+                <Compteur n={nbParCat.get(c.name) ?? 0} on={on} />
               </button>
             );
           })}
-          {tagFilter.length > 0 && (
+        </div>
+
+        {currentCat && currentCat.subs.length > 0 && !recherche && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-border pt-2.5">
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">Sous-catégorie</span>
+            {[null, ...currentCat.subs].map((s) => {
+              const on = sub === s;
+              const n = s === null ? (nbParCat.get(cat) ?? 0) : (nbParSub.get(s) ?? 0);
+              return (
+                <button
+                  key={s ?? "__toutes"}
+                  type="button"
+                  onClick={() => setSub(s)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
+                    on ? "bg-avisdoc-teal text-white" : "bg-muted text-muted-foreground hover:text-avisdoc-ink",
+                    n === 0 && !on && "opacity-55",
+                  )}
+                >
+                  {s ?? "Toutes"}
+                  <Compteur n={n} on={on} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
+          <label className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Rechercher dans tous les documents (nom, tag, catégorie, auteur)…"
+              className="ad-input w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[12.5px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+            />
+          </label>
+          {docTags.length > 0 && (
+            <div className="relative" ref={tagsRef}>
+              <button
+                type="button"
+                onClick={() => setTagsOuverts((o) => !o)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                  tagFilter.length ? "border-avisdoc-ink bg-avisdoc-ink text-white" : "border-border bg-card text-muted-foreground hover:text-avisdoc-ink",
+                )}
+              >
+                <Tag className="size-3.5" /> Tags{tagFilter.length ? ` · ${tagFilter.length}` : ""}
+                <ChevronDown className="size-3.5" />
+              </button>
+              {tagsOuverts && (
+                <div className="absolute right-0 z-20 mt-1.5 max-h-80 w-64 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-floating">
+                  {docTags.map((t) => {
+                    const on = tagFilter.includes(t);
+                    const n = nbParTag.get(t) ?? 0;
+                    return (
+                      <label key={t} className={cn("flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] hover:bg-accent", n === 0 && !on && "opacity-55")}>
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => setTagFilter((f) => (on ? f.filter((x) => x !== t) : [...f, t]))}
+                          className="size-3.5 accent-avisdoc-ink"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-avisdoc-ink">{t}</span>
+                        <span className="text-[11px] font-semibold text-muted-foreground">{n}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {tagFilter.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTagFilter((f) => f.filter((x) => x !== t))}
+              className="inline-flex items-center gap-1 rounded-full bg-avisdoc-teal/12 px-2.5 py-1 text-[11.5px] font-semibold text-avisdoc-teal"
+              title="Retirer ce filtre"
+            >
+              {t} <X className="size-3" />
+            </button>
+          ))}
+          {(tagFilter.length > 0 || recherche) && (
             <button
               type="button"
-              onClick={() => setTagFilter([])}
+              onClick={() => { setTagFilter([]); setRecherche(""); }}
               className="text-[12px] text-muted-foreground underline underline-offset-2 hover:text-avisdoc-ink"
             >
               réinitialiser
             </button>
           )}
+          <span className="ml-auto text-[12px] font-semibold text-muted-foreground">
+            {rows.length} document{rows.length > 1 ? "s" : ""}{recherche ? " trouvé" + (rows.length > 1 ? "s" : "") + " (toutes catégories)" : ""}
+          </span>
         </div>
-      )}
+      </Card>
 
       <Card className="overflow-x-auto">
-        <div style={{ minWidth: 760 }}>
+        <div style={{ minWidth: 700 }}>
           <div
             className="grid gap-2.5 whitespace-nowrap border-b border-border/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground"
             style={{ gridTemplateColumns: COLS }}
           >
-            <div className="truncate">Nom du fichier</div>
-            <div>Catégorie</div>
-            <div>Taille</div>
-            <div>Ajouté le</div>
-            <div>Par</div>
+            <EnTete cle="nom" tri={tri} trier={trier}>Nom du fichier</EnTete>
+            <EnTete cle="categorie" tri={tri} trier={trier}>Catégorie</EnTete>
+            <EnTete cle="date" tri={tri} trier={trier}>Ajouté le</EnTete>
+            <EnTete cle="par" tri={tri} trier={trier}>Par</EnTete>
             <div className="text-right">Actions</div>
           </div>
 
@@ -426,7 +519,6 @@ export default function Documents() {
                     ))}
                   </select>
                 </div>
-                <div className="text-[12.5px] text-muted-foreground">{d.size}</div>
                 <div className="text-[12.5px] text-muted-foreground">{d.date}</div>
                 <div className="min-w-0 truncate text-[12.5px] text-muted-foreground">{d.owner}</div>
                 <div className="flex justify-end gap-1.5">
@@ -465,7 +557,7 @@ export default function Documents() {
 
           {rows.length === 0 && (
             <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Aucun document dans cette catégorie.
+              {recherche ? "Aucun document ne correspond à la recherche." : "Aucun document dans cette catégorie."}
             </div>
           )}
         </div>

@@ -104,6 +104,7 @@ function toDoc(r: any): DocItem {
     date: r.date_label ?? "",
     owner: r.owner ?? "",
     version: r.version ?? 1,
+    createdAt: r.created_at ?? undefined,
     storagePath: r.storage_path ?? undefined,
   };
 }
