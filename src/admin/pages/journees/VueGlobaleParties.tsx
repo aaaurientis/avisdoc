@@ -8,13 +8,15 @@ import { useExpertises } from "../../data/journeesStore";
 import { cleJournee, enJournee, issueDe, MASQUE, MOTIF_MASQUE, resultatsVisibles, resumer, type Expertise } from "../../lib/expertises";
 import { aujourdhuiISO, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
 import NomPro from "../../components/NomPro";
+import { pourResultats } from "../../lib/masquage";
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const jour = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 
 /** Taux de consultation : avis qui orientent vers un dermatologue, sur les avis dont la recommandation est renseignée. */
-function tauxConsultation(liste: Expertise[]): number | null {
+function tauxConsultation(tous: Expertise[]): number | null {
+  const liste = pourResultats(tous); // requis masqués (Admin) retirés des résultats
   if (!resultatsVisibles(liste.length)) return null; // règle de l'AIPD
   let o = 0;
   let r = 0;
@@ -82,7 +84,10 @@ export function PartieExpertises({ periode, client, requis, journees }: { period
   const { statut, source, info } = useExpertises();
   const avis = useAvisFiltres(periode, client, requis, journees);
   const r = useMemo(() => resumer(avis), [avis]);
-  const exereses = avis.filter((e) => issueDe(e) === "exerese").length;
+  const avisResultats = pourResultats(avis);
+  const exereses = avisResultats.filter((e) => issueDe(e) === "exerese").length;
+  const nbResultats = avisResultats.length;
+  const urgentes = avisResultats.filter((e) => e.urgent).length;
   const taux = tauxConsultation(avis);
 
   return (
@@ -117,8 +122,8 @@ export function PartieExpertises({ periode, client, requis, journees }: { period
               pied={r.delais.mesures ? `${pct(r.delais.sous24h, r.delais.mesures)} % sous 24 h · ${nombre(r.delais.mesures)} mesurés` : "non mesuré"}
             />
             <Kpi label="Taux de consultation" valeur={taux === null ? MASQUE : `${taux} %`} pied={taux === null ? MOTIF_MASQUE : "avis orientant vers un dermatologue"} />
-            {resultatsVisibles(r.total) ? (
-              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            {resultatsVisibles(nbResultats) ? (
+              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, nbResultats)} % des avis · ${urgentes} urgent${urgentes > 1 ? "s" : ""}`} />
             ) : (
               <Kpi label="Exérèses indispensables" valeur={MASQUE} pied={MOTIF_MASQUE} />
             )}

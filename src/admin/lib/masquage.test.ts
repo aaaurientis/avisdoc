@@ -19,3 +19,14 @@ describe("affichage des statistiques", () => {
     expect(rapportPossible(50)).toBe(true);
   });
 });
+
+describe("requis masqués", () => {
+  it("leurs avis sont retirés des résultats, pas des volumes", async () => {
+    const { pourResultats, requisMasque } = await import("./masquage");
+    definirAffichageStats({ resultatsDermato: true, noms: "clair", requisMasques: ["Dr Alice Martin"] });
+    const avis = [{ requis: "Dr Alice Martin" }, { requis: "Dr Bruno Petit" }, { requis: " Dr Alice Martin " }];
+    expect(pourResultats(avis)).toEqual([{ requis: "Dr Bruno Petit" }]);
+    expect(requisMasque("Dr Alice Martin")).toBe(true);
+    expect(requisMasque("Dr Bruno Petit")).toBe(false);
+  });
+});

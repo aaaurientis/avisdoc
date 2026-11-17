@@ -7,7 +7,8 @@ const CLE = "statistiques_affichage";
 export async function chargerAffichageStats(): Promise<AffichageStats> {
   const { data } = await sb.from("admin_parametres").select("valeur").eq("cle", CLE).maybeSingle();
   definirAffichageStats((data?.valeur as Partial<AffichageStats>) ?? AFFICHAGE_DEFAUT);
-  return { ...AFFICHAGE_DEFAUT, ...((data?.valeur as Partial<AffichageStats>) ?? {}) };
+  const v = (data?.valeur as Partial<AffichageStats>) ?? {};
+  return { ...AFFICHAGE_DEFAUT, ...v, requisMasques: Array.isArray(v.requisMasques) ? v.requisMasques : [] };
 }
 
 export async function enregistrerAffichageStats(a: AffichageStats, email: string): Promise<void> {

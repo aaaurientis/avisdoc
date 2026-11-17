@@ -8,6 +8,7 @@ import { useExpertises } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resultatsVisibles, resumer, SEUIL_AIPD, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
 import type { JourneeDepistage } from "../../lib/journees";
 import NomPro from "../../components/NomPro";
+import { pourResultats } from "../../lib/masquage";
 
 // (Pas d'import depuis ./commun : commun affiche ce composant, on évite la boucle d'imports.)
 const nombre = (n: number) => n.toLocaleString("fr-FR");
@@ -62,7 +63,8 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
   if (!avis.length) return <p className="text-[12.5px] text-muted-foreground">Aucun avis rattaché à cette journée dans l'extraction des expertises.</p>;
 
   const n = { non: 0, consult: 0, exerese: 0 };
-  for (const e of avis) {
+  const avisResultats = pourResultats(avis); // requis masqués (Admin) retirés des résultats
+  for (const e of avisResultats) {
     const i = issueDe(e);
     if (i === "non-indispensable") n.non++;
     else if (i === "consultation") n.consult++;
@@ -75,7 +77,7 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px]">
           <Chiffre label="Avis rendus" valeur={nombre(r.total)} />
-          {resultatsVisibles(r.total) ? (
+          {resultatsVisibles(avisResultats.length) ? (
             <>
               <Chiffre label="Non indispensable" valeur={`${n.non} · ${pct(n.non, renseignes)} %`} />
               <Chiffre label="Consultation conseillée" valeur={`${n.consult} · ${pct(n.consult, renseignes)} %`} />

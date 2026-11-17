@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AxeMois, Choix, boutonCls, capitale, jour, nombre, pct, selectCls } from "./commun";
 import NomPro from "../../components/NomPro";
+import { pourResultats, requisMasque } from "../../lib/masquage";
 
 const PERIODES: { cle: PeriodeExpertises; label: string }[] = [
   { cle: "12m", label: "12 mois" },
@@ -66,7 +67,9 @@ export default function Expertises() {
     [expertises, periode, origine, requis, profession],
   );
   const r = useMemo(() => resumer(liste), [liste]);
-  const exereses = liste.filter(estExerese).length;
+  // Résultats : sans les requis masqués (Admin › Réglages › Statistiques) ; volumes : tout.
+  const rRes = useMemo(() => resumer(pourResultats(liste)), [liste]);
+  const exereses = pourResultats(liste).filter(estExerese).length;
 
   return (
     <div>
@@ -147,8 +150,8 @@ export default function Expertises() {
               valeur={heures(r.delais.mediane)}
               pied={r.delais.mesures ? `${pct(r.delais.sous24h, r.delais.mesures)} % sous 24 h · ${nombre(r.delais.mesures)} mesurés` : "délai non mesuré sur la période"}
             />
-            {resultatsVisibles(r.total) ? (
-              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, r.total)} % des avis · ${r.urgentes} urgent${r.urgentes > 1 ? "s" : ""}`} />
+            {resultatsVisibles(rRes.total) ? (
+              <Kpi label="Exérèses indispensables" valeur={nombre(exereses)} pied={`${pct(exereses, rRes.total)} % des avis · ${rRes.urgentes} urgent${rRes.urgentes > 1 ? "s" : ""}`} />
             ) : (
               <Kpi label="Exérèses indispensables" valeur={MASQUE} pied={MOTIF_MASQUE} />
             )}
@@ -167,14 +170,14 @@ export default function Expertises() {
               <div className="mb-6 grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
                 <Card className="p-[22px]">
                   <h2 className="mb-4 font-display text-lg font-semibold text-avisdoc-ink">Recommandations</h2>
-                  {resultatsVisibles(r.total) ? (
-                    <Barres parts={r.recommandations} total={r.total} />
+                  {resultatsVisibles(rRes.total) ? (
+                    <Barres parts={rRes.recommandations} total={rRes.total} />
                   ) : (
                     <p className="text-sm text-muted-foreground">{MOTIF_MASQUE}</p>
                   )}
-                  {resultatsVisibles(r.total) && r.delaiRecoMedian !== null && (
+                  {resultatsVisibles(rRes.total) && rRes.delaiRecoMedian !== null && (
                     <p className="mt-4 text-[12.5px] text-muted-foreground">
-                      Délai recommandé médian, quand une consultation est conseillée : {r.delaiRecoMedian} jours.
+                      Délai recommandé médian, quand une consultation est conseillée : {rRes.delaiRecoMedian} jours.
                     </p>
                   )}
                 </Card>
@@ -318,15 +321,18 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
   const [tri, setTri] = useState<"avis" | "taux" | "suivi">("avis");
   const lignes = useMemo(() => {
     const l = parRequis(liste);
-    if (tri === "suivi") return [...l].sort((a, b) => (delaiSuiviMoyen(a) ?? Infinity) - (delaiSuiviMoyen(b) ?? Infinity));
-    return tri === "taux" ? [...l].sort((a, b) => b.orientations / (b.renseignes || 1) - a.orientations / (a.renseignes || 1)) : l;
+    // Requis masqués : en fin de liste, pour que le tri ne trahisse pas leurs résultats.
+    const suivi = (x: (typeof l)[number]) => (requisMasque(x.requis) ? Infinity : delaiSuiviMoyen(x) ?? Infinity);
+    const taux = (x: (typeof l)[number]) => (requisMasque(x.requis) ? -1 : x.orientations / (x.renseignes || 1));
+    if (tri === "suivi") return [...l].sort((a, b) => suivi(a) - suivi(b));
+    return tri === "taux" ? [...l].sort((a, b) => taux(b) - taux(a)) : l;
   }, [liste, tri]);
-  const tous = lignes.reduce((s, l) => ({ o: s.o + l.orientations, r: s.r + l.renseignes }), { o: 0, r: 0 });
+  const tous = lignes.filter((l) => !requisMasque(l.requis)).reduce((s, l) => ({ o: s.o + l.orientations, r: s.r + l.renseignes }), { o: 0, r: 0 });
   const tauxGlobal = pct(tous.o, tous.r);
   // Délai moyen de suivi : même lecture que le taux — barre par requis, trait = ensemble des requis.
-  const suiviTous = lignes.reduce((s, l) => ({ somme: s.somme + l.delaiSuiviSomme, n: s.n + l.delaiSuiviMesures }), { somme: 0, n: 0 });
+  const suiviTous = lignes.filter((l) => !requisMasque(l.requis)).reduce((s, l) => ({ somme: s.somme + l.delaiSuiviSomme, n: s.n + l.delaiSuiviMesures }), { somme: 0, n: 0 });
   const suiviGlobal = suiviTous.n ? suiviTous.somme / suiviTous.n : null;
-  const suiviMax = Math.max(1, ...lignes.filter((l) => resultatsVisibles(l.total)).map((l) => delaiSuiviMoyen(l) ?? 0), suiviGlobal ?? 0);
+  const suiviMax = Math.max(1, ...lignes.filter((l) => resultatsVisibles(l.total) && !requisMasque(l.requis)).map((l) => delaiSuiviMoyen(l) ?? 0), suiviGlobal ?? 0);
   const jours = (v: number | null) => (v === null ? "—" : `${Math.round(v)} j`);
   return (
     <div>
@@ -358,7 +364,7 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
           <tbody>
             {lignes.map((l) => {
               const taux = pct(l.orientations, l.renseignes);
-              const visible = resultatsVisibles(l.total);
+              const visible = resultatsVisibles(l.total) && !requisMasque(l.requis);
               return (
                 <tr key={l.requis} className="border-t border-border">
                   <td className="px-5 py-2.5 font-semibold text-avisdoc-ink"><NomPro nom={l.requis} /></td>
