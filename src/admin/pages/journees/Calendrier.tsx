@@ -51,6 +51,11 @@ function Contenu() {
   // Journée terminée : on affiche le nombre d'expertises rendues.
   const { index } = useExpertisesStats();
   const avisDe = (j: JourneeDepistage) => (estPassee(j, auj) ? (index.get(cleJournee(j))?.length ?? 0) : 0);
+  /** Avis d'une journée regroupée : ceux de ses créneaux, chacun une fois. */
+  const avisDuGroupe = (js: JourneeDepistage[]) =>
+    new Set(js.filter((j) => estPassee(j, auj)).flatMap((j) => (index.get(cleJournee(j)) ?? []).map((e) => e.id))).size;
+  // Dans le calendrier : les créneaux d'une journée regroupée, montrés sous elle ou non.
+  const [creneauxVisibles, setCreneauxVisibles] = useState(true);
   const auj = aujourdhuiISO();
   const [mois, setMois] = useState(auj.slice(0, 7));
   const [choisi, setChoisi] = useState(auj);
@@ -108,7 +113,11 @@ function Contenu() {
           <SectionLabel>
             {duMois} journée{duMois > 1 ? "s" : ""} en {titreMois.toLowerCase()}
           </SectionLabel>
-          <div className="flex flex-wrap gap-3 text-[12px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-avisdoc-ink" title="Journées regroupées (même client, même ville, même jour) : afficher leurs créneaux sous la journée">
+              <input type="checkbox" checked={creneauxVisibles} onChange={(e) => setCreneauxVisibles(e.target.checked)} className="size-3.5 accent-avisdoc-ink" />
+              Détail des créneaux
+            </label>
             {LEGENDE.map((l) => (
               <span key={l.etat} className="inline-flex items-center gap-1.5">
                 <span className={cn("size-3 rounded-[3px]", TEINTE[l.etat])} />
@@ -140,7 +149,7 @@ function Contenu() {
                   horsMois && "bg-background/60",
                   choisi === d && "bg-accent ring-2 ring-inset ring-avisdoc-ink",
                 )}
-                aria-label={`${jour(d)} : ${liste.length} journée${liste.length > 1 ? "s" : ""}`}
+                aria-label={`${jour(d)} : ${nbJournees(liste)} journée${nbJournees(liste) > 1 ? "s" : ""}`}
               >
                 <span
                   className={cn(
@@ -152,23 +161,44 @@ function Contenu() {
                 </span>
                 {/* Grand écran : le client de chaque journée. Téléphone : le nombre seulement. */}
                 <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
-                  {liste.slice(0, 3).map((j) => (
-                    <span
-                      key={j.id}
-                      className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))],
-                        // Journée regroupée sur plusieurs jours : les jours se « tiennent » d'une case à l'autre.
-                        (j.groupeTaille ?? 1) > 1 && "border-l-2 border-avisdoc-ink/50")}
-                      title={`${j.client} · ${j.lieu}${(j.groupeTaille ?? 1) > 1 ? ` · jour ${j.groupeRang}/${j.groupeTaille} d'une même journée (même client, même ville)` : ""}${avisDe(j) ? ` · ${avisDe(j)} avis` : ""}`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{j.client}</span>
-                      {(j.groupeTaille ?? 1) > 1 && <span className="shrink-0 rounded bg-white/70 px-1 text-[10px] font-bold text-avisdoc-ink">{j.groupeRang}/{j.groupeTaille}</span>}
-                      {avisDe(j) > 0 && <span className="shrink-0 font-bold text-avisdoc-ink">{avisDe(j)}</span>}
-                    </span>
-                  ))}
-                  {liste.length > 3 && <span className="px-1.5 text-[11px] text-muted-foreground">+{liste.length - 3}</span>}
+                  {blocsJournees(liste).slice(0, 3).map((b) => {
+                    const j = b.journees[0];
+                    const puce = (x: JourneeDepistage, creneau = false) => (
+                      <span
+                        key={x.id}
+                        className={cn(
+                          "flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 font-semibold",
+                          TEINTE[etatDe(x, auj, reglesDe(x))],
+                          creneau ? "ml-2.5 border-l-2 border-avisdoc-ink/40 text-[10px] opacity-90" : "text-[11px]",
+                        )}
+                        title={`${x.client} · ${x.lieu}${creneau ? ` · créneau ${x.groupeRang}/${x.groupeTaille}` : ""}${avisDe(x) ? ` · ${avisDe(x)} avis` : ""}`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{x.client}</span>
+                        {creneau && <span className="shrink-0 rounded bg-white/70 px-1 text-[9.5px] font-bold text-avisdoc-ink">{x.groupeRang}/{x.groupeTaille}</span>}
+                        {avisDe(x) > 0 && <span className="shrink-0 font-bold text-avisdoc-ink">{avisDe(x)}</span>}
+                      </span>
+                    );
+                    if (b.journees.length === 1) return puce(j);
+                    const total = avisDuGroupe(b.journees);
+                    const aVenir = b.journees.find((x) => !estPassee(x, auj)) ?? j;
+                    return (
+                      <span key={b.groupe} className="flex min-w-0 flex-col gap-0.5">
+                        <span
+                          className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ring-avisdoc-ink/40", TEINTE[etatDe(aVenir, auj, reglesDe(aVenir))])}
+                          title={`${j.client} · ${j.lieu} · 1 journée, ${b.journees.length} créneaux (même client, même ville, même jour)${total ? ` · ${total} avis` : ""}`}
+                        >
+                          <span className="min-w-0 flex-1 truncate">{j.client}</span>
+                          <span className="shrink-0 rounded bg-avisdoc-ink px-1 text-[9.5px] font-bold text-white">×{b.journees.length}</span>
+                          {total > 0 && <span className="shrink-0 font-bold text-avisdoc-ink">{total}</span>}
+                        </span>
+                        {creneauxVisibles && b.journees.map((x) => puce(x, true))}
+                      </span>
+                    );
+                  })}
+                  {nbJournees(liste) > 3 && <span className="px-1.5 text-[11px] text-muted-foreground">+{nbJournees(liste) - 3}</span>}
                 </span>
                 {liste.length > 0 && (
-                  <span className={cn("self-start rounded-full px-1.5 text-[11px] font-bold sm:hidden", TEINTE[etatDe(liste[0], auj, reglesDe(liste[0]))])}>{liste.length}</span>
+                  <span className={cn("self-start rounded-full px-1.5 text-[11px] font-bold sm:hidden", TEINTE[etatDe(liste[0], auj, reglesDe(liste[0]))])}>{nbJournees(liste)}</span>
                 )}
               </button>
             );
