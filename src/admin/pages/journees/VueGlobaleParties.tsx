@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useExpertises } from "../../data/journeesStore";
+import { useExpertisesStats } from "../../data/journeesStore";
 import { cleJournee, enJournee, issueDe, MASQUE, MOTIF_MASQUE, resultatsVisibles, resumer, type Expertise } from "../../lib/expertises";
 import { aujourdhuiISO, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
 import NomPro from "../../components/NomPro";
@@ -72,7 +72,7 @@ const Chargement = () => (
  * (une téléexpertise hors journée n'a pas de client dans l'export).
  */
 function useAvisFiltres(periode: Periode, client: string, requis: string, journees: JourneeDepistage[]) {
-  const { expertises, index } = useExpertises();
+  const { expertises, index } = useExpertisesStats();
   return useMemo(() => {
     const base = client ? journees.flatMap((j) => index.get(cleJournee(j)) ?? []) : avisDeLaPeriode(expertises, periode);
     return requis ? base.filter((e) => e.requis === requis) : base;
@@ -81,7 +81,7 @@ function useAvisFiltres(periode: Periode, client: string, requis: string, journe
 
 // ── 2. Expertises ────────────────────────────────────────────────────────────
 export function PartieExpertises({ periode, client, requis, journees }: { periode: Periode; client: string; requis: string; journees: JourneeDepistage[] }) {
-  const { statut, source, info } = useExpertises();
+  const { statut, source, info } = useExpertisesStats();
   const avis = useAvisFiltres(periode, client, requis, journees);
   const r = useMemo(() => resumer(avis), [avis]);
   const avisResultats = pourResultats(avis);
@@ -136,7 +136,7 @@ export function PartieExpertises({ periode, client, requis, journees }: { period
 
 // ── 3. Journées et expertises ────────────────────────────────────────────────
 export function PartieLien({ periode, client, requis, journees }: { periode: Periode; client: string; requis: string; journees: JourneeDepistage[] }) {
-  const { statut, source, index } = useExpertises();
+  const { statut, source, index } = useExpertisesStats();
   const avisPeriode = useAvisFiltres(periode, client, requis, journees);
   const auj = aujourdhuiISO();
   const passees = journees.filter((j) => estPassee(j, auj));

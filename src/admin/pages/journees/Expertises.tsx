@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { Card, PageHeader, SectionLabel } from "../../components/ui";
 import { useAuth } from "../../auth/AuthContext";
-import { chargerExpertises, choisirExpertises, useExpertises } from "../../data/journeesStore";
+import { chargerExpertises, choisirExpertises, useExpertisesStats } from "../../data/journeesStore";
 import { dateDuFichier, telechargerExtraction } from "../../data/journeesRepo";
 import {
   dansLaPeriode,
@@ -47,7 +47,7 @@ const mois = (cle: string) => capitale(new Date(`${cle}-15T12:00:00`).toLocaleDa
 
 export default function Expertises() {
   const { user } = useAuth();
-  const { statut, source, expertises, colonnesManquantes, fichiers, info } = useExpertises();
+  const { statut, source, expertises, colonnesManquantes, fichiers, info } = useExpertisesStats();
   const [periode, setPeriode] = useState<PeriodeExpertises>("12m");
   const [origine, setOrigine] = useState<Origine>("toutes");
   const [requis, setRequis] = useState("");

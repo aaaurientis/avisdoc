@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useExpertises, useJournees, useRegles } from "../../data/journeesStore";
+import { useExpertisesStats, useJournees, useRegles } from "../../data/journeesStore";
 import { cleJournee } from "../../lib/expertises";
 import { BoutonRapport, ouvrirRapport } from "./ExpertisesJournee";
 import { PartieExpertises, PartieLien, Titre } from "./VueGlobaleParties";
@@ -22,6 +22,7 @@ import {
   type Periode,
 } from "../../lib/journees";
 import { cn } from "@/lib/utils";
+import { requisMasque } from "../../lib/masquage";
 import { AxeMois, CadreJournees, Choix, capitale, jour, nombre, pct, selectCls } from "./commun";
 import NomPro, { nomPro } from "../../components/NomPro";
 
@@ -61,7 +62,8 @@ function Contenu() {
 
   const toutes = useMemo(() => extraction?.journees ?? [], [extraction]);
   const clients = useMemo(() => compterPar(toutes, (j) => j.client).map((c) => c.cle), [toutes]);
-  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle), [toutes]);
+  // Requis masqués (Admin › Réglages › Statistiques) : absents des listes.
+  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle).filter((r) => !requisMasque(r)), [toutes]);
   const journees = useMemo(
     () => dansLaPeriode(toutes, periode).filter((j) => (!client || j.client === client) && (!requis || j.requis === requis)),
     [toutes, periode, client, requis],
@@ -233,7 +235,7 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
   const [vue, setVue] = useState<"contrat" | "client">("contrat");
   const parContrat = useMemo(() => contrats(journees), [journees]);
   const { typologieDe } = useRegles();
-  const { index, statut } = useExpertises();
+  const { index, statut } = useExpertisesStats();
   /** Avis rendus : la somme des avis des journées (d'un contrat, ou de tous les contrats du client). */
   const avisDe = (client: string, devis: string | null) =>
     journees.filter((j) => j.client === client && (devis === null || j.devis === devis)).reduce((s, j) => s + (index.get(cleJournee(j))?.length ?? 0), 0);
@@ -343,7 +345,8 @@ function Repartition({ journees, axe }: { journees: JourneeDepistage[]; axe: Axe
   const estNom = axe === "requis" || axe === "requerant";
   const { typologieDe } = useRegles();
   const parts = useMemo(() => {
-    const toutes = compterPar(journees, (j) => (axe === "typologie" ? typologieDe(j.client)?.nom ?? "Règle par défaut" : j[axe]));
+    const toutes = compterPar(journees, (j) => (axe === "typologie" ? typologieDe(j.client)?.nom ?? "Règle par défaut" : j[axe]))
+      .filter((c) => !(axe === "requis" && requisMasque(c.cle)));
     if (toutes.length <= 10) return toutes;
     return [...toutes.slice(0, 10), { cle: "Autres", nombre: toutes.slice(10).reduce((s, p) => s + p.nombre, 0) }];
   }, [journees, axe, typologieDe]);

@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
-import { useExpertises, useJournees, useRegles } from "../../data/journeesStore";
+import { useExpertisesStats, useJournees, useRegles } from "../../data/journeesStore";
 import { cleJournee } from "../../lib/expertises";
 import {
   aujourdhuiISO,
@@ -20,6 +20,7 @@ import {
   type JourneeDepistage,
 } from "../../lib/journees";
 import { cn } from "@/lib/utils";
+import { requisMasque } from "../../lib/masquage";
 import { CadreJournees, Choix, LigneJournee, boutonCls, capitale, jour } from "./commun";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -47,7 +48,7 @@ function Contenu() {
   const { extraction } = useJournees();
   const { reglesDe } = useRegles();
   // Journée terminée : on affiche le nombre d'expertises rendues.
-  const { index } = useExpertises();
+  const { index } = useExpertisesStats();
   const avisDe = (j: JourneeDepistage) => (estPassee(j, auj) ? (index.get(cleJournee(j))?.length ?? 0) : 0);
   const auj = aujourdhuiISO();
   const [mois, setMois] = useState(auj.slice(0, 7));
@@ -57,7 +58,8 @@ function Contenu() {
 
   const toutes = useMemo(() => extraction?.journees ?? [], [extraction]);
   const clients = useMemo(() => compterPar(toutes, (j) => j.client).map((c) => c.cle), [toutes]);
-  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle), [toutes]);
+  // Requis masqués (Admin › Réglages › Statistiques) : absents des listes.
+  const lesRequis = useMemo(() => compterPar(toutes, (j) => j.requis).map((c) => c.cle).filter((r) => !requisMasque(r)), [toutes]);
   const journees = useMemo(
     () => toutes.filter((j) => (!client || j.client === client) && (!requis || j.requis === requis)),
     [toutes, client, requis],

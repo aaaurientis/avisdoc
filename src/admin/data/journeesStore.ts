@@ -1,3 +1,4 @@
+import { affichageStats, requisMasque } from "../lib/masquage";
 // Journées de dépistage — l'extraction en cours, partagée par les pages Statistiques,
 // Calendrier et le tableau de bord. Chargée une fois par session, pas à chaque écran.
 //
@@ -188,4 +189,21 @@ function abonnerExp(f: () => void) {
 
 export function useExpertises(): EtatExpertises {
   return useSyncExternalStore(abonnerExp, () => etatExp);
+}
+
+/**
+ * Expertises vues par le module Statistiques : sans les avis des requis masqués
+ * (Admin › Réglages › Statistiques). Le rapport client, lui, garde `useExpertises`.
+ */
+export function useExpertisesStats(): EtatExpertises {
+  const e = useExpertises();
+  const masques = affichageStats().requisMasques;
+  const cle = masques.join("\u0000");
+  return useMemo(() => {
+    if (!masques.length) return e;
+    const garder = (x: Expertise) => !requisMasque(x.requis);
+    const index = new Map<string, Expertise[]>();
+    for (const [k, l] of e.index) index.set(k, l.filter(garder));
+    return { ...e, expertises: e.expertises.filter(garder), index };
+  }, [e, cle]); // eslint-disable-line react-hooks/exhaustive-deps
 }
