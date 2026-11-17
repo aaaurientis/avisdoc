@@ -15,6 +15,7 @@ import {
   etatDe,
   grilleDuMois,
   moisDecale,
+  nbJournees,
   type EtatJournee,
   type JourneeDepistage,
 } from "../../lib/journees";
@@ -70,7 +71,7 @@ function Contenu() {
 
   const grille = grilleDuMois(mois);
   const titreMois = capitale(new Date(`${mois}-15T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }));
-  const duMois = journees.filter((j) => j.date.startsWith(mois)).length;
+  const duMois = nbJournees(journees.filter((j) => j.date.startsWith(mois)));
   const duJour = parJour.get(choisi) ?? [];
 
   return (
@@ -151,10 +152,13 @@ function Contenu() {
                   {liste.slice(0, 3).map((j) => (
                     <span
                       key={j.id}
-                      className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))])}
-                      title={`${j.client} · ${j.lieu}${avisDe(j) ? ` · ${avisDe(j)} avis` : ""}`}
+                      className={cn("flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold", TEINTE[etatDe(j, auj, reglesDe(j))],
+                        // Journée regroupée sur plusieurs jours : les jours se « tiennent » d'une case à l'autre.
+                        (j.groupeTaille ?? 1) > 1 && "border-l-2 border-avisdoc-ink/50")}
+                      title={`${j.client} · ${j.lieu}${(j.groupeTaille ?? 1) > 1 ? ` · jour ${j.groupeRang}/${j.groupeTaille} d'une même journée (même client, même ville)` : ""}${avisDe(j) ? ` · ${avisDe(j)} avis` : ""}`}
                     >
                       <span className="min-w-0 flex-1 truncate">{j.client}</span>
+                      {(j.groupeTaille ?? 1) > 1 && <span className="shrink-0 rounded bg-white/70 px-1 text-[10px] font-bold text-avisdoc-ink">{j.groupeRang}/{j.groupeTaille}</span>}
                       {avisDe(j) > 0 && <span className="shrink-0 font-bold text-avisdoc-ink">{avisDe(j)}</span>}
                     </span>
                   ))}
@@ -212,7 +216,7 @@ function ListeJournees({ journees }: { journees: JourneeDepistage[] }) {
       {aVenir.length > 0 && (
         <>
           <div className="border-b border-border bg-background px-5 py-3">
-            <SectionLabel>À venir · {aVenir.length}</SectionLabel>
+            <SectionLabel>À venir · {nbJournees(aVenir)}</SectionLabel>
           </div>
           <ListeSimple liste={aVenir} />
         </>
@@ -220,7 +224,7 @@ function ListeJournees({ journees }: { journees: JourneeDepistage[] }) {
       {passees.length > 0 && (
         <>
           <div className="border-y border-border bg-background px-5 py-3">
-            <SectionLabel>Passées · {passees.length}</SectionLabel>
+            <SectionLabel>Passées · {nbJournees(passees)}</SectionLabel>
           </div>
           <ListeSimple liste={toutVoir ? passees : passees.slice(0, PASSEES_VISIBLES)} />
           {passees.length > PASSEES_VISIBLES && (

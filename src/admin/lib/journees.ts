@@ -121,6 +121,13 @@ export interface JourneeDepistage {
   requis: string;
   /** Date de la journée (AAAA-MM-JJ). */
   date: string;
+  /**
+   * Journée regroupée (règle du 17/11) : même client, même ville, dates consécutives (3 jours
+   * d'écart au plus, week-end compris) = UNE journée. Identifiant commun, rang et nombre de jours.
+   */
+  groupe?: string;
+  groupeRang?: number;
+  groupeTaille?: number;
   dateFacture: string;
   lieu: string;
   /** N° de la journée dans le devis (1, 2, 3…). */
@@ -216,7 +223,60 @@ export function lireExtraction(texte: string): Extraction {
   const colonnesManquantes = Object.entries(COLONNES)
     .filter(([, champ]) => !index.has(champ) && !vus.has(champ) && (vus.add(champ), true))
     .map(([nom]) => nom);
-  return { journees, colonnesManquantes };
+  return { journees: regrouperJournees(journees), colonnesManquantes };
+}
+
+// ── Journées regroupées ──────────────────────────────────────────────────────
+
+const sansAccents = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** Ville d'un lieu : après le code postal (« …, 63000 Clermont-Ferrand »), sinon la dernière partie. */
+export function villeDe(lieu: string): string {
+  const l = (lieu ?? "").trim();
+  const cp = l.match(/\b\d{5}\s+([^,;()]+)/);
+  const v = cp ? cp[1] : l.split(/[,;–-]\s+/).pop() ?? l;
+  return sansAccents(v).replace(/\b(cedex|cedex \d+)\b/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Écart maximal entre deux dates d'une même journée regroupée (vendredi → lundi compris). */
+export const ECART_REGROUPEMENT = 3;
+
+const joursEntre = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 86_400_000);
+
+/** Attribue à chaque journée son regroupement (même client, même ville, dates consécutives). */
+export function regrouperJournees<T extends JourneeDepistage>(journees: T[]): T[] {
+  const parCle = new Map<string, T[]>();
+  for (const j of journees) {
+    const ville = villeDe(j.lieu);
+    if (!j.date || !j.client || !ville) { j.groupe = `j${j.id}`; j.groupeRang = 1; j.groupeTaille = 1; continue; }
+    const cle = `${sansAccents(j.client).trim()}|${ville}`;
+    parCle.set(cle, [...(parCle.get(cle) ?? []), j]);
+  }
+  for (const [cle, liste] of parCle) {
+    liste.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+    let courant: T[] = [];
+    const clore = () => {
+      const id = `${cle}|${courant[0].date}`;
+      courant.forEach((j, i) => { j.groupe = id; j.groupeRang = i + 1; j.groupeTaille = courant.length; });
+      courant = [];
+    };
+    for (const j of liste) {
+      if (courant.length && joursEntre(courant[courant.length - 1].date, j.date) > ECART_REGROUPEMENT) clore();
+      courant.push(j);
+    }
+    if (courant.length) clore();
+  }
+  return journees;
+}
+
+/** Nombre de journées au sens de la règle de regroupement. */
+export const nbJournees = (journees: JourneeDepistage[]) => new Set(journees.map((j) => j.groupe ?? `j${j.id}`)).size;
+
+/** Une journée par regroupement (le premier jour présent dans la liste). */
+export function unParGroupe<T extends JourneeDepistage>(journees: T[]): T[] {
+  const vus = new Set<string>();
+  return [...journees].sort((a, b) => (a.date || "").localeCompare(b.date || "") || a.id - b.id)
+    .filter((j) => { const g = j.groupe ?? `j${j.id}`; if (vus.has(g)) return false; vus.add(g); return true; });
 }
 
 // ── Statistiques ─────────────────────────────────────────────────────────────
@@ -251,7 +311,7 @@ export interface Compte {
 /** Nombre de journées par valeur d'un champ (client, expert, lieu…), du plus fréquent au moins fréquent. */
 export function compterPar(journees: JourneeDepistage[], champ: (j: JourneeDepistage) => string): Compte[] {
   const n = new Map<string, number>();
-  for (const j of journees) {
+  for (const j of unParGroupe(journees)) {
     const k = champ(j) || "(non renseigné)";
     n.set(k, (n.get(k) ?? 0) + 1);
   }
@@ -260,7 +320,7 @@ export function compterPar(journees: JourneeDepistage[], champ: (j: JourneeDepis
 
 /** Journées par mois (AAAA-MM), sans trou entre le premier et le dernier mois. */
 export function parMois(journees: JourneeDepistage[]): Compte[] {
-  const datees = journees.filter((j) => j.date);
+  const datees = unParGroupe(journees).filter((j) => j.date);
   if (!datees.length) return [];
   const n = new Map<string, number>();
   for (const j of datees) n.set(j.date.slice(0, 7), (n.get(j.date.slice(0, 7)) ?? 0) + 1);
@@ -295,11 +355,15 @@ export interface Contrat {
 /** Un contrat = un client + un devis. Commandées / planifiées / passées. */
 export function contrats(journees: JourneeDepistage[], aujourdhui = aujourdhuiISO()): Contrat[] {
   const parCle = new Map<string, Contrat>();
-  for (const j of journees) {
+  // Une journée regroupée compte une fois (son dernier jour décide si elle est passée).
+  const dernierJour = new Map<string, string>();
+  for (const j of journees) { const g = j.groupe ?? `j${j.id}`; if (j.date > (dernierJour.get(g) ?? "")) dernierJour.set(g, j.date); }
+  for (const j of unParGroupe(journees)) {
     const cle = `${j.client}\u0000${j.devis}`;
     const c = parCle.get(cle) ?? { client: j.client, devis: j.devis, commandees: null, planifiees: 0, passees: 0, prochaine: null };
     c.planifiees++;
-    if (estPassee(j, aujourdhui)) c.passees++;
+    const fin = dernierJour.get(j.groupe ?? `j${j.id}`) ?? j.date;
+    if (fin && fin < aujourdhui) c.passees++;
     else if (j.date && (!c.prochaine || j.date < c.prochaine)) c.prochaine = j.date;
     if (j.commandees !== null) c.commandees = Math.max(c.commandees ?? 0, j.commandees);
     parCle.set(cle, c);

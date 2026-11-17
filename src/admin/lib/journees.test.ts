@@ -174,3 +174,24 @@ describe("fichiers du bucket", () => {
     expect(extractionsJournees([f("2026-11-05.csv"), f("2026-11-05-expertise.csv")]).map((x) => x.key)).toEqual(["2026-11-05.csv"]);
   });
 });
+
+describe("journées regroupées (même client, même ville, dates consécutives)", () => {
+  const j = (id: number, client: string, date: string, lieu: string) => ({ id, client, date, lieu, devis: "D1", commandees: null, numero: null } as any);
+  it("deux jours de suite chez le même client dans la même ville = une journée", async () => {
+    const { regrouperJournees, nbJournees, compterPar, contrats, villeDe } = await import("./journees");
+    expect(villeDe("Salle B, 2 rue X, 63000 Clermont-Ferrand")).toBe("clermont ferrand");
+    const l = regrouperJournees([
+      j(1, "ACME", "2026-11-12", "Usine, 63000 Clermont-Ferrand"),
+      j(2, "ACME", "2026-11-13", "Bureaux, 63000 CLERMONT-FERRAND"),
+      j(3, "ACME", "2026-11-16", "Usine, 63000 Clermont-Ferrand"), // lundi après le vendredi : même journée
+      j(4, "ACME", "2027-03-01", "Usine, 63000 Clermont-Ferrand"), // des mois plus tard : autre journée
+      j(5, "ACME", "2026-11-12", "Site, 69000 Lyon"),              // autre ville
+      j(6, "BETA", "2026-11-12", "Usine, 63000 Clermont-Ferrand"), // autre client
+    ]);
+    expect(nbJournees(l)).toBe(4);
+    expect(l[0].groupe).toBe(l[2].groupe);
+    expect([l[0].groupeRang, l[1].groupeRang, l[2].groupeRang, l[0].groupeTaille]).toEqual([1, 2, 3, 3]);
+    expect(compterPar(l, (x) => x.client)).toEqual([{ cle: "ACME", nombre: 3 }, { cle: "BETA", nombre: 1 }]);
+    expect(contrats(l, "2026-12-01").find((c) => c.client === "ACME")?.planifiees).toBe(3);
+  });
+});
