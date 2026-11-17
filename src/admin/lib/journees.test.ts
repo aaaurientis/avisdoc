@@ -175,26 +175,25 @@ describe("fichiers du bucket", () => {
   });
 });
 
-describe("journées regroupées (même client, même ville, dates consécutives)", () => {
+describe("journées regroupées (même client, même ville, même jour)", () => {
   const j = (id: number, client: string, date: string, lieu: string) => ({ id, client, date, lieu, devis: "D1", commandees: null, numero: null } as any);
-  it("deux jours de suite chez le même client dans la même ville = une journée", async () => {
+  it("le même jour chez le même client dans la même ville = une journée ; deux jours = deux journées", async () => {
     const { regrouperJournees, nbJournees, compterPar, contrats, villeDe } = await import("./journees");
     expect(villeDe("Salle B, 2 rue X, 63000 Clermont-Ferrand")).toBe("clermont ferrand");
     const l = regrouperJournees([
       j(1, "ACME", "2026-11-12", "Usine, 63000 Clermont-Ferrand"),
-      j(2, "ACME", "2026-11-13", "Bureaux, 63000 CLERMONT-FERRAND"),
-      j(3, "ACME", "2026-11-16", "Usine, 63000 Clermont-Ferrand"), // lundi après le vendredi : même journée
-      j(4, "ACME", "2027-03-01", "Usine, 63000 Clermont-Ferrand"), // des mois plus tard : autre journée
-      j(5, "ACME", "2026-11-12", "Site, 69000 Lyon"),              // autre ville
-      j(6, "BETA", "2026-11-12", "Usine, 63000 Clermont-Ferrand"), // autre client
+      j(2, "ACME", "2026-11-12", "Bureaux, 63000 CLERMONT-FERRAND"), // même jour, même ville : même journée
+      j(3, "ACME", "2026-11-13", "Usine, 63000 Clermont-Ferrand"), // le lendemain : autre journée
+      j(4, "ACME", "2026-11-12", "Site, 69000 Lyon"),              // autre ville
+      j(5, "BETA", "2026-11-12", "Usine, 63000 Clermont-Ferrand"), // autre client
     ]);
     expect(nbJournees(l)).toBe(4);
-    expect(l[0].groupe).toBe(l[2].groupe);
-    expect([l[0].groupeRang, l[1].groupeRang, l[2].groupeRang, l[0].groupeTaille]).toEqual([1, 2, 3, 3]);
+    expect(l[0].groupe).toBe(l[1].groupe);
+    expect(l[0].groupe).not.toBe(l[2].groupe);
+    expect([l[0].groupeRang, l[1].groupeRang, l[0].groupeTaille, l[2].groupeTaille]).toEqual([1, 2, 2, 1]);
     expect(compterPar(l, (x) => x.client)).toEqual([{ cle: "ACME", nombre: 3 }, { cle: "BETA", nombre: 1 }]);
     expect(contrats(l, "2026-12-01").find((c) => c.client === "ACME")?.planifiees).toBe(3);
   });
-
   it("blocs pour l'affichage hiérarchique, dates du regroupement", async () => {
     const { regrouperJournees, blocsJournees, memeRegroupement, datesRegroupement } = await import("./journees");
     const l = regrouperJournees([
@@ -203,11 +202,10 @@ describe("journées regroupées (même client, même ville, dates consécutives)
       j(3, "ACME", "2026-11-04", "58800 Prémery"),
       j(4, "ACME", "2026-11-04", "58800 Prémery"),
     ]);
-    const blocs = blocsJournees(l);
-    expect(blocs.map((b) => b.journees.map((x) => x.id))).toEqual([[3, 4, 1], [2]]);
-    expect(memeRegroupement(l, l[0]).map((x) => x.id)).toEqual([1, 3, 4]);
+    expect(blocsJournees(l).map((b) => b.journees.map((x) => x.id))).toEqual([[1], [2], [3, 4]]);
+    expect(memeRegroupement(l, l[2]).map((x) => x.id)).toEqual([3, 4]);
     expect(datesRegroupement(["2026-11-05", "2026-11-04", "2026-11-04"])).toBe("4 au 5 nov. 2026");
     expect(datesRegroupement(["2026-10-30", "2026-11-02"])).toBe("30 oct. au 2 nov. 2026");
-    expect(datesRegroupement(["2026-11-04"])).toBe("4 nov. 2026");
+    expect(datesRegroupement(["2026-11-04", "2026-11-04"])).toBe("4 nov. 2026");
   });
 });
