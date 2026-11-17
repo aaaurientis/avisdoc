@@ -6,7 +6,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { Card, SectionLabel } from "../../components/ui";
 import { useExpertisesStats } from "../../data/journeesStore";
 import { cleJournee, enJournee, issueDe, MASQUE, MOTIF_MASQUE, resultatsVisibles, resumer, type Expertise } from "../../lib/expertises";
-import { aujourdhuiISO, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
+import { aujourdhuiISO, blocsJournees, datesRegroupement, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
 import NomPro from "../../components/NomPro";
 import { pourResultats } from "../../lib/masquage";
 
@@ -140,7 +140,11 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
   const avisPeriode = useAvisFiltres(periode, client, requis, journees);
   const auj = aujourdhuiISO();
   const passees = journees.filter((j) => estPassee(j, auj));
-  const parJournee = passees.map((j) => ({ j, n: (index.get(cleJournee(j)) ?? []).filter((e) => !requis || e.requis === requis).length }));
+  // Une journée regroupée (même client, même ville) compte pour une : ses avis sont réunis, chacun une fois.
+  const parJournee = blocsJournees(passees).map((b) => {
+    const ids = new Set(b.journees.flatMap((j) => (index.get(cleJournee(j)) ?? []).filter((e) => !requis || e.requis === requis).map((e) => e.id)));
+    return { j: b.journees[0], bloc: b.journees, n: ids.size };
+  });
   const avecAvis = parJournee.filter((x) => x.n > 0);
   const sansAvis = parJournee.filter((x) => x.n === 0).sort((a, b) => b.j.date.localeCompare(a.j.date));
   const avisEnJournee = avecAvis.reduce((s, x) => s + x.n, 0);
@@ -158,7 +162,7 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
       ) : !source ? null : (
         <>
           <p className="mb-4 text-[12.5px] text-muted-foreground">
-            Une expertise est rattachée à sa journée par la date, le lieu et le numéro de journée. Calcul sur les {nombre(passees.length)} journées passées de la période.
+            Une expertise est rattachée à sa journée par la date, le lieu et le numéro de journée. Calcul sur les {nombre(parJournee.length)} journées passées de la période (même client, même ville : une seule journée).
           </p>
           <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi
@@ -167,7 +171,7 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
               pied={client ? `sur ${nombre(avecAvis.length)} journées` : `${pct(enJ.length, avisPeriode.length)} % de l'activité de la période`}
             />
             <Kpi label="Moyenne par journée" valeur={avecAvis.length ? nombre(Math.round(avisEnJournee / avecAvis.length)) : "—"} pied={max ? `jusqu'à ${max} avis sur une journée` : "—"} />
-            <Kpi label="Journées passées sans avis" valeur={nombre(sansAvis.length)} pied={`sur ${nombre(passees.length)} journées passées`} />
+            <Kpi label="Journées passées sans avis" valeur={nombre(sansAvis.length)} pied={`sur ${nombre(parJournee.length)} journées passées`} />
             <Kpi
               label="Consultation : en journée / hors"
               valeur={`${tauxEn === null ? MASQUE : `${tauxEn} %`} / ${client || tauxHors === null ? MASQUE : `${tauxHors} %`}`}
@@ -185,17 +189,31 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
               <div className="max-h-72 overflow-auto">
                 <table className="w-full text-left text-[13px]">
                   <tbody>
-                    {sansAvis.map(({ j }) => (
+                    {sansAvis.flatMap(({ j, bloc }) => [
                       <tr key={cleJournee(j)} className="border-t border-border first:border-t-0">
-                        <td className="w-32 px-5 py-2 font-semibold text-avisdoc-ink">{jour(j.date)}</td>
+                        <td className="w-32 px-5 py-2 font-semibold text-avisdoc-ink">{bloc.length > 1 ? datesRegroupement(bloc.map((x) => x.date)) : jour(j.date)}</td>
                         <td className="px-3 py-2 text-avisdoc-ink">
                           {j.client}
-                          {j.numero !== null && <span className="text-muted-foreground"> · journée {j.numero}{j.commandees ? `/${j.commandees}` : ""}</span>}
+                          {bloc.length > 1 ? (
+                            <span className="ml-1.5 rounded-full bg-avisdoc-ink px-2 text-[11px] font-semibold text-white">1 journée · {bloc.length} créneaux</span>
+                          ) : (
+                            j.numero !== null && <span className="text-muted-foreground"> · journée {j.numero}{j.commandees ? `/${j.commandees}` : ""}</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{j.lieu}</td>
-                        <td className="px-5 py-2 text-muted-foreground"><NomPro nom={j.requis} vide="requis non renseigné" /></td>
-                      </tr>
-                    ))}
+                        <td className="px-5 py-2 text-muted-foreground">{bloc.length > 1 ? "" : <NomPro nom={j.requis} vide="requis non renseigné" />}</td>
+                      </tr>,
+                      ...(bloc.length > 1
+                        ? bloc.map((x) => (
+                            <tr key={`${cleJournee(x)}#${x.id}`} className="border-t border-border/60 text-[12.5px]">
+                              <td className="w-32 py-1.5 pl-9 pr-5 text-muted-foreground">└ {jour(x.date)}</td>
+                              <td className="px-3 py-1.5 text-muted-foreground">{x.numero !== null ? `journée ${x.numero}${x.commandees ? `/${x.commandees}` : ""}` : ""}</td>
+                              <td className="px-3 py-1.5 text-muted-foreground">{x.lieu}</td>
+                              <td className="px-5 py-1.5 text-muted-foreground"><NomPro nom={x.requis} vide="requis non renseigné" /></td>
+                            </tr>
+                          ))
+                        : []),
+                    ])}
                   </tbody>
                 </table>
               </div>

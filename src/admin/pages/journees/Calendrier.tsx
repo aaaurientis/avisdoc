@@ -18,10 +18,11 @@ import {
   nbJournees,
   type EtatJournee,
   type JourneeDepistage,
+  blocsJournees,
 } from "../../lib/journees";
 import { cn } from "@/lib/utils";
 import { requisMasque } from "../../lib/masquage";
-import { CadreJournees, Choix, LigneJournee, boutonCls, capitale, jour } from "./commun";
+import { CadreJournees, Choix, ListeJourneesGroupees, boutonCls, capitale, jour } from "./commun";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -178,7 +179,7 @@ function Contenu() {
       <Card className="mb-6 overflow-hidden">
         <div className="border-b border-border bg-background px-5 py-3">
           <SectionLabel>
-            {capitale(jour(choisi, { weekday: "long", day: "numeric", month: "long", year: "numeric" }))} · {duJour.length} journée{duJour.length > 1 ? "s" : ""}
+            {capitale(jour(choisi, { weekday: "long", day: "numeric", month: "long", year: "numeric" }))} · {nbJournees(duJour)} journée{nbJournees(duJour) > 1 ? "s" : ""}
           </SectionLabel>
         </div>
         {duJour.length ? (
@@ -193,19 +194,16 @@ function Contenu() {
   );
 }
 
-function ListeSimple({ liste, avecDate = true }: { liste: JourneeDepistage[]; avecDate?: boolean }) {
-  const [ouverte, setOuverte] = useState<number | null>(null);
-  return (
-    <div>
-      {liste.map((j) => (
-        <LigneJournee key={j.id} j={j} avecDate={avecDate} ouverte={ouverte === j.id} basculer={() => setOuverte((o) => (o === j.id ? null : j.id))} />
-      ))}
-    </div>
-  );
-}
+const ListeSimple = ListeJourneesGroupees;
 
 /** Au-delà, les journées passées se replient : on suit surtout ce qui vient et ce qui vient de se faire. */
 const PASSEES_VISIBLES = 10;
+
+/** Les n premières journées (au sens du regroupement) d'une liste, sans couper un regroupement. */
+function premieresJournees(liste: JourneeDepistage[], n: number) {
+  const garde = new Set(blocsJournees(liste).slice(0, n).map((b) => b.groupe));
+  return liste.filter((j) => garde.has(j.groupe ?? `j${j.id}`));
+}
 
 /** Toutes les journées : à venir d'abord (la plus proche en tête), puis les passées (la plus récente en tête). */
 function ListeJournees({ journees }: { journees: JourneeDepistage[] }) {
@@ -228,14 +226,14 @@ function ListeJournees({ journees }: { journees: JourneeDepistage[] }) {
           <div className="border-y border-border bg-background px-5 py-3">
             <SectionLabel>Passées · {nbJournees(passees)}</SectionLabel>
           </div>
-          <ListeSimple liste={toutVoir ? passees : passees.slice(0, PASSEES_VISIBLES)} />
-          {passees.length > PASSEES_VISIBLES && (
+          <ListeSimple liste={toutVoir ? passees : premieresJournees(passees, PASSEES_VISIBLES)} />
+          {nbJournees(passees) > PASSEES_VISIBLES && (
             <button
               type="button"
               onClick={() => setToutVoir((v) => !v)}
               className="w-full border-t border-border px-5 py-3 text-center text-[13px] font-semibold text-avisdoc-teal transition-colors hover:bg-accent"
             >
-              {toutVoir ? "Réduire" : `Voir les ${passees.length} journées passées`}
+              {toutVoir ? "Réduire" : `Voir les ${nbJournees(passees)} journées passées`}
             </button>
           )}
         </>

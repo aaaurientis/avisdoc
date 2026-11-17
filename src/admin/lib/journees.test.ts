@@ -194,4 +194,20 @@ describe("journées regroupées (même client, même ville, dates consécutives)
     expect(compterPar(l, (x) => x.client)).toEqual([{ cle: "ACME", nombre: 3 }, { cle: "BETA", nombre: 1 }]);
     expect(contrats(l, "2026-12-01").find((c) => c.client === "ACME")?.planifiees).toBe(3);
   });
+
+  it("blocs pour l'affichage hiérarchique, dates du regroupement", async () => {
+    const { regrouperJournees, blocsJournees, memeRegroupement, datesRegroupement } = await import("./journees");
+    const l = regrouperJournees([
+      j(1, "ACME", "2026-11-05", "58800 Prémery"),
+      j(2, "BETA", "2026-11-04", "63000 Clermont-Ferrand"),
+      j(3, "ACME", "2026-11-04", "58800 Prémery"),
+      j(4, "ACME", "2026-11-04", "58800 Prémery"),
+    ]);
+    const blocs = blocsJournees(l);
+    expect(blocs.map((b) => b.journees.map((x) => x.id))).toEqual([[3, 4, 1], [2]]);
+    expect(memeRegroupement(l, l[0]).map((x) => x.id)).toEqual([1, 3, 4]);
+    expect(datesRegroupement(["2026-11-05", "2026-11-04", "2026-11-04"])).toBe("4 au 5 nov. 2026");
+    expect(datesRegroupement(["2026-10-30", "2026-11-02"])).toBe("30 oct. au 2 nov. 2026");
+    expect(datesRegroupement(["2026-11-04"])).toBe("4 nov. 2026");
+  });
 });

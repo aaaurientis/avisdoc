@@ -39,7 +39,8 @@ export interface ContenuRapport {
   /** Absent quand le délai repose sur trop peu d'avis mesurés. */
   delais: [string, string][] | null;
   /** Absent pour le rapport d'une seule journée. */
-  journees: { date: string; lieu: string; avis: string }[] | null;
+  /** `niveau` 1 : créneau d'une journée regroupée, sous sa journée principale. */
+  journees: { date: string; lieu: string; avis: string; niveau?: 0 | 1 }[] | null;
   note: string;
   moisEdition: string;
 }
@@ -262,17 +263,18 @@ export async function fabriquerPdfRapport(c: ContenuRapport): Promise<Blob> {
         y = 18;
         entete();
       }
-      doc.setFillColor(i % 2 ? COULEURS.cyanClair : "#ffffff");
+      const sous = j.niveau === 1;
+      doc.setFillColor(!sous && i % 2 ? COULEURS.cyanClair : "#ffffff");
       doc.rect(L, y, LARGEUR, hLigne, "F");
       doc.setDrawColor(COULEURS.filet);
       doc.setLineWidth(0.2);
       doc.line(L, y + hLigne, R, y + hLigne);
       const yt = y + hLigne / 2 + 1.1;
-      police("HG400", 8.5, COULEURS.marine);
-      texte(j.date, L + 3, yt);
+      police("HG400", sous ? 7.6 : 8.5, sous ? COULEURS.ardoise : COULEURS.marine);
+      texte(net(sous ? `- ${j.date}` : j.date), sous ? L + 7 : L + 3, yt);
       const lieu = doc.splitTextToSize(net(j.lieu), R - 30 - colLieu)[0] as string;
       texte(lieu, colLieu, yt);
-      police("HG700", 8.5, COULEURS.marine);
+      police(sous ? "HG400" : "HG700", sous ? 7.6 : 8.5, sous ? COULEURS.ardoise : COULEURS.marine);
       texte(j.avis, R - 3, yt, { align: "right" });
       y += hLigne;
     });
