@@ -122,8 +122,8 @@ export interface JourneeDepistage {
   /** Date de la journée (AAAA-MM-JJ). */
   date: string;
   /**
-   * Journée regroupée (règle du 17/11) : même client, même ville, dates consécutives (3 jours
-   * d'écart au plus, week-end compris) = UNE journée. Identifiant commun, rang et nombre de jours.
+   * Journée regroupée : même client, même ville, même jour = UNE journée (deux jours = deux
+   * journées). Identifiant commun, rang et nombre de créneaux.
    */
   groupe?: string;
   groupeRang?: number;
@@ -238,12 +238,12 @@ export function villeDe(lieu: string): string {
   return sansAccents(v).replace(/\b(cedex|cedex \d+)\b/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-/** Écart maximal entre deux dates d'une même journée regroupée (vendredi → lundi compris). */
-export const ECART_REGROUPEMENT = 3;
+/** Écart maximal entre deux dates d'une même journée regroupée : 0, le même jour seulement. */
+export const ECART_REGROUPEMENT = 0;
 
 const joursEntre = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 86_400_000);
 
-/** Attribue à chaque journée son regroupement (même client, même ville, dates consécutives). */
+/** Attribue à chaque journée son regroupement (même client, même ville, même jour). */
 export function regrouperJournees<T extends JourneeDepistage>(journees: T[]): T[] {
   const parCle = new Map<string, T[]>();
   for (const j of journees) {

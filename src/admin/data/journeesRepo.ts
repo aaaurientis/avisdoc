@@ -139,7 +139,7 @@ function demo(): string {
       );
     }
   }
-  // Une journée regroupée : même client, même ville, deux dermatologues sur deux jours de suite.
+  // Une journée regroupée : même client, même ville, deux dermatologues le même jour (le lendemain : une autre journée).
   [[-12, 11, 0], [-12, 12, 1], [-11, 11, 2]].forEach(([decalage, n, e], i) => {
     const d = new Date();
     d.setDate(d.getDate() + decalage);

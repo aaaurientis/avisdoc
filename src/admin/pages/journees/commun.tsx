@@ -302,7 +302,7 @@ function LigneGroupe({
           <span className="block truncate font-semibold text-avisdoc-ink">
             {premiere.client}
             <span className="ml-1.5 inline-flex items-center rounded-full bg-avisdoc-ink px-2 text-[11px] font-semibold text-white"
-              title="Même client, même ville, dates consécutives : comptées comme une seule journée">
+              title="Même client, même ville, même jour : une seule journée">
               1 journée · {journees.length} créneaux{nbJours > 1 ? ` sur ${nbJours} jours` : ""}
             </span>
             {numeros.length > 0 && (
