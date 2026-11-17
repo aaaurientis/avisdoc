@@ -304,10 +304,10 @@ export function dansLaPeriode(liste: Expertise[], periode: PeriodeExpertises, au
 
 /**
  * Règle de l'AIPD : aucun détail sur le résultat (recommandation, exérèse, urgence, taux de
- * consultation) quand il porte sur 20 dossiers ou moins. Vaut pour le rapport client comme pour
+ * consultation) quand il porte sur 10 dossiers ou moins. Vaut pour le rapport client comme pour
  * les statistiques du Hub ; les volumes (nombre d'avis) et les délais restent visibles.
  */
-export const SEUIL_RAPPORT = 20;
+export const SEUIL_RAPPORT = 10;
 export const SEUIL_AIPD = SEUIL_RAPPORT;
 // Admin › Réglages › Statistiques : les résultats dermatologiques peuvent être masqués partout dans le module.
 export const resultatsVisibles = (nbDossiers: number) => affichageStats().resultatsDermato && nbDossiers > SEUIL_AIPD;

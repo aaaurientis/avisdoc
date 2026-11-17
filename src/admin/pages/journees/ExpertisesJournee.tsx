@@ -1,7 +1,7 @@
 // Ce qu'il s'est passé lors d'une journée : les avis rendus, les délais, et ce qu'ils recommandent
-// (en agrégé seulement, et seulement au-delà de 20 dossiers : règle de l'AIPD). La liste des dossiers
+// (en agrégé seulement, et seulement au-delà de 10 dossiers : règle de l'AIPD). La liste des dossiers
 // ne montre jamais de résultat individuel.
-// Affiché dans le détail d'une journée (Calendrier). Lien vers le rapport client au-delà de 20 avis.
+// Affiché dans le détail d'une journée (Calendrier). Lien vers le rapport client au-delà de 10 avis.
 import { useMemo } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { useExpertisesStats } from "../../data/journeesStore";

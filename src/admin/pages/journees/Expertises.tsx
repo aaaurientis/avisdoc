@@ -16,6 +16,7 @@ import {
   MASQUE,
   MOTIF_MASQUE,
   resultatsVisibles,
+  SEUIL_AIPD,
   parMois,
   parRequis,
   delaiSuiviMoyen,
@@ -338,7 +339,7 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-3 text-[12px] text-muted-foreground">
         <span>
-          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? `${tauxGlobal} %` : MASQUE}</b>, délai moyen de suivi <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? jours(suiviGlobal) : MASQUE}</b>. Un requis à {20} avis ou moins n'affiche pas ses résultats (règle de l'AIPD).
+          Taux de consultation = avis qui orientent vers un dermatologue (consultation ou exérèse), sur les avis où la recommandation est renseignée. Ensemble des requis : <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? `${tauxGlobal} %` : MASQUE}</b>, délai moyen de suivi <b className="text-avisdoc-ink">{resultatsVisibles(tous.r) ? jours(suiviGlobal) : MASQUE}</b>. Un requis à {SEUIL_AIPD} avis ou moins n'affiche pas ses résultats (règle de l'AIPD).
         </span>
         <select value={tri} onChange={(e) => setTri(e.target.value as "avis" | "taux" | "suivi")} className={selectCls} aria-label="Trier">
           <option value="avis">Trier par nombre d'avis</option>
