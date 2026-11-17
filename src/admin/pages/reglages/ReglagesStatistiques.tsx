@@ -1,5 +1,6 @@
 // Admin › Réglages › Statistiques : ce que le module Statistiques montre, pour tout le monde.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { chargerExpertises, useExpertises } from "../../data/journeesStore";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "../../components/ui";
@@ -21,6 +22,15 @@ export default function ReglagesStatistiques() {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   useEffect(() => { chargerAffichageStats().then(setA).catch((e) => { setErreur(String(e?.message ?? e)); setA(AFFICHAGE_DEFAUT); }); }, []);
+  // Liste des requis : ceux de l'extraction des expertises, plus ceux déjà masqués.
+  const { expertises, statut } = useExpertises();
+  useEffect(() => { if (statut === "initial") void chargerExpertises(); }, [statut]);
+  const lesRequis = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const e of expertises) if (e.requis?.trim()) n.set(e.requis.trim(), (n.get(e.requis.trim()) ?? 0) + 1);
+    for (const r of a?.requisMasques ?? []) if (!n.has(r)) n.set(r, 0);
+    return [...n.entries()].sort((x, y) => x[0].localeCompare(y[0], "fr"));
+  }, [expertises, a?.requisMasques]);
 
   const enregistrer = async (n: AffichageStats) => {
     setA(n); setEnvoi(true); setErreur(null);
@@ -43,6 +53,27 @@ export default function ReglagesStatistiques() {
           <span className="block text-[12px] text-muted-foreground">Recommandations, taux de consultation, exérèses, urgences, délais de suivi. Décoché : masqués partout dans le module (le rapport client n'est pas concerné).</span>
         </span>
       </label>
+
+      <div className="mt-5 font-semibold text-avisdoc-ink">Requis dont les résultats sont masqués</div>
+      <p className="text-[12px] text-muted-foreground">Leurs avis restent comptés dans les volumes ; ils sont retirés des taux, exérèses, recommandations et délais de suivi, totaux compris.</p>
+      {statut !== "pret" && !lesRequis.length ? (
+        <div className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Lecture des expertises…</div>
+      ) : (
+        <div className="mt-2 grid max-h-72 grid-cols-1 gap-x-4 gap-y-1 overflow-y-auto rounded-xl border border-border p-2 sm:grid-cols-2">
+          {lesRequis.map(([nom, nb]) => {
+            const masque = a.requisMasques.includes(nom);
+            return (
+              <label key={nom} className={cn("flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1", masque && "bg-amber-50")}>
+                <input type="checkbox" className="size-4" checked={masque} disabled={envoi}
+                  onChange={() => void enregistrer({ ...a, requisMasques: masque ? a.requisMasques.filter((x) => x !== nom) : [...a.requisMasques, nom] })} />
+                <span className="min-w-0 flex-1 truncate text-avisdoc-ink">{nom}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{nb} avis</span>
+              </label>
+            );
+          })}
+          {!lesRequis.length && <p className="px-2 py-1 text-[12px] text-muted-foreground">Aucun requis dans l'extraction des expertises.</p>}
+        </div>
+      )}
 
       <div className="mt-5 font-semibold text-avisdoc-ink">Noms des professionnels de santé (requis, requérants)</div>
       <div className="mt-2 flex flex-wrap gap-2">

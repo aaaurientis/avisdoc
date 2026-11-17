@@ -8,9 +8,11 @@ export interface AffichageStats {
   resultatsDermato: boolean;
   /** Noms des professionnels de santé (requis, requérants). */
   noms: ModeNoms;
+  /** Requis dont les résultats sont masqués (leurs avis restent comptés dans les volumes). */
+  requisMasques: string[];
 }
 
-export const AFFICHAGE_DEFAUT: AffichageStats = { resultatsDermato: true, noms: "clair" };
+export const AFFICHAGE_DEFAUT: AffichageStats = { resultatsDermato: true, noms: "clair", requisMasques: [] };
 
 let courant: AffichageStats = AFFICHAGE_DEFAUT;
 export const affichageStats = () => courant;
@@ -18,8 +20,16 @@ export function definirAffichageStats(a: Partial<AffichageStats> | null | undefi
   courant = {
     resultatsDermato: a?.resultatsDermato !== false,
     noms: a?.noms === "flou" || a?.noms === "initiale" ? a.noms : "clair",
+    requisMasques: Array.isArray(a?.requisMasques) ? a!.requisMasques.filter((x) => typeof x === "string") : [],
   };
 }
+
+/** Les résultats de ce requis sont-ils masqués (Admin › Réglages › Statistiques) ? */
+export const requisMasque = (requis: string | null | undefined) => courant.requisMasques.includes((requis ?? "").trim());
+
+/** Pour calculer des RÉSULTATS : les avis des requis masqués sont retirés (les volumes, eux, gardent tout). */
+export const pourResultats = <T extends { requis: string }>(liste: T[]): T[] =>
+  courant.requisMasques.length ? liste.filter((e) => !requisMasque(e.requis)) : liste;
 
 const TITRES = /^(dr|docteur|pr|professeur|mme|mr|m)\.?$/i;
 
