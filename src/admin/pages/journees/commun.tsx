@@ -172,6 +172,12 @@ export function LigneJournee({
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold text-avisdoc-ink">
             {j.client}
+            {(j.groupeTaille ?? 1) > 1 && (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-avisdoc-ink/10 px-1.5 text-[11px] font-semibold text-avisdoc-ink"
+                title="Même client, même ville, jours consécutifs : comptés comme une seule journée">
+                jour {j.groupeRang}/{j.groupeTaille} · une seule journée
+              </span>
+            )}
             {j.numero !== null && (
               <span className="ml-1.5 font-normal text-muted-foreground">
                 · journée {j.numero}
