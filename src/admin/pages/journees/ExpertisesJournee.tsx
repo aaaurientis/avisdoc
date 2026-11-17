@@ -4,7 +4,7 @@
 // Affiché dans le détail d'une journée (Calendrier). Lien vers le rapport client au-delà de 20 avis.
 import { useMemo } from "react";
 import { FileText, Loader2 } from "lucide-react";
-import { useExpertises } from "../../data/journeesStore";
+import { useExpertisesStats } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resultatsVisibles, resumer, SEUIL_AIPD, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
 import type { JourneeDepistage } from "../../lib/journees";
 import NomPro from "../../components/NomPro";
@@ -16,7 +16,7 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 /** Les expertises d'une journée (vide tant qu'elles ne sont pas chargées). */
 export function useAvisDeLaJournee(j: JourneeDepistage): { avis: Expertise[]; pret: boolean } {
-  const { index, statut } = useExpertises();
+  const { index, statut } = useExpertisesStats();
   return { avis: index.get(cleJournee(j)) ?? [], pret: statut === "pret" };
 }
 
