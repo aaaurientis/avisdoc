@@ -9,6 +9,11 @@ import { etatDe, manques, type JourneeDepistage } from "../../lib/journees";
 import { exigences } from "../../lib/typologies";
 import ExpertisesJournee, { useAvisDeLaJournee } from "./ExpertisesJournee";
 import { cn } from "@/lib/utils";
+import NomPro, { nomPro } from "../../components/NomPro";
+import { affichageStats } from "../../lib/masquage";
+
+/** Dans une liste déroulante, le flou n'est pas possible : on masque le nom. */
+const nomAffichable = (n: string) => (affichageStats().noms === "flou" ? "••••••" : nomPro(n));
 
 export const jour = (iso: string, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }) =>
   iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("fr-FR", opts) : "—";
@@ -20,13 +25,13 @@ export const boutonCls =
   "inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink transition-colors hover:border-avisdoc-ink disabled:opacity-60";
 export const selectCls = "min-w-0 max-w-[260px] rounded-full border border-border bg-card px-3 py-1.5 text-[13px] text-avisdoc-ink";
 
-export function Choix({ valeur, changer, options, tous }: { valeur: string; changer: (v: string) => void; options: string[]; tous: string }) {
+export function Choix({ valeur, changer, options, tous, noms = false }: { valeur: string; changer: (v: string) => void; options: string[]; tous: string; noms?: boolean }) {
   return (
     <select value={valeur} onChange={(e) => changer(e.target.value)} className={selectCls} aria-label={tous}>
       <option value="">{tous}</option>
       {options.map((o) => (
         <option key={o} value={o}>
-          {o}
+          {noms ? nomAffichable(o) : o}
         </option>
       ))}
     </select>
@@ -195,8 +200,8 @@ export function LigneJournee({
             valeur={`${typologie?.nom ?? "Règle par défaut"} — exige : ${exigences(regles).join(", ") || "rien"}`}
           />
           <Info label="Devis" valeur={j.devis} />
-          <Info label="Requérant" valeur={j.requerant} />
-          <Info label="Requis" valeur={j.requis} />
+          <Info label="Requérant" valeur={j.requerant} nom />
+          <Info label="Requis" valeur={j.requis} nom />
           <Info label="Contact" valeur={[j.contactNom, j.contactTel, j.contactEmail].filter(Boolean).join(" · ")} />
           <Info label="Salle" valeur={j.salle} />
           <Info label="Accès" valeur={j.acces} />
@@ -217,11 +222,11 @@ export function LigneJournee({
 
 const oui = (v: boolean) => (v ? "oui" : "non");
 
-function Info({ label, valeur }: { label: string; valeur: string }) {
+function Info({ label, valeur, nom = false }: { label: string; valeur: string; nom?: boolean }) {
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</div>
-      <div className="break-words text-avisdoc-ink">{valeur || "—"}</div>
+      <div className="break-words text-avisdoc-ink">{nom ? <NomPro nom={valeur} /> : valeur || "—"}</div>
     </div>
   );
 }

@@ -7,11 +7,12 @@ import { cn } from "@/lib/utils";
 import Onglets from "../components/Onglets";
 import { ESPACES_CRM, ESPACES_VEILLE } from "../lib/espaces";
 import ReglagesEspaces from "./reglages/ReglagesEspaces";
+import ReglagesStatistiques from "./reglages/ReglagesStatistiques";
 
 const SEP = "␟";
 
-type Bloc = "documents" | "crm" | "veille";
-const BLOCS: { cle: Bloc; label: string }[] = [{ cle: "documents", label: "Documents" }, { cle: "crm", label: "CRM" }, { cle: "veille", label: "Veille" }];
+type Bloc = "documents" | "crm" | "veille" | "statistiques";
+const BLOCS: { cle: Bloc; label: string }[] = [{ cle: "documents", label: "Documents" }, { cle: "crm", label: "CRM" }, { cle: "veille", label: "Veille" }, { cle: "statistiques", label: "Statistiques" }];
 
 export default function Settings() {
   const {
@@ -68,6 +69,7 @@ export default function Settings() {
       </div>
       {bloc === "crm" && <ReglagesEspaces espaces={ESPACES_CRM} explication="Pour chaque CRM : « Reçoit les mails » lui envoie les mails de ce CRM (aujourd'hui, ceux de sa veille : alertes et récapitulatifs) ; « Reçoit le Weekly » lui envoie le Weekly de ce CRM, le vendredi." />}
       {bloc === "veille" && <ReglagesEspaces espaces={ESPACES_VEILLE} explication="La Veille Marché : « Reçoit les mails » lui envoie ses mails (alertes, récapitulatifs) ; « Reçoit le Weekly » lui envoie son Weekly, le vendredi." />}
+      {bloc === "statistiques" && <ReglagesStatistiques />}
       {bloc === "documents" && <>
 
       <Card className="max-w-[680px] p-6">

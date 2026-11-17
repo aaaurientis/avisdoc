@@ -1,3 +1,4 @@
+import { affichageStats } from "./masquage";
 // Expertises — lecture de l'extraction CSV (une ligne = un avis) et calculs.
 //
 // Une expertise faite lors d'une journée de dépistage porte Date événement + Lieu + Numéro journée :
@@ -241,7 +242,14 @@ export interface LigneRequis {
   /** Avis qui orientent vers un dermatologue : consultation conseillée ou exérèse. */
   orientations: number;
   urgentes: number;
+  /** Délai de suivi recommandé (jours) : somme et nombre d'avis qui en donnent un (> 0). */
+  delaiSuiviSomme: number;
+  delaiSuiviMesures: number;
 }
+
+/** Délai moyen de suivi recommandé (jours), ou null s'il n'y en a aucun. */
+export const delaiSuiviMoyen = (l: { delaiSuiviSomme: number; delaiSuiviMesures: number }) =>
+  l.delaiSuiviMesures ? l.delaiSuiviSomme / l.delaiSuiviMesures : null;
 
 /** Trois issues possibles d'un avis. */
 export type Issue = "non-indispensable" | "consultation" | "exerese" | null;
@@ -272,6 +280,10 @@ export function parRequis(liste: Expertise[]): LigneRequis[] {
       exereses: l.filter((e) => issueDe(e) === "exerese").length,
       orientations: l.filter((e) => issueDe(e) === "consultation" || issueDe(e) === "exerese").length,
       urgentes: l.filter((e) => e.urgent).length,
+      ...(() => {
+        const d = l.map((e) => e.delaiRecoJours).filter((x): x is number => x !== null && x > 0);
+        return { delaiSuiviSomme: d.reduce((s, x) => s + x, 0), delaiSuiviMesures: d.length };
+      })(),
     }))
     .sort((a, b) => b.total - a.total);
 }
@@ -297,8 +309,10 @@ export function dansLaPeriode(liste: Expertise[], periode: PeriodeExpertises, au
  */
 export const SEUIL_RAPPORT = 20;
 export const SEUIL_AIPD = SEUIL_RAPPORT;
-export const resultatsVisibles = (nbDossiers: number) => nbDossiers > SEUIL_AIPD;
-export const rapportPossible = resultatsVisibles;
+// Admin › Réglages › Statistiques : les résultats dermatologiques peuvent être masqués partout dans le module.
+export const resultatsVisibles = (nbDossiers: number) => affichageStats().resultatsDermato && nbDossiers > SEUIL_AIPD;
+/** Rapport client : seuil de l'AIPD seulement (le réglage d'affichage des statistiques ne le change pas). */
+export const rapportPossible = (nbDossiers: number) => nbDossiers > SEUIL_RAPPORT;
 /** Ce qui s'affiche à la place d'un résultat masqué, et pourquoi. */
 export const MASQUE = "—";
 export const MOTIF_MASQUE = `Masqué : ${SEUIL_AIPD} dossiers ou moins (règle de l'AIPD).`;

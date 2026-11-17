@@ -96,7 +96,7 @@ function Contenu() {
           Aujourd'hui
         </button>
         <Choix valeur={client} changer={setClient} options={clients} tous="Tous les clients" />
-        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" />
+        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" noms />
       </div>
 
       <Card className="mb-6 overflow-hidden">

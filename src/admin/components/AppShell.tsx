@@ -1,3 +1,4 @@
+import { chargerAffichageStats } from "../lib/affichageStats";
 // Coquille applicative : le menu, et la zone de contenu.
 //
 // Sur un écran large, le menu est une colonne fixe. Sur un téléphone, il ne peut pas
@@ -20,6 +21,9 @@ let dejaAiguille = false;
 export default function AppShell() {
   const [tiroir, setTiroir] = useState(false);
   const { pathname } = useLocation();
+  // Réglages d'affichage du module Statistiques (Admin › Réglages › Statistiques).
+  const [versionAffichage, setVersionAffichage] = useState(0);
+  useEffect(() => { void chargerAffichageStats().then(() => setVersionAffichage((v) => v + 1)).catch(() => undefined); }, []);
   const naviguer = useNavigate();
   const vueSeule = useVueSeule();
 
@@ -86,7 +90,8 @@ export default function AppShell() {
         )}
         {/* Une erreur dans un écran n'emporte plus le menu : on peut changer d'écran. */}
         <FiletErreur cle={pathname}>
-          <Outlet />
+          {/* Statistiques : remonté une fois les réglages d'affichage chargés (résultats, noms). */}
+          <Outlet key={pathname.startsWith("/journees") ? `stats-${versionAffichage}` : undefined} />
         </FiletErreur>
       </main>
     </div>
