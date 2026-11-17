@@ -26,6 +26,7 @@ import {
 } from "../../lib/expertises";
 import { cn } from "@/lib/utils";
 import { AxeMois, Choix, boutonCls, capitale, jour, nombre, pct, selectCls } from "./commun";
+import NomPro from "../../components/NomPro";
 
 const PERIODES: { cle: PeriodeExpertises; label: string }[] = [
   { cle: "12m", label: "12 mois" },
@@ -360,7 +361,7 @@ function TableRequis({ liste }: { liste: Expertise[] }) {
               const visible = resultatsVisibles(l.total);
               return (
                 <tr key={l.requis} className="border-t border-border">
-                  <td className="px-5 py-2.5 font-semibold text-avisdoc-ink">{l.requis}</td>
+                  <td className="px-5 py-2.5 font-semibold text-avisdoc-ink"><NomPro nom={l.requis} /></td>
                   <td className="px-3 py-2.5 text-right text-avisdoc-ink">{nombre(l.total)}</td>
                   <td className="px-3 py-2.5" title={visible ? `${l.orientations} orientations sur ${l.renseignes} avis renseignés` : MOTIF_MASQUE}>
                     <div className="flex items-center gap-2">

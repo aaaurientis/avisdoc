@@ -7,6 +7,7 @@ import { FileText, Loader2 } from "lucide-react";
 import { useExpertises } from "../../data/journeesStore";
 import { cleJournee, issueDe, rapportPossible, resultatsVisibles, resumer, SEUIL_AIPD, SEUIL_RAPPORT, type Expertise } from "../../lib/expertises";
 import type { JourneeDepistage } from "../../lib/journees";
+import NomPro from "../../components/NomPro";
 
 // (Pas d'import depuis ./commun : commun affiche ce composant, on évite la boucle d'imports.)
 const nombre = (n: number) => n.toLocaleString("fr-FR");
@@ -104,7 +105,7 @@ export default function ExpertisesJournee({ j }: { j: JourneeDepistage }) {
                 <tr key={e.id} className="border-t border-border text-avisdoc-ink">
                   <td className="px-3 py-1.5 text-muted-foreground">{e.id}</td>
                   <td className="px-3 py-1.5">{heure(e.envoi)}</td>
-                  <td className="px-3 py-1.5">{e.requis || "—"}</td>
+                  <td className="px-3 py-1.5"><NomPro nom={e.requis} /></td>
                   <td className="px-3 py-1.5 text-right">{e.delaiH !== null ? `${e.delaiH} h` : "—"}</td>
                 </tr>
               ))}

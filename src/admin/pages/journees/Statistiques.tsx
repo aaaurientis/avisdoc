@@ -22,6 +22,7 @@ import {
 } from "../../lib/journees";
 import { cn } from "@/lib/utils";
 import { AxeMois, CadreJournees, Choix, capitale, jour, nombre, pct, selectCls } from "./commun";
+import NomPro, { nomPro } from "../../components/NomPro";
 
 const PERIODES: { cle: Periode; label: string }[] = [
   { cle: "avenir", label: "À venir" },
@@ -87,7 +88,7 @@ function Contenu() {
           </button>
         ))}
         <Choix valeur={client} changer={setClient} options={clients} tous="Tous les clients" />
-        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" />
+        <Choix valeur={requis} changer={setRequis} options={lesRequis} tous="Tous les requis" noms />
       </div>
 
       <Titre numero="01" titre="Journées" />
@@ -287,6 +288,7 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
 }
 
 function Repartition({ journees, axe }: { journees: JourneeDepistage[]; axe: Axe }) {
+  const estNom = axe === "requis" || axe === "requerant";
   const { typologieDe } = useRegles();
   const parts = useMemo(() => {
     const toutes = compterPar(journees, (j) => (axe === "typologie" ? typologieDe(j.client)?.nom ?? "Règle par défaut" : j[axe]));
@@ -298,9 +300,9 @@ function Repartition({ journees, axe }: { journees: JourneeDepistage[]; axe: Axe
   return (
     <div className="flex flex-col gap-3">
       {parts.map((p) => (
-        <div key={p.cle} title={`${p.cle} : ${p.nombre} journées (${pct(p.nombre, total)} %)`}>
+        <div key={p.cle} title={`${estNom ? nomPro(p.cle) : p.cle} : ${p.nombre} journées (${pct(p.nombre, total)} %)`}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
-            <span className="min-w-0 truncate font-semibold text-avisdoc-ink">{p.cle}</span>
+            <span className="min-w-0 truncate font-semibold text-avisdoc-ink">{estNom ? <NomPro nom={p.cle} /> : p.cle}</span>
             <span className="shrink-0 text-muted-foreground">
               {nombre(p.nombre)} · {pct(p.nombre, total)} %
             </span>

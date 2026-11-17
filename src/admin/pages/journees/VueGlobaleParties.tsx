@@ -7,6 +7,7 @@ import { Card, SectionLabel } from "../../components/ui";
 import { useExpertises } from "../../data/journeesStore";
 import { cleJournee, enJournee, issueDe, MASQUE, MOTIF_MASQUE, resultatsVisibles, resumer, type Expertise } from "../../lib/expertises";
 import { aujourdhuiISO, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
+import NomPro from "../../components/NomPro";
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -187,7 +188,7 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
                           {j.numero !== null && <span className="text-muted-foreground"> · journée {j.numero}{j.commandees ? `/${j.commandees}` : ""}</span>}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{j.lieu}</td>
-                        <td className="px-5 py-2 text-muted-foreground">{j.requis || "requis non renseigné"}</td>
+                        <td className="px-5 py-2 text-muted-foreground"><NomPro nom={j.requis} vide="requis non renseigné" /></td>
                       </tr>
                     ))}
                   </tbody>
