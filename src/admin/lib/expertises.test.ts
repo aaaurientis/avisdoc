@@ -79,7 +79,7 @@ describe("expertises", () => {
 
   it("période et seuil du rapport", () => {
     expect(dansLaPeriode(expertises, "12m", new Date("2026-11-14")).map((e) => e.id)).toEqual(["1", "2", "3"]);
-    expect(rapportPossible(20)).toBe(false);
-    expect(rapportPossible(21)).toBe(true);
+    expect(rapportPossible(10)).toBe(false);
+    expect(rapportPossible(11)).toBe(true);
   });
 });

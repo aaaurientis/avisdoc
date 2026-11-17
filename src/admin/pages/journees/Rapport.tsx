@@ -2,7 +2,7 @@
 // aux couleurs AvisDoc (charte : crème, bleu marine, cyan, accents orange ; Newsreader + Hanken Grotesk).
 //
 // Page à part, sans le menu du Hub : on l'imprime ou on l'enregistre en PDF depuis le navigateur.
-// Seulement au-delà de 20 expertises, et sans aucun chiffre par personne : le client reçoit des
+// Seulement au-delà de 10 expertises, et sans aucun chiffre par personne : le client reçoit des
 // totaux et des proportions, jamais de quoi reconnaître quelqu'un.
 
 import { useEffect, useMemo, useState } from "react";

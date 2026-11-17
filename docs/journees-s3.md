@@ -131,14 +131,14 @@ autoriser ce dossier (voir plus haut).
 
 Bouton **Rapport** (contrats, Vue globale) ou **Rapport de la journée** (page Journées) : bilan aux
 couleurs AvisDoc (fond blanc, Newsreader + Hanken Grotesk, cyan / bleu marine / orange), à imprimer
-ou enregistrer en PDF. Il n'existe qu'**au-delà de 20 expertises** et ne contient que des totaux et
+ou enregistrer en PDF. Il n'existe qu'**au-delà de 10 expertises** et ne contient que des totaux et
 des proportions (aucun chiffre par personne, aucune ventilation des recommandations par journée).
 
 ## Règle de l'AIPD
 
 Aucun détail sur le résultat (recommandation, exérèse, urgence, taux de consultation) quand il porte
-sur **20 dossiers ou moins** : il est remplacé par « — » avec le motif. Les volumes (nombre d'avis) et
-les délais restent visibles. La règle vaut partout : rapport client (qui n'existe qu'au-delà de 20
+sur **10 dossiers ou moins** : il est remplacé par « — » avec le motif. Les volumes (nombre d'avis) et
+les délais restent visibles. La règle vaut partout : rapport client (qui n'existe qu'au-delà de 10
 expertises), détail d'une journée, tableau par requis, filtres de la page Expertises, Vue globale.
 La liste des dossiers d'une journée ne montre jamais de résultat individuel.
 
