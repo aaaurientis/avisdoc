@@ -144,8 +144,11 @@ export default function Rapport() {
     }
     const client = params.get("client") ?? "";
     const devis = params.get("devis") ?? "";
-    const journees = toutes.filter((j) => j.client === client && j.devis === devis).sort((a, b) => a.date.localeCompare(b.date));
-    return journees.length ? { titre: client, sousTitre: devis ? `Devis ${devis}` : "", journees, uneJournee: false } : null;
+    const tousDevis = params.get("tous_devis") === "1";
+    const journees = toutes.filter((j) => j.client === client && (tousDevis || j.devis === devis)).sort((a, b) => a.date.localeCompare(b.date));
+    const nbDevis = new Set(journees.map((j) => j.devis)).size;
+    const sousTitre = tousDevis ? `Tous les contrats${nbDevis > 1 ? ` (${nbDevis} devis)` : ""}` : devis ? `Devis ${devis}` : "";
+    return journees.length ? { titre: client, sousTitre, journees, uneJournee: false } : null;
   }, [extraction, params]);
 
   const lignes = useMemo(

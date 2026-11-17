@@ -20,12 +20,14 @@ export function useAvisDeLaJournee(j: JourneeDepistage): { avis: Expertise[]; pr
 }
 
 /** Adresse du rapport client : un contrat (client + devis) ou une seule journée. Ouvert dans un nouvel onglet. */
-export function ouvrirRapport(portee: { client: string; devis: string } | { journee: JourneeDepistage }) {
+/** `devis: null` : tous les contrats du client. */
+export function ouvrirRapport(portee: { client: string; devis: string | null } | { journee: JourneeDepistage }) {
   const p = new URLSearchParams();
   if ("journee" in portee) p.set("journee", cleJournee(portee.journee));
   else {
     p.set("client", portee.client);
-    p.set("devis", portee.devis);
+    if (portee.devis === null) p.set("tous_devis", "1");
+    else p.set("devis", portee.devis);
   }
   window.open(`${window.location.pathname}#/journees/rapport?${p}`, "_blank", "noopener");
 }

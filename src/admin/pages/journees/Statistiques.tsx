@@ -230,37 +230,73 @@ function PreparationCarte({ journees }: { journees: JourneeDepistage[] }) {
 }
 
 function Contrats({ journees }: { journees: JourneeDepistage[] }) {
-  const liste = useMemo(() => contrats(journees), [journees]);
+  const [vue, setVue] = useState<"contrat" | "client">("contrat");
+  const parContrat = useMemo(() => contrats(journees), [journees]);
   const { typologieDe } = useRegles();
   const { index, statut } = useExpertises();
-  /** Avis rendus par contrat : la somme des avis de ses journées. */
-  const avisDe = (client: string, devis: string) =>
-    journees.filter((j) => j.client === client && j.devis === devis).reduce((s, j) => s + (index.get(cleJournee(j))?.length ?? 0), 0);
+  /** Avis rendus : la somme des avis des journées (d'un contrat, ou de tous les contrats du client). */
+  const avisDe = (client: string, devis: string | null) =>
+    journees.filter((j) => j.client === client && (devis === null || j.devis === devis)).reduce((s, j) => s + (index.get(cleJournee(j))?.length ?? 0), 0);
+
+  // Par client : les contrats du client cumulés (commandées seulement si tous les devis les donnent).
+  const lignes = useMemo(() => {
+    if (vue === "contrat") return parContrat.map((c) => ({ ...c, devis: c.devis as string | null, nbDevis: 1 }));
+    const m = new Map<string, { client: string; devis: string | null; nbDevis: number; commandees: number | null; planifiees: number; passees: number; prochaine: string | null }>();
+    for (const c of parContrat) {
+      const x = m.get(c.client) ?? { client: c.client, devis: null, nbDevis: 0, commandees: 0, planifiees: 0, passees: 0, prochaine: null };
+      x.nbDevis++;
+      x.commandees = x.commandees === null || c.commandees === null ? null : x.commandees + c.commandees;
+      x.planifiees += c.planifiees;
+      x.passees += c.passees;
+      if (c.prochaine && (!x.prochaine || c.prochaine < x.prochaine)) x.prochaine = c.prochaine;
+      m.set(c.client, x);
+    }
+    return [...m.values()].sort((a, b) => b.planifiees - a.planifiees || a.client.localeCompare(b.client));
+  }, [vue, parContrat]);
+
+  const total = lignes.reduce((t, c) => ({
+    commandees: t.commandees === null || c.commandees === null ? null : t.commandees + c.commandees,
+    planifiees: t.planifiees + c.planifiees, passees: t.passees + c.passees,
+    prochaine: c.prochaine && (!t.prochaine || c.prochaine < t.prochaine) ? c.prochaine : t.prochaine,
+  }), { commandees: 0 as number | null, planifiees: 0, passees: 0, prochaine: null as string | null });
+  const avisTotal = journees.reduce((s, j) => s + (index.get(cleJournee(j))?.length ?? 0), 0);
+
   return (
     <div className="overflow-x-auto">
+      <div className="flex justify-end px-5 pt-3">
+        <div className="flex gap-0.5 rounded-full border border-border bg-card p-0.5 text-[12px] font-semibold">
+          {(["contrat", "client"] as const).map((v) => (
+            <button key={v} type="button" onClick={() => setVue(v)}
+              className={cn("rounded-full px-3 py-1 transition-colors", vue === v ? "bg-avisdoc-ink text-white" : "text-muted-foreground hover:text-avisdoc-ink")}>
+              {v === "contrat" ? "Par contrat" : "Par client"}
+            </button>
+          ))}
+        </div>
+      </div>
       <table className="w-full min-w-[900px] text-left text-[13px]">
         <thead>
           <tr className="text-[11.5px] text-muted-foreground">
-            <th className="min-w-[200px] px-5 py-2.5 font-semibold">Client · devis</th>
+            <th className="min-w-[200px] px-5 py-2.5 font-semibold">{vue === "contrat" ? "Client · devis" : "Client"}</th>
             <th className="px-3 py-2.5 text-right font-semibold">Commandées</th>
             <th className="px-3 py-2.5 text-right font-semibold">Planifiées</th>
             <th className="px-3 py-2.5 text-right font-semibold">Passées</th>
             <th className="w-32 px-3 py-2.5 font-semibold">Avancement</th>
             <th className="px-3 py-2.5 font-semibold">Prochaine</th>
             <th className="px-3 py-2.5 text-right font-semibold">Avis</th>
-            <th className="whitespace-nowrap px-3 py-2.5 text-right font-semibold" title="Avis rendus ÷ journées passées du contrat">Avis / journée</th>
+            <th className="whitespace-nowrap px-3 py-2.5 text-right font-semibold" title="Avis rendus ÷ journées passées">Avis / journée</th>
             <th className="px-5 py-2.5 font-semibold">Rapport</th>
           </tr>
         </thead>
         <tbody>
-          {liste.map((c) => {
+          {lignes.map((c) => {
             const base = c.commandees ?? c.planifiees;
+            const avis = avisDe(c.client, c.devis);
             return (
-              <tr key={`${c.client}|${c.devis}`} className="border-t border-border">
+              <tr key={`${c.client}|${c.devis ?? "*"}`} className="border-t border-border">
                 <td className="px-5 py-2.5">
                   <div className="font-semibold text-avisdoc-ink">{c.client || "(sans client)"}</div>
                   <div className="text-[11.5px] text-muted-foreground">
-                    {c.devis || "sans n° de devis"} · {typologieDe(c.client)?.nom ?? "règle par défaut"}
+                    {vue === "contrat" ? (c.devis || "sans n° de devis") : `${c.nbDevis} contrat${c.nbDevis > 1 ? "s" : ""}`} · {typologieDe(c.client)?.nom ?? "règle par défaut"}
                   </div>
                 </td>
                 <td className="px-3 py-2.5 text-right text-avisdoc-ink">{c.commandees ?? "—"}</td>
@@ -272,16 +308,31 @@ function Contrats({ journees }: { journees: JourneeDepistage[] }) {
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{c.prochaine ? jour(c.prochaine, { day: "numeric", month: "short" }) : "—"}</td>
-                <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut === "pret" ? nombre(avisDe(c.client, c.devis)) : "…"}</td>
-                <td className="px-3 py-2.5 text-right text-avisdoc-ink">
-                  {statut !== "pret" ? "…" : c.passees ? nombre(Math.round(avisDe(c.client, c.devis) / c.passees)) : "—"}
-                </td>
+                <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut === "pret" ? nombre(avis) : "…"}</td>
+                <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut !== "pret" ? "…" : c.passees ? nombre(Math.round(avis / c.passees)) : "—"}</td>
                 <td className="px-5 py-2.5">
-                  <BoutonRapport nbAvis={avisDe(c.client, c.devis)} onClick={() => ouvrirRapport({ client: c.client, devis: c.devis })} libelle="Rapport" />
+                  <BoutonRapport nbAvis={avis} onClick={() => ouvrirRapport({ client: c.client, devis: c.devis })} libelle="Rapport" />
                 </td>
               </tr>
             );
           })}
+          {lignes.length > 1 && (
+            <tr className="border-t-2 border-border bg-muted/40 font-semibold">
+              <td className="px-5 py-2.5 text-avisdoc-ink">Total · {lignes.length} {vue === "contrat" ? "contrats" : "clients"}</td>
+              <td className="px-3 py-2.5 text-right text-avisdoc-ink">{total.commandees ?? "—"}</td>
+              <td className="px-3 py-2.5 text-right text-avisdoc-ink">{total.planifiees}</td>
+              <td className="px-3 py-2.5 text-right text-avisdoc-ink">{total.passees}</td>
+              <td className="px-3 py-2.5">
+                <div className="h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-avisdoc-ink/70" style={{ width: `${Math.min(100, pct(total.passees, total.commandees ?? total.planifiees))}%` }} />
+                </div>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{total.prochaine ? jour(total.prochaine, { day: "numeric", month: "short" }) : "—"}</td>
+              <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut === "pret" ? nombre(avisTotal) : "…"}</td>
+              <td className="px-3 py-2.5 text-right text-avisdoc-ink">{statut !== "pret" ? "…" : total.passees ? nombre(Math.round(avisTotal / total.passees)) : "—"}</td>
+              <td />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
