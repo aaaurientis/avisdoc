@@ -9,7 +9,9 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0.125.0";
 import { POPULATION_LIBELLE } from "./reseau-rpps.ts";
 
-const MODELE = Deno.env.get("RESEAU_MODEL_DOCTOLIB") ?? Deno.env.get("RESEAU_MODEL_RECHERCHE") ?? "claude-opus-5-5";
+// Tâche simple (lancer une ou deux recherches et rendre les adresses) : Sonnet 5.5 suffit, à moitié
+// prix d'Opus 5.5. Le choix de la fiche est fait par le code (choisirDoctolib), pas par le modèle.
+const MODELE = Deno.env.get("RESEAU_MODEL_DOCTOLIB") ?? "claude-sonnet-5-5";
 
 /** Les adresses doctolib.fr renvoyées par la recherche web pour ce praticien. */
 export async function urlsDoctolib(p: { nom: string; prenom: string; population: string; communes: string[] }): Promise<string[]> {

@@ -358,3 +358,11 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 - 16/11 (suite) : écran département compacté — bandeau source sur une ligne (date d'extraction RPPS, date d'import, total et effectif par spécialité ; libéraux/salariés et détail d'import au survol ; ligne Doctolib retirée), tuiles de recherche sur une ligne (pastille, titre court, une ligne de synthèse, bouton icône ; détail au survol), « Ajouter par RPPS » dans l'en-tête, filtres compacts sur une ligne sans le compteur « N affichés… ».
 - 16/11 (suite) : **favori « Relever sur Doctolib » supprimé** à la demande de l'utilisateur (encadré d'installation, page de relevé `/reseau-aval/doctolib`, code du favori). Les informations Doctolib passent désormais par l'import CSV. Les actions serveur `doctolib_fiche` et `doctolib_creneaux` et l'analyse de page restent dans le code, inutilisées par l'écran.
 - 16/11 (suite) : encadré export/import Doctolib — point rapide à la place du texte : liens Doctolib, à collecter (jamais relevés, relevés de plus de 180 jours), relevés récents, liens à valider (trouvés à confirmer, fiches à choisir). L'import enregistre désormais la date du relevé (`doctolib_releve_le`) même sans créneau.
+
+## Modèles d'IA (18/11)
+
+| Usage | Modèle par défaut | Variable | Pourquoi |
+|---|---|---|---|
+| Vérification des adresses Google | `claude-haiku-5-5` | `RESEAU_MODEL_VERIF` | Comparaison courte de deux adresses, gros volume : le moins cher. |
+| Recherche du lien Doctolib | `claude-sonnet-5-5` | `RESEAU_MODEL_DOCTOLIB` | Lance une ou deux recherches web et rend les adresses ; le choix est fait par le code. Moitié prix d'Opus. |
+| Recherche IA des signaux | `claude-opus-5-5` | `RESEAU_MODEL_RECHERCHE` | Lecture de pages et citations exactes : la qualité prime (rien d'inventé). |
