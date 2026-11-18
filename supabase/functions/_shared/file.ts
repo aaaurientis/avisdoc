@@ -22,11 +22,36 @@ const BUDGET_MS: Record<TypeFile, number> = { google_departement: 150_000, ia_de
 /** Une recherche IA de moins de 30 jours n'est pas relancée (sauf demande expresse). */
 const JOURS_IA_RECENTE = 30;
 
+/**
+ * Toutes les lignes d'une requête, par pages de 1 000 : au-delà, Supabase tronque la réponse
+ * en silence (un département de plus de 1 000 lieux n'était traité qu'en partie).
+ */
+export async function toutLireServeur<T = any>(page: (de: number, a: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await page(de, de + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+/** Sans activité depuis ce délai, une tâche « en cours » est considérée interrompue (fonction arrêtée en route). */
+export const INACTIVITE_MAX_MS = 10 * 60_000;
+
+/** Dernière activité d'une tâche : sa dernière ligne de journal, sinon son début. */
+export function derniereActivite(job: { debut?: string | null; journal?: { le?: string }[] | null }): number {
+  const journal = Array.isArray(job.journal) ? job.journal : [];
+  const dates = [job.debut, ...journal.map((l) => l?.le)].map((d) => (d ? Date.parse(d) : NaN)).filter((t) => !Number.isNaN(t));
+  return dates.length ? Math.max(...dates) : 0;
+}
+
 /** Les praticiens du département à traiter. */
 export async function praticiensATraiter(
   db: any, type: TypeFile, departement: string, opts: { inclureRecents?: boolean; volet?: Volet } = {},
 ): Promise<string[]> {
-  const { data: lieux } = await db.from("admin_reseau_lieux").select("praticien_id, lat, geo_tente").eq("departement", departement).limit(20000);
+  const lieux = await toutLireServeur((de, a) =>
+    db.from("admin_reseau_lieux").select("praticien_id, lat, geo_tente").eq("departement", departement).order("id").range(de, a));
   const ici = [...new Set<string>((lieux ?? []).map((l: any) => l.praticien_id as string))];
   const sansGeo = new Set((lieux ?? []).filter((l: any) => l.lat == null && !l.geo_tente).map((l: any) => l.praticien_id));
   const out: string[] = [];
@@ -64,9 +89,19 @@ export async function praticiensATraiter(
 export async function lancerFile(
   db: any, type: TypeFile, departement: string, ids: string[], acteur: string, volet: Volet = "tout",
 ): Promise<{ id: string; total: number; deja: boolean } | null> {
-  const { data: enCours } = await db.from("admin_reseau_recherches_ia").select("id, file")
-    .eq("departement", departement).eq("type", type).eq("statut", "en_cours").limit(1);
-  if (enCours?.length) return { id: enCours[0].id, total: enCours[0].file?.length ?? 0, deja: true };
+  const { data: enCours } = await db.from("admin_reseau_recherches_ia").select("id, file, debut, journal")
+    .eq("departement", departement).eq("type", type).eq("statut", "en_cours");
+  for (const j of enCours ?? []) {
+    // Une tâche sans activité depuis 10 min s'est arrêtée en route : elle ne bloque plus le département.
+    if (Date.now() - derniereActivite(j) > INACTIVITE_MAX_MS) {
+      const journal = [...(Array.isArray(j.journal) ? j.journal : []),
+        { le: new Date().toISOString(), texte: "Interrompue (plus d'activité depuis 10 min) : remplacée par une nouvelle tâche", niveau: "ecarte" }].slice(-40);
+      await db.from("admin_reseau_recherches_ia").update({ statut: "echec", fin: new Date().toISOString(), etape: "Interrompue", journal })
+        .eq("id", j.id).eq("statut", "en_cours");
+      continue;
+    }
+    return { id: j.id, total: j.file?.length ?? 0, deja: true };
+  }
   if (!ids.length) return null;
   const { data: r, error } = await db.from("admin_reseau_recherches_ia").insert({
     type, departement, lance_par: acteur, file: ids,

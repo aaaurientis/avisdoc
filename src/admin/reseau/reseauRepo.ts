@@ -278,10 +278,23 @@ const toSignal = (r: any): SignalReseau => ({
   decidePar: r.decide_par ?? null, decideLe: r.decide_le ?? null,
 });
 
-const toRecherche = (r: any): RechercheIa => ({
-  id: r.id, type: r.type, statut: r.statut, debut: r.debut, fin: r.fin ?? null, resultat: r.resultat ?? null, erreur: r.erreur ?? null,
-  etape: r.etape ?? null, progression: typeof r.progression === "number" ? r.progression : 0, journal: Array.isArray(r.journal) ? r.journal : [],
-});
+/** Sans activité depuis 10 min, une tâche groupée « en cours » s'est arrêtée en route (même règle que le serveur). */
+const INACTIVITE_MAX_MS = 10 * 60_000;
+
+const toRecherche = (r: any): RechercheIa => {
+  const journal = Array.isArray(r.journal) ? r.journal : [];
+  const x: RechercheIa = {
+    id: r.id, type: r.type, statut: r.statut, debut: r.debut, fin: r.fin ?? null, resultat: r.resultat ?? null, erreur: r.erreur ?? null,
+    etape: r.etape ?? null, progression: typeof r.progression === "number" ? r.progression : 0, journal,
+  };
+  if (x.statut === "en_cours" && (x.type === "google_departement" || x.type === "ia_departement")) {
+    const derniere = Math.max(...[x.debut, ...journal.map((l: { le?: string }) => l?.le)].map((d) => (d ? Date.parse(d) : 0)).filter((t) => !Number.isNaN(t)));
+    if (Date.now() - derniere > INACTIVITE_MAX_MS) {
+      return { ...x, statut: "echec", etape: "Interrompue", erreur: "Tâche interrompue (plus d'activité depuis 10 min). Relancez la recherche." };
+    }
+  }
+  return x;
+};
 
 export const reseauRepo = {
   async departements(): Promise<DepartementReseau[]> {
