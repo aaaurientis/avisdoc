@@ -27,7 +27,7 @@ import {
   SPECIALITES,
 } from "../_shared/reseau-rpps.ts";
 import { dateExtraction, lignesSpecialiteDepartement } from "../_shared/tabulaire-rpps.ts";
-import { lancerFile, praticiensATraiter } from "../_shared/file.ts";
+import { lancerFile, praticiensATraiter, toutLireServeur } from "../_shared/file.ts";
 
 /** Un NOUVEAU praticien (les praticiens déjà présents ne sont jamais réécrits). */
 function versLigne(p: PraticienRpps, extraitLe: string | null) {
@@ -169,7 +169,7 @@ serve(async (req) => {
 
     // Praticiens du département absents de cette extraction : CONSERVÉS. Ceux qui n'exercent
     // nulle part ailleurs sont seulement signalés « absent de la dernière extraction ».
-    const { data: ici } = await db.from("admin_reseau_lieux").select("praticien_id").eq("departement", dep).limit(20000);
+    const ici = await toutLireServeur((de, a) => db.from("admin_reseau_lieux").select("praticien_id").eq("departement", dep).order("id").range(de, a));
     const exclusConnus = new Set(existants.filter((e) => e.etat === "exclu").map((e) => e.id));
     const vus = new Set(ids);
     const absents = [...new Set<string>((ici ?? []).map((x: any) => x.praticien_id as string))]
