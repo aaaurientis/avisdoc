@@ -11,8 +11,13 @@ import httpx
 
 # .strip() : robustesse face aux espaces/tabulations collés par erreur dans les
 # variables d'environnement (un simple '\t' en tête d'URL casse toutes les requêtes).
-SUPABASE_URL = os.environ["SUPABASE_URL"].strip().rstrip("/")
-SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip()
+# Variable manquante : le conteneur démarre quand même (et /debug le dit) au lieu de planter à
+# l'import, ce qui ne laissait qu'un « crashed with exit code 1 » sans explication (19/11).
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+MANQUANTES = [n for n, v in (("SUPABASE_URL", SUPABASE_URL), ("SUPABASE_SERVICE_ROLE_KEY", SERVICE_KEY)) if not v]
+if MANQUANTES:
+    print(f"ATTENTION : variable(s) d'environnement absente(s) : {', '.join(MANQUANTES)}", flush=True)
 
 _HEADERS = {
     "apikey": SERVICE_KEY,
