@@ -147,3 +147,19 @@ def delete_object(bucket: str, path: str) -> None:
     r = httpx.request("DELETE", _storage(f"object/{bucket}"), headers={**_HEADERS, "Content-Type": "application/json"},
                       json={"prefixes": [path]}, timeout=30)
     r.raise_for_status()
+
+
+def prendre_job_deck(job_id: str, maintenant: str) -> bool:
+    """Réserve un job en attente (atomique : un seul traitement, même si plusieurs appels arrivent)."""
+    r = httpx.patch(_rest("admin_deck_jobs"), params={"id": f"eq.{job_id}", "statut": "eq.en_attente"},
+                    headers={**_HEADERS, "Content-Type": "application/json", "Prefer": "return=representation"},
+                    json={"statut": "en_cours", "demarre_le": maintenant}, timeout=30)
+    r.raise_for_status()
+    return bool(r.json())
+
+
+def jobs_deck_en_attente(depuis: str) -> list[str]:
+    r = httpx.get(_rest("admin_deck_jobs"), params={"statut": "eq.en_attente", "cree_le": f"gt.{depuis}",
+                  "select": "id", "order": "cree_le.asc", "limit": "10"}, headers=_HEADERS, timeout=30)
+    r.raise_for_status()
+    return [x["id"] for x in r.json()]
