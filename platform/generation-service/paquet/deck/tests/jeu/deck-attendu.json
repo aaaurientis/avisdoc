@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "meta": {
+    "titre": "Repérage des lésions suspectes en entreprise",
+    "source": "source-fictive.pptx",
+    "fond": "creme",
+    "logo_client": false,
+    "acces": "hds"
+  },
+  "diapositives": [
+    {
+      "source": 1,
+      "gabarit": "couverture",
+      "titre": "Repérage des lésions suspectes en entreprise",
+      "chapo": "Bilan de campagne 2026 — Mutuelle Exemple",
+      "notes": "Présentation fictive, jeu de test de la commande deck."
+    },
+    {
+      "source": 2,
+      "gabarit": "enonce_liste",
+      "titre": "Le constat",
+      "cle": "6 mois",
+      "enonce": "délai moyen pour voir un dermatologue",
+      "elements": ["Des déserts médicaux étendus", "Des salariés peu suivis", "Des lésions repérées tard"]
+    },
+    {
+      "source": 3,
+      "gabarit": "etapes",
+      "titre": "Le parcours",
+      "etapes": [
+        { "texte": "Une infirmière photographie la lésion" },
+        { "texte": "Un dermatologue du réseau donne son avis" },
+        { "texte": "Avis rendu sous 48 heures ouvrées" },
+        { "texte": "Orientation vers une consultation si besoin" }
+      ]
+    },
+    {
+      "source": 4,
+      "gabarit": "grille",
+      "titre": "Nos atouts",
+      "cartes": [
+        { "texte": "Sur le lieu de travail", "icone": "entreprise" },
+        { "texte": "Sans avance de frais", "icone": "euro" },
+        { "texte": "Avis d'un dermatologue", "icone": "medecin" },
+        { "texte": "Confidentiel", "icone": "cadenas" },
+        { "texte": "Rapide", "icone": "horloge" }
+      ]
+    },
+    {
+      "source": 5,
+      "gabarit": "objectifs_questions",
+      "titre": "Objectifs et questions",
+      "objectifs": [
+        { "texte": "Objectif : repérer plus tôt", "icone": "loupe" },
+        { "texte": "Objectif : orienter sans délai", "icone": "fleche" }
+      ],
+      "questions": ["Qui peut en bénéficier ?", "Combien de temps dure l'examen ?", "Les résultats sont-ils confidentiels ?"]
+    },
+    {
+      "source": 6,
+      "gabarit": "chiffres",
+      "titre": "Statistiques",
+      "blocs": [
+        { "valeur": "13 706", "libelle": "avis donnés", "accent": true },
+        { "valeur": "15%", "libelle": "de demandes de consultation dermatologique", "accent": true },
+        { "valeur": "92 %", "libelle": "de participants satisfaits" },
+        { "valeur": "3 jours", "libelle": "de délai médian" }
+      ],
+      "notes": "Chiffres fictifs."
+    },
+    {
+      "source": 7,
+      "gabarit": "tableau",
+      "titre": "Évolution",
+      "colonnes": ["Année", "Avis", "Consultations"],
+      "lignes": [["2024", "3 120", "410"], ["2025", "5 870", "820"], ["2026", "4 716", "690"]],
+      "graphique": { "series": ["Avis", "Consultations"], "alt": "Avis et consultations par année, de 2024 à 2026" }
+    },
+    {
+      "source": 8,
+      "gabarit": "captures",
+      "titre": "Exemple de compte-rendu",
+      "images": [
+        { "fichier": "images/diapo08-1.png", "alt": "Compte-rendu de téléexpertise fictif, page 1" },
+        { "fichier": "images/diapo08-2.png", "alt": "Compte-rendu de téléexpertise fictif, page 2" }
+      ]
+    },
+    {
+      "source": 9,
+      "gabarit": "texte",
+      "section": "Résultats",
+      "titre": "Résultats",
+      "lignes": ["Une participation en hausse", "Des orientations plus précoces"]
+    },
+    {
+      "source": 10,
+      "gabarit": "texte",
+      "section": "Résultats",
+      "titre": "Résultats",
+      "lignes": ["Le dépistage en entreprise a convaincu", "AvisDoc reconduit pour 2027 — trois sites"]
+    },
+    {
+      "source": 11,
+      "gabarit": "cloture",
+      "titre": "AvisDoc",
+      "phrase": "La dermatologie n'attend pas."
+    }
+  ],
+  "corrections": [
+    { "diapositive": 3, "type": "orthographe", "avant": "heures ouvrés", "apres": "heures ouvrées" },
+    { "diapositive": 10, "type": "marque", "avant": "Avisdoc", "apres": "AvisDoc" }
+  ],
+  "anomalies": [
+    { "diapositive": 8, "code": "DONNEES_PATIENT", "message": "Captures de compte-rendu : vérification humaine exigée (ici, jeu fictif Marion Delaunay)." },
+    { "diapositive": 9, "code": "GABARIT_REPLI", "message": "Deux phrases sans structure : gabarit texte." },
+    { "diapositive": 10, "code": "GABARIT_REPLI", "message": "Deux phrases sans structure : gabarit texte." },
+    { "diapositive": 10, "code": "TITRE_DOUBLON", "message": "Même titre que la diapositive 9." },
+    { "diapositive": 10, "code": "VOCABULAIRE", "message": "« dépistage » : terme attendu « repérage de lésions suspectes ». Signalé, non remplacé." }
+  ],
+  "decisions": [
+    { "diapositive": 1, "gabarit": "couverture", "motif": "première diapositive" },
+    { "diapositive": 2, "gabarit": "enonce_liste", "motif": "un énoncé fort et 3 éléments" },
+    { "diapositive": 3, "gabarit": "etapes", "motif": "liste numérotée" },
+    { "diapositive": 4, "gabarit": "grille", "motif": "5 puces courtes" },
+    { "diapositive": 5, "gabarit": "objectifs_questions", "motif": "lignes « Objectif » et lignes interrogatives" },
+    { "diapositive": 6, "gabarit": "chiffres", "motif": "majorité de lignes commençant par un nombre" },
+    { "diapositive": 7, "gabarit": "tableau", "motif": "mêmes libellés répétés sur plusieurs années" },
+    { "diapositive": 8, "gabarit": "captures", "motif": "images sans texte propre" },
+    { "diapositive": 9, "gabarit": "texte", "motif": "repli" },
+    { "diapositive": 10, "gabarit": "texte", "motif": "repli" },
+    { "diapositive": 11, "gabarit": "cloture", "motif": "dernière diapositive sans texte propre" }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avisdoc.fr/schemas/deck/v1.json",
+  "title": "deck.json (version 1)",
+  "description": "Fichier pivot de la commande deck : contenu d'une présentation et gabarit de chaque diapositive. Lisible et modifiable à la main. Voir deck/NOTE-LOT0.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "meta", "diapositives", "corrections", "anomalies"],
+  "properties": {
+    "version": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titre", "source", "fond", "logo_client"],
+      "properties": {
+        "titre": { "type": "string" },
+        "source": { "type": "string", "description": "Nom du fichier d'origine. Jamais modifié ni écrasé." },
+        "fond": { "enum": ["creme", "blanc"], "description": "Fond des diapositives claires, en un seul endroit." },
+        "logo_client": { "type": "boolean", "description": "Faux par défaut : une présentation ne porte pas le logo client." },
+        "acces": { "enum": ["public", "client", "hds"], "description": "Calculé : hds tant qu'une diapositive captures n'a pas été levée." }
+      }
+    },
+    "diapositives": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/diapositive" }
+    },
+    "corrections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["diapositive", "type", "avant", "apres"],
+        "properties": {
+          "diapositive": { "type": "integer", "minimum": 1, "description": "Numéro de la diapositive d'origine." },
+          "type": { "enum": ["orthographe", "accent", "casse", "marque"] },
+          "avant": { "type": "string", "minLength": 1 },
+          "apres": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "diapositive": { "type": "integer", "minimum": 1 },
+          "code": {
+            "enum": [
+              "DIAPOSITIVE_ECARTEE", "GABARIT_REPLI", "ICONE_INCONNUE", "TITRE_DOUBLON",
+              "VOCABULAIRE", "MARQUE", "DONNEES_PATIENT", "IMAGE_BASSE_DEF", "CORPS_TROP_PETIT"
+            ]
+          },
+          "message": { "type": "string" },
+          "levee": {
+            "type": "object",
+            "description": "Avertissement levé par un humain (exigé pour DONNEES_PATIENT avant toute publication hors hds).",
+            "additionalProperties": false,
+            "required": ["par", "le"],
+            "properties": { "par": { "type": "string" }, "le": { "type": "string", "format": "date" } }
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Étape 2 : règle ou mode qui a choisi le gabarit de chaque diapositive (repris dans le rapport).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["diapositive", "gabarit", "motif"],
+        "properties": {
+          "diapositive": { "type": "integer", "minimum": 1 },
+          "gabarit": { "$ref": "#/$defs/nomGabarit" },
+          "motif": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nomGabarit": {
+      "enum": ["couverture", "enonce_liste", "grille", "chiffres", "tableau", "etapes", "objectifs_questions", "captures", "cloture", "texte"]
+    },
+    "texte": { "type": "string", "description": "Texte tel qu'extrait ; la typographie française est appliquée à la génération." },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fichier", "alt"],
+      "properties": {
+        "fichier": { "type": "string", "pattern": "^images/[^/]+$", "description": "Chemin relatif ; jamais d'image encodée dans le JSON." },
+        "alt": { "type": "string", "minLength": 1 }
+      }
+    },
+    "communs": {
+      "type": "object",
+      "required": ["source", "gabarit", "titre"],
+      "properties": {
+        "source": { "type": "integer", "minimum": 1, "description": "Numéro de la diapositive d'origine." },
+        "gabarit": { "$ref": "#/$defs/nomGabarit" },
+        "section": { "type": "string" },
+        "titre": { "$ref": "#/$defs/texte" },
+        "notes": { "type": "string", "description": "Notes de l'orateur, reprises telles quelles." }
+      }
+    },
+    "diapositive": {
+      "allOf": [
+        { "$ref": "#/$defs/communs" },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "gabarit": { "const": "couverture" },
+                "surtitre": { "type": "string" }, "chapo": { "type": "string" },
+                "accent": { "type": "string", "description": "Fragment final du titre, en italique cyan." },
+                "image": { "$ref": "#/$defs/image" }
+              }
+            },
+            {
+              "required": ["enonce", "elements"],
+              "properties": {
+                "gabarit": { "const": "enonce_liste" },
+                "cle": { "type": "string", "description": "Chiffre ou mot clé de la carte marine." },
+                "legende": { "type": "string" },
+                "enonce": { "type": "string" },
+                "surtitre": { "type": "string" },
+                "elements": { "type": "array", "minItems": 2, "maxItems": 5, "items": { "type": "string" } }
+              }
+            },
+            {
+              "required": ["cartes"],
+              "properties": {
+                "gabarit": { "const": "grille" },
+                "cartes": {
+                  "type": "array", "minItems": 3, "maxItems": 6,
+                  "items": {
+                    "type": "object", "additionalProperties": false, "required": ["texte"],
+                    "properties": { "texte": { "type": "string", "maxLength": 90 }, "icone": { "type": "string" } }
+                  }
+                }
+              }
+            },
+            {
+              "required": ["blocs"],
+              "properties": {
+                "gabarit": { "const": "chiffres" },
+                "blocs": {
+                  "type": "array", "minItems": 2, "maxItems": 5,
+                  "items": {
+                    "type": "object", "additionalProperties": false, "required": ["valeur", "libelle"],
+                    "properties": { "valeur": { "type": "string" }, "libelle": { "type": "string" }, "accent": { "type": "boolean" } }
+                  }
+                }
+              }
+            },
+            {
+              "required": ["colonnes", "lignes"],
+              "properties": {
+                "gabarit": { "const": "tableau" },
+                "colonnes": { "type": "array", "minItems": 2, "maxItems": 4, "items": { "type": "string" } },
+                "lignes": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "type": "array", "items": { "type": "string" } } },
+                "graphique": {
+                  "type": "object", "additionalProperties": false, "required": ["alt"],
+                  "properties": { "series": { "type": "array", "items": { "type": "string" } }, "alt": { "type": "string", "minLength": 1 } }
+                }
+              }
+            },
+            {
+              "required": ["etapes"],
+              "properties": {
+                "gabarit": { "const": "etapes" },
+                "etapes": {
+                  "type": "array", "minItems": 2, "maxItems": 6,
+                  "items": {
+                    "type": "object", "additionalProperties": false, "required": ["texte"],
+                    "properties": { "amorce": { "type": "string" }, "texte": { "type": "string" } }
+                  }
+                }
+              }
+            },
+            {
+              "required": ["objectifs", "questions"],
+              "properties": {
+                "gabarit": { "const": "objectifs_questions" },
+                "objectifs": {
+                  "type": "array", "minItems": 1, "maxItems": 2,
+                  "items": {
+                    "type": "object", "additionalProperties": false, "required": ["texte"],
+                    "properties": { "texte": { "type": "string" }, "icone": { "type": "string" } }
+                  }
+                },
+                "surtitre": { "type": "string" },
+                "questions": { "type": "array", "minItems": 2, "maxItems": 5, "items": { "type": "string" } }
+              }
+            },
+            {
+              "required": ["images"],
+              "properties": {
+                "gabarit": { "const": "captures" },
+                "surtitre": { "type": "string" },
+                "images": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "#/$defs/image" } }
+              }
+            },
+            {
+              "required": ["phrase"],
+              "properties": { "gabarit": { "const": "cloture" }, "phrase": { "type": "string" } }
+            },
+            {
+              "required": ["lignes"],
+              "properties": {
+                "gabarit": { "const": "texte" },
+                "lignes": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
