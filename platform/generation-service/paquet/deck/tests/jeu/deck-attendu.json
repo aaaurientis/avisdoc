@@ -12,7 +12,7 @@
       "source": 1,
       "gabarit": "couverture",
       "titre": "Repérage des lésions suspectes en entreprise",
-      "chapo": "Bilan de campagne 2026 — Mutuelle Exemple",
+      "chapo": "Bilan de campagne 2026 – Mutuelle Exemple",
       "notes": "Présentation fictive, jeu de test de la commande deck."
     },
     {
@@ -97,7 +97,7 @@
       "gabarit": "texte",
       "section": "Résultats",
       "titre": "Résultats",
-      "lignes": ["Le dépistage en entreprise a convaincu", "AvisDoc reconduit pour 2027 — trois sites"]
+      "lignes": ["Le dépistage en entreprise a convaincu", "AvisDoc reconduit pour 2027 – trois sites"]
     },
     {
       "source": 11,

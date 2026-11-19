@@ -115,6 +115,7 @@ export const SEED_DOCS: DocItem[] = [
   { id: "dc-1", name: "Convention CHU Grenoble — filière rapide.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", tags: ["Signé", "Prioritaire"], ext: "PDF", size: "1,2 Mo", date: "9 juil. 2026", owner: "S. Benali", version: 1 },
   { id: "dc-2", name: "Compte-rendu comité médical T2 2026.docx", catParent: "Doc. Interne", cat: "Organisation", tags: [], ext: "DOC", size: "340 Ko", date: "5 juil. 2026", owner: "S. Benali", version: 1 },
   { id: "dc-3", name: "Grille tarifaire téléexpertise 2026.xlsx", catParent: "Doc. Interne", cat: "Technique", tags: ["Confidentiel"], ext: "XLS", size: "88 Ko", date: "1 juil. 2026", owner: "M. Diallo", version: 1 },
+  { id: "dc-10", name: "Présentation bilan Mutuelle Exemple.pptx", catParent: "Doc. Interne", cat: "Organisation", tags: [], ext: "PPT", size: "1,4 Mo", date: "18 nov. 2026", owner: "A. Martin", version: 1 },
   { id: "dc-4", name: "Fiche logistique journée dépistage.pdf", catParent: "CR journées", cat: "Fiches logistiques", tags: ["À valider"], ext: "PDF", size: "2,1 Mo", date: "24 juin 2026", owner: "S. Benali", version: 1 },
   { id: "dc-5", name: "Convention Clinique Belledonne — exérèses.pdf", catParent: "Contrats signés", cat: "Réseau d'aval", tags: ["Signé"], ext: "PDF", size: "980 Ko", date: "18 juin 2026", owner: "S. Benali", version: 1 },
   { id: "dc-6", name: "Modèle de consentement patient — 2026.docx", catParent: "CR journées", cat: "Patients", tags: ["Modèle"], ext: "DOC", size: "120 Ko", date: "12 juin 2026", owner: "S. Benali", version: 1 },

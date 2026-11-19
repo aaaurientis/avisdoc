@@ -1,5 +1,6 @@
 # Service de génération documentaire AvisDoc.
 # Python (WeasyPrint, python-pptx) + Node (pptxgenjs) + polices, = le pack.
+# LibreOffice (Impress) + poppler : rendu de contrôle de la commande deck (planche controle.jpg).
 FROM python:3.11-slim
 
 # --- Dépendances système : WeasyPrint (Pango/Cairo/FFI) + Node + polices ------
@@ -8,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libffi8 libcairo2 libjpeg62-turbo shared-mime-info \
       fonts-liberation \
       nodejs npm \
+      libreoffice-impress poppler-utils fonts-crosextra-carlito \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,7 +23,7 @@ RUN npm install pptxgenjs@3.12.0 --no-save --prefix /app
 ENV NODE_PATH=/app/node_modules
 
 # --- Application + pack vendorisé ---------------------------------------------
-COPY sb.py generator.py app.py ./
+COPY sb.py generator.py app.py deck_job.py ./
 COPY paquet ./paquet
 
 # Sanity check du pack à la construction de l'image (doit passer, cf. brief).
