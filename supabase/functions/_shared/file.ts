@@ -21,6 +21,8 @@ const PARALLELE: Record<TypeFile, number> = { google_departement: 4, ia_departem
 const BUDGET_MS: Record<TypeFile, number> = { google_departement: 150_000, ia_departement: 120_000 };
 /** Une recherche IA de moins de 30 jours n'est pas relancée (sauf demande expresse). */
 const JOURS_IA_RECENTE = 30;
+/** Résultat positif (correspondance trouvée, signaux retenus) : pas de nouvelle recherche avant 180 jours (décision du 19/11). */
+export const JOURS_SI_POSITIF = 180;
 
 /**
  * Toutes les lignes d'une requête, par pages de 1 000 : au-delà, Supabase tronque la réponse
@@ -78,6 +80,7 @@ export async function praticiensATraiter(
   const sansGeo = new Set((lieux ?? []).filter((l: any) => l.lat == null && !l.geo_tente).map((l: any) => l.praticien_id));
   const out: string[] = [];
   const limite = Date.now() - JOURS_SANS_REVERIFIER * 86_400_000;
+  const limitePositif = Date.now() - JOURS_SI_POSITIF * 86_400_000;
   const fichesDe = new Map<string, string[]>();
   for (let i = 0; i < ici.length; i += 200) {
     const { data, error } = await db.from("admin_reseau_praticiens")
@@ -89,7 +92,9 @@ export async function praticiensATraiter(
         const v = opts.volet ?? "tout";
         const a = v === "google" ? p.google_statut === "a_chercher"
           : v === "doctolib" ? p.doctolib_statut === "a_chercher"
-          : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut) && !(p.google_cherche_le && Date.parse(p.google_cherche_le) > limite)
+          : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut)
+            // Fiche déjà trouvée (même nom, même code postal) : résultat positif, 180 jours ; sinon 30.
+            && !(p.google_cherche_le && Date.parse(p.google_cherche_le) > (p.google_statut === "trouvee_auto" ? limitePositif : limite))
           : v === "validation" ? p.google_statut === "trouvee_auto"
           : p.google_statut === "a_chercher" || p.doctolib_statut === "a_chercher" || sansGeo.has(p.id);
         if (a) out.push(p.id);
@@ -102,12 +107,16 @@ export async function praticiensATraiter(
     return out.filter((id) => !recentes.has(id));
   }
   if (type === "ia_departement" && !opts.inclureRecents && out.length) {
-    const depuis = new Date(Date.now() - JOURS_IA_RECENTE * 86_400_000).toISOString();
+    // Recherche récente (30 jours), ou recherche qui a trouvé des signaux (180 jours) : pas relancée.
+    const depuis = new Date(Date.now() - JOURS_SI_POSITIF * 86_400_000).toISOString();
+    const limiteIa = Date.now() - JOURS_IA_RECENTE * 86_400_000;
     const recents = new Set<string>();
     for (let i = 0; i < out.length; i += 200) {
-      const { data } = await db.from("admin_reseau_recherches_ia").select("praticien_id")
+      const { data } = await db.from("admin_reseau_recherches_ia").select("praticien_id, debut, resultat")
         .eq("type", "praticien").in("praticien_id", out.slice(i, i + 200)).gt("debut", depuis).neq("statut", "echec");
-      for (const r of data ?? []) recents.add(r.praticien_id);
+      for (const r of data ?? []) {
+        if (Date.parse(r.debut) > limiteIa || (r.resultat?.retenues ?? 0) > 0) recents.add(r.praticien_id);
+      }
     }
     return out.filter((id) => !recents.has(id));
   }
