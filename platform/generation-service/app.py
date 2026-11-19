@@ -9,7 +9,9 @@ Sécurité : le webhook doit présenter l'en-tête X-Webhook-Secret == WEBHOOK_S
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+import threading
+import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -98,10 +100,9 @@ def _traiter(job_id: str, client_id: str) -> dict:
 
 
 def _traiter_deck(job_id: str) -> dict:
-    """Mise à la charte d'une présentation (admin_deck_jobs). Même contrat que _traiter."""
+    """Mise à la charte d'un fichier (admin_deck_jobs), job déjà réservé (statut en_cours)."""
     import deck_job
     try:
-        sb.update_row("admin_deck_jobs", job_id, statut="en_cours", demarre_le=_maintenant())
         resultat = deck_job.traiter(job_id)
         sb.update_row("admin_deck_jobs", job_id, statut="termine", fini_le=_maintenant(), **resultat)
         return {"job_id": job_id, **{k: v for k, v in resultat.items() if k != "rapport"}}
@@ -123,12 +124,52 @@ def _job_deck(payload: dict) -> str:
     return rec["id"]
 
 
-@app.post("/deck")
+# Le webhook Supabase n'attend que quelques secondes : un conteneur en veille ne répond pas à temps
+# et l'appel est perdu (constaté le 19/11). D'où trois mécanismes :
+#   1. /deck répond tout de suite et travaille en arrière-plan ;
+#   2. au démarrage (le webhook, même expiré, a réveillé le conteneur), les jobs en attente sont repris ;
+#   3. tant que le conteneur vit, il regarde toutes les 20 s s'il reste des jobs en attente.
+# Chaque job est réservé de façon atomique (en_attente → en_cours) : jamais traité deux fois.
+_verrou = threading.Lock()
+
+
+def _executer_si_libre(job_id: str) -> None:
+    try:
+        if not sb.prendre_job_deck(job_id, _maintenant()):
+            return  # déjà pris
+    except Exception:  # noqa: BLE001
+        return
+    with _verrou:  # un traitement à la fois : LibreOffice et la mémoire du conteneur
+        try:
+            _traiter_deck(job_id)
+        except HTTPException:
+            pass  # l'échec est déjà écrit dans le job
+
+
+def _balayer() -> None:
+    while True:
+        try:
+            depuis = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+            for job_id in sb.jobs_deck_en_attente(depuis):
+                _executer_si_libre(job_id)
+        except Exception:  # noqa: BLE001 — réseau : on réessaie au tour suivant
+            pass
+        time.sleep(20)
+
+
+@app.on_event("startup")
+def _demarrage() -> None:
+    threading.Thread(target=_balayer, name="balayage-deck", daemon=True).start()
+
+
+@app.post("/deck", status_code=202)
 async def deck(payload: dict, x_webhook_secret: str = Header(default="")) -> dict:
-    """Webhook Supabase sur INSERT dans admin_deck_jobs (migration 0097)."""
+    """Webhook Supabase sur INSERT dans admin_deck_jobs : accepté aussitôt, traité en arrière-plan."""
     if not WEBHOOK_SECRET or x_webhook_secret.strip() != WEBHOOK_SECRET:
         raise HTTPException(401, "secret webhook invalide")
-    return await run_in_threadpool(_traiter_deck, _job_deck(payload))
+    job_id = _job_deck(payload)
+    threading.Thread(target=_executer_si_libre, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "accepte": True}
 
 
 @app.post("/generate")
@@ -136,6 +177,8 @@ async def generate(payload: dict, x_webhook_secret: str = Header(default="")) ->
     if not WEBHOOK_SECRET or x_webhook_secret.strip() != WEBHOOK_SECRET:
         raise HTTPException(401, "secret webhook invalide")
     if payload.get("table") == "admin_deck_jobs":  # un seul webhook peut servir les deux tables
-        return await run_in_threadpool(_traiter_deck, _job_deck(payload))
+        job_id = _job_deck(payload)
+        threading.Thread(target=_executer_si_libre, args=(job_id,), daemon=True).start()
+        return {"job_id": job_id, "accepte": True}
     job_id, client_id = _extraire_job(payload)
     return await run_in_threadpool(_traiter, job_id, client_id)
