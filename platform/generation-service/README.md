@@ -80,3 +80,20 @@ pytest tests/ -v                       # ~20 s (régénère les documents)
 `paquet/` contient la chaîne documentaire (`build.py` + `scripts/` + `assets/`).
 Le `CATALOGUE` de `build.py` reste la **source de vérité** : tout nouveau
 document s'ajoute là, pas dans le service ni dans les frontends.
+
+## Mise à la charte des présentations (commande deck, 19/11)
+
+Endpoint `POST /deck` (même secret `X-Webhook-Secret`), déclenché par un webhook Supabase sur
+`INSERT` dans `admin_deck_jobs` (migration `0097_deck_jobs.sql`). Le service télécharge le PPTX
+depuis `admin-documents`, lance `paquet/deck`, et range la présentation refaite dans Documents
+(nouvelle ligne `admin_documents`, même catégorie), avec `rapport.md`, `deck.json` et
+`controle.jpg` dans `<id>/charte/`. `/generate` accepte aussi ces jobs (`table = admin_deck_jobs`).
+
+Mise en service :
+1. appliquer la migration `0097_deck_jobs.sql` ;
+2. reconstruire l'image (action « Image du service de génération », lancée aussi par main) puis
+   redéployer le conteneur (console Scaleway) ;
+3. variables du conteneur : `ANTHROPIC_API_KEY` (mode modèle ; sans elle, mode règles),
+   `DECK_MODELE` facultatif (défaut `claude-opus-5-5`) ;
+4. Supabase → Database → Webhooks : table `admin_deck_jobs`, événement `INSERT`, méthode POST,
+   URL `https://<conteneur>/deck`, en-tête `X-Webhook-Secret` = `WEBHOOK_SECRET`.

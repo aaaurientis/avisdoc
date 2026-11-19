@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowDownWideNarrow, ArrowUp, ArrowUpDown, ArrowUpNarrowWide, ChevronDown, Download, Search, Tag, Upload, X } from "lucide-react";
+import { AlertTriangle, ArrowDownWideNarrow, ArrowUp, ArrowUpDown, ArrowUpNarrowWide, ChevronDown, Download, Loader2, Search, Tag, Upload, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DocItem } from "../types";
 import { DOC_EXT, catPalette } from "../lib/ui-tokens";
 import { humanSize } from "../lib/format";
 import { suggestTags } from "../lib/autotag";
 import { useAdminData } from "../data/AdminDataContext";
+import { useAuth } from "../auth/AuthContext";
+import { deckRepo, type DeckJob } from "../data/deckRepo";
 import { Card, PageHeader } from "../components/ui";
 import { cn } from "@/lib/utils";
 
@@ -55,8 +57,48 @@ interface Preview {
 export default function Documents() {
   const {
     docs, docTree, docTags, deleteDoc, importDoc, newDocVersion,
-    downloadDoc, documentUrl, setDocCategory, setDocTags,
+    downloadDoc, documentUrl, setDocCategory, setDocTags, rafraichir,
   } = useAdminData();
+  const { user } = useAuth();
+  // Mise à la charte des présentations (commande deck) : dernier travail de chaque document.
+  const [deckJobs, setDeckJobs] = useState<Map<string, DeckJob>>(new Map());
+  const deckJobsRef = useRef<Map<string, DeckJob>>(new Map());
+  const [rapportDeck, setRapportDeck] = useState<DeckJob | null>(null);
+  const [plancheUrl, setPlancheUrl] = useState<string | null>(null);
+  const deckEnCours = [...deckJobs.values()].some((j) => j.statut === "en_attente" || j.statut === "en_cours");
+  useEffect(() => {
+    let actif = true;
+    const lire = () => deckRepo.derniers().then((m) => {
+      if (!actif) return;
+      const avant = deckJobsRef.current;
+      const finis = [...m.values()].filter((j) => j.statut === "termine" && avant.has(j.documentId) && avant.get(j.documentId)?.statut !== "termine");
+      deckJobsRef.current = m;
+      setDeckJobs(m);
+      if (finis.length) {
+        void rafraichir();
+        toast.success(finis.length > 1 ? `${finis.length} présentations mises à la charte.` : "Présentation mise à la charte : elle est rangée à côté de la source.");
+      }
+    }).catch(() => { /* table absente (migration 0097 non appliquée) : rien à afficher */ });
+    void lire();
+    if (!deckEnCours) return () => { actif = false; };
+    const t = window.setInterval(lire, 5000);
+    return () => { actif = false; window.clearInterval(t); };
+  }, [deckEnCours, rafraichir]);
+  const lancerDeck = async (d: DocItem) => {
+    try {
+      await deckRepo.lancer(d.id, user?.name ?? "—");
+      const m = await deckRepo.derniers();
+      deckJobsRef.current = m;
+      setDeckJobs(m);
+      toast.success("Mise à la charte lancée : le résultat arrivera dans cette catégorie.");
+    } catch (e) {
+      toast.error(`Mise à la charte impossible : ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const ouvrirRapport = async (j: DeckJob) => {
+    setRapportDeck(j);
+    setPlancheUrl(j.planchePath ? await deckRepo.urlFichier(j.planchePath) : null);
+  };
   const [cat, setCat] = useState(""); // catégorie (niveau 1) sélectionnée
   const [sub, setSub] = useState<string | null>(null); // sous-catégorie ou toutes
   const [searchParams, setSearchParams] = useSearchParams();
@@ -454,6 +496,7 @@ export default function Documents() {
                       <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                         v{d.version}
                       </span>
+                      <PastilleDeck job={deckJobs.get(d.id)} ouvrir={ouvrirRapport} />
                     </div>
                     {/* Tags du document */}
                     <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -522,6 +565,17 @@ export default function Documents() {
                 <div className="text-[12.5px] text-muted-foreground">{d.date}</div>
                 <div className="min-w-0 truncate text-[12.5px] text-muted-foreground">{d.owner}</div>
                 <div className="flex justify-end gap-1.5">
+                  {d.ext === "PPT" && d.name.toLowerCase().endsWith(".pptx") && (
+                    <button
+                      type="button"
+                      disabled={["en_attente", "en_cours"].includes(deckJobs.get(d.id)?.statut ?? "")}
+                      onClick={() => void lancerDeck(d)}
+                      title="Mettre à la charte AvisDoc : une nouvelle présentation est créée à côté, la source n'est pas modifiée"
+                      className="ad-chip inline-flex items-center rounded-full bg-avisdoc-teal/12 px-2 py-1.5 text-avisdoc-teal transition-[filter] disabled:opacity-50"
+                    >
+                      <Wand2 className="size-3.5" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => downloadDoc(d.id)}
@@ -562,6 +616,40 @@ export default function Documents() {
           )}
         </div>
       </Card>
+
+      {/* Rapport de mise à la charte */}
+      {rapportDeck && (
+        <div onClick={() => setRapportDeck(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-avisdoc-ink/50 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="flex max-h-[88vh] w-[min(900px,94vw)] flex-col overflow-hidden rounded-2xl bg-card shadow-floating">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+              <Wand2 className="size-4 text-avisdoc-teal" />
+              <div className="min-w-0 flex-1 truncate text-[14px] font-semibold text-avisdoc-ink">Mise à la charte</div>
+              {rapportDeck.resultatDocumentId && docs.some((x) => x.id === rapportDeck.resultatDocumentId) && (
+                <button
+                  type="button"
+                  onClick={() => { const r = docs.find((x) => x.id === rapportDeck.resultatDocumentId); if (r) { setRapportDeck(null); void openPreview(r); } }}
+                  className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink"
+                >
+                  Ouvrir la présentation refaite
+                </button>
+              )}
+              <button type="button" onClick={() => setRapportDeck(null)} className="rounded-lg p-1 text-muted-foreground hover:text-avisdoc-ink"><X className="size-5" /></button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto px-5 py-4 text-[13px] text-avisdoc-ink">
+              {rapportDeck.statut === "echec" && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-rose-700">Échec : {rapportDeck.erreur}</p>}
+              {rapportDeck.acces === "hds" && (
+                <p className="mb-3 flex items-start gap-2 rounded-lg bg-avisdoc-coral-soft px-3 py-2">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  La présentation contient des captures : vérifiez qu'aucune donnée patient réelle n'y apparaît avant de la diffuser.
+                </p>
+              )}
+              {rapportDeck.mode && <p className="mb-3 text-[12px] text-muted-foreground">Mode : {rapportDeck.mode}</p>}
+              {plancheUrl && <img src={plancheUrl} alt="Planche de contrôle : vignettes de la présentation refaite" className="mb-4 w-full rounded-lg border border-border" />}
+              <RapportMarkdown texte={rapportDeck.rapport ?? ""} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Visionneuse intégrée */}
       {preview && (
@@ -761,6 +849,51 @@ export default function Documents() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** État de la dernière mise à la charte d'une présentation ; un clic ouvre le rapport. */
+function PastilleDeck({ job, ouvrir }: { job?: DeckJob; ouvrir: (j: DeckJob) => void }) {
+  if (!job) return null;
+  if (job.statut === "en_attente" || job.statut === "en_cours")
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-avisdoc-teal/12 px-2 py-0.5 text-[10.5px] font-semibold text-avisdoc-teal">
+        <Loader2 className="size-3 animate-spin" /> Mise à la charte…
+      </span>
+    );
+  const ko = job.statut === "echec" || (job.erreurs ?? 0) > 0;
+  return (
+    <button
+      type="button"
+      onClick={() => ouvrir(job)}
+      title="Voir le rapport de mise à la charte"
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
+        ko ? "bg-rose-100 text-rose-700" : "bg-avisdoc-teal/12 text-avisdoc-teal",
+      )}
+    >
+      <Wand2 className="size-3" />
+      {job.statut === "echec" ? "Charte : échec" : ko ? `Charte : ${job.erreurs} erreur(s)` : `Charte faite${job.avertissements ? ` · ${job.avertissements} à vérifier` : ""}`}
+    </button>
+  );
+}
+
+/** Rendu simple du rapport (titres, listes, gras, code) : aucun HTML injecté. */
+function RapportMarkdown({ texte }: { texte: string }) {
+  const enLigne = (t: string) =>
+    t.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((m, i) =>
+      m.startsWith("**") ? <strong key={i}>{m.slice(2, -2)}</strong>
+      : m.startsWith("`") ? <code key={i} className="rounded bg-muted px-1 text-[12px]">{m.slice(1, -1)}</code>
+      : <span key={i}>{m}</span>);
+  return (
+    <div className="space-y-1.5">
+      {texte.split("\n").map((l, i) =>
+        l.startsWith("# ") ? <h2 key={i} className="font-display text-[17px] font-semibold">{enLigne(l.slice(2))}</h2>
+        : l.startsWith("## ") ? <h3 key={i} className="pt-3 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">{enLigne(l.slice(3))}</h3>
+        : l.startsWith("- ") ? <p key={i} className="pl-3">· {enLigne(l.slice(2))}</p>
+        : l.trim() ? <p key={i}>{enLigne(l)}</p> : null,
       )}
     </div>
   );

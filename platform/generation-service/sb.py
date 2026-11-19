@@ -118,3 +118,26 @@ def update_job(job_id: str, **champs) -> None:
         timeout=30,
     )
     r.raise_for_status()
+
+
+# ── Mise à la charte des présentations (admin_deck_jobs, migration 0097) ─────
+
+def get_row(table: str, row_id: str) -> dict | None:
+    r = httpx.get(_rest(table), params={"id": f"eq.{row_id}", "select": "*", "limit": "1"}, headers=_HEADERS, timeout=30)
+    r.raise_for_status()
+    rows = r.json()
+    return rows[0] if rows else None
+
+
+def insert_row(table: str, row: dict) -> dict:
+    r = httpx.post(_rest(table), headers={**_HEADERS, "Content-Type": "application/json", "Prefer": "return=representation"},
+                   json=row, timeout=30)
+    r.raise_for_status()
+    return r.json()[0]
+
+
+def update_row(table: str, row_id: str, **champs) -> None:
+    r = httpx.patch(_rest(table), params={"id": f"eq.{row_id}"},
+                    headers={**_HEADERS, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                    json=champs, timeout=30)
+    r.raise_for_status()

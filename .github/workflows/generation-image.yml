@@ -11,7 +11,7 @@ name: Image du service de génération
 on:
   workflow_dispatch:
   push:
-    branches: [claude/avisdoc-fusion]
+    branches: [claude/avisdoc-fusion, main]
     paths:
       - "platform/generation-service/**"
       - ".github/workflows/generation-image.yml"

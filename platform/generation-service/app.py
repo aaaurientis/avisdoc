@@ -97,9 +97,45 @@ def _traiter(job_id: str, client_id: str) -> dict:
         raise HTTPException(500, f"génération échouée : {type(e).__name__}: {e}")
 
 
+def _traiter_deck(job_id: str) -> dict:
+    """Mise à la charte d'une présentation (admin_deck_jobs). Même contrat que _traiter."""
+    import deck_job
+    try:
+        sb.update_row("admin_deck_jobs", job_id, statut="en_cours", demarre_le=_maintenant())
+        resultat = deck_job.traiter(job_id)
+        sb.update_row("admin_deck_jobs", job_id, statut="termine", fini_le=_maintenant(), **resultat)
+        return {"job_id": job_id, **{k: v for k, v in resultat.items() if k != "rapport"}}
+    except Exception as e:  # noqa: BLE001
+        message = str(e) if isinstance(e, deck_job.DeckEchec) else f"{type(e).__name__}: {e}"
+        try:
+            sb.update_row("admin_deck_jobs", job_id, statut="echec", erreur=message[:1000], fini_le=_maintenant())
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(500, f"mise à la charte échouée : {message}")
+
+
+def _job_deck(payload: dict) -> str:
+    rec = payload.get("record") or payload
+    if not rec.get("id"):
+        raise HTTPException(400, "id du job requis")
+    if rec.get("statut") and rec["statut"] != "en_attente":
+        raise HTTPException(409, f"job déjà au statut {rec['statut']}")
+    return rec["id"]
+
+
+@app.post("/deck")
+async def deck(payload: dict, x_webhook_secret: str = Header(default="")) -> dict:
+    """Webhook Supabase sur INSERT dans admin_deck_jobs (migration 0097)."""
+    if not WEBHOOK_SECRET or x_webhook_secret.strip() != WEBHOOK_SECRET:
+        raise HTTPException(401, "secret webhook invalide")
+    return await run_in_threadpool(_traiter_deck, _job_deck(payload))
+
+
 @app.post("/generate")
 async def generate(payload: dict, x_webhook_secret: str = Header(default="")) -> dict:
     if not WEBHOOK_SECRET or x_webhook_secret.strip() != WEBHOOK_SECRET:
         raise HTTPException(401, "secret webhook invalide")
+    if payload.get("table") == "admin_deck_jobs":  # un seul webhook peut servir les deux tables
+        return await run_in_threadpool(_traiter_deck, _job_deck(payload))
     job_id, client_id = _extraire_job(payload)
     return await run_in_threadpool(_traiter, job_id, client_id)

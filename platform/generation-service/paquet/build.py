@@ -6,6 +6,8 @@
     python3 build.py controles                     contrôles qualité sur les sorties
     python3 build.py manifeste                     réécrit manifeste.json
     python3 build.py liste                         affiche le catalogue
+    python3 build.py deck tout source.pptx -d dossier/ [--modele]
+                                                   met une présentation à la charte (voir deck/)
 
 Le CATALOGUE ci-dessous est la source de vérité : il alimente la génération,
 les contrôles et le manifeste servi à la plateforme web. Toute évolution
@@ -161,7 +163,14 @@ def cmd_controles(a):
         p = SORTIE / e["fichier"]
         if not p.exists():
             manquants.append(e["fichier"]); continue
-        if p.suffix == ".pdf":
+        if e["moteur"] == "deck":
+            # Présentation mise à la charte par la commande deck : ses propres contrôles (brief deck §7).
+            from deck import controles as deck_controles
+            import json as _json
+            pivot = RACINE / e["pivot"]
+            res = deck_controles.controler(p, _json.loads(pivot.read_text(encoding="utf-8")))
+            defauts += [f"{e['fichier']} : {c.code} (diapositive {c.diapositive or '—'}) {c.message}" for c in res.erreurs]
+        elif p.suffix == ".pdf":
             defauts += controler_pdf(p, e)
         elif p.suffix == ".pptx":
             r = subprocess.run([sys.executable, "scripts/validateur/validate.py", str(p)],
@@ -239,5 +248,9 @@ if __name__ == "__main__":
     sub.add_parser("controles").set_defaults(f=cmd_controles)
     sub.add_parser("manifeste").set_defaults(f=cmd_manifeste)
     sub.add_parser("liste").set_defaults(f=cmd_liste)
+    if len(sys.argv) > 1 and sys.argv[1] == "deck":
+        # Mise à la charte d'une présentation : python3 build.py deck tout source.pptx -d dossier/
+        from deck.__main__ import main as deck_main
+        sys.exit(deck_main(sys.argv[2:]))
     a = ap.parse_args()
     a.f(a)
