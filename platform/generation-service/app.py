@@ -54,6 +54,8 @@ def debug() -> dict:
         "service_key_role": _role_de_cle(cle),
         "webhook_secret_len": len(WEBHOOK_SECRET),
         "supabase_url_set": bool(os.environ.get("SUPABASE_URL")),
+        "variables_manquantes": sb.MANQUANTES + ([] if WEBHOOK_SECRET else ["WEBHOOK_SECRET"]),
+        "anthropic_cle": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "supabase_probe": sb.probe(),
     }
 
