@@ -4,7 +4,7 @@
     python3 -m deck proposer  dossier/deck-brut.json [--modele]
     python3 -m deck generer   dossier/deck.json
     python3 -m deck controles dossier/sortie.pptx dossier/deck.json
-    python3 -m deck tout      source.pptx -d dossier/ [--modele] [--fond blanc] [--sans-planche]
+    python3 -m deck tout      source.pptx|.docx|.pdf -d dossier/ [--modele] [--fond blanc] [--sans-planche]
     python3 -m deck maitre    [gabarits/deck-avisdoc.pptx]
 
 Le fichier source n'est jamais modifié. Code de sortie non nul si un contrôle est en erreur.
@@ -67,6 +67,13 @@ def main(argv=None) -> int:
     # tout
     if a.source.resolve().parent == a.dossier.resolve():
         print("Le dossier de travail doit être distinct de celui de la source.", file=sys.stderr); return 2
+    if a.source.suffix.lower() in (".docx", ".pdf"):  # Word et PDF : documents.py
+        from . import documents
+        sortie, bilan = documents.mettre_a_la_charte(a.source, a.dossier)
+        for x in bilan.anomalies:
+            print(f"{x['niveau']:13} {x['code']:22} {x['message']}")
+        print(f"{len(bilan.erreurs)} erreur(s). Fichier : {sortie}. Rapport : {a.dossier / 'rapport.md'}")
+        return 1 if bilan.erreurs else 0
     brut = extraire.extraire(a.source, a.dossier)
     deck = _proposer(brut, a.modele)
     if a.fond:

@@ -141,3 +141,9 @@ def update_row(table: str, row_id: str, **champs) -> None:
                     headers={**_HEADERS, "Content-Type": "application/json", "Prefer": "return=minimal"},
                     json=champs, timeout=30)
     r.raise_for_status()
+
+
+def delete_object(bucket: str, path: str) -> None:
+    r = httpx.request("DELETE", _storage(f"object/{bucket}"), headers={**_HEADERS, "Content-Type": "application/json"},
+                      json={"prefixes": [path]}, timeout=30)
+    r.raise_for_status()

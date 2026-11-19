@@ -90,10 +90,14 @@ depuis `admin-documents`, lance `paquet/deck`, et range la présentation refaite
 `controle.jpg` dans `<id>/charte/`. `/generate` accepte aussi ces jobs (`table = admin_deck_jobs`).
 
 Mise en service :
-1. appliquer la migration `0097_deck_jobs.sql` ;
+1. appliquer les migrations `0097_deck_jobs.sql` et `0098_deck_jobs_sans_enregistrer.sql` ;
 2. reconstruire l'image (action « Image du service de génération », lancée aussi par main) puis
    redéployer le conteneur (console Scaleway) ;
 3. variables du conteneur : `ANTHROPIC_API_KEY` (mode modèle ; sans elle, mode règles),
    `DECK_MODELE` facultatif (défaut `claude-opus-5-5`) ;
 4. Supabase → Database → Webhooks : table `admin_deck_jobs`, événement `INSERT`, méthode POST,
    URL `https://<conteneur>/deck`, en-tête `X-Webhook-Secret` = `WEBHOOK_SECRET`.
+
+Depuis le 19/11, le Hub l'utilise « sans enregistrer » : job sans `document_id`, fichier déposé dans
+`admin-documents/_charte-temp/` (PowerPoint, Word ou PDF), résultat déposé au même endroit
+(`resultat_path`) et effacé par le Hub une fois téléchargé ; la source est effacée par le service.

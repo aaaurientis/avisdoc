@@ -41,9 +41,19 @@ modèle, la trace `modele-demande.json` / `modele-reponse.json`. La source n'est
 | `controles.py` | étape 4 : codes du brief §7, `rapport.md`, planche |
 | `charte.py`, `typo.py`, `icones.py` | palette, géométrie, typographie française, icônes au trait |
 
+## Word et PDF (`documents.py`, 19/11)
+
+- **Word (.docx)** : remis à la charte sur place (styles Georgia/Calibri en marine, polices et
+  couleurs posées à la main retirées, styles inutilisés du modèle Word retirés, tableaux, A4,
+  en-tête logo et pied signature + numéro, typographie). Contenu, images et ordre inchangés.
+- **PDF** : mise en page reconstruite à la charte (titres, paragraphes, listes, tableaux,
+  images repérés), PDF régénéré en Newsreader et Hanken Grotesk ; avertissement `MISE_EN_PAGE`
+  à vérifier. Un PDF scanné (sans texte) est refusé.
+- `python3 -m deck tout fichier.docx|.pdf -d dossier/` ; rapport dans `dossier/rapport.md`.
+
 ## Depuis le Hub (module Documents)
 
-Sur un fichier `.pptx`, le bouton baguette crée une ligne `admin_deck_jobs` (migration 0097). Un
-webhook Supabase appelle le service de génération (`POST /deck`), qui range la présentation
-refaite dans la même catégorie (« … (charte AvisDoc).pptx ») et le rapport à côté. Mise en
-service : voir `platform/generation-service/README.md`, section « Mise à la charte ».
+Bouton « Mettre à la charte » en haut de Documents : on choisit un `.pptx`, `.docx` ou `.pdf`, le
+fichier transite par `admin-documents/_charte-temp/` (invisible dans la liste), le service le
+traite (webhook sur `admin_deck_jobs`, migrations 0097-0098) et efface la source ; on télécharge
+le résultat avec son rapport, puis il est effacé à la fermeture. Rien n'est enregistré.
