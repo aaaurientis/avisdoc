@@ -499,7 +499,7 @@ export default function ReseauDepartement() {
           icone={<Sparkles className="size-4" />} titre="IA des fiches"
           etat={rechercheIa?.statut === "en_cours" ? "en_cours" : iaRestants === null ? "vide" : iaRestants ? "a_faire" : comptes.actifs ? "a_jour" : "vide"}
           lignes={[
-            iaRestants === null ? "Calcul…" : iaRestants ? `${iaRestants} à chercher (30 j)` : "Toutes cherchées (30 j)",
+            iaRestants === null ? "Calcul…" : iaRestants ? `${iaRestants} à chercher` : "Toutes cherchées",
             rechercheIa?.statut === "termine" ? `Dernière passe le ${dateFr(rechercheIa.fin ?? rechercheIa.debut)}` : "",
           ]}
           bouton={rechercheIa?.statut === "en_cours" ? "Arrêter" : "Lancer…"}
