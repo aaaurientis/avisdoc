@@ -168,6 +168,8 @@ async function validerTrouvees(db: any, p: any, lieux: any[]): Promise<{ lignes:
         [{ ...fiche, categorie: x.primaryTypeDisplayName?.text ?? null }])).get(fiche.place_id);
       if (v?.memePraticien && v.memeAdresse) { verifiees.push({ place_id: id, par: "ia", raison: v.raison }); continue; }
     }
+    // Tentative mémorisée : pas de nouvelle lecture chez Google avant 30 jours, sauf si les fiches changent.
+    await db.from("admin_reseau_historique").insert({ praticien_id: p.id, acteur: "automatique", action: "google_validation_tentee", detail: { place_ids: ids } });
     return { lignes: [{ texte: `Validation Google : ${qui} reste à vérifier (adresse différente du RPPS)`, niveau: "info" }], confirmee: false };
   }
   const maintenant = new Date().toISOString();

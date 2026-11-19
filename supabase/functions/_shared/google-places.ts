@@ -87,7 +87,11 @@ export function requeteFiche(p: PraticienPourGoogle, departements: string[]): st
  *   2. pour chaque lieu RPPS géocodé du département : le nom de famille seul, autour du point
  *      (rayon 3 km) — rattrape « Cabinet Dermatologie Dr VENAULT - Pôle Santé » ;
  *   3. « Nom spécialité commune » pour chaque autre commune d'exercice.
+ * Trois requêtes au plus (décision du 19/11, coût) : la première trouve presque toujours.
  */
+/** Requêtes Google au plus par praticien (5 avant le 19/11). */
+export const MAX_REQUETES_FICHE = 3;
+
 export function requetesFiche(p: PraticienPourGoogle, departements: string[]): { textQuery: string; locationBias?: unknown }[] {
   const lieux = (p.admin_reseau_lieux ?? []).filter((l) => !l.departement || departements.includes(l.departement));
   const specialite = POPULATION_LIBELLE[p.population as keyof typeof POPULATION_LIBELLE] ?? "";
@@ -101,7 +105,7 @@ export function requetesFiche(p: PraticienPourGoogle, departements: string[]): {
     out.push({ textQuery: `${p.nom} ${specialite}`.trim(), locationBias: { circle: { center: { latitude: l.lat, longitude: l.lng }, radius: 3000 } } });
   }
   for (const c of [...new Set(lieux.map((l) => l.commune).filter(Boolean))].slice(1)) out.push({ textQuery: `${p.nom} ${specialite} ${c}` });
-  return out.slice(0, 5);
+  return out.slice(0, MAX_REQUETES_FICHE);
 }
 
 /**

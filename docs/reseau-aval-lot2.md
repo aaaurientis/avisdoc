@@ -366,3 +366,9 @@ clé dans l'environnement de développement. Ils se vérifient à la recette.
 | Vérification des adresses Google | `claude-haiku-5-5` | `RESEAU_MODEL_VERIF` | Comparaison courte de deux adresses, gros volume : le moins cher. |
 | Recherche du lien Doctolib | `claude-sonnet-5-5` | `RESEAU_MODEL_DOCTOLIB` | Lance une ou deux recherches web et rend les adresses ; le choix est fait par le code. Moitié prix d'Opus. |
 | Recherche IA des signaux | `claude-opus-5-5` | `RESEAU_MODEL_RECHERCHE` | Lecture de pages et citations exactes : la qualité prime (rien d'inventé). |
+
+## Économies sur les recherches (19/11)
+
+- **Pas de revérification avant 30 jours** : une fiche Google « trouvée » dont la validation a échoué n'est relue chez Google qu'après 30 jours, ou si ses fiches rattachées changent (trace `google_validation_tentee` dans l'historique). Le rapprochement ignore les praticiens cherchés il y a moins de 30 jours (`google_cherche_le`). La revérification depuis la fiche d'un praticien n'est pas concernée.
+- **Vérification IA (Haiku)** : le paramètre de repli serveur, non pris en charge par Haiku, n'est plus envoyé (l'appel pouvait être refusé en silence, sans aucune fiche confirmée par l'IA).
+- **Recherche Google** : 3 requêtes au plus par praticien au lieu de 5 (`MAX_REQUETES_FICHE`).

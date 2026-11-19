@@ -71,14 +71,17 @@ Pour chaque fiche :
 Dans le doute, réponds false. N'invente rien.`;
   try {
     const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") ?? "" });
+    // Le repli serveur (« fallbacks ») n'existe pas pour Haiku : ne le demander qu'aux autres modèles,
+    // sinon l'appel est refusé et aucune fiche n'est jamais confirmée par l'IA.
+    const repli = /haiku/i.test(MODELE_VERIF) ? {} : { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
     const r: any = await client.beta.messages.create({
       model: MODELE_VERIF,
       max_tokens: 2000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...repli,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{ role: "user", content: consigne }],
     } as any);
+    if (r.stop_reason === "refusal") { console.error("vérification IA des fiches Google : refus du modèle"); return out; }
     const texte = (r.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const json = JSON.parse(texte);
     const connus = new Set(fiches.map((f) => f.place_id));

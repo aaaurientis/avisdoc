@@ -59,7 +59,10 @@ serve(async (req) => {
     if (corps.action === "estimer") return json({ total: ids.length });
     if (corps.action === "lancer") {
       const r = await lancerFile(db, type, dep, ids, acces.email, volet);
-      if (!r) return json({ error: "Aucun praticien à traiter." }, 409);
+      if (!r) {
+        const recent = volet === "rapprochement" || volet === "validation";
+        return json({ error: recent ? "Rien à revérifier : ces fiches ont été vérifiées il y a moins de 30 jours (sans changement depuis)." : "Aucun praticien à traiter." }, 409);
+      }
       return json({ job_id: r.id, total: r.total, deja: r.deja }, 202);
     }
     return json({ error: "Action inconnue." }, 400);

@@ -46,6 +46,28 @@ export function derniereActivite(job: { debut?: string | null; journal?: { le?: 
   return dates.length ? Math.max(...dates) : 0;
 }
 
+/**
+ * Une fiche Google n'est pas revérifiée (validation) ni recherchée à nouveau (rapprochement) avant
+ * ce délai, si rien n'a changé : on ne repaie pas Google pour la même réponse (décision du 19/11).
+ */
+export const JOURS_SANS_REVERIFIER = 30;
+
+/** Les praticiens dont la validation des fiches trouvées a été tentée récemment, avec les mêmes fiches. */
+async function validationsRecentes(db: any, ids: string[], fiches: Map<string, string[]>): Promise<Set<string>> {
+  const depuis = new Date(Date.now() - JOURS_SANS_REVERIFIER * 86_400_000).toISOString();
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await db.from("admin_reseau_historique").select("praticien_id, detail")
+      .eq("action", "google_validation_tentee").in("praticien_id", ids.slice(i, i + 200)).gt("le", depuis);
+    for (const h of data ?? []) {
+      const avant = [...(h.detail?.place_ids ?? [])].sort().join(",");
+      const maintenant = [...(fiches.get(h.praticien_id) ?? [])].sort().join(",");
+      if (avant === maintenant) out.add(h.praticien_id);
+    }
+  }
+  return out;
+}
+
 /** Les praticiens du département à traiter. */
 export async function praticiensATraiter(
   db: any, type: TypeFile, departement: string, opts: { inclureRecents?: boolean; volet?: Volet } = {},
@@ -55,9 +77,11 @@ export async function praticiensATraiter(
   const ici = [...new Set<string>((lieux ?? []).map((l: any) => l.praticien_id as string))];
   const sansGeo = new Set((lieux ?? []).filter((l: any) => l.lat == null && !l.geo_tente).map((l: any) => l.praticien_id));
   const out: string[] = [];
+  const limite = Date.now() - JOURS_SANS_REVERIFIER * 86_400_000;
+  const fichesDe = new Map<string, string[]>();
   for (let i = 0; i < ici.length; i += 200) {
     const { data, error } = await db.from("admin_reseau_praticiens")
-      .select("id, google_statut, doctolib_statut").in("id", ici.slice(i, i + 200)).neq("etat", "exclu");
+      .select("id, google_statut, doctolib_statut, google_cherche_le, google_place_ids").in("id", ici.slice(i, i + 200)).neq("etat", "exclu");
     if (error) throw new Error(error.message);
     for (const p of data ?? []) {
       if (type === "ia_departement") out.push(p.id);
@@ -65,12 +89,17 @@ export async function praticiensATraiter(
         const v = opts.volet ?? "tout";
         const a = v === "google" ? p.google_statut === "a_chercher"
           : v === "doctolib" ? p.doctolib_statut === "a_chercher"
-          : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut)
+          : v === "rapprochement" ? A_RAPPROCHER.includes(p.google_statut) && !(p.google_cherche_le && Date.parse(p.google_cherche_le) > limite)
           : v === "validation" ? p.google_statut === "trouvee_auto"
           : p.google_statut === "a_chercher" || p.doctolib_statut === "a_chercher" || sansGeo.has(p.id);
         if (a) out.push(p.id);
+        if (a && v === "validation") fichesDe.set(p.id, p.google_place_ids ?? []);
       }
     }
+  }
+  if (type === "google_departement" && opts.volet === "validation" && out.length) {
+    const recentes = await validationsRecentes(db, out, fichesDe);
+    return out.filter((id) => !recentes.has(id));
   }
   if (type === "ia_departement" && !opts.inclureRecents && out.length) {
     const depuis = new Date(Date.now() - JOURS_IA_RECENTE * 86_400_000).toISOString();
