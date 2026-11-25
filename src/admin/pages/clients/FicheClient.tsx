@@ -33,7 +33,7 @@ import type { Prospect } from "../../lib/merx";
 import { cn } from "@/lib/utils";
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 /**
  * Ce qu'on peut proposer à quelqu'un qui est DÉJÀ client — et qu'on n'a pas à retrouver
@@ -498,7 +498,7 @@ export default function FicheClient({
               type="button"
               onClick={enregistrer}
               disabled={!nom}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
               Enregistrer
             </button>

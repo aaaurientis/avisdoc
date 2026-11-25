@@ -126,7 +126,7 @@ export default function Audit() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink transition-colors disabled:opacity-60"
+            className="hub-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink transition-colors disabled:opacity-60"
           >
             <RefreshCw className={cn("size-4", loading && "animate-spin")} /> Rafraîchir
           </button>
@@ -158,7 +158,7 @@ export default function Audit() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Rechercher (email, action, cible…)"
-            className="ad-input w-72 max-w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input w-72 max-w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           />
         </div>
       </div>

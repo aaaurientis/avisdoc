@@ -41,7 +41,7 @@ export default function BarreSelection({
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
-      <div className="ad-card pointer-events-auto flex flex-wrap items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-floating">
+      <div className="hub-card pointer-events-auto flex flex-wrap items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-floating">
         <span className="px-2 text-[13px] font-bold text-avisdoc-ink">
           {nombre} fiche{nombre > 1 ? "s" : ""}
         </span>

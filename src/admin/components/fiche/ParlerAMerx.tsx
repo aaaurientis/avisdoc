@@ -355,13 +355,13 @@ export default function ParlerAMerx({
           value={saisie}
           onChange={(e) => setSaisie(e.target.value)}
           placeholder="Le numéro est faux, le bon est le 03 85 43 07 51…"
-          className="ad-input w-full min-w-0 rounded-full border border-border bg-background px-4 py-2.5 text-[13px] outline-none focus:border-avisdoc-teal"
+          className="hub-input w-full min-w-0 rounded-full border border-border bg-background px-4 py-2.5 text-[13px] outline-none focus:border-avisdoc-teal"
           aria-label="Votre message à Merx"
         />
         <button
           type="submit"
           disabled={attente || !saisie.trim()}
-          className="ad-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+          className="hub-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
         >
           {attente ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Envoyer
         </button>

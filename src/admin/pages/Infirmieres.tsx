@@ -66,7 +66,7 @@ export default function Infirmieres() {
           <button
             type="button"
             onClick={() => setShowInvite(true)}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <UserPlus className="size-4" /> Inviter
           </button>

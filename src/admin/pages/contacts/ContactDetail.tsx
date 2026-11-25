@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const STATUTS: ContactStatut[] = ["Accepté", "En attente", "Refusé"];
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function ContactDetail({
   contact,
@@ -87,7 +87,7 @@ export default function ContactDetail({
           <input className={inputCls} placeholder="Adresse (n°, rue, code postal)" value={draft.adresse} onChange={(e) => set("adresse", e.target.value)} />
           <input className={inputCls} placeholder="Ville" value={draft.ville} onChange={(e) => set("ville", e.target.value)} />
           <textarea
-            className={cn(inputCls, "ad-textarea resize-y")}
+            className={cn(inputCls, "hub-textarea resize-y")}
             rows={3}
             placeholder="Notes"
             value={draft.notes}
@@ -136,14 +136,14 @@ export default function ContactDetail({
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="ad-btn-outline flex-1 rounded-full border-[1.5px] border-border py-2.5 text-[13px] font-bold text-muted-foreground transition-colors"
+              className="hub-btn-outline flex-1 rounded-full border-[1.5px] border-border py-2.5 text-[13px] font-bold text-muted-foreground transition-colors"
             >
               Annuler
             </button>
             <button
               type="button"
               onClick={save}
-              className="ad-btn-accent flex-1 rounded-full bg-avisdoc-teal py-2.5 text-[13px] font-bold text-white"
+              className="hub-btn-accent flex-1 rounded-full bg-avisdoc-teal py-2.5 text-[13px] font-bold text-white"
             >
               Enregistrer
             </button>
@@ -298,13 +298,13 @@ export default function ContactDetail({
             <button
               type="button"
               onClick={startEdit}
-              className="ad-btn-accent flex-1 rounded-full bg-avisdoc-teal py-2.5 text-[13px] font-bold text-white"
+              className="hub-btn-accent flex-1 rounded-full bg-avisdoc-teal py-2.5 text-[13px] font-bold text-white"
             >
               Modifier
             </button>
             <a
               href={`mailto:${contact.email}`}
-              className="ad-btn-outline flex-1 rounded-full border-[1.5px] border-border py-2.5 text-center text-[13px] font-bold text-avisdoc-ink transition-colors"
+              className="hub-btn-outline flex-1 rounded-full border-[1.5px] border-border py-2.5 text-center text-[13px] font-bold text-avisdoc-ink transition-colors"
             >
               Contacter
             </a>

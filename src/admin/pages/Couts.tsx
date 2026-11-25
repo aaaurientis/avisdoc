@@ -356,7 +356,7 @@ export default function Couts() {
                         value={recherche}
                         onChange={(e) => setRecherche(e.target.value)}
                         placeholder="Chercher une entreprise…"
-                        className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-10 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+                        className="hub-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-10 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
                       />
                       {recherche && (
                         <button

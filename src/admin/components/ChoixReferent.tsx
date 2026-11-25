@@ -106,7 +106,7 @@ export default function ChoixReferent({
         disabled={envoi}
         onChange={(e) => void enregistrer(e.target.value)}
         className={cn(
-          "ad-input min-w-0 cursor-pointer rounded-full border bg-background px-3 py-1 text-[12.5px] font-bold outline-none transition-colors",
+          "hub-input min-w-0 cursor-pointer rounded-full border bg-background px-3 py-1 text-[12.5px] font-bold outline-none transition-colors",
           erreur ? "border-rose-300 text-rose-700" : "border-border text-avisdoc-ink focus:border-avisdoc-teal",
         )}
       >

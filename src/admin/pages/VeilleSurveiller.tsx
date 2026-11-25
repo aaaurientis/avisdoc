@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { SuggestionsATraiter } from "./veille/Suggestions";
 
 const champCls =
-  "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 const libelleCls = "mb-1.5 block text-[12px] font-bold text-avisdoc-ink";
 
 type Cat = "presse" | "scientifique" | "reseaux" | "comptes" | "expressions" | "nous" | "influenceurs" | "moteurs" | "rubriques";
@@ -204,7 +204,7 @@ export default function VeilleSurveiller() {
           <button
             type="button"
             onClick={() => setFiche({ cat, id: null, mode: "modifier" })}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <Plus className="size-4" />
             Ajouter {courante.un}
@@ -718,7 +718,7 @@ function FenetreFiche({
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" disabled={envoi} onClick={onFermer} className="rounded-full px-5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-muted">Annuler</button>
-          <button type="submit" disabled={!pret || envoi} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="submit" disabled={!pret || envoi} className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {envoi && <Loader2 className="size-4 animate-spin" />}
             Enregistrer
           </button>

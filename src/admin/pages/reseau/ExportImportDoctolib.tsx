@@ -217,7 +217,7 @@ function ApercuImport({ lecture, onClose }: { lecture: LectureImport & { fichier
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
             <button type="button" onClick={() => void importer()} disabled={!resultats.length || envoi}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-sm font-bold text-white disabled:opacity-50">
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-sm font-bold text-white disabled:opacity-50">
               {envoi && <Loader2 className="size-4 animate-spin" />} Importer {resultats.length} ligne{resultats.length > 1 ? "s" : ""}
             </button>
           </div>

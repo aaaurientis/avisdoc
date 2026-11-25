@@ -116,7 +116,7 @@ export default function Confirmation() {
             className={
               demande.definitif
                 ? "rounded-full bg-rose-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-rose-700"
-                : "ad-btn-accent rounded-full bg-avisdoc-coral px-5 py-2.5 text-sm font-bold text-white"
+                : "hub-btn-accent rounded-full bg-avisdoc-coral px-5 py-2.5 text-sm font-bold text-white"
             }
           >
             {demande.action ?? "Supprimer"}

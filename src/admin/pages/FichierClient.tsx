@@ -346,7 +346,7 @@ export default function FichierClient() {
             <button
               type="button"
               onClick={() => setFiche({ mode: "edition" })}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
             >
               <Plus className="size-4" /> Nouveau client
             </button>
@@ -378,7 +378,7 @@ export default function FichierClient() {
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             placeholder="Rechercher un client…"
-            className="ad-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           />
         </div>
         <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>
@@ -389,7 +389,7 @@ export default function FichierClient() {
             value={groupePar}
             onChange={(e) => setGroupePar(e.target.value)}
             aria-label="Regrouper par"
-            className="ad-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal"
           >
             {regroupements.map((r) => (
               <option key={r.cle} value={r.cle}>
@@ -499,7 +499,7 @@ export default function FichierClient() {
       ) : (
         /* ── Kanban par secteur ── */
         <div
-          className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
+          className="hub-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
           style={{ gridTemplateColumns: `repeat(${Math.max(secteurs.length, 1)}, minmax(300px, 380px))` }}
         >
           {secteurs.map((secteur) => {
@@ -653,7 +653,7 @@ export default function FichierClient() {
                 setImportOuvert(false);
                 fichierRef.current?.click();
               }}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
             >
               <Upload className="size-4" /> Choisir mon fichier
             </button>

@@ -74,7 +74,7 @@ export default function Kanban({
     // Beaucoup de colonnes : elles gardent une largeur lisible et le tableau défile.
     <div
       ref={zoneRef}
-      className="ad-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
+      className="hub-kanban grid gap-3 overflow-x-auto overscroll-x-none pb-1"
       style={{ gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(300px, 380px))` }}
     >
       {stages.map((stage) => {
@@ -132,7 +132,7 @@ export default function Kanban({
                     setSurvolee(null);
                   }}
                   className={cn(
-                    "ad-card-clickable group flex items-start gap-1.5 rounded-xl border bg-card p-3 transition-colors",
+                    "hub-card-clickable group flex items-start gap-1.5 rounded-xl border bg-card p-3 transition-colors",
                     coches?.has(c.id) ? "border-avisdoc-teal ring-1 ring-avisdoc-teal/40" : "border-border hover:border-avisdoc-teal",
                     saisi === c.id && "opacity-50",
                   )}

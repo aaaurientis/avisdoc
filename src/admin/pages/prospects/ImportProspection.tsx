@@ -48,7 +48,7 @@ import { crmPourFiche } from "../../lib/crm";
 const champCls =
   "w-full rounded-xl border border-border bg-background px-3 py-2 text-[13.5px] text-avisdoc-ink outline-none focus:border-avisdoc-teal";
 const boutonPrincipal =
-  "ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60";
+  "hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60";
 const boutonSecondaire =
   "inline-flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal";
 

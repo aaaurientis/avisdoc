@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import type { PersonneFiche } from "../../lib/fiche";
 
 const champCls =
-  "ad-input min-w-0 rounded-full border border-border bg-muted/50 px-3.5 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input min-w-0 rounded-full border border-border bg-muted/50 px-3.5 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 const hote = (url: string) => {
   try {
@@ -217,7 +217,7 @@ export default function Interlocuteurs({
           <input className={cn(champCls, "flex-1")} placeholder="Nom" value={saisie.nom} onChange={(e) => setSaisie({ ...saisie, nom: e.target.value })} />
           <input className={cn(champCls, "flex-1")} placeholder="Fonction" value={saisie.role} onChange={(e) => setSaisie({ ...saisie, role: e.target.value })} />
           <input className={cn(champCls, "flex-[1.3]")} placeholder="E-mail" value={saisie.email} onChange={(e) => setSaisie({ ...saisie, email: e.target.value })} />
-          <button type="button" onClick={ajouter} className="ad-btn-accent rounded-full bg-avisdoc-teal px-4 py-2 text-[12.5px] font-bold text-white">
+          <button type="button" onClick={ajouter} className="hub-btn-accent rounded-full bg-avisdoc-teal px-4 py-2 text-[12.5px] font-bold text-white">
             Ajouter
           </button>
           <button type="button" onClick={() => setOuvert(false)} className="rounded-full px-3 py-2 text-[12.5px] font-bold text-muted-foreground">

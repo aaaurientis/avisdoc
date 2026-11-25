@@ -101,7 +101,7 @@ export default function ApercuImport({
               value={valeurDe(c)}
               onChange={(e) => surChoix(c.entete, e.target.value)}
               aria-label={`Destination de la colonne ${c.entete}`}
-              className="ad-input w-full rounded-xl border border-border bg-card px-3 py-2 text-[12.5px] font-semibold text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+              className="hub-input w-full rounded-xl border border-border bg-card px-3 py-2 text-[12.5px] font-semibold text-avisdoc-ink outline-none focus:border-avisdoc-teal"
             >
               <option value="nom">Nom de l’entreprise</option>
               {champs
@@ -131,7 +131,7 @@ export default function ApercuImport({
           type="button"
           onClick={() => onValider(etat)}
           disabled={!colonneNom}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
           <Upload className="size-4" /> Importer {lignes} ligne{lignes > 1 ? "s" : ""}
         </button>

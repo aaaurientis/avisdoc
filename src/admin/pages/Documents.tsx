@@ -290,7 +290,7 @@ export default function Documents() {
           const wb = XLSX.read(buf, { type: "array" });
           if (cancelled) return;
           el.innerHTML = wb.SheetNames
-            .map((n) => `<div class="ad-sheet">${n}</div>` + XLSX.utils.sheet_to_html(wb.Sheets[n]))
+            .map((n) => `<div class="hub-sheet">${n}</div>` + XLSX.utils.sheet_to_html(wb.Sheets[n]))
             .join("");
         } else if (preview.ext === "PPT") {
           const { init } = await import("pptx-preview");
@@ -326,7 +326,7 @@ export default function Documents() {
             onClick={() => charteInputRef.current?.click()}
             disabled={charteEnCours}
             title="Remettre un PowerPoint, un Word ou un PDF à la charte AvisDoc, puis le télécharger (rien n'est enregistré)"
-            className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border bg-card px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors disabled:opacity-60"
+            className="hub-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border bg-card px-5 py-2.5 text-sm font-bold text-avisdoc-ink transition-colors disabled:opacity-60"
           >
             Mettre à la charte
           </button>
@@ -334,7 +334,7 @@ export default function Documents() {
             type="button"
             onClick={() => importInputRef.current?.click()}
             disabled={busy}
-            className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-60"
+            className="hub-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-60"
           >
             <Upload className="size-4" /> {busy ? "Import…" : "Importer un document"}
           </button>
@@ -403,7 +403,7 @@ export default function Documents() {
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher dans tous les documents (nom, tag, catégorie, auteur)…"
-              className="ad-input w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[12.5px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+              className="hub-input w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[12.5px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
             />
           </label>
           {docTags.length > 0 && (
@@ -486,7 +486,7 @@ export default function Documents() {
             return (
               <div
                 key={d.id}
-                className="ad-row grid items-center gap-2.5 border-b border-border/60 px-5 py-3 transition-colors last:border-b-0"
+                className="hub-row grid items-center gap-2.5 border-b border-border/60 px-5 py-3 transition-colors last:border-b-0"
                 style={{ gridTemplateColumns: COLS }}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -558,7 +558,7 @@ export default function Documents() {
                       setDocCategory(d.id, p, s);
                     }}
                     title="Changer la catégorie"
-                    className="ad-input w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:border-avisdoc-teal focus:border-avisdoc-teal"
+                    className="hub-input w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:border-avisdoc-teal focus:border-avisdoc-teal"
                   >
                     {!inTree && (
                       <option value={`${d.catParent}${SEP}${d.cat}`}>
@@ -583,7 +583,7 @@ export default function Documents() {
                     type="button"
                     onClick={() => downloadDoc(d.id)}
                     title="Télécharger le document"
-                    className="ad-chip inline-flex items-center rounded-full bg-muted px-2 py-1.5 text-muted-foreground transition-[filter] hover:text-avisdoc-ink"
+                    className="hub-chip inline-flex items-center rounded-full bg-muted px-2 py-1.5 text-muted-foreground transition-[filter] hover:text-avisdoc-ink"
                   >
                     <Download className="size-3.5" />
                   </button>
@@ -595,7 +595,7 @@ export default function Documents() {
                       versionInputRef.current?.click();
                     }}
                     title="Importer une nouvelle version"
-                    className="ad-chip inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition-[filter] disabled:opacity-60"
+                    className="hub-chip inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition-[filter] disabled:opacity-60"
                   >
                     <ArrowUp className="size-3" /> Version
                   </button>
@@ -603,7 +603,7 @@ export default function Documents() {
                     type="button"
                     onClick={() => deleteDoc(d.id)}
                     title="Supprimer le document"
-                    className="ad-chip inline-flex items-center rounded-full bg-rose-100 px-2 py-1.5 text-[12px] font-bold text-rose-700 transition-[filter]"
+                    className="hub-chip inline-flex items-center rounded-full bg-rose-100 px-2 py-1.5 text-[12px] font-bold text-rose-700 transition-[filter]"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -630,7 +630,7 @@ export default function Documents() {
                 <div className="truncate text-[12px] text-muted-foreground">{charteNom}</div>
               </div>
               {charte.statut === "termine" && charteLien && (
-                <a href={charteLien} className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-4 py-2 text-[12.5px] font-bold text-white">
+                <a href={charteLien} className="hub-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-4 py-2 text-[12.5px] font-bold text-white">
                   <Download className="size-4" /> Télécharger
                 </a>
               )}
@@ -690,7 +690,7 @@ export default function Documents() {
                 type="button"
                 onClick={() => downloadDoc(preview.id)}
                 title="Télécharger"
-                className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors"
+                className="hub-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-3.5 py-1.5 text-[12.5px] font-bold text-avisdoc-ink transition-colors"
               >
                 <Download className="size-3.5" /> Télécharger
               </button>
@@ -712,7 +712,7 @@ export default function Documents() {
                     className={cn(
                       preview.ext === "PPT"
                         ? "mx-auto w-full max-w-[960px]"
-                        : "mx-auto max-w-[900px] rounded-lg bg-white p-6 text-[13px] text-avisdoc-ink shadow-sm [&_.ad-sheet:first-child]:mt-0 [&_.ad-sheet]:mb-2 [&_.ad-sheet]:mt-5 [&_.ad-sheet]:text-[13px] [&_.ad-sheet]:font-bold [&_.ad-sheet]:uppercase [&_.ad-sheet]:tracking-wide [&_.ad-sheet]:text-muted-foreground [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1",
+                        : "mx-auto max-w-[900px] rounded-lg bg-white p-6 text-[13px] text-avisdoc-ink shadow-sm [&_.hub-sheet:first-child]:mt-0 [&_.hub-sheet]:mb-2 [&_.hub-sheet]:mt-5 [&_.hub-sheet]:text-[13px] [&_.hub-sheet]:font-bold [&_.hub-sheet]:uppercase [&_.hub-sheet]:tracking-wide [&_.hub-sheet]:text-muted-foreground [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1",
                     )}
                   />
                 </div>
@@ -730,7 +730,7 @@ export default function Documents() {
                   <button
                     type="button"
                     onClick={() => downloadDoc(preview.id)}
-                    className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+                    className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
                   >
                     <Download className="size-4" /> Télécharger le document
                   </button>
@@ -775,7 +775,7 @@ export default function Documents() {
                         : d,
                     );
                   }}
-                  className="ad-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+                  className="hub-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
                 >
                   {docTree.map((c) => (
                     <option key={c.name} value={c.name}>{c.name}</option>
@@ -792,7 +792,7 @@ export default function Documents() {
                       d ? { ...d, sub: s, tags: suggestTags(d.file.name, d.parent, s, docTags) } : d,
                     );
                   }}
-                  className="ad-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
+                  className="hub-input mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-[13px] text-avisdoc-ink outline-none focus:border-avisdoc-teal"
                 >
                   {(draftCat?.subs ?? []).map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -847,7 +847,7 @@ export default function Documents() {
               <button
                 type="button"
                 onClick={() => setImportDraft(null)}
-                className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink"
+                className="hub-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink"
               >
                 Annuler
               </button>
@@ -855,7 +855,7 @@ export default function Documents() {
                 type="button"
                 onClick={() => void confirmImport()}
                 disabled={!importDraft.sub}
-                className="ad-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+                className="hub-btn-navy inline-flex items-center gap-1.5 rounded-full bg-avisdoc-ink px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
               >
                 <Upload className="size-4" /> Importer
               </button>

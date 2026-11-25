@@ -107,7 +107,7 @@ export default function Droits() {
       {/* Ajout d'un utilisateur */}
       <div className="mb-3 flex flex-wrap gap-2">
         <input
-          className="ad-input w-full max-w-[280px] rounded-full border border-border bg-card px-4 py-1.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+          className="hub-input w-full max-w-[280px] rounded-full border border-border bg-card px-4 py-1.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           placeholder="email@avisdoc.fr"
           value={nouvelEmail}
           onChange={(e) => setNouvelEmail(e.target.value)}
@@ -117,7 +117,7 @@ export default function Droits() {
           type="button"
           onClick={ajouter}
           disabled={busy || !nouvelEmail.includes("@")}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-1.5 text-[13px] font-bold text-white disabled:opacity-40"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-1.5 text-[13px] font-bold text-white disabled:opacity-40"
         >
           <Plus className="size-4" /> Ajouter
         </button>
@@ -182,7 +182,7 @@ export default function Droits() {
                     disabled={busy}
                     onClick={() => retirer(l.email)}
                     title="Retirer (retour aux droits par défaut)"
-                    className="ad-x p-1 text-muted-foreground/60 transition-colors hover:text-orange-600"
+                    className="hub-x p-1 text-muted-foreground/60 transition-colors hover:text-orange-600"
                   >
                     <X className="size-4" />
                   </button>

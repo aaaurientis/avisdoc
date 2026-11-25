@@ -344,7 +344,7 @@ export default function Sidebar({ ouvert = false }: { ouvert?: boolean } = {}) {
     <>
     <aside
       data-ouvert={ouvert ? "oui" : "non"}
-      className="ad-sidebar sticky top-0 flex h-screen w-[19rem] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6"
+      className="hub-sidebar sticky top-0 flex h-screen w-[19rem] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 py-6"
     >
       <div className="flex flex-col gap-1.5 px-2.5 pb-6">
         <AvisdocLogo className="h-12 w-auto self-start" />

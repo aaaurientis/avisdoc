@@ -9,7 +9,7 @@ import { Modal, SectionLabel } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function BrouillonEmail({
   nom,
@@ -134,7 +134,7 @@ export default function BrouillonEmail({
         <button
           type="button"
           onClick={ouvrirMessagerie}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
         >
           <Mail className="size-4" /> Ouvrir dans ma messagerie
         </button>

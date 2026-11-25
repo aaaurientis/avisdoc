@@ -4,17 +4,17 @@
 
 /* Tablette : le menu passe au-dessus, en pleine largeur. Il y a la place. */
 @media (min-width: 768px) and (max-width: 900px) {
-  .ad-shell {
+  .hub-shell {
     flex-direction: column;
   }
-  .ad-sidebar {
+  .hub-sidebar {
     position: static;
     width: 100%;
     height: auto;
     border-right: none;
     border-bottom: 1px solid hsl(var(--border));
   }
-  .ad-content {
+  .hub-content {
     padding: 1.5rem 1.25rem;
   }
 }
@@ -22,22 +22,22 @@
 /* Téléphone : le menu devient un tiroir. En pleine largeur, il occupait toute la
    page et repoussait chaque écran en dessous — on croyait que rien ne marchait. */
 @media (max-width: 767px) {
-  .ad-shell {
+  .hub-shell {
     flex-direction: column;
   }
 
-  .ad-barre-mobile {
+  .hub-barre-mobile {
     display: flex;
     position: sticky;
     top: 0;
     z-index: 40;
   }
 
-  .ad-voile {
+  .hub-voile {
     display: block;
   }
 
-  .ad-sidebar {
+  .hub-sidebar {
     position: fixed;
     top: 0;
     left: 0;
@@ -50,11 +50,11 @@
     box-shadow: 0 0 40px hsl(var(--foreground) / 0.12);
   }
 
-  .ad-sidebar[data-ouvert="oui"] {
+  .hub-sidebar[data-ouvert="oui"] {
     transform: translateX(0);
   }
 
-  .ad-content {
+  .hub-content {
     padding: 1.25rem 1rem;
   }
 }
@@ -64,19 +64,19 @@
 /* Chrome ignore les ::-webkit-scrollbar dès que scrollbar-color est posé : la règle
    standard ne sert qu'aux navigateurs qui n'ont pas les pseudo-éléments (Firefox). */
 @supports not selector(::-webkit-scrollbar) {
-  .ad-barre-defilement {
+  .hub-barre-defilement {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
   }
 }
-.ad-barre-defilement::-webkit-scrollbar {
+.hub-barre-defilement::-webkit-scrollbar {
   height: 10px;
 }
-.ad-barre-defilement::-webkit-scrollbar-track {
+.hub-barre-defilement::-webkit-scrollbar-track {
   background: hsl(var(--muted));
   border-radius: 999px;
 }
-.ad-barre-defilement::-webkit-scrollbar-thumb {
+.hub-barre-defilement::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.45);
   border-radius: 999px;
 }

@@ -153,7 +153,7 @@ export default function Merx() {
           <button
             type="button"
             onClick={nouvelleConversation}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <Plus className="size-4" /> Nouvelle conversation
           </button>
@@ -220,7 +220,7 @@ export default function Merx() {
                 type="button"
                 onClick={() => void envoyer()}
                 disabled={!saisie.trim() || occupe}
-                className="ad-btn-accent inline-flex h-[52px] shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 text-sm font-bold text-white disabled:opacity-50 sm:px-5"
+                className="hub-btn-accent inline-flex h-[52px] shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 text-sm font-bold text-white disabled:opacity-50 sm:px-5"
               >
                 {occupe ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 {/* À trois éléments sur une ligne de 375 pixels, le libellé faisait

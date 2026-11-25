@@ -114,7 +114,7 @@ export function PartieExpertises({ periode, client, requis, journees }: { period
                 ? "Tous les avis de l'extraction, en journée et hors journée."
                 : "Avis envoyés sur la période, en journée et hors journée."}
           </p>
-          <div className="ad-kpi-grid grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="hub-kpi-grid grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi label="Avis rendus" valeur={nombre(r.total)} pied={`${nombre(r.requerants)} requérants · ${r.requis.length} requis`} />
             <Kpi
               label="Délai médian de réponse"
@@ -164,7 +164,7 @@ export function PartieLien({ periode, client, requis, journees }: { periode: Per
           <p className="mb-4 text-[12.5px] text-muted-foreground">
             Une expertise est rattachée à sa journée par la date, le lieu et le numéro de journée. Calcul sur les {nombre(parJournee.length)} journées passées de la période (même client, même ville : une seule journée).
           </p>
-          <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="hub-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi
               label="Avis rendus en journée"
               valeur={nombre(avisEnJournee)}

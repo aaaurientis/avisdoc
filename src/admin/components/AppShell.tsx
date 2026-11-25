@@ -50,9 +50,9 @@ export default function AppShell() {
   }, []);
 
   return (
-    <div className="ad-shell flex min-h-screen bg-background" data-tiroir={tiroir ? "ouvert" : "ferme"}>
+    <div className="hub-shell flex min-h-screen bg-background" data-tiroir={tiroir ? "ouvert" : "ferme"}>
       {/* Visible seulement sur petit écran (voir admin.css). */}
-      <header className="ad-barre-mobile hidden items-center justify-between border-b border-border bg-card px-4 py-3">
+      <header className="hub-barre-mobile hidden items-center justify-between border-b border-border bg-card px-4 py-3">
         <AvisdocLogo className="h-8 w-auto" />
         <button
           type="button"
@@ -71,13 +71,13 @@ export default function AppShell() {
           type="button"
           aria-label="Fermer le menu"
           onClick={() => setTiroir(false)}
-          className="ad-voile hidden fixed inset-0 z-30 bg-avisdoc-ink/40"
+          className="hub-voile hidden fixed inset-0 z-30 bg-avisdoc-ink/40"
         />
       )}
 
       <Sidebar ouvert={tiroir} />
 
-      <main className="ad-content min-w-0 flex-1 px-9 py-8">
+      <main className="hub-content min-w-0 flex-1 px-9 py-8">
         {/* CRM Synthèse : une bande calme en tête du contenu, qui reste visible quand on fait défiler. */}
         {vueSeule && (
           <div className="sticky top-0 z-20 -mt-3 mb-3 bg-background py-3 max-md:top-[57px]">

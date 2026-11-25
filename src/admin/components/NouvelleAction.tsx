@@ -27,7 +27,7 @@ const GENRES: { valeur: GenreEchange; label: string; icone: typeof Phone; aide: 
 ];
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 /** L'heure ronde qui vient : on propose, on ne fait pas saisir. */
 const prochaineHeure = () => {
@@ -200,7 +200,7 @@ export default function NouvelleAction({
           type="button"
           onClick={() => void enregistrer()}
           disabled={!titre.trim() || envoi}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />} Ajouter au planning
         </button>

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { confirmer } from "./Confirmation";
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function ModifierAction({
   action,
@@ -99,7 +99,7 @@ export default function ModifierAction({
           type="button"
           onClick={() => void agir("enregistrer")}
           disabled={!titre.trim() || envoi}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />} Enregistrer
         </button>

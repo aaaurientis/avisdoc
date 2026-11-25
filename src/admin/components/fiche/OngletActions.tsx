@@ -278,7 +278,7 @@ export default function OngletActions({
                         e.stopPropagation();
                         setOuvert({ quoi: "compte-rendu", action: a });
                       }}
-                      className="ad-btn-accent h-8 shrink-0 rounded-full bg-avisdoc-teal px-3.5 text-[12.5px] font-bold text-white"
+                      className="hub-btn-accent h-8 shrink-0 rounded-full bg-avisdoc-teal px-3.5 text-[12.5px] font-bold text-white"
                     >
                       Faire le compte rendu
                     </button>

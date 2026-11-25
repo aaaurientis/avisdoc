@@ -10,7 +10,7 @@ import { colonnesDe } from "../../lib/ui-tokens";
 import { cn } from "@/lib/utils";
 
 const menu =
-  "ad-input h-[34px] min-w-0 cursor-pointer rounded-full border-0 pl-3.5 pr-8 text-[13px] font-semibold outline-none focus:ring-2 focus:ring-avisdoc-teal/40";
+  "hub-input h-[34px] min-w-0 cursor-pointer rounded-full border-0 pl-3.5 pr-8 text-[13px] font-semibold outline-none focus:ring-2 focus:ring-avisdoc-teal/40";
 
 /** Le pipeline où entre un prospect : celui de la personne, sinon Général, sinon le premier. */
 export function pipelineParDefaut(pipelines: Pipeline[], email: string | null | undefined): Pipeline | undefined {

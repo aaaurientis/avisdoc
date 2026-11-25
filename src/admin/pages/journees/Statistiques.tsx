@@ -95,7 +95,7 @@ function Contenu() {
       </div>
 
       <Titre numero="01" titre="Journées" />
-      <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="hub-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Journées" valeur={nombre(nbJournees(journees))} pied={`sur ${nombre(nbJournees(toutes))} dans l'extraction${journees.length > nbJournees(journees) ? ` · ${journees.length - nbJournees(journees)} jour(s) regroupé(s)` : ""}`} />
         <Kpi label="Passées" valeur={nombre(nbJournees(passees))} pied={journees.length ? `${pct(nbJournees(passees), nbJournees(journees))} % des journées` : "—"} />
         <Kpi label="À venir" valeur={nombre(nbJournees(aVenir))} pied={prochaine ? `prochaine : ${jour(prochaine.date, { day: "numeric", month: "short" })}` : "aucune"} />

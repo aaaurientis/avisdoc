@@ -222,7 +222,7 @@ export default function Clients() {
             ))}
           </div>
           <button type="button" onClick={charger} disabled={busy}
-            className="ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors disabled:opacity-40">
+            className="hub-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors disabled:opacity-40">
             <RefreshCw className={cn("size-3.5", busy && "animate-spin")} /> Actualiser
           </button>
         </div>
@@ -283,7 +283,7 @@ export default function Clients() {
       {/* Filtres */}
       <div className="flex flex-wrap items-center gap-2">
         <input
-          className="ad-input w-full max-w-[280px] rounded-full border border-border bg-card px-4 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+          className="hub-input w-full max-w-[280px] rounded-full border border-border bg-card px-4 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
           placeholder="Rechercher (nom, SIREN, e-mail)…"
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
