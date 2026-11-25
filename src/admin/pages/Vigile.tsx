@@ -166,7 +166,7 @@ export default function Scope() {
         title="Scope"
         subtitle="Posez vos questions sur ce que Scope surveille et sur ce que ses rapports ont trouvé."
         action={
-          <button type="button" onClick={nouvelle} disabled={enCours} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" onClick={nouvelle} disabled={enCours} className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             <Plus className="size-4" /> Nouvelle conversation
           </button>
         }
@@ -231,13 +231,13 @@ export default function Scope() {
             }}
             rows={2}
             placeholder="Votre question à Scope…"
-            className="ad-input min-w-0 flex-1 resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13.5px] outline-none focus:border-avisdoc-teal"
+            className="hub-input min-w-0 flex-1 resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13.5px] outline-none focus:border-avisdoc-teal"
           />
           <button
             type="submit"
             disabled={!saisie.trim() || enCours}
             aria-label="Envoyer"
-            className="ad-btn-accent inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-avisdoc-teal text-white disabled:opacity-50"
+            className="hub-btn-accent inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-avisdoc-teal text-white disabled:opacity-50"
           >
             {enCours ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </button>

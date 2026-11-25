@@ -10,7 +10,7 @@ import { Card, Modal } from "../../components/ui";
 import { ESPACES_SUGGESTION, listerSuggestionsATraiter, suggerer, traiterSuggestion, type EspaceSuggestion, type Suggestion } from "../../lib/veille";
 
 const champCls =
-  "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 const libelleCls = "mb-1.5 block text-[12px] font-bold text-avisdoc-ink";
 const labelEspace = (e: EspaceSuggestion) => ESPACES_SUGGESTION.find((x) => x.espace === e)?.label ?? e;
 
@@ -66,7 +66,7 @@ export function BoutonSuggerer({ espace }: { espace: EspaceSuggestion }) {
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" disabled={envoi} onClick={() => setOuvert(false)} className="rounded-full px-5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-muted">Annuler</button>
-              <button type="submit" disabled={texte.trim().length < 2 || envoi} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+              <button type="submit" disabled={texte.trim().length < 2 || envoi} className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
                 {envoi && <Loader2 className="size-4 animate-spin" />}
                 Envoyer
               </button>

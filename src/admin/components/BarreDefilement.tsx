@@ -76,7 +76,7 @@ export default function BarreDefilement({ cible }: { cible: HTMLElement | null }
     <div
       ref={barre}
       aria-hidden
-      className={utile ? "ad-barre-defilement sticky top-0 z-10 mb-2 overflow-x-auto overflow-y-hidden overscroll-x-none bg-background" : "hidden"}
+      className={utile ? "hub-barre-defilement sticky top-0 z-10 mb-2 overflow-x-auto overflow-y-hidden overscroll-x-none bg-background" : "hidden"}
     >
       <div style={{ width: largeur, height: 1 }} />
     </div>

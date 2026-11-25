@@ -42,7 +42,7 @@ const lirePreference = (): Messagerie => {
 };
 
 const champ =
-  "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 const etapeCls = "mb-1.5 mt-5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground";
 const bouton =
   "inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink transition-colors hover:border-avisdoc-teal disabled:opacity-60";
@@ -264,7 +264,7 @@ export default function EcrireMail({
       onClick={() => ouvrir(m)}
       className={
         m === messagerie
-          ? "ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white"
+          ? "hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white"
           : bouton
       }
     >
@@ -344,7 +344,7 @@ export default function EcrireMail({
                 type="button"
                 onClick={() => void ecrireAvecMerx()}
                 disabled={ecriture}
-                className="ad-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+                className="hub-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
               >
                 {ecriture ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {ecriture ? "Merx écrit…" : objet || corps ? "Réécrire" : "Rédiger"}
@@ -383,7 +383,7 @@ export default function EcrireMail({
             value={envoyeLe}
             max={jourISO(new Date())}
             onChange={(e) => setEnvoyeLe(e.target.value)}
-            className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]"
+            className="hub-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]"
           />
         </label>
       )}
@@ -446,8 +446,8 @@ export default function EcrireMail({
         <div className="mt-4 rounded-2xl border border-border p-4">
           <p className="text-[13px] font-semibold text-avisdoc-ink">Me le rappeler le</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input type="date" value={le} min={jourISO(new Date())} onChange={(e) => setLe(e.target.value)} className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Jour" />
-            <input type="time" value={aHeure} onChange={(e) => setAHeure(e.target.value)} className="ad-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Heure" />
+            <input type="date" value={le} min={jourISO(new Date())} onChange={(e) => setLe(e.target.value)} className="hub-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Jour" />
+            <input type="time" value={aHeure} onChange={(e) => setAHeure(e.target.value)} className="hub-input h-9 rounded-xl border border-border bg-background px-2.5 text-[13px]" aria-label="Heure" />
             <button type="button" onClick={() => void programmer()} disabled={Boolean(envoi) || ecriture} className={bouton}>
               {envoi === "programme" ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />} Programmer
             </button>

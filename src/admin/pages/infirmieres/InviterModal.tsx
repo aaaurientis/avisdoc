@@ -12,7 +12,7 @@ import { Modal } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-avisdoc-teal";
 
 // Sous-ensemble de la fiche renvoyée par l'Edge Function annuaire-sante.
 interface FichePro {
@@ -157,7 +157,7 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
             type="button"
             onClick={() => void chercher()}
             disabled={chargement || !query.trim()}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-xl bg-avisdoc-teal px-4 text-[13px] font-bold text-white disabled:opacity-40"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-xl bg-avisdoc-teal px-4 text-[13px] font-bold text-white disabled:opacity-40"
           >
             <Search className="size-4" /> {chargement ? "…" : "Chercher"}
           </button>
@@ -237,14 +237,14 @@ export default function InviterModal({ onClose, onDone }: { onClose: () => void;
           )}
 
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">
+            <button type="button" onClick={onClose} className="hub-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">
               Annuler
             </button>
             <button
               type="button"
               onClick={() => void soumettre()}
               disabled={busy}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-60"
             >
               <UserPlus className="size-4" /> {busy ? "Envoi…" : dejaValide ? "Ajouter" : "Inviter"}
             </button>

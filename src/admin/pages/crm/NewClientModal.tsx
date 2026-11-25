@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { crmPourFiche } from "../../lib/crm";
 
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 interface ClientQonto {
   id: string;
@@ -230,7 +230,7 @@ export default function NewClientModal({
             type="button"
             onClick={runSearch}
             disabled={loading}
-            className="ad-btn-navy whitespace-nowrap rounded-full bg-avisdoc-ink px-5 py-2.5 text-[13px] font-bold text-white transition-colors disabled:opacity-70"
+            className="hub-btn-navy whitespace-nowrap rounded-full bg-avisdoc-ink px-5 py-2.5 text-[13px] font-bold text-white transition-colors disabled:opacity-70"
           >
             {loading ? "Recherche…" : "Rechercher"}
           </button>
@@ -261,7 +261,7 @@ export default function NewClientModal({
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <div className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">Déjà dans Qonto ({suggestions.length})</div>
               <input
-                className="ad-input w-[180px] rounded-full border border-border bg-muted/50 px-3 py-1.5 text-[12px] outline-none transition-colors focus:border-avisdoc-teal"
+                className="hub-input w-[180px] rounded-full border border-border bg-muted/50 px-3 py-1.5 text-[12px] outline-none transition-colors focus:border-avisdoc-teal"
                 placeholder="Filtrer la liste…"
                 value={qQonto}
                 onChange={(e) => setQQonto(e.target.value)}
@@ -316,7 +316,7 @@ export default function NewClientModal({
         <button
           type="button"
           onClick={fermer}
-          className="ad-btn-outline flex-1 rounded-full border-[1.5px] border-border py-3 text-sm font-bold text-muted-foreground transition-colors"
+          className="hub-btn-outline flex-1 rounded-full border-[1.5px] border-border py-3 text-sm font-bold text-muted-foreground transition-colors"
         >
           Annuler
         </button>
@@ -333,7 +333,7 @@ export default function NewClientModal({
           type="button"
           onClick={() => void create()}
           disabled={Boolean(envoi) || !saisie.nom.trim()}
-          className="ad-btn-accent inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white transition-opacity disabled:opacity-45"
+          className="hub-btn-accent inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white transition-opacity disabled:opacity-45"
         >
           {envoi === "simple" && <Loader2 className="size-4 animate-spin" />}
           Créer le client

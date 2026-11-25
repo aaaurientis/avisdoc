@@ -127,7 +127,7 @@ export default function FicheJetee({
               type="button"
               onClick={() => void agir("restaurer")}
               disabled={enCours}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2 text-[13px] font-bold text-white disabled:opacity-50"
             >
               {enCours ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
               Remettre dans {destination.label}{etape ? `, ${etape}` : ""}
@@ -146,7 +146,7 @@ export default function FicheJetee({
           <button
             type="button"
             onClick={() => setConfirmation(true)}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <RotateCcw className="size-4" /> Restaurer
           </button>

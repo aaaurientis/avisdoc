@@ -131,11 +131,11 @@ function ControleModal({ piece, ins, onClose, onDone }: { piece: ReqPiece; ins: 
             <div className="flex flex-col gap-1">
               {piece.type === "rcp" && (
                 <>
-                  <input className="ad-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="Assureur" value={rcp.assureur} onChange={(e) => setRcp((s) => ({ ...s, assureur: e.target.value }))} />
-                  <input className="ad-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="N° de police" value={rcp.police} onChange={(e) => setRcp((s) => ({ ...s, police: e.target.value }))} />
+                  <input className="hub-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="Assureur" value={rcp.assureur} onChange={(e) => setRcp((s) => ({ ...s, assureur: e.target.value }))} />
+                  <input className="hub-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="N° de police" value={rcp.police} onChange={(e) => setRcp((s) => ({ ...s, police: e.target.value }))} />
                   <label className="text-[12px] font-semibold text-muted-foreground">
                     Date de fin de validité
-                    <input type="date" className="ad-input mt-0.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" value={rcp.dateFin} onChange={(e) => setRcp((s) => ({ ...s, dateFin: e.target.value }))} />
+                    <input type="date" className="hub-input mt-0.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" value={rcp.dateFin} onChange={(e) => setRcp((s) => ({ ...s, dateFin: e.target.value }))} />
                   </label>
                   <div className="mt-2 border-t border-border pt-2">
                     <Case on={rcp.c1} set={(v) => setRcp((s) => ({ ...s, c1: v }))}>Nomme le requérant</Case>
@@ -148,7 +148,7 @@ function ControleModal({ piece, ins, onClose, onDone }: { piece: ReqPiece; ins: 
                 <>
                   <label className="text-[12px] font-semibold text-muted-foreground">
                     Date d'émission
-                    <input type="date" className="ad-input mt-0.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" value={urssaf.dateEmission} onChange={(e) => setUrssaf((s) => ({ ...s, dateEmission: e.target.value }))} />
+                    <input type="date" className="hub-input mt-0.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" value={urssaf.dateEmission} onChange={(e) => setUrssaf((s) => ({ ...s, dateEmission: e.target.value }))} />
                   </label>
                   <p className="mt-1 text-[12px] text-muted-foreground">Validité = émission + 6 mois (RI-05).</p>
                   <div className="mt-2 border-t border-border pt-2">
@@ -178,7 +178,7 @@ function ControleModal({ piece, ins, onClose, onDone }: { piece: ReqPiece; ins: 
               <select
                 value={motif}
                 onChange={(e) => setMotif(e.target.value as MotifRefus)}
-                className="ad-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
+                className="hub-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
               >
                 <option value="">Motif du refus…</option>
                 {(Object.keys(MOTIF_LABEL) as MotifRefus[]).map((m) => (
@@ -186,13 +186,13 @@ function ControleModal({ piece, ins, onClose, onDone }: { piece: ReqPiece; ins: 
                 ))}
               </select>
               {motif === "autre" && (
-                <input className="ad-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="Préciser le motif" value={autre} onChange={(e) => setAutre(e.target.value)} />
+                <input className="hub-input rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal" placeholder="Préciser le motif" value={autre} onChange={(e) => setAutre(e.target.value)} />
               )}
             </div>
           )}
 
           <div className="mt-auto flex justify-end gap-2 pt-4">
-            <button type="button" onClick={onClose} className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">
+            <button type="button" onClick={onClose} className="hub-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">
               Annuler
             </button>
             {mode === "valider" ? (
@@ -220,14 +220,14 @@ function ActionModal({ action, onClose, onConfirm }: { action: "suspendre" | "re
       <h2 className="font-display text-lg font-semibold text-avisdoc-ink">{label} l'inscription</h2>
       <p className="mt-1 text-[13px] text-muted-foreground">Un motif est obligatoire (tracé dans l'historique).</p>
       <textarea
-        className="ad-input mt-3 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
+        className="hub-input mt-3 w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-avisdoc-teal"
         rows={3}
         placeholder="Motif…"
         value={motif}
         onChange={(e) => setMotif(e.target.value)}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="ad-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">Annuler</button>
+        <button type="button" onClick={onClose} className="hub-btn-outline rounded-full border-[1.5px] border-border px-4 py-2 text-[13px] font-bold text-avisdoc-ink">Annuler</button>
         <button type="button" disabled={!motif.trim()} onClick={() => onConfirm(motif.trim())} className="rounded-full bg-avisdoc-coral px-5 py-2 text-[13px] font-bold text-white disabled:opacity-40">{label}</button>
       </div>
     </Modal>

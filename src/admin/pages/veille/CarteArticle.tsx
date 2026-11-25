@@ -186,7 +186,7 @@ export default function CarteArticle({
       {/* Confier seulement une entreprise que personne ne suit encore. */}
       {demarcher && a.entreprise && (!statut || (statut.type === "prospection" && !statut.referent)) && (
         <div className="mt-2.5">
-          <button type="button" onClick={() => setFenetre(true)} disabled={vueSeule} title={vueSeule ? titreGris : undefined} className={cn("ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12px] font-bold text-white", gris)}>
+          <button type="button" onClick={() => setFenetre(true)} disabled={vueSeule} title={vueSeule ? titreGris : undefined} className={cn("hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12px] font-bold text-white", gris)}>
             <Send className="size-3.5" /> Confier à un commercial
           </button>
         </div>
@@ -201,7 +201,7 @@ export default function CarteArticle({
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" autoFocus disabled={retrait !== null} onClick={() => setChoix(false)} className="rounded-full border border-border px-5 py-2.5 text-sm font-bold text-avisdoc-ink hover:border-avisdoc-ink disabled:opacity-50">Annuler</button>
-            <button type="button" disabled={retrait !== null} onClick={archiver} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            <button type="button" disabled={retrait !== null} onClick={archiver} className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
               {retrait === "archiver" ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />} Archiver
             </button>
             <button type="button" disabled={retrait !== null} onClick={supprimer} className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50">
@@ -290,14 +290,14 @@ function FenetreConfier({ a, onFermer, onConfie }: { a: Article; onFermer: () =>
         {membres === null ? (
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground"><Loader2 className="size-4 animate-spin text-avisdoc-teal" /> Chargement…</div>
         ) : (
-          <select value={choix} onChange={(e) => setChoix(e.target.value)} className="ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none focus:border-avisdoc-teal">
+          <select value={choix} onChange={(e) => setChoix(e.target.value)} className="hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none focus:border-avisdoc-teal">
             {membres.map((m) => <option key={m} value={m.toLowerCase()}>{nomLisible(m)}</option>)}
           </select>
         )}
       </label>
       <div className="mt-6 flex justify-end gap-2">
         <button type="button" disabled={envoi} onClick={onFermer} className="rounded-full px-5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-muted">Annuler</button>
-        <button type="button" disabled={!choix || envoi || membres === null || !membres.some((m) => m.toLowerCase() === choix)} onClick={valider} className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+        <button type="button" disabled={!choix || envoi || membres === null || !membres.some((m) => m.toLowerCase() === choix)} onClick={valider} className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
           {envoi ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Confier
         </button>
       </div>

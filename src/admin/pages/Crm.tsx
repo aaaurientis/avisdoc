@@ -259,7 +259,7 @@ export default function Crm() {
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <Plus className="size-4" /> Nouveau client
           </button>
@@ -283,7 +283,7 @@ export default function Crm() {
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher un client, une ville, un contact…"
-              className="ad-input w-full rounded-full border border-border bg-card py-2 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+              className="hub-input w-full rounded-full border border-border bg-card py-2 pl-10 pr-4 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
             />
           </div>
           <FiltresRepliables actifs={Object.values(filtres).filter(Boolean).length}>

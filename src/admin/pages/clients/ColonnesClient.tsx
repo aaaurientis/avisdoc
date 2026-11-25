@@ -22,7 +22,7 @@ const TYPES: { id: FieldType; label: string }[] = [
 const typeLabel = (t: FieldType) => TYPES.find((x) => x.id === t)?.label ?? t;
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function ColonnesClient({ onClose }: { onClose: () => void }) {
   const { accountFields, accounts, addField, renameField, moveField, deleteField } = useAdminData();
@@ -152,7 +152,7 @@ export default function ColonnesClient({ onClose }: { onClose: () => void }) {
                 type="button"
                 disabled={!nouveau.trim()}
                 onClick={ajouter}
-                className="ad-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                className="hub-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
               >
                 <Plus className="size-4" /> Ajouter
               </button>

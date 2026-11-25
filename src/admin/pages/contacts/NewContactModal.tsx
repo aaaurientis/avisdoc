@@ -8,7 +8,7 @@ import { Modal } from "../../components/ui";
 import { cn } from "@/lib/utils";
 
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-avisdoc-teal";
 
 // L'annuaire ne gère plus que Requis et Réseau d'aval (les requérants viennent
 // du parcours infirmières).
@@ -185,7 +185,7 @@ export default function NewContactModal({ onClose, defaultType = "Requis" }: { o
             type="button"
             onClick={chercher}
             disabled={chargement || !query.trim()}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-xl bg-avisdoc-teal px-4 text-[13px] font-bold text-white disabled:opacity-40"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-xl bg-avisdoc-teal px-4 text-[13px] font-bold text-white disabled:opacity-40"
           >
             <Search className="size-4" /> {chargement ? "…" : "Chercher"}
           </button>
@@ -280,14 +280,14 @@ export default function NewContactModal({ onClose, defaultType = "Requis" }: { o
         <button
           type="button"
           onClick={onClose}
-          className="ad-btn-outline flex-1 rounded-full border-[1.5px] border-border py-3 text-sm font-bold text-muted-foreground transition-colors"
+          className="hub-btn-outline flex-1 rounded-full border-[1.5px] border-border py-3 text-sm font-bold text-muted-foreground transition-colors"
         >
           Annuler
         </button>
         <button
           type="button"
           onClick={save}
-          className="ad-btn-accent flex-1 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white"
+          className="hub-btn-accent flex-1 rounded-full bg-avisdoc-teal py-3 text-sm font-bold text-white"
         >
           Enregistrer
         </button>

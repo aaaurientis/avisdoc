@@ -409,7 +409,7 @@ export default function ReseauDepartement() {
               onClick={() => void importer()}
               disabled={!!motifImport}
               title={motifImport ?? undefined}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
               {importEnCours ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
               {importEnCours ? TEXTES.importEnCours : dep?.dernierImportLe ? TEXTES.rafraichir : TEXTES.importer}
@@ -534,7 +534,7 @@ export default function ReseauDepartement() {
       {/* Filtres */}
       <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
         <input
-          className="ad-input w-36 shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] outline-none focus:border-avisdoc-teal"
+          className="hub-input w-36 shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] outline-none focus:border-avisdoc-teal"
           placeholder="Nom, RPPS, ville…"
           value={filtres.q}
           onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
@@ -590,7 +590,7 @@ export default function ReseauDepartement() {
             const ici = p.lieux.filter((l) => l.departement === code);
             return (
               <button key={p.id} type="button" onClick={() => setSelection(p.id)}
-                className={cn("ad-row grid w-full items-center gap-3 border-b border-border/60 px-5 py-3 text-left last:border-b-0",
+                className={cn("hub-row grid w-full items-center gap-3 border-b border-border/60 px-5 py-3 text-left last:border-b-0",
                   selection === p.id && "bg-sky-50/70")}
                 style={{ gridTemplateColumns: selectionne ? COLS_COMPACT : COLS_FULL, minWidth: selectionne ? undefined : 1040 }}>
                 <div className="min-w-0">
@@ -752,7 +752,7 @@ function IaGroupee({ departement, onClose, onLance }: { departement: string; onC
       <div className="mt-6 flex items-center justify-end gap-3">
         <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
         <button type="button" onClick={() => void lancer()} disabled={!!motif} title={motif ?? undefined}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
           {envoi && <Loader2 className="size-4 animate-spin" />} Lancer
         </button>
       </div>
@@ -795,7 +795,7 @@ function AjoutRpps({ onClose, onAjoute }: { onClose: () => void; onAjoute: (id: 
       <div className="mt-6 flex items-center justify-end gap-3">
         <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground">Annuler</button>
         <button type="button" onClick={() => void valider()} disabled={!!motif} title={motif ?? undefined}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
           {envoi && <Loader2 className="size-4 animate-spin" />} Ajouter
         </button>
       </div>

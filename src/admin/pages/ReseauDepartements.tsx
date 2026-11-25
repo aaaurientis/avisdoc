@@ -76,7 +76,7 @@ export default function ReseauDepartements() {
             onClick={() => setAjout(true)}
             disabled={lectureSeule}
             title={lectureSeule ? TEXTES.motifLectureSeule : undefined}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
             <Plus className="size-4" /> {TEXTES.ajouterDepartement}
           </button>
@@ -120,7 +120,7 @@ export default function ReseauDepartements() {
                 tabIndex={0}
                 onClick={() => navigate(`/reseau-aval/${d.code}`)}
                 onKeyDown={(e) => { if (e.key === "Enter") navigate(`/reseau-aval/${d.code}`); }}
-                className="ad-row grid cursor-pointer items-center gap-3 border-b border-border/60 px-5 py-3 text-left text-[13px] last:border-b-0"
+                className="hub-row grid cursor-pointer items-center gap-3 border-b border-border/60 px-5 py-3 text-left text-[13px] last:border-b-0"
                 style={{ gridTemplateColumns: COLS }}
               >
                 <div className="text-muted-foreground">{d.ordre ?? "—"}</div>
@@ -244,7 +244,7 @@ function AjoutDepartement({ dejaLa, onClose, onAjoute }: {
           onClick={() => void valider()}
           disabled={!!motif}
           title={motif ?? undefined}
-          className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />} Ajouter
         </button>

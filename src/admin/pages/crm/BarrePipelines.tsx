@@ -46,7 +46,7 @@ interface Brouillon {
 }
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function BarrePipelines({
   actif,
@@ -252,7 +252,7 @@ export default function BarrePipelines({
                       value={c.tone}
                       onChange={(e) => majColonne(i, { tone: e.target.value as StageTone })}
                       aria-label={`Couleur de la colonne ${c.label}`}
-                      className="ad-input shrink-0 rounded-lg border border-border bg-muted/50 px-2 py-2 text-[12px] outline-none focus:border-avisdoc-teal"
+                      className="hub-input shrink-0 rounded-lg border border-border bg-muted/50 px-2 py-2 text-[12px] outline-none focus:border-avisdoc-teal"
                     >
                       {TEINTES.map((t) => (
                         <option key={t} value={t}>
@@ -294,7 +294,7 @@ export default function BarrePipelines({
               type="button"
               onClick={() => void enregistrer()}
               disabled={!brouillon.nom.trim()}
-              className="ad-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+              className="hub-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
               {brouillon.id ? "Enregistrer" : "Créer le pipeline"}
             </button>

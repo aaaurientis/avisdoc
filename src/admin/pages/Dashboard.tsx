@@ -74,7 +74,7 @@ export default function Dashboard() {
     <div>
       <PageHeader title="Tableau de bord" subtitle={`Vue d'ensemble de l'activité — ${moisCourant}`} />
 
-      <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="hub-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {peut("journee") ? <KpisAvis /> : (
           <>
             <Kpi label="Avis ce mois" value="—" foot="Réservé au droit « Statistiques »" />

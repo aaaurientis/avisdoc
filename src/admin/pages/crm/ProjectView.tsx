@@ -40,7 +40,7 @@ import { jeter, JOURS_DE_GARDE } from "../../lib/corbeille";
 import { crmPourFiche } from "../../lib/crm";
 
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 /** Ce qu'une étape retient encore, dit une seule fois. */
 function Verrouille({ etape, fonctions }: { etape: string; fonctions: string }) {
@@ -402,8 +402,8 @@ export default function ProjectView({
   };
 
   const btnOutline =
-    "ad-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors";
-  const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
+    "hub-btn-outline inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-border px-4 py-2 text-[12.5px] font-bold text-avisdoc-ink transition-colors";
+  const btnAccent = "hub-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
   return (
     <>
@@ -678,7 +678,7 @@ export default function ProjectView({
                 <button
                   type="button"
                   onClick={() => removeProjectDoc(client.id, d.id)}
-                  className="ad-x px-1 text-muted-foreground/60 transition-colors"
+                  className="hub-x px-1 text-muted-foreground/60 transition-colors"
                 >
                   <X className="size-4" />
                 </button>
@@ -801,7 +801,7 @@ function Stepper({
       <button
         type="button"
         onClick={onMinus}
-        className="ad-stepper flex size-7 items-center justify-center rounded-full bg-white/10 transition-colors"
+        className="hub-stepper flex size-7 items-center justify-center rounded-full bg-white/10 transition-colors"
       >
         <Minus className="size-3.5" />
       </button>
@@ -809,7 +809,7 @@ function Stepper({
       <button
         type="button"
         onClick={onPlus}
-        className="ad-stepper flex size-7 items-center justify-center rounded-full bg-white/10 transition-colors"
+        className="hub-stepper flex size-7 items-center justify-center rounded-full bg-white/10 transition-colors"
       >
         <Plus className="size-3.5" />
       </button>

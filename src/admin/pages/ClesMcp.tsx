@@ -82,7 +82,7 @@ export default function ClesMcp() {
           <input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom de la clé (ex. Cowork Arthur)" maxLength={80}
             className="w-72 rounded-full border border-border bg-card px-4 py-2 text-[13px] outline-none focus:border-avisdoc-teal" />
           <button type="button" onClick={() => void creer()} disabled={lectureSeule || !nom.trim() || occupe === "creer"}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50">
             {occupe === "creer" ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Créer une clé
           </button>
         </div>

@@ -345,14 +345,14 @@ export default function Debrief() {
             onChange={(e) => setTexte(e.target.value)}
             rows={8}
             placeholder={EXEMPLE}
-            className="ad-input mt-3 w-full resize-none rounded-xl border border-border bg-background px-3.5 py-3 text-[13.5px] leading-relaxed outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input mt-3 w-full resize-none rounded-xl border border-border bg-background px-3.5 py-3 text-[13.5px] leading-relaxed outline-none transition-colors focus:border-avisdoc-teal"
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void ranger(texte, null)}
               disabled={texte.trim().length < 20}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
               <Sparkles className="size-4" /> Merx range ça
             </button>
@@ -429,7 +429,7 @@ export default function Debrief() {
                       traitees.current.delete(n.id);
                       void chargerPasses();
                     }}
-                    className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
+                    className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-60"
                   >
                     <Sparkles className="size-3.5" /> Réessayer
                   </button>

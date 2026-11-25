@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const TEINTES = Object.keys(TONES) as StageTone[];
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 
 function Teintes({ valeur, onChoisir }: { valeur: StageTone; onChoisir: (t: StageTone) => void }) {
   return (
@@ -190,7 +190,7 @@ export default function ColonnesModal({
                   addStage(nouveau, teinteNouveau, pipelineId);
                   setNouveau("");
                 }}
-                className="ad-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                className="hub-btn-accent inline-flex shrink-0 items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
               >
                 <Plus className="size-4" /> Ajouter
               </button>

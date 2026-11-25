@@ -152,7 +152,7 @@ export default function Corbeille() {
               type="button"
               onClick={() => void agir("restaurer")}
               disabled={selection.length === 0 || enCours}
-              className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
               {enCours ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
               Restaurer{selection.length > 0 ? ` (${selection.length})` : ""}

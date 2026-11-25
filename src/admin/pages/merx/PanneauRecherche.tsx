@@ -180,7 +180,7 @@ function ecrirePersos(liste: { id: string; label: string; phrase: string }[]) {
 }
 
 const champCls =
-  "ad-input w-full rounded-xl border border-border bg-background px-3 py-2 text-[12.5px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full rounded-xl border border-border bg-background px-3 py-2 text-[12.5px] outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function PanneauRecherche({
   occupe,
@@ -474,7 +474,7 @@ export default function PanneauRecherche({
           type="button"
           onClick={() => pret && onChercher(rediger())}
           disabled={!pret}
-          className="ad-btn-accent inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+          className="hub-btn-accent inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
         >
           {occupe ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           Chercher

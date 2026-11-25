@@ -143,7 +143,7 @@ export default function Expertises() {
             <Choix valeur={profession} changer={setProfession} options={professions} tous="Toutes professions" />
           </div>
 
-          <div className="ad-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="hub-kpi-grid mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi label="Avis rendus" valeur={nombre(r.total)} pied={`${nombre(r.requerants)} requérants · ${r.requis.length} requis`} />
             <Kpi label="En journée" valeur={nombre(r.enJournee)} pied={`${pct(r.enJournee, r.total)} % des avis`} />
             <Kpi

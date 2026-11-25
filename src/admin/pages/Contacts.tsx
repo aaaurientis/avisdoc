@@ -47,7 +47,7 @@ export default function Contacts({ fixedType }: { fixedType: ContactType }) {
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-5 py-2.5 text-sm font-bold text-white"
           >
             <Plus className="size-4" /> Nouveau contact
           </button>
@@ -56,7 +56,7 @@ export default function Contacts({ fixedType }: { fixedType: ContactType }) {
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
-          className="ad-input max-w-[320px] flex-1 rounded-full border border-border bg-card px-4.5 py-2.5 text-[13.5px] outline-none transition-colors focus:border-avisdoc-teal"
+          className="hub-input max-w-[320px] flex-1 rounded-full border border-border bg-card px-4.5 py-2.5 text-[13.5px] outline-none transition-colors focus:border-avisdoc-teal"
           style={{ paddingLeft: 18, paddingRight: 18 }}
           placeholder="Rechercher un nom, une ville…"
           value={search}
@@ -122,7 +122,7 @@ export default function Contacts({ fixedType }: { fixedType: ContactType }) {
               type="button"
               onClick={() => setSelectedId(c.id)}
               className={cn(
-                "ad-row grid w-full items-center gap-3 border-b border-border/60 px-5 py-3 text-left transition-colors last:border-b-0",
+                "hub-row grid w-full items-center gap-3 border-b border-border/60 px-5 py-3 text-left transition-colors last:border-b-0",
                 selectedId === c.id && "bg-sky-50/70",
               )}
               style={{ gridTemplateColumns: cols }}

@@ -11,7 +11,7 @@ import { SectionLabel } from "../ui";
 import { cn } from "@/lib/utils";
 
 const champ =
-  "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal";
 
 function Champ({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (

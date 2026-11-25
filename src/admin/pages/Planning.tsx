@@ -226,7 +226,7 @@ export default function Planning() {
             <button
               type="button"
               onClick={() => setAjout(true)}
-              className="ad-btn-accent mr-1 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white"
+              className="hub-btn-accent mr-1 inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-2 text-[13px] font-bold text-white"
             >
               <Plus className="size-3.5" /> Ajouter une action
             </button>
@@ -372,7 +372,7 @@ export default function Planning() {
         <div
           // Sur un téléphone, les jours s'empilent : en colonnes, la semaine faisait
           // 1348 pixels de large, soit quatre écrans à faire défiler pour voir vendredi.
-          className="ad-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-none max-sm:!grid-cols-1 max-sm:overflow-x-visible"
+          className="hub-kanban grid gap-3 overflow-x-auto pb-1 overscroll-x-none max-sm:!grid-cols-1 max-sm:overflow-x-visible"
           style={{ gridTemplateColumns: `repeat(${JOURS_OUVRES}, minmax(260px, 1fr))` }}
         >
           {semaine.map(({ jour, actions }) => {

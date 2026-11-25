@@ -7,8 +7,8 @@ import { initials } from "../lib/format";
 import { Avatar } from "../components/ui";
 
 const inputCls =
-  "ad-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
-const btnAccent = "ad-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
+  "hub-input w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+const btnAccent = "hub-btn-accent rounded-full bg-avisdoc-teal text-[12.5px] font-bold text-white";
 
 function horodatage(iso: string): string {
   const d = new Date(iso);
@@ -80,7 +80,7 @@ export default function JournalCard({ clientId }: { clientId: string }) {
               <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-foreground/85">{l.message}</p>
             </div>
             <button type="button" onClick={() => supprimer(l.id)} disabled={busy}
-              className="ad-x h-fit shrink-0 px-1 text-muted-foreground/50 transition-colors">
+              className="hub-x h-fit shrink-0 px-1 text-muted-foreground/50 transition-colors">
               <X className="size-4" />
             </button>
           </div>

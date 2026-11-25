@@ -246,7 +246,7 @@ function Budget({ depense, budget, modifiable, onRegle }: { depense: number; bud
             type="button"
             onClick={enregistrer}
             disabled={choix === null || choix === budget || envoi}
-            className="ad-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+            className="hub-btn-accent inline-flex items-center gap-1.5 rounded-full bg-avisdoc-teal px-4 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
           >
             {envoi && <Loader2 className="size-3.5 animate-spin" />} Enregistrer
           </button>

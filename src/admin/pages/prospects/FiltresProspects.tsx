@@ -98,7 +98,7 @@ export function retenue(p: Prospect, f: Filtres, recherche: string): boolean {
 }
 
 const selectCls =
-  "ad-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input rounded-full border border-border bg-card px-4 py-2 text-[13px] font-semibold text-avisdoc-ink outline-none transition-colors focus:border-avisdoc-teal";
 
 export default function FiltresProspects({
   filtres,

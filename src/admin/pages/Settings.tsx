@@ -102,7 +102,7 @@ export default function Settings() {
                         if (e.key === "Escape") setEditKey(null);
                       }}
                       onBlur={() => commitCat(c.name)}
-                      className="ad-input min-w-0 flex-1 rounded-lg border border-avisdoc-teal bg-card px-2 py-1 text-[14px] font-bold text-avisdoc-ink outline-none"
+                      className="hub-input min-w-0 flex-1 rounded-lg border border-avisdoc-teal bg-card px-2 py-1 text-[14px] font-bold text-avisdoc-ink outline-none"
                     />
                   ) : (
                     <button
@@ -147,7 +147,7 @@ export default function Settings() {
                     type="button"
                     onClick={() => removeCategory(c.name)}
                     title="Supprimer la catégorie (et ses sous-catégories)"
-                    className="ad-x px-1 text-muted-foreground transition-colors"
+                    className="hub-x px-1 text-muted-foreground transition-colors"
                   >
                     <X className="size-4" />
                   </button>
@@ -174,7 +174,7 @@ export default function Settings() {
                               if (e.key === "Escape") setEditKey(null);
                             }}
                             onBlur={() => commitSub(c.name, s)}
-                            className="ad-input min-w-0 flex-1 rounded-lg border border-avisdoc-teal bg-card px-2 py-0.5 text-[13px] font-semibold text-avisdoc-ink outline-none"
+                            className="hub-input min-w-0 flex-1 rounded-lg border border-avisdoc-teal bg-card px-2 py-0.5 text-[13px] font-semibold text-avisdoc-ink outline-none"
                           />
                         ) : (
                           <button
@@ -219,7 +219,7 @@ export default function Settings() {
                           type="button"
                           onClick={() => removeSubType(c.name, s)}
                           title="Supprimer la sous-catégorie"
-                          className="ad-x px-1 text-muted-foreground transition-colors"
+                          className="hub-x px-1 text-muted-foreground transition-colors"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -235,7 +235,7 @@ export default function Settings() {
                   {/* Ajout d'une sous-catégorie */}
                   <div className="mt-2 flex gap-2">
                     <input
-                      className="ad-input flex-1 rounded-full border border-border bg-muted/50 px-3.5 py-2 text-[12.5px] outline-none transition-colors focus:border-avisdoc-teal"
+                      className="hub-input flex-1 rounded-full border border-border bg-muted/50 px-3.5 py-2 text-[12.5px] outline-none transition-colors focus:border-avisdoc-teal"
                       placeholder="Nouvelle sous-catégorie…"
                       value={draft}
                       onChange={(e) => setSubDraft((d) => ({ ...d, [c.name]: e.target.value }))}
@@ -262,7 +262,7 @@ export default function Settings() {
         {/* Ajout d'une catégorie */}
         <div className="mt-5 flex gap-2 border-t border-border pt-5">
           <input
-            className="ad-input flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
             placeholder="Nouvelle catégorie…"
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
@@ -271,7 +271,7 @@ export default function Settings() {
           <button
             type="button"
             onClick={submitCat}
-            className="ad-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-[13px] font-bold text-white"
+            className="hub-btn-accent rounded-full bg-avisdoc-teal px-5 py-2.5 text-[13px] font-bold text-white"
           >
             Ajouter une catégorie
           </button>
@@ -314,7 +314,7 @@ export default function Settings() {
 
         <div className="mt-4 flex gap-2">
           <input
-            className="ad-input flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
+            className="hub-input flex-1 rounded-full border border-border bg-muted/50 px-4 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal"
             placeholder="Nouveau tag…"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}

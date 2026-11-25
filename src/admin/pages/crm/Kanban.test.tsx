@@ -31,7 +31,7 @@ describe("Kanban de Général", () => {
     expect(screen.getByText("A répondu")).toBeInTheDocument();
 
     const carte = screen.getByText("Hager Group").closest("[draggable]")!;
-    const colonne = (l: string) => screen.getByText(l, { selector: "div" }).closest("[title], .ad-kanban > div")!;
+    const colonne = (l: string) => screen.getByText(l, { selector: "div" }).closest("[title], .hub-kanban > div")!;
     fireEvent.dragStart(carte);
     expect(colonne("Proposition").className).toContain("opacity-40");
     expect(colonne("RDV").className).not.toContain("opacity-40");

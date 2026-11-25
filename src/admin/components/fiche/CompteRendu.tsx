@@ -56,9 +56,9 @@ export interface EtapeFiche {
 }
 
 const champ =
-  "ad-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
+  "hub-input w-full min-w-0 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-avisdoc-teal";
 const petitChamp =
-  "ad-input h-9 w-auto min-w-0 rounded-xl border border-border bg-background px-2.5 text-[13px] outline-none focus:border-avisdoc-teal";
+  "hub-input h-9 w-auto min-w-0 rounded-xl border border-border bg-background px-2.5 text-[13px] outline-none focus:border-avisdoc-teal";
 const sousTitre = "mb-1.5 mt-4 text-[12px] font-bold text-muted-foreground";
 
 function Pastille({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -497,7 +497,7 @@ export default function CompteRendu({
           type="button"
           onClick={() => void enregistrer()}
           disabled={envoi}
-          className="ad-btn-accent inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-avisdoc-teal text-[14px] font-bold text-white disabled:opacity-60"
+          className="hub-btn-accent inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-avisdoc-teal text-[14px] font-bold text-white disabled:opacity-60"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />}
           {mode === "programmer" && !existante ? "Programmer" : "Enregistrer"}
