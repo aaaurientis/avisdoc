@@ -7,6 +7,7 @@
 // Deux clients au même endroit : deux points, légèrement écartés pour rester visibles.
 //
 // Les lieux sont localisés par l'API Adresse (BAN, data.gouv.fr) : seul le nom du lieu est envoyé.
+// Méthode : code postal s'il y en a un, sinon une commune de ce nom (voir localiserLieu).
 // Le résultat est gardé dans le navigateur, pour ne pas relocaliser à chaque visite.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -16,7 +17,7 @@ import { Loader2, MapPin } from "lucide-react";
 import { Card } from "../../components/ui";
 import { useExpertises, useJournees } from "../../data/journeesStore";
 import { fetchMapsKey, loadGoogleMaps } from "../../lib/googleMaps";
-import { geocodeBAN } from "../../lib/geo";
+import { localiserLieu } from "../../lib/geo";
 import { cleJournee } from "../../lib/expertises";
 import { aujourdhuiISO, compterPar, dansLaPeriode, estPassee, type JourneeDepistage, type Periode } from "../../lib/journees";
 import { cn } from "@/lib/utils";
@@ -34,7 +35,13 @@ const COULEUR_AVENIR = "#EC7735"; // orange de la charte
 const COULEUR_PASSEE = "#0CA6DF"; // cyan de la charte
 
 // ── Localisation des lieux, gardée dans le navigateur ─────────────────────────
-const CLE_CACHE = "avisdoc.journees.lieux";
+// v2 : nouvelle méthode de localisation (commune d'abord) ; les positions de la v1 sont oubliées.
+const CLE_CACHE = "avisdoc.journees.lieux.v2";
+try {
+  localStorage.removeItem("avisdoc.journees.lieux");
+} catch {
+  /* stockage indisponible */
+}
 type Coord = { lat: number; lng: number } | null;
 const normaliser = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -70,7 +77,7 @@ function useLieux(lieux: string[]) {
     (async () => {
       for (let i = 0; i < aFaire.length && vivant; i += 4) {
         const lot = aFaire.slice(i, i + 4);
-        const res = await Promise.all(lot.map((l) => geocodeBAN(`${l}, France`)));
+        const res = await Promise.all(lot.map((l) => localiserLieu(l)));
         lot.forEach((l, k) => (cache[normaliser(l)] = res[k]));
         ecrireCache(cache);
         if (vivant) {
