@@ -35,10 +35,12 @@ const COULEUR_AVENIR = "#EC7735"; // orange de la charte
 const COULEUR_PASSEE = "#0CA6DF"; // cyan de la charte
 
 // ── Localisation des lieux, gardée dans le navigateur ─────────────────────────
-// v2 : nouvelle méthode de localisation (commune d'abord) ; les positions de la v1 sont oubliées.
-const CLE_CACHE = "avisdoc.journees.lieux.v2";
+// v3 : positions rangées par client et par lieu (une commune homonyme se départage par le client) ;
+// celles des versions précédentes sont oubliées.
+const CLE_CACHE = "avisdoc.journees.lieux.v3";
 try {
   localStorage.removeItem("avisdoc.journees.lieux");
+  localStorage.removeItem("avisdoc.journees.lieux.v2");
 } catch {
   /* stockage indisponible */
 }
@@ -60,25 +62,57 @@ function ecrireCache(c: Record<string, Coord>) {
   }
 }
 
-/** Localise les lieux absents du cache, 4 à la fois. */
-function useLieux(lieux: string[]) {
+/** Clé d'un point : un client à un lieu. */
+const clePoint = (lieu: string, client: string) => `${normaliser(lieu)}|${normaliser(client)}`;
+
+/** Départements tirés des codes postaux écrits dans les lieux (« Le Bourg 18220 … » → 18). */
+function departementsDuTexte(textes: string[]): string[] {
+  const n = new Map<string, number>();
+  for (const t of textes) {
+    const cp = t.match(/\b(\d{5})\b/)?.[1];
+    if (!cp) continue;
+    const deps = cp.startsWith("97") ? [cp.slice(0, 3)] : cp.startsWith("20") ? ["2A", "2B"] : [cp.slice(0, 2)];
+    for (const d of deps) n.set(d, (n.get(d) ?? 0) + 1);
+  }
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([d]) => d);
+}
+
+/**
+ * Localise les points absents du cache, 4 à la fois. Pour départager une commune homonyme, chaque
+ * client apporte ses départements : ceux des codes postaux de toutes ses journées, puis ceux de ses
+ * points déjà localisés. Les lieux avec un code postal passent en premier pour enrichir ces indices.
+ */
+function useLieux(points: { lieu: string; client: string }[], toutes: JourneeDepistage[]) {
   const [coords, setCoords] = useState<Record<string, Coord>>(lireCache);
   const [enCours, setEnCours] = useState(0);
-  const cle = lieux.join("|");
+  const cle = points.map((p) => clePoint(p.lieu, p.client)).join("§");
   useEffect(() => {
     let vivant = true;
     const cache = lireCache();
-    const aFaire = lieux.filter((l) => !(normaliser(l) in cache));
+    const aFaire = points
+      .filter((p) => !(clePoint(p.lieu, p.client) in cache))
+      .sort((a, b) => Number(/\b\d{5}\b/.test(b.lieu)) - Number(/\b\d{5}\b/.test(a.lieu)));
     if (!aFaire.length) {
       setCoords(cache);
       return;
+    }
+    // Indices par client : codes postaux de toutes ses journées.
+    const indices = new Map<string, string[]>();
+    for (const c of new Set(toutes.map((j) => normaliser(j.client)))) {
+      indices.set(c, departementsDuTexte(toutes.filter((j) => normaliser(j.client) === c).map((j) => j.lieu)));
     }
     setEnCours(aFaire.length);
     (async () => {
       for (let i = 0; i < aFaire.length && vivant; i += 4) {
         const lot = aFaire.slice(i, i + 4);
-        const res = await Promise.all(lot.map((l) => localiserLieu(l)));
-        lot.forEach((l, k) => (cache[normaliser(l)] = res[k]));
+        const res = await Promise.all(lot.map((p) => localiserLieu(p.lieu, indices.get(normaliser(p.client)) ?? [])));
+        lot.forEach((p, k) => {
+          const r = res[k];
+          cache[clePoint(p.lieu, p.client)] = r ? { lat: r.lat, lng: r.lng } : null;
+          // Le département trouvé devient un indice pour les autres lieux du client.
+          const deps = indices.get(normaliser(p.client)) ?? [];
+          if (r?.dep && !deps.includes(r.dep)) indices.set(normaliser(p.client), [...deps, r.dep]);
+        });
         ecrireCache(cache);
         if (vivant) {
           setCoords({ ...cache });
@@ -142,8 +176,9 @@ function Contenu() {
     return [...m.values()];
   }, [journees]);
 
-  const { coords, enCours } = useLieux(useMemo(() => [...new Set(lieux.map((l) => l.nom))].sort(), [lieux]));
-  const nonLocalises = lieux.filter((l) => coords[normaliser(l.nom)] === null);
+  const points = useMemo(() => lieux.map((l) => ({ lieu: l.nom, client: l.client })), [lieux]);
+  const { coords, enCours } = useLieux(points, toutes);
+  const nonLocalises = lieux.filter((l) => coords[clePoint(l.nom, l.client)] === null);
   const nbEndroits = new Set(lieux.map((l) => normaliser(l.nom))).size;
 
   /**
@@ -261,11 +296,15 @@ function CarteGoogle({
     const cadre = new google.maps.LatLngBounds();
     const max = Math.max(1, ...lieux.map((l) => l.journees.length));
 
-    // Plusieurs clients au même endroit : on les dispose en petit cercle autour du point.
+    // Plusieurs clients au même endroit (mêmes coordonnées) : disposés en petit cercle autour du point.
+    const endroit = (c: { lat: number; lng: number }) => `${c.lat.toFixed(4)},${c.lng.toFixed(4)}`;
     const parEndroit = new Map<string, Lieu[]>();
-    for (const l of lieux) parEndroit.set(normaliser(l.nom), [...(parEndroit.get(normaliser(l.nom)) ?? []), l]);
+    for (const l of lieux) {
+      const c = coords[clePoint(l.nom, l.client)];
+      if (c) parEndroit.set(endroit(c), [...(parEndroit.get(endroit(c)) ?? []), l]);
+    }
     const position = (l: Lieu, c: { lat: number; lng: number }) => {
-      const voisins = parEndroit.get(normaliser(l.nom)) ?? [l];
+      const voisins = parEndroit.get(endroit(c)) ?? [l];
       if (voisins.length < 2) return c;
       const angle = (2 * Math.PI * voisins.indexOf(l)) / voisins.length;
       const r = 0.004; // ≈ 400 m : visible dès qu'on zoome sur la ville
@@ -273,7 +312,7 @@ function CarteGoogle({
     };
 
     for (const l of lieux) {
-      const base = coords[normaliser(l.nom)];
+      const base = coords[clePoint(l.nom, l.client)];
       if (!base) continue;
       const c = position(l, base);
       const n = l.journees.length;
@@ -323,7 +362,7 @@ function CarteGoogle({
 
     // Recadrage seulement quand l'ensemble des lieux affichés change (pas à chaque localisation).
     const signature = lieux.map((l) => `${normaliser(l.nom)}|${normaliser(l.client)}`).sort().join("|");
-    if (!cadre.isEmpty() && cadreRef.current !== signature && marqueursRef.current.length === lieux.filter((l) => coords[normaliser(l.nom)]).length) {
+    if (!cadre.isEmpty() && cadreRef.current !== signature && marqueursRef.current.length === lieux.filter((l) => coords[clePoint(l.nom, l.client)]).length) {
       cadreRef.current = signature;
       carte.fitBounds(cadre, 48);
       google.maps.event.addListenerOnce(carte, "idle", () => {
