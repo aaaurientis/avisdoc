@@ -146,3 +146,12 @@ La liste des dossiers d'une journée ne montre jamais de résultat individuel.
 « Enregistrer au format PDF » depuis la boîte d'impression de Safari donnait un fichier vide. Nom du
 fichier : « AvisDoc - Bilan des journees - <client> - <devis> - <date>.pdf » (sans accents, pour tous
 les navigateurs). Le bouton **Imprimer** reste disponible pour une impression papier.
+
+## Carte
+
+**Statistiques › Carte** (`/journees/carte`) : un point par client et par lieu, avec l'historique de ses
+journées. Taille = nombre de journées ; orange s'il y a une journée à venir, bleu sinon. Un clic ouvre
+la bulle : date, lieu, client et participants (avis rendus ; « à venir » ; « pas encore dans l'export »
+pour une journée postérieure à l'extraction des expertises). Deux clients au même lieu : deux points
+légèrement écartés. Lieux localisés par l'API Adresse (api-adresse.data.gouv.fr, puis la Géoplateforme
+data.geopf.fr en secours), gardés dans le navigateur ; les lieux introuvables sont listés sous la carte.
