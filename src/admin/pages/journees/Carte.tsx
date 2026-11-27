@@ -35,12 +35,13 @@ const COULEUR_AVENIR = "#EC7735"; // orange de la charte
 const COULEUR_PASSEE = "#0CA6DF"; // cyan de la charte
 
 // ── Localisation des lieux, gardée dans le navigateur ─────────────────────────
-// v3 : positions rangées par client et par lieu (une commune homonyme se départage par le client) ;
+// v4 (v3 : positions rangées par client et par lieu ; v4 : recherche dans le département du client) (une commune homonyme se départage par le client) ;
 // celles des versions précédentes sont oubliées.
-const CLE_CACHE = "avisdoc.journees.lieux.v3";
+const CLE_CACHE = "avisdoc.journees.lieux.v4";
 try {
   localStorage.removeItem("avisdoc.journees.lieux");
   localStorage.removeItem("avisdoc.journees.lieux.v2");
+  localStorage.removeItem("avisdoc.journees.lieux.v3");
 } catch {
   /* stockage indisponible */
 }
