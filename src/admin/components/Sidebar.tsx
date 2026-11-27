@@ -46,6 +46,7 @@ import {
   BarChart3,
   Tags,
   ClipboardList,
+  MapPinned,
   HeartPulse,
   UserSearch,
 } from "lucide-react";
@@ -152,6 +153,7 @@ const MENU: Entree[] = [
   { module: "journee", label: "Statistiques", icon: CalendarCheck, enfants: [
     { to: "/journees", label: "Vue globale", icon: BarChart3, end: true },
     { to: "/journees/calendrier", label: "Journées", icon: CalendarDays },
+    { to: "/journees/carte", label: "Carte", icon: MapPinned },
     { to: "/journees/expertises", label: "Expertises", icon: ClipboardList },
   ] },
   { module: "finance", label: "Finance", icon: Wallet, enfants: [

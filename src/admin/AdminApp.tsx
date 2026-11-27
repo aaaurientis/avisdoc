@@ -27,6 +27,7 @@ import Infirmieres from "./pages/Infirmieres";
 import JourneesStatistiques from "./pages/journees/Statistiques";
 import JourneesCalendrier from "./pages/journees/Calendrier";
 import JourneesExpertises from "./pages/journees/Expertises";
+import JourneesCarte from "./pages/journees/Carte";
 import JourneesRapport from "./pages/journees/Rapport";
 import InfirmiereFiche from "./pages/infirmieres/Fiche";
 import Settings from "./pages/Settings";
@@ -172,6 +173,7 @@ function Gate() {
           <Route path="/journees" element={<Garde module="journee"><JourneesStatistiques /></Garde>} />
           <Route path="/journees/calendrier" element={<Garde module="journee"><JourneesCalendrier /></Garde>} />
           <Route path="/journees/expertises" element={<Garde module="journee"><JourneesExpertises /></Garde>} />
+          <Route path="/journees/carte" element={<Garde module="journee"><JourneesCarte /></Garde>} />
           <Route path="/documents" element={<Garde module="documents"><Documents /></Garde>} />
           <Route path="/infirmieres" element={<Garde module="sante"><Infirmieres /></Garde>} />
           <Route path="/infirmieres/:id" element={<Garde module="sante"><InfirmiereFiche /></Garde>} />
