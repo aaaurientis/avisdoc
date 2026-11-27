@@ -5,10 +5,14 @@ type Faux = { lat: number; lng: number; dep: string; city: string };
 const feature = (f: Faux) => ({ geometry: { coordinates: [f.lng, f.lat] }, properties: { context: `${f.dep}, x, y`, city: f.city, score: 0.9 } });
 
 /** Faux service d'adresses : répond selon les paramètres demandés, et garde la trace des appels. */
-function brancher(repond: (p: URLSearchParams) => Faux[]) {
+function brancher(repond: (p: URLSearchParams) => Faux[], communes: (p: URLSearchParams) => Faux[] = () => []) {
   const appels: URLSearchParams[] = [];
   vi.stubGlobal("fetch", async (url: string) => {
     const p = new URL(url).searchParams;
+    if (url.includes("geo.api.gouv.fr")) {
+      const r = communes(p).map((c) => ({ nom: c.city, codeDepartement: c.dep, centre: { coordinates: [c.lng, c.lat] } }));
+      return new Response(JSON.stringify(r), { status: 200 });
+    }
     appels.push(p);
     return new Response(JSON.stringify({ features: repond(p).map(feature) }), { status: 200 });
   });
@@ -35,6 +39,25 @@ describe("localiserLieu", () => {
   it("commune homonyme : celle du département du client", async () => {
     brancher((p) => (p.get("type") === "municipality" ? SAINT_JUST : []));
     expect(await localiserLieu("Saint-Just", ["18"])).toMatchObject({ dep: "18" });
+  });
+
+  it("commune du client absente des 10 premiers résultats : cherchée dans son département", async () => {
+    // La recherche générale ne rend pas le Saint-Just du Cher ; « Saint-Just 18 » le rend.
+    const appels = brancher((p) => {
+      if (p.get("type") !== "municipality") return [];
+      if (p.get("q") === "Saint-Just 18") return [{ lat: 47.0, lng: 2.5, dep: "18", city: "Saint-Just" }, { lat: 49.4, lng: 2.4, dep: "60", city: "Saint-Just-en-Chaussée" }];
+      return [{ lat: 43.65, lng: 4.11, dep: "34", city: "Saint-Just" }, { lat: 49.4, lng: 2.4, dep: "60", city: "Saint-Just-en-Chaussée" }];
+    });
+    expect(await localiserLieu("Saint-Just", ["18"])).toMatchObject({ dep: "18" });
+    expect(appels[0].get("q")).toBe("Saint-Just 18");
+  });
+
+  it("commune du client : réponse exacte du Découpage administratif", async () => {
+    brancher(
+      () => [{ lat: 43.65, lng: 4.11, dep: "34", city: "Saint-Just" }],
+      (p) => (p.get("nom") === "Saint-Just" && p.get("codeDepartement") === "18" ? [{ lat: 47.03, lng: 2.51, dep: "18", city: "Saint-Just" }] : []),
+    );
+    expect(await localiserLieu("Saint-Just", ["18"])).toMatchObject({ dep: "18", lat: 47.03 });
   });
 
   it("commune homonyme sans indice : la métropole plutôt que l'outre-mer", async () => {

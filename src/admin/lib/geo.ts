@@ -81,6 +81,24 @@ const normaliser = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,
 const outreMer = (dep: string) => dep.startsWith("97") || dep.startsWith("98");
 
 /**
+ * La commune de ce nom exact dans ce département, par l'API Découpage administratif
+ * (geo.api.gouv.fr, sans clé, CORS ouvert) : une réponse exacte, sans recherche approchée.
+ */
+async function communeDuDepartement(nom: string, dep: string): Promise<Resultat | null> {
+  try {
+    const p = new URLSearchParams({ nom, codeDepartement: dep, fields: "nom,centre,codeDepartement", boost: "population", limit: "5" });
+    const res = await fetch(`https://geo.api.gouv.fr/communes?${p}`, { signal: delai(8000) });
+    if (!res.ok) return null;
+    const liste = (await res.json()) as { nom?: string; codeDepartement?: string; centre?: { coordinates?: number[] } }[];
+    const c = liste.find((x) => normaliser(x.nom ?? "") === normaliser(nom) && x.centre?.coordinates?.length === 2);
+    if (!c?.centre?.coordinates) return null;
+    return { lat: c.centre.coordinates[1], lng: c.centre.coordinates[0], dep: c.codeDepartement ?? dep, nom: c.nom ?? nom, score: 1 };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Localise un lieu écrit librement (« Quimper », « Saint-Just », « Route du Haut Morvan 58430 Arleuf »).
  *   1. Avec un code postal dans le texte : la recherche limitée à ce code postal (puis la commune
  *      qui le suit).
@@ -102,6 +120,18 @@ export async function localiserLieu(lieu: string, departements: string[] = []): 
       const [c] = await chercher(commune, { type: "municipality", postcode: cp });
       if (c) return c;
     }
+  }
+  // D'abord dans les départements du client : la recherche générale ne rend que les 10 communes
+  // au nom le plus proche, et la bonne n'y est pas toujours (Saint-Just du Cher, parmi une
+  // vingtaine de « Saint-Just… »). Le numéro du département oriente la recherche ; on ne garde que
+  // la commune de ce nom exact, dans ce département.
+  for (const d of departements.slice(0, 3)) {
+    const exacte = await communeDuDepartement(texte, d);
+    if (exacte) return exacte;
+    const dansLeDep = (await chercher(`${texte} ${d}`, { type: "municipality" }, 10)).find(
+      (c) => c.dep === d && normaliser(c.nom) === normaliser(texte),
+    );
+    if (dansLeDep) return dansLeDep;
   }
   const candidats = await chercher(texte, { type: "municipality" }, 10);
   if (candidats.length) {
