@@ -155,3 +155,5 @@ la bulle : date, lieu, client et participants (avis rendus ; « à venir » ; «
 pour une journée postérieure à l'extraction des expertises). Deux clients au même lieu : deux points
 légèrement écartés. Lieux localisés par l'API Adresse (api-adresse.data.gouv.fr, puis la Géoplateforme
 data.geopf.fr en secours), gardés dans le navigateur ; les lieux introuvables sont listés sous la carte.
+Méthode : code postal s'il y en a un ; sinon une commune de ce nom ; une commune homonyme (« Saint-Just »)
+est départagée par les départements où le client a ses autres journées, sinon la métropole est préférée.

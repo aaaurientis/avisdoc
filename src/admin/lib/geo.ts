@@ -30,53 +30,89 @@ function delai(ms: number): AbortSignal {
   return c.signal;
 }
 
-async function depuis(url: string): Promise<{ lat: number; lng: number } | null> {
+/** Un résultat de recherche : position, département (code), nom de la commune, pertinence. */
+export interface Resultat {
+  lat: number;
+  lng: number;
+  dep: string;
+  nom: string;
+  score: number;
+}
+
+const departementDe = (p: { context?: string; citycode?: string }): string =>
+  (p.context?.split(",")[0] ?? "").trim() || (p.citycode?.startsWith("97") ? p.citycode.slice(0, 3) : p.citycode?.slice(0, 2) ?? "");
+
+async function rechercher(url: string): Promise<Resultat[]> {
   try {
     const res = await fetch(url, { signal: delai(8000) });
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
-    const coords = data?.features?.[0]?.geometry?.coordinates;
-    if (Array.isArray(coords) && coords.length === 2) {
-      return { lat: coords[1], lng: coords[0] }; // GeoJSON = [lng, lat]
-    }
-    return null;
+    return (data?.features ?? [])
+      .map((f: { geometry?: { coordinates?: number[] }; properties?: Record<string, unknown> }) => {
+        const c = f?.geometry?.coordinates;
+        const p = (f?.properties ?? {}) as { context?: string; citycode?: string; city?: string; name?: string; score?: number };
+        return Array.isArray(c) && c.length === 2
+          ? { lat: c[1], lng: c[0], dep: departementDe(p), nom: String(p.city ?? p.name ?? ""), score: Number(p.score ?? 0) }
+          : null;
+      })
+      .filter(Boolean) as Resultat[];
   } catch {
-    return null;
+    return [];
   }
+}
+
+/** Les résultats de la première source qui en donne. */
+async function chercher(q: string, filtres: Filtres, limite = 1): Promise<Resultat[]> {
+  for (const source of SOURCES) {
+    const r = await rechercher(source(q, filtres).replace("limit=1", `limit=${limite}`));
+    if (r.length) return r;
+  }
+  return [];
 }
 
 export async function geocodeBAN(query: string, filtres: Filtres = {}): Promise<{ lat: number; lng: number } | null> {
   const q = query.trim();
   if (!q) return null;
-  for (const source of SOURCES) {
-    const r = await depuis(source(q, filtres));
-    if (r) return r;
-  }
-  return null;
+  const [r] = await chercher(q, filtres);
+  return r ? { lat: r.lat, lng: r.lng } : null;
 }
 
+const normaliser = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const outreMer = (dep: string) => dep.startsWith("97") || dep.startsWith("98");
+
 /**
- * Localise un lieu écrit librement (« Quimper », « Bourg-Saint-Maurice »,
- * « Route du Haut Morvan 58430 Arleuf »). Une recherche libre pouvait tomber sur une rue
- * homonyme à l'autre bout de la France (« rue de Bourg-Saint-Maurice » dans l'Aisne) ; on cherche
- * donc dans cet ordre :
- *   1. avec un code postal dans le texte : la recherche limitée à ce code postal ;
- *   2. sinon : une commune de ce nom ;
- *   3. en dernier recours : la recherche libre.
+ * Localise un lieu écrit librement (« Quimper », « Saint-Just », « Route du Haut Morvan 58430 Arleuf »).
+ *   1. Avec un code postal dans le texte : la recherche limitée à ce code postal (puis la commune
+ *      qui le suit).
+ *   2. Sinon : les communes de ce nom. Un nom porté par plusieurs communes (une dizaine de
+ *      « Saint-Just ») est départagé par `departements` (ceux où le client a ses autres journées,
+ *      par ordre de préférence), sinon la métropole est préférée à l'outre-mer.
+ *   3. En dernier recours : la recherche libre.
+ * Une recherche libre seule tombait sur une rue homonyme (Bourg-Saint-Maurice dans l'Aisne).
  */
-export async function localiserLieu(lieu: string): Promise<{ lat: number; lng: number } | null> {
+export async function localiserLieu(lieu: string, departements: string[] = []): Promise<Resultat | null> {
   const texte = lieu.trim();
   if (!texte) return null;
   const cp = texte.match(/\b(\d{5})\b/)?.[1];
   if (cp) {
-    const r = await geocodeBAN(texte, { postcode: cp });
+    const [r] = await chercher(texte, { postcode: cp });
     if (r) return r;
-    // La commune après le code postal (« … 58430 Arleuf ») si l'adresse exacte est introuvable.
     const commune = texte.slice(texte.indexOf(cp) + 5).trim();
     if (commune) {
-      const c = await geocodeBAN(commune, { type: "municipality", postcode: cp });
+      const [c] = await chercher(commune, { type: "municipality", postcode: cp });
       if (c) return c;
     }
   }
-  return (await geocodeBAN(texte, { type: "municipality" })) ?? geocodeBAN(texte);
+  const candidats = await chercher(texte, { type: "municipality" }, 10);
+  if (candidats.length) {
+    const memeNom = candidats.filter((c) => normaliser(c.nom) === normaliser(texte));
+    const choix = memeNom.length ? memeNom : candidats;
+    for (const d of departements) {
+      const dansLeDep = choix.find((c) => c.dep === d);
+      if (dansLeDep) return dansLeDep;
+    }
+    return choix.find((c) => !outreMer(c.dep)) ?? choix[0];
+  }
+  const [libre] = await chercher(texte, {});
+  return libre ?? null;
 }
